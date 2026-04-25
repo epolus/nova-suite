@@ -116,6 +116,8 @@ router.get(
         paramIdx++;
         conditions.push(`r.status = $${paramIdx}`);
         params.push(req.query.status);
+      } else if (req.query.active === 'true') {
+        conditions.push(`r.status IN ('submitted', 'pending_approval', 'approved', 'in_progress')`);
       }
       if (req.query.search) {
         paramIdx++;
@@ -221,6 +223,8 @@ router.get('/nav', async (req: Request, res: Response, next: NextFunction) => {
       paramIdx++;
       conditions.push(`r.status = $${paramIdx}`);
       params.push(req.query.status);
+    } else if (req.query.active === 'true') {
+      conditions.push(`r.status IN ('submitted', 'pending_approval', 'approved', 'in_progress')`);
     }
     if (req.query.search) {
       paramIdx++;

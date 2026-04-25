@@ -24,6 +24,7 @@ interface FilterPreset {
   name: string;
   search: string;
   status: string;
+  active: string;
   columnFilters: Record<string, string>;
 }
 
@@ -125,7 +126,7 @@ export default function RequestsPage() {
   const isAgent = isAgentRole(user?.roles);
   const { params, setSearch, setSort, setCols, setPage, setFilter, setColumnFilter, update } = useListParams({
     defaultCols: DEFAULT_COLS,
-    filterKeys: ['status'],
+    filterKeys: ['status', 'active'],
     storageKey: 'requests',
   });
 
@@ -148,6 +149,8 @@ export default function RequestsPage() {
 
   const rawStatusFilter = params.filters.status || '';
   const statusFilter = rawStatusFilter;
+  const activeFilter = params.filters.active || '';
+  const activeOnly = activeFilter !== 'all';
   const cfKey = JSON.stringify(params.columnFilters);
 
   useEffect(() => {
@@ -155,6 +158,7 @@ export default function RequestsPage() {
     setSelectedIds([]);
     const apiParams: Record<string, string> = {};
     if (statusFilter) apiParams.status = statusFilter;
+    else if (activeOnly) apiParams.active = 'true';
     if (params.search) apiParams.search = params.search;
     if (params.sort) {
       apiParams.sort_by = params.sort;
@@ -168,11 +172,13 @@ export default function RequestsPage() {
       setPagination(res.pagination);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [params.page, statusFilter, params.search, params.sort, params.dir, cfKey, refreshKey]);
+  }, [params.page, statusFilter, activeOnly, params.search, params.sort, params.dir, cfKey, refreshKey]);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};
     if (statusFilter) lp.status = statusFilter;
+    else if (activeFilter === 'all') lp.active = 'all';
+    else lp.active = 'true';
     if (params.search) lp.search = params.search;
     if (params.sort) {
       lp.sort_by = params.sort;
@@ -182,12 +188,17 @@ export default function RequestsPage() {
       if (val) lp[`cf.${col}`] = val;
     }
     return lp;
-  }, [statusFilter, params.search, params.sort, params.dir, params.columnFilters]);
+  }, [statusFilter, activeFilter, params.search, params.sort, params.dir, params.columnFilters]);
 
   const columns = useMemo(() => buildColumns(getListParams()), [getListParams]);
-  const hasActiveFilter = !!params.search || statusFilter !== '' || Object.values(params.columnFilters).some(Boolean);
+  const hasActiveFilter = !!params.search || statusFilter !== '' || activeFilter === 'all' || Object.values(params.columnFilters).some(Boolean);
   const applyPreset = (preset: FilterPreset) => {
-    update({ search: preset.search, filters: { status: preset.status }, columnFilters: preset.columnFilters, page: 1 });
+    update({
+      search: preset.search,
+      filters: { status: preset.status, active: preset.active || 'true' },
+      columnFilters: preset.columnFilters,
+      page: 1,
+    });
   };
   const savePreset = () => {
     if (!savePresetName.trim()) return;
@@ -196,6 +207,7 @@ export default function RequestsPage() {
       name: savePresetName.trim(),
       search: params.search,
       status: rawStatusFilter,
+      active: activeFilter || 'true',
       columnFilters: { ...params.columnFilters },
     }];
     setPresets(next);
@@ -352,6 +364,26 @@ export default function RequestsPage() {
           />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
+          <button
+            onClick={() => update({ filters: { ...params.filters, active: 'true' }, page: 1 })}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              activeOnly
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            Active
+          </button>
+          <button
+            onClick={() => update({ filters: { ...params.filters, active: 'all' }, page: 1 })}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              activeFilter === 'all'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            All
+          </button>
           {REQUEST_STATUS_OPTIONS.map((s) => (
             <button
               key={s}
@@ -362,7 +394,7 @@ export default function RequestsPage() {
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {s === '' ? 'All' : s.replace(/_/g, ' ')}
+              {s === '' ? 'Any status' : s.replace(/_/g, ' ')}
             </button>
           ))}
           {isAgent && (

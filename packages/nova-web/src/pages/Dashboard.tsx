@@ -95,7 +95,7 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const promises: Promise<unknown>[] = [requestsApi.list({}, 1, 5)];
+        const promises: Promise<unknown>[] = [requestsApi.list({ active: 'true' }, 1, 5)];
 
         if (isFulfiller) {
           promises.push(
@@ -185,7 +185,7 @@ export default function Dashboard() {
           color="text-blue-600"
           bg="bg-blue-50"
           icon={Icons.request('w-5 h-5 text-blue-500')}
-          link="/requests"
+          link="/requests?active=true"
         />
         {isFulfiller && incStats && (
           <StatCard
@@ -314,7 +314,7 @@ export default function Dashboard() {
         <Card padding={false}>
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">Recent Requests</h2>
-            <Link to="/requests" className="text-sm text-indigo-600 hover:text-indigo-800">View all</Link>
+            <Link to="/requests?active=true" className="text-sm text-indigo-600 hover:text-indigo-800">View all</Link>
           </div>
           <div className="divide-y divide-gray-50">
             {recentRequests.length === 0 ? (
