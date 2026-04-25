@@ -12,6 +12,7 @@ import {
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
+import UserDateInput from '../../components/UserDateInput';
 
 const EMPLOYEE_TYPES = [
   { value: 'employee', label: 'Employee' },
@@ -46,6 +47,13 @@ function buildDisplayName(firstName: string, lastName: string, userId: string): 
   const name = lastName && firstName ? `${lastName}, ${firstName}` : parts.join(' ');
   if (!name) return '';
   return userId ? `${name} (${userId})` : name;
+}
+
+function toDateOnly(value: string | null | undefined): string {
+  if (!value) return '';
+  const raw = String(value).trim();
+  const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m?.[1] ?? raw;
 }
 
 function getSortValue(user: AdminUser, key: string): unknown {
@@ -246,8 +254,8 @@ export default function UserDetailPage() {
       employee_type: currentUser.employee_type ?? 'employee',
       company: currentUser.company ?? '',
       preferred_language: currentUser.preferred_language ?? 'en',
-      start_date: currentUser.start_date ?? '',
-      last_working_date: currentUser.last_working_date ?? '',
+      start_date: toDateOnly(currentUser.start_date),
+      last_working_date: toDateOnly(currentUser.last_working_date),
       manager_id: currentUser.manager_id ?? '',
       department_id: currentUser.department_id ?? '',
       cost_center_id: currentUser.cost_center_id ?? '',
@@ -569,11 +577,11 @@ export default function UserDetailPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Start Date</label>
-                <input type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} className={inputCls} />
+                <UserDateInput value={form.start_date} onChange={(value) => set('start_date', value)} className={inputCls} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Last Working Date</label>
-                <input type="date" value={form.last_working_date} onChange={(e) => set('last_working_date', e.target.value)} className={inputCls} />
+                <UserDateInput value={form.last_working_date} onChange={(value) => set('last_working_date', value)} className={inputCls} />
               </div>
             </div>
           </fieldset>
