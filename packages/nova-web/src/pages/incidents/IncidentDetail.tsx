@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { type FormEvent, useState } from 'react';
 import { attachments as attachmentsApi, knowledge as knowledgeApi } from '../../api/client';
-import type { JournalEntry, KnowledgeSuggestion } from '../../api/client';
+import type { JournalEntry, KnowledgeSuggestion, KnowledgeArticleDetail } from '../../api/client';
 import { AttachmentCard } from '../../components/AttachmentCard';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
@@ -52,6 +52,23 @@ export default function IncidentDetail() {
 
   const inputCls = `w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none${readonly ? ' bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`;
   const selectCls = inputCls;
+  const [previewArticle, setPreviewArticle] = useState<KnowledgeArticleDetail | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+
+  const openKnowledgePreview = async (articleId: string) => {
+    setPreviewError('');
+    setPreviewLoading(true);
+    try {
+      const article = await knowledgeApi.article(articleId);
+      setPreviewArticle(article);
+    } catch (err: unknown) {
+      setPreviewArticle(null);
+      setPreviewError(err instanceof Error ? err.message : 'Failed to load article preview');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   return (
     <>
@@ -458,7 +475,39 @@ export default function IncidentDetail() {
                 {loadingSidebar && <div className="text-sm text-gray-500">Loading recommendations...</div>}
                 {sidebarError && <div className="text-sm text-red-600">{sidebarError}</div>}
                 <SimilarIncidentsSection incidents={similarIncidents} loading={loadingSidebar} onGoTo={goTo} />
-                <KbSuggestionsSection articles={kbSuggestions} loading={loadingSidebar} />
+                <KbSuggestionsSection articles={kbSuggestions} loading={loadingSidebar} onPreview={openKnowledgePreview} />
+                {(previewLoading || previewError || previewArticle) && (
+                  <section className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h5 className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Knowledge Preview</h5>
+                      <button
+                        type="button"
+                        onClick={() => { setPreviewArticle(null); setPreviewError(''); }}
+                        className="text-xs text-indigo-600 hover:text-indigo-800"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    {previewLoading && <p className="text-sm text-gray-500">Loading article...</p>}
+                    {previewError && <p className="text-sm text-red-600">{previewError}</p>}
+                    {previewArticle && !previewLoading && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-mono text-indigo-600">{previewArticle.number}</p>
+                        <p className="text-sm font-semibold text-gray-900">{previewArticle.title}</p>
+                        <p className="text-xs text-gray-700 whitespace-pre-wrap max-h-44 overflow-y-auto">
+                          {previewArticle.content || 'No content'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/knowledge?articleId=${previewArticle.id}`)}
+                          className="text-xs font-medium text-indigo-700 hover:text-indigo-900"
+                        >
+                          Open full article
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                )}
               </CardContent>
             </UiCard>
           </div>
