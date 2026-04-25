@@ -818,7 +818,10 @@ INSERT INTO roles (id, tenant_id, name, description) VALUES
    'catalog_designer', 'Can design catalog service items and tasks'),
   ('a3000000-0000-0000-0000-000000000010',
    'a0000000-0000-0000-0000-000000000001',
-   'credential_manager', 'Can create and rotate encrypted integration credentials');
+   'credential_manager', 'Can create and rotate encrypted integration credentials'),
+  ('a3000000-0000-0000-0000-000000000011',
+   'a0000000-0000-0000-0000-000000000001',
+   'knowledge', 'Can create, review, and publish knowledge articles');
 
 -- Demo company
 INSERT INTO companies (
@@ -875,11 +878,21 @@ INSERT INTO users (
    'employee', 'a4000000-0000-0000-0000-000000000001', 'en',
    '2022-03-15',
    'a1000000-0000-0000-0000-000000000002',
-   'a2000000-0000-0000-0000-000000000002');
+   'a2000000-0000-0000-0000-000000000002'),
+  ('b0000000-0000-0000-0000-000000000004',
+   'a0000000-0000-0000-0000-000000000001',
+   'EMP004', 'knowledge@acme.local',
+   '$2b$10$WI5eBebgKFrYIXgHEKUdF.X7ogfJWMaDkLg7UUOb2paF8sUAjxf4y',
+   'Kim', 'Knowledge', 'Knowledge Editor', 'Knowledge Manager',
+  '+41 20 555 0103', '+41 6 4567 8901', 'Zurich HQ', 'Europe/Zurich', '24h', 'DD.MM.YYYY',
+   'employee', 'a4000000-0000-0000-0000-000000000001', 'en',
+   '2023-01-10',
+   'a1000000-0000-0000-0000-000000000001',
+   'a2000000-0000-0000-0000-000000000001');
 
 -- Set manager relationships (fulfiller and user report to admin)
 UPDATE users SET manager_id = 'b0000000-0000-0000-0000-000000000001'
-WHERE id IN ('b0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000003');
+WHERE id IN ('b0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000004');
 
 -- Assign roles to demo users
 INSERT INTO user_roles (tenant_id, user_id, role_id, granted_by) VALUES
@@ -899,6 +912,9 @@ INSERT INTO user_roles (tenant_id, user_id, role_id, granted_by) VALUES
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000001',
    'a3000000-0000-0000-0000-000000000008', NULL),
+  ('a0000000-0000-0000-0000-000000000001',
+   'b0000000-0000-0000-0000-000000000001',
+   'a3000000-0000-0000-0000-000000000011', NULL),
   -- Fulfiller gets fulfiller + user
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000002',
@@ -909,7 +925,14 @@ INSERT INTO user_roles (tenant_id, user_id, role_id, granted_by) VALUES
   -- Jane Employee gets user
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000003',
-   'a3000000-0000-0000-0000-000000000003', NULL);
+   'a3000000-0000-0000-0000-000000000003', NULL),
+  -- Knowledge Editor gets user + knowledge
+  ('a0000000-0000-0000-0000-000000000001',
+   'b0000000-0000-0000-0000-000000000004',
+   'a3000000-0000-0000-0000-000000000003', NULL),
+  ('a0000000-0000-0000-0000-000000000001',
+   'b0000000-0000-0000-0000-000000000004',
+   'a3000000-0000-0000-0000-000000000011', NULL);
 
 -- Demo processes
 INSERT INTO processes (id, tenant_id, name, description) VALUES
