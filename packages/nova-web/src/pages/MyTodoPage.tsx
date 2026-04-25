@@ -189,7 +189,7 @@ function IncidentsTab() {
   useEffect(() => {
     setLoading(true);
     setSelectedIds([]);
-    const apiParams: Record<string, string> = { assigned_to_me: 'true' };
+    const apiParams: Record<string, string> = { assigned_to_me: 'true', my_groups: 'true' };
     if (statusFilter) apiParams.status = statusFilter;
     for (const [col, val] of Object.entries(params.columnFilters)) {
       if (val) apiParams[`cf.${col}`] = val;
@@ -207,7 +207,7 @@ function IncidentsTab() {
   }, [params.page, statusFilter, cfKey, params.search, params.sort, params.dir, refreshKey]);
 
   const getListParams = useCallback((): Record<string, string> => {
-    const lp: Record<string, string> = { assigned_to_me: 'true' };
+    const lp: Record<string, string> = { assigned_to_me: 'true', my_groups: 'true' };
     if (statusFilter) lp.status = statusFilter;
     if (params.search) lp.search = params.search;
     if (params.sort) {
@@ -273,7 +273,7 @@ function IncidentsTab() {
       const allIncidents = selectedIds.length > 0
         ? data.filter((incident) => selectedIds.includes(incident.id))
         : await (async () => {
-            const apiParams: Record<string, string> = { assigned_to_me: 'true' };
+            const apiParams: Record<string, string> = { assigned_to_me: 'true', my_groups: 'true' };
             if (statusFilter) apiParams.status = statusFilter;
             if (params.search) apiParams.search = params.search;
             if (params.sort) {
@@ -480,10 +480,10 @@ export default function MyTodoPage() {
   const [incidentCount, setIncidentCount] = useState<number | null>(null);
 
   useEffect(() => {
-    requestsApi.taskQueue({ assigned_to_me: 'true' }, 1, 1).then((res) =>
+    requestsApi.taskQueue({ assigned_to_me: 'true', my_groups: 'true' }, 1, 1).then((res) =>
       setTaskCount(res.pagination.total),
     ).catch(() => {});
-    incidentsApi.list({ assigned_to_me: 'true' }, 1, 1).then((res) =>
+    incidentsApi.list({ assigned_to_me: 'true', my_groups: 'true' }, 1, 1).then((res) =>
       setIncidentCount(res.pagination.total),
     ).catch(() => {});
   }, []);
@@ -531,7 +531,7 @@ export default function MyTodoPage() {
       </div>
 
       {activeTab === 'incidents' && <IncidentsTab />}
-      {activeTab === 'tasks' && <RequestTasksTab filterKey="assigned_to_me" />}
+      {activeTab === 'tasks' && <RequestTasksTab filterKey="assigned_to_me_in_my_groups" />}
     </>
   );
 }

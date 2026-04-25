@@ -525,8 +525,22 @@ router.patch(
         );
       } else if (action === 'assign_group') {
         await client.query(
-          `UPDATE incidents SET assignment_group_id = $1, updated_at = NOW()
-           WHERE id = ANY($2::uuid[]) AND status NOT IN ('closed', 'cancelled')`,
+          `UPDATE incidents i
+           SET
+             assignment_group_id = $1,
+             assigned_to = CASE
+               WHEN $1::uuid IS NULL THEN i.assigned_to
+               WHEN i.assigned_to IS NULL THEN NULL
+               WHEN EXISTS (
+                 SELECT 1
+                 FROM assignment_group_members agm
+                 WHERE agm.group_id = $1::uuid
+                   AND agm.user_id = i.assigned_to
+               ) THEN i.assigned_to
+               ELSE NULL
+             END,
+             updated_at = NOW()
+           WHERE i.id = ANY($2::uuid[]) AND i.status NOT IN ('closed', 'cancelled')`,
           [value || null, ids],
         );
       } else {

@@ -25,7 +25,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 interface Props {
-  filterKey: 'assigned_to_me' | 'my_groups';
+  filterKey: 'assigned_to_me' | 'my_groups' | 'assigned_to_me_in_my_groups';
 }
 
 export default function RequestTasksTab({ filterKey }: Props) {
@@ -47,7 +47,9 @@ export default function RequestTasksTab({ filterKey }: Props) {
 
   const fetchTasks = useCallback(() => {
     setLoading(true);
-    const apiParams: Record<string, string> = { [filterKey]: 'true' };
+    const apiParams: Record<string, string> = filterKey === 'assigned_to_me_in_my_groups'
+      ? { assigned_to_me: 'true', my_groups: 'true' }
+      : { [filterKey]: 'true' };
     if (statusFilter) apiParams.status = statusFilter;
     if (params.search) apiParams.search = params.search;
     if (params.sort) {
