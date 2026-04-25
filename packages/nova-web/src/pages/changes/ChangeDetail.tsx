@@ -8,6 +8,7 @@ import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import { Button } from '../../components/ui/button';
+import UserDateTimeInput from '../../components/UserDateTimeInput';
 import { formatDateTime } from '../../utils/dateTime';
 
 type FormState = {
@@ -65,6 +66,14 @@ const EMPTY_FORM: FormState = {
   review_notes: '',
   affected_cis: [],
 };
+
+function hasInvalidScheduleRange(start: string, end: string): boolean {
+  if (!start || !end) return false;
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return false;
+  return endMs < startMs;
+}
 
 export default function ChangeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -208,6 +217,11 @@ export default function ChangeDetailPage() {
   const save = async () => {
     setSaving(true);
     setError('');
+    if (hasInvalidScheduleRange(form.scheduled_start, form.scheduled_end)) {
+      setError('Scheduled end must be greater than or equal to scheduled start.');
+      setSaving(false);
+      return;
+    }
     try {
       const payload = {
         change_type_id: form.change_type_id,
@@ -252,6 +266,11 @@ export default function ChangeDetailPage() {
 
   const runTransition = async (action: string) => {
     if (!id || isNew) return;
+    if ((action === 'schedule' || action === 'request_approval' || action === 'approve')
+      && hasInvalidScheduleRange(form.scheduled_start, form.scheduled_end)) {
+      setError('Scheduled end must be greater than or equal to scheduled start.');
+      return;
+    }
     try {
       await changes.transition(id, {
         action,
@@ -387,11 +406,19 @@ export default function ChangeDetailPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Scheduled Start</label>
-                  <input type="datetime-local" value={form.scheduled_start} onChange={(e) => setForm((p) => ({ ...p, scheduled_start: e.target.value }))} className={inputCls} />
+                  <UserDateTimeInput
+                    value={form.scheduled_start}
+                    onChange={(v) => setForm((p) => ({ ...p, scheduled_start: v }))}
+                    className={inputCls}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Scheduled End</label>
-                  <input type="datetime-local" value={form.scheduled_end} onChange={(e) => setForm((p) => ({ ...p, scheduled_end: e.target.value }))} className={inputCls} />
+                  <UserDateTimeInput
+                    value={form.scheduled_end}
+                    onChange={(v) => setForm((p) => ({ ...p, scheduled_end: v }))}
+                    className={inputCls}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Maintenance Window</label>

@@ -6,7 +6,7 @@ import type { Change, ChangeBlackout } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
-import { formatDateTime } from '../../utils/dateTime';
+import { formatDate, formatDateTime } from '../../utils/dateTime';
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -304,7 +304,7 @@ export default function ChangeCalendarPage() {
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {new Date(selectedKey + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                  {formatDate(new Date(selectedKey + 'T12:00:00'))}
                 </p>
               </div>
 
@@ -366,7 +366,7 @@ export default function ChangeCalendarPage() {
                   <div key={b.id} className="px-4 py-3">
                     <p className="text-sm font-medium text-red-700">{b.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {new Date(b.start_date).toLocaleDateString()} — {new Date(b.end_date).toLocaleDateString()}
+                      {formatDate(b.start_date)} — {formatDate(b.end_date)}
                     </p>
                     {b.reason && <p className="text-xs text-gray-400 mt-0.5">{b.reason}</p>}
                   </div>

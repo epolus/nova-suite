@@ -153,6 +153,7 @@ async function refreshChangeConflicts(client: any, changeId: string): Promise<vo
     [changeId],
   );
   if (!c.scheduled_start || !c.scheduled_end) return;
+  if (new Date(c.scheduled_start).getTime() > new Date(c.scheduled_end).getTime()) return;
 
   await client.query(
     `INSERT INTO change_conflicts (tenant_id, change_id, conflicting_change_id, conflict_type, severity, details)
@@ -205,6 +206,16 @@ async function refreshChangeConflicts(client: any, changeId: string): Promise<vo
        AND tstzrange(c2.scheduled_start, c2.scheduled_end, '[)') && tstzrange($3::timestamptz, $4::timestamptz, '[)')`,
     [changeId, c.risk_level, c.scheduled_start, c.scheduled_end],
   );
+}
+
+function validateScheduleRange(start: unknown, end: unknown): void {
+  if (!start || !end) return;
+  const startMs = new Date(String(start)).getTime();
+  const endMs = new Date(String(end)).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return;
+  if (startMs > endMs) {
+    throw new AppError(400, 'scheduled_end must be greater than or equal to scheduled_start');
+  }
 }
 
 router.get('/assignment-groups', async (req: Request, res: Response, next: NextFunction) => {
@@ -820,6 +831,7 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
     if (!hasChangeRole(req)) throw new AppError(403, 'Insufficient permissions');
     const client = getRequestClient(req);
     const b = req.body || {};
+    validateScheduleRange(b.scheduled_start, b.scheduled_end);
     if (b.assignment_group_id) {
       const ok = await isChangeEnabledGroup(client, b.assignment_group_id);
       if (!ok) throw new AppError(400, 'Assignment group is not enabled for Change Management');
@@ -966,6 +978,10 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
     const canWork = await canWorkOnChange(client, req, current);
     if (!canWork) throw new AppError(403, 'Insufficient permissions');
     const updates = req.body || {};
+    validateScheduleRange(
+      updates.scheduled_start ?? current.scheduled_start,
+      updates.scheduled_end ?? current.scheduled_end,
+    );
     if (updates.assignment_group_id !== undefined && updates.assignment_group_id !== null) {
       const ok = await isChangeEnabledGroup(client, updates.assignment_group_id);
       if (!ok) throw new AppError(400, 'Assignment group is not enabled for Change Management');

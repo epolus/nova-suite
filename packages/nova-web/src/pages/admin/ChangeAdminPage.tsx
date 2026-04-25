@@ -4,6 +4,8 @@ import { changes } from '../../api/client';
 import type { CabMeeting, ChangeBlackout, ChangeType, StandardChangeTemplate } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
+import UserDateTimeInput from '../../components/UserDateTimeInput';
+import { formatDateTime } from '../../utils/dateTime';
 
 export default function ChangeAdminPage() {
   const [types, setTypes] = useState<ChangeType[]>([]);
@@ -103,13 +105,17 @@ export default function ChangeAdminPage() {
             {meetings.map((m) => (
               <div key={m.id} className="p-2 border rounded-lg">
                 <p className="text-sm font-medium">{m.title}</p>
-                <p className="text-xs text-gray-500">{new Date(m.scheduled_at).toLocaleString()} • {m.status}</p>
+                <p className="text-xs text-gray-500">{formatDateTime(m.scheduled_at)} • {m.status}</p>
               </div>
             ))}
           </div>
           <div className="space-y-2">
             <input value={newMeeting.title} onChange={(e) => setNewMeeting((p) => ({ ...p, title: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Meeting title" />
-            <input type="datetime-local" value={newMeeting.scheduled_at} onChange={(e) => setNewMeeting((p) => ({ ...p, scheduled_at: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm" />
+            <UserDateTimeInput
+              value={newMeeting.scheduled_at}
+              onChange={(v) => setNewMeeting((p) => ({ ...p, scheduled_at: v }))}
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+            />
             <button onClick={() => changes.createCabMeeting({ title: newMeeting.title, scheduled_at: new Date(newMeeting.scheduled_at).toISOString() }).then(() => { setNewMeeting({ title: '', scheduled_at: '' }); load(); })} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">Schedule CAB</button>
           </div>
         </Card>
@@ -120,14 +126,22 @@ export default function ChangeAdminPage() {
             {blackouts.map((b) => (
               <div key={b.id} className="p-2 border border-red-200 bg-red-50 rounded-lg">
                 <p className="text-sm font-medium text-red-800">{b.name}</p>
-                <p className="text-xs text-red-700">{new Date(b.start_date).toLocaleString()} → {new Date(b.end_date).toLocaleString()}</p>
+                <p className="text-xs text-red-700">{formatDateTime(b.start_date)} → {formatDateTime(b.end_date)}</p>
               </div>
             ))}
           </div>
           <div className="space-y-2">
             <input value={newBlackout.name} onChange={(e) => setNewBlackout((p) => ({ ...p, name: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Blackout name" />
-            <input type="datetime-local" value={newBlackout.start_date} onChange={(e) => setNewBlackout((p) => ({ ...p, start_date: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm" />
-            <input type="datetime-local" value={newBlackout.end_date} onChange={(e) => setNewBlackout((p) => ({ ...p, end_date: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm" />
+            <UserDateTimeInput
+              value={newBlackout.start_date}
+              onChange={(v) => setNewBlackout((p) => ({ ...p, start_date: v }))}
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+            />
+            <UserDateTimeInput
+              value={newBlackout.end_date}
+              onChange={(v) => setNewBlackout((p) => ({ ...p, end_date: v }))}
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+            />
             <input value={newBlackout.reason} onChange={(e) => setNewBlackout((p) => ({ ...p, reason: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Reason" />
             <button onClick={() => changes.createBlackout({ ...newBlackout, start_date: new Date(newBlackout.start_date).toISOString(), end_date: new Date(newBlackout.end_date).toISOString() }).then(() => { setNewBlackout({ name: '', start_date: '', end_date: '', reason: '' }); load(); })} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">Add Blackout</button>
           </div>

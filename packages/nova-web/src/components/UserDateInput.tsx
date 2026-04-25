@@ -9,6 +9,7 @@ interface Props {
   onChange: (value: string) => void;
   className?: string;
   disallowPast?: boolean;
+  showPickerButton?: boolean;
 }
 
 function getDateFormat(): DateFormat {
@@ -75,7 +76,13 @@ function placeholderFor(fmt: DateFormat): string {
   return 'yyyy-mm-dd';
 }
 
-export default function UserDateInput({ value, onChange, className, disallowPast = false }: Props) {
+export default function UserDateInput({
+  value,
+  onChange,
+  className,
+  disallowPast = false,
+  showPickerButton = true,
+}: Props) {
   const tCommon = useTranslations('common');
   const fmt = useMemo(() => getDateFormat(), []);
   const [todayIso] = useState(() => {
@@ -129,15 +136,17 @@ export default function UserDateInput({ value, onChange, className, disallowPast
           placeholder={placeholderFor(fmt)}
           className={className}
         />
-        <button
-          type="button"
-          onClick={openPicker}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-          title="Open date picker"
-          aria-label="Open date picker"
-        >
-          📅
-        </button>
+        {showPickerButton && (
+          <button
+            type="button"
+            onClick={openPicker}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+            title="Open date picker"
+            aria-label="Open date picker"
+          >
+            📅
+          </button>
+        )}
         <input
           ref={pickerRef}
           type="date"
