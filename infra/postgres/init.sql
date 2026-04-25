@@ -74,6 +74,7 @@ CREATE INDEX idx_tenants_settings_gin ON tenants USING gin (settings);
 CREATE TABLE departments (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  parent_department_id uuid REFERENCES departments(id) ON DELETE SET NULL,
   name        text NOT NULL,
   description text,
   is_active   boolean NOT NULL DEFAULT true,

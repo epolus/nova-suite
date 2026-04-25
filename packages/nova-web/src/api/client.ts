@@ -366,9 +366,9 @@ export const admin = {
     request<{ success: boolean }>(`/admin/roles/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   // Departments
   departments: () => request<{ departments: DepartmentItem[] }>('/admin/departments'),
-  createDepartment: (data: { name: string; description?: string }) =>
+  createDepartment: (data: { name: string; description?: string; parent_department_id?: string }) =>
     request<{ id: string }>('/admin/departments', { method: 'POST', body: JSON.stringify(data) }),
-  updateDepartment: (id: string, data: { name?: string; description?: string; is_active?: boolean }) =>
+  updateDepartment: (id: string, data: { name?: string; description?: string; parent_department_id?: string; is_active?: boolean }) =>
     request<{ success: boolean }>(`/admin/departments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   // Cost Centers
   costCenters: () => request<{ cost_centers: CostCenterItem[] }>('/admin/cost-centers'),
@@ -1199,6 +1199,8 @@ export interface DepartmentItem {
   id: string;
   name: string;
   description: string | null;
+  parent_department_id: string | null;
+  parent_department_name: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
