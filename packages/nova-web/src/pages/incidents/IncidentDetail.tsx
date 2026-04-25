@@ -16,6 +16,10 @@ import { SimilarIncidentsSection, KbSuggestionsSection } from '../../components/
 import type { UserListItem, ServiceListItem, CI } from '../../api/client';
 
 export default function IncidentDetail() {
+  const [previewArticle, setPreviewArticle] = useState<KnowledgeArticleDetail | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+
   const {
     user, navigate, prevId, nextId, goTo,
     inc, journal, loading, loadError,
@@ -32,6 +36,20 @@ export default function IncidentDetail() {
     handleUpdate, handleReopen, handleCancel, handleAddJournal, handleResolveWithKb,
     handleFileUpload, handleDrop, handleDeleteAttachment, handlePreview, formatSize,
   } = useIncidentDetail();
+
+  const openKnowledgePreview = async (articleId: string) => {
+    setPreviewError('');
+    setPreviewLoading(true);
+    try {
+      const article = await knowledgeApi.article(articleId);
+      setPreviewArticle(article);
+    } catch (err: unknown) {
+      setPreviewArticle(null);
+      setPreviewError(err instanceof Error ? err.message : 'Failed to load article preview');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   if (loading) return <Spinner />;
   if (!inc) {
@@ -52,23 +70,6 @@ export default function IncidentDetail() {
 
   const inputCls = `w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none${readonly ? ' bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`;
   const selectCls = inputCls;
-  const [previewArticle, setPreviewArticle] = useState<KnowledgeArticleDetail | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState('');
-
-  const openKnowledgePreview = async (articleId: string) => {
-    setPreviewError('');
-    setPreviewLoading(true);
-    try {
-      const article = await knowledgeApi.article(articleId);
-      setPreviewArticle(article);
-    } catch (err: unknown) {
-      setPreviewArticle(null);
-      setPreviewError(err instanceof Error ? err.message : 'Failed to load article preview');
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
 
   return (
     <>
