@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { Link } from 'react-router-dom';
 import type { SimilarIncident, KnowledgeSuggestion } from '../api/client';
 import Badge from './Badge';
 
@@ -56,7 +57,11 @@ export function KbSuggestionsSection({
       <div className="space-y-2">
         {!loading && articles.length === 0 && <p className="text-sm text-gray-400">No article suggestions yet.</p>}
         {articles.map((article) => (
-          <a key={article.id} href={`/knowledge/${article.id}`} className="block rounded-md border border-gray-200 p-3 hover:bg-gray-50">
+          <Link
+            key={article.id}
+            to={`/knowledge?articleId=${article.id}`}
+            className="block rounded-md border border-gray-200 p-3 hover:bg-gray-50"
+          >
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-mono text-indigo-600">{article.number}</span>
               {article.category_name && <span className="text-xs text-gray-500">{article.category_name}</span>}
@@ -64,7 +69,7 @@ export function KbSuggestionsSection({
             </div>
             <p className="text-sm font-medium text-gray-900">{article.title}</p>
             {article.excerpt && <p className="text-xs text-gray-500 mt-1 line-clamp-3">{article.excerpt}</p>}
-          </a>
+          </Link>
         ))}
       </div>
     </section>
