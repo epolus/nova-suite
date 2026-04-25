@@ -75,6 +75,7 @@ CREATE TABLE departments (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   parent_department_id uuid REFERENCES departments(id) ON DELETE SET NULL,
+  cost_center_id uuid,
   name        text NOT NULL,
   description text,
   is_active   boolean NOT NULL DEFAULT true,
@@ -84,6 +85,7 @@ CREATE TABLE departments (
 );
 
 CREATE INDEX idx_departments_tenant ON departments(tenant_id);
+CREATE INDEX idx_departments_cost_center ON departments(cost_center_id);
 
 -- ============================================================
 -- 3. COST CENTERS
@@ -101,6 +103,10 @@ CREATE TABLE cost_centers (
 );
 
 CREATE INDEX idx_cost_centers_tenant ON cost_centers(tenant_id);
+
+ALTER TABLE departments
+  ADD CONSTRAINT fk_departments_cost_center
+  FOREIGN KEY (cost_center_id) REFERENCES cost_centers(id) ON DELETE SET NULL;
 
 -- ============================================================
 -- 4. ROLES

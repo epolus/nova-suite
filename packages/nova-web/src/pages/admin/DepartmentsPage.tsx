@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { admin, type DepartmentItem } from '../../api/client';
+import { admin, type CostCenterItem, type DepartmentItem } from '../../api/client';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
 
 const columns: ColumnDef<DepartmentItem>[] = [
@@ -24,6 +24,12 @@ const columns: ColumnDef<DepartmentItem>[] = [
     render: (d) => <span className="text-gray-500">{d.parent_department_name || '—'}</span>,
   },
   {
+    key: 'cost_center_name',
+    label: 'Cost Center',
+    sortable: true,
+    render: (d) => <span className="text-gray-500">{d.cost_center_name || '—'}</span>,
+  },
+  {
     key: 'user_count',
     label: 'Users',
     sortable: true,
@@ -41,14 +47,21 @@ export default function DepartmentsPage() {
     return res.departments;
   }, []);
   const [allDepartmentsForOptions, setAllDepartmentsForOptions] = useState<DepartmentItem[]>([]);
+  const [allCostCentersForOptions, setAllCostCentersForOptions] = useState<CostCenterItem[]>([]);
 
   useEffect(() => {
     let active = true;
-    admin.departments().then((res) => {
-      if (active) setAllDepartmentsForOptions(res.departments);
-    }).catch(() => {
-      if (active) setAllDepartmentsForOptions([]);
-    });
+    Promise.all([admin.departments(), admin.costCenters()])
+      .then(([departmentsRes, costCentersRes]) => {
+        if (!active) return;
+        setAllDepartmentsForOptions(departmentsRes.departments);
+        setAllCostCentersForOptions(costCentersRes.cost_centers);
+      })
+      .catch(() => {
+        if (!active) return;
+        setAllDepartmentsForOptions([]);
+        setAllCostCentersForOptions([]);
+      });
     return () => {
       active = false;
     };
@@ -68,7 +81,18 @@ export default function DepartmentsPage() {
           .map((d) => ({ value: d.id, label: d.name })),
       ],
     },
-  ], [allDepartmentsForOptions]);
+    {
+      key: 'cost_center_id',
+      label: 'Cost Center',
+      type: 'select',
+      options: [
+        { value: '', label: '— None —' },
+        ...allCostCentersForOptions
+          .filter((cc) => cc.is_active)
+          .map((cc) => ({ value: cc.id, label: `${cc.code} - ${cc.name}` })),
+      ],
+    },
+  ], [allCostCentersForOptions, allDepartmentsForOptions]);
 
   return (
     <MasterDataPage<DepartmentItem>
@@ -79,17 +103,20 @@ export default function DepartmentsPage() {
       columns={columns}
       fields={fields}
       fetchItems={fetchItems}
-      createItem={(data) => admin.createDepartment(data as { name: string; description?: string; parent_department_id?: string })}
+      createItem={(data) => admin.createDepartment(data as { name: string; description?: string; parent_department_id?: string; cost_center_id?: string })}
       updateItem={(id, data) => admin.updateDepartment(id, data)}
       getDefaults={(item) => ({
         name: item?.name ?? '',
         description: item?.description ?? '',
         parent_department_id: item?.parent_department_id ?? '',
+        cost_center_id: item?.cost_center_id ?? '',
       })}
       searchFilter={(item, q) =>
         item.name.toLowerCase().includes(q) ||
         (item.description?.toLowerCase().includes(q) ?? false) ||
-        (item.parent_department_name?.toLowerCase().includes(q) ?? false)
+        (item.parent_department_name?.toLowerCase().includes(q) ?? false) ||
+        (item.cost_center_name?.toLowerCase().includes(q) ?? false) ||
+        (item.cost_center_code?.toLowerCase().includes(q) ?? false)
       }
     />
   );

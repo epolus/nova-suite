@@ -122,11 +122,14 @@ router.get('/departments', async (req: Request, res: Response, next: NextFunctio
   try {
     const tenantId = req.user!.tenant_id;
     const rows = await db.getMany(
-      `SELECT d.id, d.name, d.description, d.parent_department_id, d.is_active, d.created_at, d.updated_at,
+      `SELECT d.id, d.name, d.description, d.parent_department_id, d.cost_center_id, d.is_active, d.created_at, d.updated_at,
               pd.name AS parent_department_name,
+              cc.name AS cost_center_name,
+              cc.code AS cost_center_code,
               (SELECT count(*) FROM users u WHERE u.department_id = d.id AND u.is_active)::int AS user_count
        FROM departments d
        LEFT JOIN departments pd ON pd.id = d.parent_department_id
+       LEFT JOIN cost_centers cc ON cc.id = d.cost_center_id
        WHERE d.tenant_id = $1
        ORDER BY d.name`,
       [tenantId],
@@ -138,9 +141,10 @@ router.get('/departments', async (req: Request, res: Response, next: NextFunctio
 router.post('/departments', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { name, description, parent_department_id } = req.body;
+    const { name, description, parent_department_id, cost_center_id } = req.body;
     if (!name) throw new AppError(400, 'name is required');
     const parentDepartmentId = parent_department_id || null;
+    const costCenterId = cost_center_id || null;
     if (parentDepartmentId) {
       const parent = await db.getOne<{ id: string }>(
         'SELECT id FROM departments WHERE id = $1 AND tenant_id = $2',
@@ -148,9 +152,16 @@ router.post('/departments', async (req: Request, res: Response, next: NextFuncti
       );
       if (!parent) throw new AppError(400, 'parent_department_id must reference an existing department in this tenant');
     }
+    if (costCenterId) {
+      const costCenter = await db.getOne<{ id: string }>(
+        'SELECT id FROM cost_centers WHERE id = $1 AND tenant_id = $2',
+        [costCenterId, tenantId],
+      );
+      if (!costCenter) throw new AppError(400, 'cost_center_id must reference an existing cost center in this tenant');
+    }
     const row = await db.getOne<{ id: string }>(
-      'INSERT INTO departments (tenant_id, name, description, parent_department_id) VALUES ($1, $2, $3, $4) RETURNING id',
-      [tenantId, name, description || null, parentDepartmentId],
+      'INSERT INTO departments (tenant_id, name, description, parent_department_id, cost_center_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [tenantId, name, description || null, parentDepartmentId, costCenterId],
     );
     res.status(201).json(row);
   } catch (err) { next(err); }
@@ -159,7 +170,7 @@ router.post('/departments', async (req: Request, res: Response, next: NextFuncti
 router.patch('/departments/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { name, description, is_active, parent_department_id } = req.body;
+    const { name, description, is_active, parent_department_id, cost_center_id } = req.body;
     if (parent_department_id !== undefined) {
       const parentDepartmentId = parent_department_id || null;
       if (parentDepartmentId === req.params.id) {
@@ -173,12 +184,23 @@ router.patch('/departments/:id', async (req: Request, res: Response, next: NextF
         if (!parent) throw new AppError(400, 'parent_department_id must reference an existing department in this tenant');
       }
     }
+    if (cost_center_id !== undefined) {
+      const costCenterId = cost_center_id || null;
+      if (costCenterId) {
+        const costCenter = await db.getOne<{ id: string }>(
+          'SELECT id FROM cost_centers WHERE id = $1 AND tenant_id = $2',
+          [costCenterId, tenantId],
+        );
+        if (!costCenter) throw new AppError(400, 'cost_center_id must reference an existing cost center in this tenant');
+      }
+    }
     const sets: string[] = [];
     const vals: unknown[] = [];
     let i = 1;
     if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(name); }
     if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description || null); }
     if (parent_department_id !== undefined) { sets.push(`parent_department_id = $${i++}`); vals.push(parent_department_id || null); }
+    if (cost_center_id !== undefined) { sets.push(`cost_center_id = $${i++}`); vals.push(cost_center_id || null); }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
     if (sets.length === 0) { res.json({ success: true }); return; }
     vals.push(req.params.id, tenantId);
