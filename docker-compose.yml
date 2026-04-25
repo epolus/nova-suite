@@ -1,0 +1,158 @@
+services:
+  # ─── PostgreSQL 18 ───
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nova}
+      POSTGRES_USER: ${POSTGRES_USER:-nova_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./infra/postgres/rls.sql:/docker-entrypoint-initdb.d/02-rls.sql
+      - ./infra/postgres/03-demo-data.sql:/docker-entrypoint-initdb.d/03-demo-data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nova_app} -d ${POSTGRES_DB:-nova}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─── Nova Engine API ───
+  nova-engine:
+    build:
+      context: .
+      dockerfile: packages/nova-engine/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nova}
+      POSTGRES_USER: ${POSTGRES_USER:-nova_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      AUTH_LOCAL_LOGIN_ENABLED: ${AUTH_LOCAL_LOGIN_ENABLED:-true}
+      API_PORT: 4000
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-nova-itsm}
+      TEMPORAL_RETENTION_DAYS: ${TEMPORAL_RETENTION_DAYS:-30}
+      CREDENTIALS_MASTER_KEY: ${CREDENTIALS_MASTER_KEY:-}
+      REDIS_ENABLED: ${REDIS_ENABLED:-false}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_DEFAULT_TTL_SECONDS: ${REDIS_DEFAULT_TTL_SECONDS:-300}
+      UPLOAD_DIR: /data/uploads
+      UPLOAD_MAX_FILE_SIZE_MB: ${UPLOAD_MAX_FILE_SIZE_MB:-20}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-http://localhost/api/auth/sso/callback}
+      OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-Google}
+      OIDC_SCOPE: ${OIDC_SCOPE:-openid email profile}
+    extra_hosts:
+      - "localhost:host-gateway"
+    ports:
+      - "4000:4000"
+    volumes:
+      - uploads_data:/data/uploads
+
+  # ─── Temporal (Workflow Engine) ───
+  temporal:
+    image: temporalio/auto-setup:1.24
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-nova_app}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_SEEDS: postgres
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
+      # Applied when the default namespace is first registered only (see docs/ENVIRONMENT.md).
+      DEFAULT_NAMESPACE_RETENTION: ${DEFAULT_NAMESPACE_RETENTION:-720h}
+    ports:
+      - "7233:7233"
+
+  temporal-ui:
+    image: temporalio/ui:2.26.2
+    restart: unless-stopped
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8080:8080"
+
+  # ─── Redis (optional cache backend) ───
+  #redis:
+  #  image: redis:7-alpine
+  #  restart: unless-stopped
+  #  ports:
+  #    - "6379:6379"
+
+  # ─── Nova Worker (Temporal Workflows) ───
+  nova-worker:
+    build:
+      context: .
+      dockerfile: packages/nova-worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nova}
+      POSTGRES_USER: ${POSTGRES_USER:-nova_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-nova-itsm}
+      TEMPORAL_RETENTION_DAYS: ${TEMPORAL_RETENTION_DAYS:-30}
+      CREDENTIALS_MASTER_KEY: ${CREDENTIALS_MASTER_KEY:-}
+      NODE_ENV: ${NODE_ENV:-production}
+
+  # ─── Nova Web (Admin Dashboard) ───
+  nova-web:
+    build:
+      context: .
+      dockerfile: packages/nova-web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - nova-engine
+    ports:
+      - "3000:3000"
+
+  # ─── Caddy (Reverse Proxy) ───
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - nova-engine
+      - nova-web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pg_data:
+  uploads_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,24 @@
+{
+  "name": "nova-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open-source Service Management System",
+  "license": "AGPL-3.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=packages/nova-engine",
+    "build": "npm run build --workspace=packages/nova-engine",
+    "start": "npm run start --workspace=packages/nova-engine",
+    "test": "npm run test --workspace=packages/nova-engine",
+    "lint": "npm run lint --workspace=packages/nova-engine",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:reset": "docker compose down -v && docker compose up -d"
+  }
+}

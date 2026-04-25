@@ -1,0 +1,32 @@
+{
+  "name": "@nova-suite/worker",
+  "version": "1.0.0",
+  "description": "Nova Suite Temporal worker – workflow definitions and activity implementations",
+  "license": "AGPL-3.0",
+  "main": "dist/worker.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/worker.js",
+    "dev": "tsx watch src/worker.ts"
+  },
+  "dependencies": {
+    "@temporalio/activity": "^1.14.1",
+    "@temporalio/client": "^1.14.1",
+    "@temporalio/worker": "^1.14.1",
+    "@temporalio/workflow": "^1.14.1",
+    "pg": "^8.13.1",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
+    "ssh2-sftp-client": "^12.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/pg": "^8.11.10",
+    "@types/ssh2-sftp-client": "^9.0.6",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

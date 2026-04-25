@@ -1,0 +1,319 @@
+{
+  "common": {
+    "language": {
+      "label": "Langue",
+      "en": "Anglais",
+      "de": "Allemand",
+      "de-ch": "Allemand Suisse",
+      "fr": "Français",
+      "it": "italien"
+    },
+    "actions": {
+      "save": "Sauvegarder",
+      "saving": "Économie...",
+      "cancel": "Annuler",
+      "close": "Fermer",
+      "search": "Recherche",
+      "clear": "Clair",
+      "reset": "Réinitialiser",
+      "refresh": "Rafraîchir",
+      "back": "Dos",
+      "next": "Suivant",
+      "previous": "Précédent",
+      "create": "Créer",
+      "update": "Mise à jour",
+      "delete": "Supprimer",
+      "edit": "Modifier",
+      "view": "Voir",
+      "open": "Ouvrir",
+      "submit": "Soumettre",
+      "approve": "Approuver",
+      "reject": "Rejeter",
+      "reopen": "Rouvrir",
+      "resolve": "Résoudre",
+      "upload": "Télécharger",
+      "remove": "Retirer",
+      "download": "Télécharger"
+    },
+    "states": {
+      "yes": "Oui",
+      "no": "Non",
+      "none": "Aucun",
+      "unknown": "Inconnu",
+      "enabled": "Activé",
+      "disabled": "Désactivé",
+      "active": "Actif",
+      "inactive": "Inactif",
+      "all": "Tous",
+      "optional": "Facultatif",
+      "required": "Requis",
+      "loading": "Chargement...",
+      "noData": "Aucune donnée trouvée.",
+      "noResults": "Aucun résultat trouvé."
+    },
+    "roles": {
+      "admin": "Administrateur",
+      "fulfiller": "Accomplisseur",
+      "user": "Utilisateur"
+    },
+    "fields": {
+      "name": "Nom",
+      "title": "Titre",
+      "description": "Description",
+      "email": "E-mail",
+      "phone": "Téléphone",
+      "location": "Emplacement",
+      "status": "Statut",
+      "priority": "Priorité",
+      "impact": "Impact",
+      "urgency": "Urgence",
+      "category": "Catégorie",
+      "service": "Service",
+      "assignmentGroup": "Groupe d'affectation",
+      "assignedTo": "Attribué à",
+      "createdAt": "Créé à",
+      "updatedAt": "Mis à jour à",
+      "search": "Recherche"
+    },
+    "table": {
+      "number": "Nombre",
+      "actions": "Actes",
+      "selectAll": "Tout sélectionner",
+      "rowsPerPage": "Lignes par page",
+      "showing": "Affichage de {from}-{to} sur {total}",
+      "nextPage": "Page suivante",
+      "previousPage": "Page précédente"
+    },
+    "filters": {
+      "title": "Filtres",
+      "searchPlaceholder": "Recherche...",
+      "saved": "Enregistré:",
+      "saveCurrent": "Enregistrer le filtre actuel",
+      "filterNamePlaceholder": "Nom du filtre..."
+    },
+    "messages": {
+      "changesSaved": "Modifications enregistrées et appliquées!",
+      "somethingWentWrong": "Quelque chose s'est mal passé.",
+      "tryAgain": "Veuillez réessayer.",
+      "confirmDelete": "Êtes-vous sûr de vouloir supprimer cet élément?",
+      "unsavedChanges": "Vous avez des modifications non enregistrées."
+    },
+    "userMenu": {
+      "profileSettings": "Paramètres du profil",
+      "logout": "Déconnexion"
+    },
+    "sidebar": {
+      "expandNavigation": "Développer la navigation",
+      "collapseNavigation": "Réduire la navigation"
+    },
+    "cart": {
+      "label": "Panier",
+      "empty": "Votre panier est vide.",
+      "checkout": "Vérifier"
+    },
+    "date": {
+      "futureOnly": "Choisissez aujourd'hui ou une date ultérieure."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "markAllRead": "Marquer tout comme lu",
+      "deleteAll": "Supprimer tout",
+      "empty": "Aucune notification",
+      "loadFailed": "Échec du chargement des notifications.",
+      "markReadFailed": "Échec du marquage de la notification comme lue.",
+      "markAllFailed": "Échec du marquage de toutes les notifications comme lues."
+    }
+  },
+  "navigation": {
+    "agent": {
+      "dashboard": "Tableau de bord",
+      "myTodo": "Ma tâche",
+      "myGroups": "Mes groupes",
+      "catalog": "Catalogue",
+      "knowledge": "Connaissance",
+      "requests": "Demandes",
+      "requestTasks": "Demander des tâches",
+      "incidents": "Incidents",
+      "problems": "Problèmes",
+      "changes": "Changements",
+      "cmdb": "CMDB",
+      "catalogDesigner": "Concepteur de catalogue"
+    },
+    "ess": {
+      "home": "Accueil",
+      "catalog": "Catalogue",
+      "myRequests": "Mes demandes",
+      "myIncidents": "Mes incidents",
+      "knowledge": "Connaissance",
+      "approvals": "Approbations"
+    },
+    "adminSections": {
+      "administration": "Administration",
+      "organization": "Organisation",
+      "serviceCatalog": "Catalogue de services",
+      "processAutomation": "Processus et automatisation",
+      "cmdb": "CMDB",
+      "dataIntegration": "Données et intégration",
+      "system": "Système"
+    },
+    "admin": {
+      "users": "Utilisateurs",
+      "departments": "Départements",
+      "costCenters": "Centres de coûts",
+      "companies": "Entreprises",
+      "locations": "Emplacements",
+      "roles": "Rôles",
+      "assignmentGroups": "Groupes d'affectation",
+      "services": "Services",
+      "serviceItems": "Articles de service",
+      "catalogTasks": "Tâches de catalogue",
+      "processes": "Processus",
+      "slaConfiguration": "Configuration du SLA",
+      "notificationWorkflows": "Flux de travail de notification",
+      "changeManagement": "Gestion du changement",
+      "knowledgeWorkflows": "Flux de travail de connaissances",
+      "workflows": "Flux de travail",
+      "workflowEditorBeta": "Éditeur de workflow (bêta)",
+      "ciClasses": "Classes CI",
+      "dataSources": "Sources de données",
+      "credentials": "Identifiants",
+      "importData": "Importer des données",
+      "theming": "Thématisation",
+      "status": "Statut"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Se connecter",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "submit": "Se connecter",
+      "signingIn": "Connexion...",
+      "signInWith": "Connectez-vous avec {provider}",
+      "orContinueWithPassword": "ou continuez avec le mot de passe",
+      "demoCredentials": "Identifiants de démonstration",
+      "serviceManagementPlatform": "Plateforme de gestion de services",
+      "localDisabledSsoMissing": "La connexion locale est désactivée et SSO n'est pas configuré."
+    },
+    "errors": {
+      "loginFailed": "La connexion a échoué",
+      "unauthorized": "Non autorisé",
+      "sessionExpired": "Votre session a expiré. "
+    }
+  },
+  "pages": {
+    "dashboard": {
+      "title": "Tableau de bord",
+      "welcomeBack": "Bon retour, {nom}",
+      "description": "Voici ce qui se passe dans votre organisation.",
+      "sections": {
+        "incidents": "Incidents",
+        "changes": "Changements",
+        "requests": "Demandes",
+        "myQueue": "Ma file d'attente"
+      }
+    },
+    "incidents": {
+      "title": "Incidents",
+      "description": "Gérer et suivre les incidents.",
+      "newIncident": "Nouvel incident",
+      "detailTitle": "Détails de l'incident",
+      "summary": "Résumé",
+      "callerProfile": "Profil de l'appelant",
+      "journal": "Journal",
+      "attachments": "Pièces jointes",
+      "insights": "Connaissances",
+      "showInsights": "Afficher les informations",
+      "hideInsights": "Masquer les informations"
+    },
+    "requests": {
+      "title": "Demandes",
+      "description": "Suivez et répondez aux demandes de service.",
+      "newRequest": "Nouvelle demande",
+      "myRequests": "Mes demandes",
+      "tasks": "Demander des tâches",
+      "detailTitle": "Demander des détails"
+    },
+    "changes": {
+      "title": "Changements",
+      "description": "Planifiez, évaluez et suivez les changements.",
+      "newChange": "Nouveau changement",
+      "calendar": "Changer de calendrier",
+      "detailTitle": "Modifier les détails"
+    },
+    "problems": {
+      "title": "Problèmes",
+      "description": "Recherchez les causes profondes et gérez les erreurs connues.",
+      "newProblem": "Nouveau problème",
+      "detailTitle": "Détails du problème"
+    },
+    "knowledge": {
+      "title": "Connaissance",
+      "description": "Parcourez et gérez les articles de connaissances.",
+      "newArticle": "Nouvel article",
+      "publish": "Publier",
+      "retire": "Se retirer"
+    },
+    "cmdb": {
+      "title": "CMDB",
+      "description": "Gérez les éléments de configuration et les relations.",
+      "newCi": "Nouvel élément de configuration",
+      "editCi": "Modifier l'élément de configuration",
+      "ciClasses": "Classes CI"
+    },
+    "catalog": {
+      "title": "Catalogue de services",
+      "description": "Parcourez et demandez les services disponibles.",
+      "addToCart": "Ajouter au panier",
+      "removeFromCart": "Supprimer du panier"
+    },
+    "profile": {
+      "title": "Paramètres du profil",
+      "description": "Préférences personnelles pour l'affichage de la date, de l'heure et de la langue.",
+      "timeFormat": "Format de l'heure",
+      "dateFormat": "Format des dates",
+      "language": "Langue",
+      "preview": "Aperçu"
+    },
+    "search": {
+      "title": "Résultats de la recherche",
+      "description": "Résultats regroupés dans tous les enregistrements pris en charge.",
+      "resultsFor": "Résultats pour \"{query}\""
+    },
+    "admin": {
+      "title": "Administration",
+      "users": "Gérez les utilisateurs, les rôles et la structure organisationnelle.",
+      "assignmentGroups": "Gérez les groupes d'affectation et les adhésions.",
+      "theming": "Personnalisez la marque, les couleurs du thème clair et du thème sombre.",
+      "imports": "Importez et synchronisez des données externes."
+    }
+  },
+  "status": {
+    "new": "Nouveau",
+    "open": "Ouvrir",
+    "inProgress": "En cours",
+    "pending": "En attente",
+    "resolved": "Résolu",
+    "closed": "Fermé",
+    "cancelled": "Annulé",
+    "approved": "Approuvé",
+    "rejected": "Rejeté",
+    "draft": "Brouillon",
+    "published": "Publié",
+    "retired": "À la retraite"
+  },
+  "priority": {
+    "p1": "P1 Critique",
+    "p2": "P2 Élevé",
+    "p3": "P3 modéré",
+    "p4": "P4 Faible",
+    "p5": "Planification P5"
+  },
+  "errors": {
+    "generic": "Une erreur inattendue s'est produite.",
+    "network": "Erreur réseau. ",
+    "forbidden": "Vous n'êtes pas autorisé à effectuer cette action.",
+    "notFound": "La ressource demandée n'a pas été trouvée.",
+    "validation": "Veuillez consulter les champs en surbrillance."
+  }
+}

@@ -1,0 +1,28 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+.workflow-editor .react-flow__node {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+}
+
+.workflow-editor .react-flow__controls {
+  background: #ffffff;
+  border-color: #d1d5db;
+}
+
+html.dark .workflow-editor .react-flow__node {
+  background: var(--color-dark-surface-bg);
+  color: var(--color-dark-text-primary);
+  border: 1px solid var(--color-dark-border);
+}
+
+html.dark .workflow-editor .react-flow__controls {
+  background: var(--color-dark-surface-bg);
+  border-color: var(--color-dark-border);
+}
+
+html.dark .workflow-editor .react-flow__controls-button {
+  background: var(--color-dark-surface-bg);
+  color: var(--color-dark-text-primary);
+  border-bottom-color: var(--color-dark-border);
+}

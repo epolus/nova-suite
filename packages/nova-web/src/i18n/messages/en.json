@@ -1,0 +1,319 @@
+{
+  "common": {
+    "language": {
+      "label": "Language",
+      "en": "English",
+      "de": "German",
+      "de-ch": "German Switzerland",
+      "fr": "French",
+      "it": "Italian"
+    },
+    "actions": {
+      "save": "Save",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "close": "Close",
+      "search": "Search",
+      "clear": "Clear",
+      "reset": "Reset",
+      "refresh": "Refresh",
+      "back": "Back",
+      "next": "Next",
+      "previous": "Previous",
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "edit": "Edit",
+      "view": "View",
+      "open": "Open",
+      "submit": "Submit",
+      "approve": "Approve",
+      "reject": "Reject",
+      "reopen": "Reopen",
+      "resolve": "Resolve",
+      "upload": "Upload",
+      "remove": "Remove",
+      "download": "Download"
+    },
+    "states": {
+      "yes": "Yes",
+      "no": "No",
+      "none": "None",
+      "unknown": "Unknown",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "active": "Active",
+      "inactive": "Inactive",
+      "all": "All",
+      "optional": "Optional",
+      "required": "Required",
+      "loading": "Loading...",
+      "noData": "No data found.",
+      "noResults": "No results found."
+    },
+    "roles": {
+      "admin": "Admin",
+      "fulfiller": "Fulfiller",
+      "user": "User"
+    },
+    "fields": {
+      "name": "Name",
+      "title": "Title",
+      "description": "Description",
+      "email": "Email",
+      "phone": "Phone",
+      "location": "Location",
+      "status": "Status",
+      "priority": "Priority",
+      "impact": "Impact",
+      "urgency": "Urgency",
+      "category": "Category",
+      "service": "Service",
+      "assignmentGroup": "Assignment Group",
+      "assignedTo": "Assigned To",
+      "createdAt": "Created At",
+      "updatedAt": "Updated At",
+      "search": "Search"
+    },
+    "table": {
+      "number": "Number",
+      "actions": "Actions",
+      "selectAll": "Select all",
+      "rowsPerPage": "Rows per page",
+      "showing": "Showing {from}-{to} of {total}",
+      "nextPage": "Next page",
+      "previousPage": "Previous page"
+    },
+    "filters": {
+      "title": "Filters",
+      "searchPlaceholder": "Search...",
+      "saved": "Saved:",
+      "saveCurrent": "Save current filter",
+      "filterNamePlaceholder": "Filter name..."
+    },
+    "messages": {
+      "changesSaved": "Changes saved and applied!",
+      "somethingWentWrong": "Something went wrong.",
+      "tryAgain": "Please try again.",
+      "confirmDelete": "Are you sure you want to delete this item?",
+      "unsavedChanges": "You have unsaved changes."
+    },
+    "userMenu": {
+      "profileSettings": "Profile settings",
+      "logout": "Logout"
+    },
+    "sidebar": {
+      "expandNavigation": "Expand navigation",
+      "collapseNavigation": "Collapse navigation"
+    },
+    "cart": {
+      "label": "Cart",
+      "empty": "Your cart is empty.",
+      "checkout": "Checkout"
+    },
+    "date": {
+      "futureOnly": "Choose today or a future date."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "markAllRead": "Mark all read",
+      "deleteAll": "Delete all",
+      "empty": "No notifications",
+      "loadFailed": "Failed to load notifications.",
+      "markReadFailed": "Failed to mark notification as read.",
+      "markAllFailed": "Failed to mark all notifications as read."
+    }
+  },
+  "navigation": {
+    "agent": {
+      "dashboard": "Dashboard",
+      "myTodo": "My Todo",
+      "myGroups": "My Groups",
+      "catalog": "Catalog",
+      "knowledge": "Knowledge",
+      "requests": "Requests",
+      "requestTasks": "Request Tasks",
+      "incidents": "Incidents",
+      "problems": "Problems",
+      "changes": "Changes",
+      "cmdb": "CMDB",
+      "catalogDesigner": "Catalog Designer"
+    },
+    "ess": {
+      "home": "Home",
+      "catalog": "Catalog",
+      "myRequests": "My Requests",
+      "myIncidents": "My Incidents",
+      "knowledge": "Knowledge",
+      "approvals": "Approvals"
+    },
+    "adminSections": {
+      "administration": "Administration",
+      "organization": "Organization",
+      "serviceCatalog": "Service Catalog",
+      "processAutomation": "Process & Automation",
+      "cmdb": "CMDB",
+      "dataIntegration": "Data & Integration",
+      "system": "System"
+    },
+    "admin": {
+      "users": "Users",
+      "departments": "Departments",
+      "costCenters": "Cost Centers",
+      "companies": "Companies",
+      "locations": "Locations",
+      "roles": "Roles",
+      "assignmentGroups": "Assignment Groups",
+      "services": "Services",
+      "serviceItems": "Service Items",
+      "catalogTasks": "Catalog Tasks",
+      "processes": "Processes",
+      "slaConfiguration": "SLA Configuration",
+      "notificationWorkflows": "Notification Workflows",
+      "changeManagement": "Change Management",
+      "knowledgeWorkflows": "Knowledge Workflows",
+      "workflows": "Workflows",
+      "workflowEditorBeta": "Workflow Editor (beta)",
+      "ciClasses": "CI Classes",
+      "dataSources": "Data Sources",
+      "credentials": "Credentials",
+      "importData": "Import Data",
+      "theming": "Theming",
+      "status": "Status"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "signingIn": "Signing in...",
+      "signInWith": "Sign in with {provider}",
+      "orContinueWithPassword": "or continue with password",
+      "demoCredentials": "Demo credentials",
+      "serviceManagementPlatform": "Service Management Platform",
+      "localDisabledSsoMissing": "Local login is disabled and SSO is not configured."
+    },
+    "errors": {
+      "loginFailed": "Login failed",
+      "unauthorized": "Unauthorized",
+      "sessionExpired": "Your session has expired. Please sign in again."
+    }
+  },
+  "pages": {
+    "dashboard": {
+      "title": "Dashboard",
+      "welcomeBack": "Welcome back, {name}",
+      "description": "Here's what's happening in your organization.",
+      "sections": {
+        "incidents": "Incidents",
+        "changes": "Changes",
+        "requests": "Requests",
+        "myQueue": "My Queue"
+      }
+    },
+    "incidents": {
+      "title": "Incidents",
+      "description": "Manage and track incidents.",
+      "newIncident": "New Incident",
+      "detailTitle": "Incident Detail",
+      "summary": "Summary",
+      "callerProfile": "Caller Profile",
+      "journal": "Journal",
+      "attachments": "Attachments",
+      "insights": "Insights",
+      "showInsights": "Show Insights",
+      "hideInsights": "Hide Insights"
+    },
+    "requests": {
+      "title": "Requests",
+      "description": "Track and fulfill service requests.",
+      "newRequest": "New Request",
+      "myRequests": "My Requests",
+      "tasks": "Request Tasks",
+      "detailTitle": "Request Detail"
+    },
+    "changes": {
+      "title": "Changes",
+      "description": "Plan, assess, and track changes.",
+      "newChange": "New Change",
+      "calendar": "Change Calendar",
+      "detailTitle": "Change Detail"
+    },
+    "problems": {
+      "title": "Problems",
+      "description": "Investigate root causes and manage known errors.",
+      "newProblem": "New Problem",
+      "detailTitle": "Problem Detail"
+    },
+    "knowledge": {
+      "title": "Knowledge",
+      "description": "Browse and maintain knowledge articles.",
+      "newArticle": "New Article",
+      "publish": "Publish",
+      "retire": "Retire"
+    },
+    "cmdb": {
+      "title": "CMDB",
+      "description": "Manage configuration items and relationships.",
+      "newCi": "New Configuration Item",
+      "editCi": "Edit Configuration Item",
+      "ciClasses": "CI Classes"
+    },
+    "catalog": {
+      "title": "Service Catalog",
+      "description": "Browse and request available services.",
+      "addToCart": "Add to cart",
+      "removeFromCart": "Remove from cart"
+    },
+    "profile": {
+      "title": "Profile Settings",
+      "description": "Personal preferences for date, time, and language display.",
+      "timeFormat": "Time Format",
+      "dateFormat": "Date Format",
+      "language": "Language",
+      "preview": "Preview"
+    },
+    "search": {
+      "title": "Search Results",
+      "description": "Grouped results across all supported records.",
+      "resultsFor": "Results for \"{query}\""
+    },
+    "admin": {
+      "title": "Administration",
+      "users": "Manage users, roles, and organizational structure.",
+      "assignmentGroups": "Manage assignment groups and memberships.",
+      "theming": "Customize branding, light theme, and dark theme colors.",
+      "imports": "Import and synchronize external data."
+    }
+  },
+  "status": {
+    "new": "New",
+    "open": "Open",
+    "inProgress": "In Progress",
+    "pending": "Pending",
+    "resolved": "Resolved",
+    "closed": "Closed",
+    "cancelled": "Cancelled",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "draft": "Draft",
+    "published": "Published",
+    "retired": "Retired"
+  },
+  "priority": {
+    "p1": "P1 Critical",
+    "p2": "P2 High",
+    "p3": "P3 Moderate",
+    "p4": "P4 Low",
+    "p5": "P5 Planning"
+  },
+  "errors": {
+    "generic": "An unexpected error occurred.",
+    "network": "Network error. Please check your connection.",
+    "forbidden": "You do not have permission to perform this action.",
+    "notFound": "The requested resource was not found.",
+    "validation": "Please review the highlighted fields."
+  }
+}

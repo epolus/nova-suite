@@ -1,0 +1,319 @@
+{
+  "common": {
+    "language": {
+      "label": "Lingua",
+      "en": "Inglese",
+      "de": "tedesco",
+      "de-ch": "tedesco Svizzera",
+      "fr": "francese",
+      "it": "Italiano"
+    },
+    "actions": {
+      "save": "Salva",
+      "saving": "Risparmio...",
+      "cancel": "Cancellare",
+      "close": "Vicino",
+      "search": "Ricerca",
+      "clear": "Chiaro",
+      "reset": "Reset",
+      "refresh": "Aggiorna",
+      "back": "Indietro",
+      "next": "Prossimo",
+      "previous": "Precedente",
+      "create": "Creare",
+      "update": "Aggiornamento",
+      "delete": "Eliminare",
+      "edit": "Modificare",
+      "view": "Visualizzazione",
+      "open": "Aprire",
+      "submit": "Invia",
+      "approve": "Approvare",
+      "reject": "Rifiutare",
+      "reopen": "Riaprire",
+      "resolve": "Risolvere",
+      "upload": "Caricamento",
+      "remove": "Rimuovere",
+      "download": "Scaricamento"
+    },
+    "states": {
+      "yes": "Sì",
+      "no": "No",
+      "none": "Nessuno",
+      "unknown": "Sconosciuto",
+      "enabled": "Abilitato",
+      "disabled": "Disabilitato",
+      "active": "Attivo",
+      "inactive": "Inattivo",
+      "all": "Tutto",
+      "optional": "Opzionale",
+      "required": "Necessario",
+      "loading": "Caricamento...",
+      "noData": "Nessun dato trovato.",
+      "noResults": "Nessun risultato trovato"
+    },
+    "roles": {
+      "admin": "Admin",
+      "fulfiller": "Fulfiller",
+      "user": "Utente"
+    },
+    "fields": {
+      "name": "Nome",
+      "title": "Titolo",
+      "description": "Descrizione",
+      "email": "E-mail",
+      "phone": "Telefono",
+      "location": "Posizione",
+      "status": "Stato",
+      "priority": "Priorità",
+      "impact": "Impatto",
+      "urgency": "Urgenza",
+      "category": "Categoria",
+      "service": "Servizio",
+      "assignmentGroup": "Gruppo di assegnazione",
+      "assignedTo": "Assegnato a",
+      "createdAt": "Creato a",
+      "updatedAt": "Aggiornato a",
+      "search": "Ricerca"
+    },
+    "table": {
+      "number": "Numero",
+      "actions": "Azioni",
+      "selectAll": "Seleziona tutto",
+      "rowsPerPage": "Righe per pagina",
+      "showing": "Mostrando {from}-{to} di {total}",
+      "nextPage": "Pagina successiva",
+      "previousPage": "Pagina precedente"
+    },
+    "filters": {
+      "title": "Filtri",
+      "searchPlaceholder": "Ricerca...",
+      "saved": "Salvato:",
+      "saveCurrent": "Salva il filtro corrente",
+      "filterNamePlaceholder": "Nome filtro..."
+    },
+    "messages": {
+      "changesSaved": "Modifiche salvate e applicate!",
+      "somethingWentWrong": "Qualcosa è andato storto.",
+      "tryAgain": "Per favore riprova.",
+      "confirmDelete": "Sei sicuro di voler eliminare questo elemento?",
+      "unsavedChanges": "Sono presenti modifiche non salvate."
+    },
+    "userMenu": {
+      "profileSettings": "Impostazioni del profilo",
+      "logout": "Esci"
+    },
+    "sidebar": {
+      "expandNavigation": "Espandi la navigazione",
+      "collapseNavigation": "Comprimi la navigazione"
+    },
+    "cart": {
+      "label": "Carrello",
+      "empty": "Il tuo carrello è vuoto.",
+      "checkout": "Guardare"
+    },
+    "date": {
+      "futureOnly": "Scegli oggi o una data futura."
+    },
+    "notifications": {
+      "title": "Notifiche",
+      "markAllRead": "Segna tutto letto",
+      "deleteAll": "Elimina tutto",
+      "empty": "Nessuna notifica",
+      "loadFailed": "Impossibile caricare le notifiche.",
+      "markReadFailed": "Impossibile contrassegnare la notifica come letta.",
+      "markAllFailed": "Impossibile contrassegnare tutte le notifiche come lette."
+    }
+  },
+  "navigation": {
+    "agent": {
+      "dashboard": "Pannello di controllo",
+      "myTodo": "Il mio Todo",
+      "myGroups": "I miei gruppi",
+      "catalog": "Catalogare",
+      "knowledge": "Conoscenza",
+      "requests": "Richieste",
+      "requestTasks": "Richiedi attività",
+      "incidents": "Incidenti",
+      "problems": "Problemi",
+      "changes": "Cambiamenti",
+      "cmdb": "CMDB",
+      "catalogDesigner": "Progettista di cataloghi"
+    },
+    "ess": {
+      "home": "Home",
+      "catalog": "Catalogo",
+      "myRequests": "Le mie richieste",
+      "myIncidents": "I miei incidenti",
+      "knowledge": "Base di conoscenza",
+      "approvals": "Approvazioni"
+    },
+    "adminSections": {
+      "administration": "Amministrazione",
+      "organization": "Organizzazione",
+      "serviceCatalog": "Catalogo dei servizi",
+      "processAutomation": "Processo e automazione",
+      "cmdb": "CMDB",
+      "dataIntegration": "Dati e integrazione",
+      "system": "Sistema"
+    },
+    "admin": {
+      "users": "Utenti",
+      "departments": "Dipartimenti",
+      "costCenters": "Centri di costo",
+      "companies": "Aziende",
+      "locations": "Posizioni",
+      "roles": "Ruoli",
+      "assignmentGroups": "Gruppi di assegnazione",
+      "services": "Servizi",
+      "serviceItems": "Articoli di servizio",
+      "catalogTasks": "Attività del catalogo",
+      "processes": "Processi",
+      "slaConfiguration": "Configurazione SLA",
+      "notificationWorkflows": "Workflow di notifica",
+      "changeManagement": "Gestione del cambiamento",
+      "knowledgeWorkflows": "Workflow della conoscenza",
+      "workflows": "Workflow",
+      "workflowEditorBeta": "Editor workflow (beta)",
+      "ciClasses": "Classi CI",
+      "dataSources": "Fonti dei dati",
+      "credentials": "Credenziali",
+      "importData": "Importa dati",
+      "theming": "Tematizzazione",
+      "status": "Stato"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Login al tuo account",
+      "email": "E-mail",
+      "password": "Password",
+      "submit": "Login",
+      "signingIn": "Accesso...",
+      "signInWith": "Accedi con {provider}",
+      "orContinueWithPassword": "oppure proseguire con la password",
+      "demoCredentials": "Credenziali dimostrative",
+      "serviceManagementPlatform": "Piattaforma di gestione dei servizi",
+      "localDisabledSsoMissing": "L'accesso locale è disabilitato e SSO non è configurato."
+    },
+    "errors": {
+      "loginFailed": "Accesso non riuscito",
+      "unauthorized": "Non autorizzato",
+      "sessionExpired": "La tua sessione è scaduta. "
+    }
+  },
+  "pages": {
+    "dashboard": {
+      "title": "Pannello di controllo",
+      "welcomeBack": "Bentornato, {name}",
+      "description": "Ecco cosa sta succedendo nella tua organizzazione.",
+      "sections": {
+        "incidents": "Incidenti",
+        "changes": "Cambiamenti",
+        "requests": "Richieste",
+        "myQueue": "La mia coda"
+      }
+    },
+    "incidents": {
+      "title": "Incidenti",
+      "description": "Gestire e tenere traccia degli incidenti.",
+      "newIncident": "Nuovo incidente",
+      "detailTitle": "Dettagli dell'incidente",
+      "summary": "Riepilogo",
+      "callerProfile": "Profilo del chiamante",
+      "journal": "Diario",
+      "attachments": "Allegati",
+      "insights": "Approfondimenti",
+      "showInsights": "Mostra approfondimenti",
+      "hideInsights": "Nascondi approfondimenti"
+    },
+    "requests": {
+      "title": "Richieste",
+      "description": "Monitorare e soddisfare le richieste di servizio.",
+      "newRequest": "Nuova richiesta",
+      "myRequests": "Le mie richieste",
+      "tasks": "Richiedi attività",
+      "detailTitle": "Richiedi dettagli"
+    },
+    "changes": {
+      "title": "Cambiamenti",
+      "description": "Pianificare, valutare e tenere traccia dei cambiamenti.",
+      "newChange": "Nuovo cambiamento",
+      "calendar": "Cambia calendario",
+      "detailTitle": "Modifica dettaglio"
+    },
+    "problems": {
+      "title": "Problemi",
+      "description": "Indagare le cause principali e gestire gli errori noti.",
+      "newProblem": "Nuovo problema",
+      "detailTitle": "Dettaglio del problema"
+    },
+    "knowledge": {
+      "title": "Conoscenza",
+      "description": "Sfoglia e gestisci articoli della Knowledge Base.",
+      "newArticle": "Nuovo articolo",
+      "publish": "Pubblicare",
+      "retire": "Andare in pensione"
+    },
+    "cmdb": {
+      "title": "CMDB",
+      "description": "Gestire gli elementi e le relazioni della configurazione.",
+      "newCi": "Nuovo elemento di configurazione",
+      "editCi": "Modifica elemento di configurazione",
+      "ciClasses": "Classi CI"
+    },
+    "catalog": {
+      "title": "Catalogo dei servizi",
+      "description": "Sfoglia e richiedi i servizi disponibili.",
+      "addToCart": "Aggiungi al carrello",
+      "removeFromCart": "Rimuovi dal carrello"
+    },
+    "profile": {
+      "title": "Impostazioni del profilo",
+      "description": "Preferenze personali per data, ora e lingua di visualizzazione.",
+      "timeFormat": "Formato ora",
+      "dateFormat": "Formato data",
+      "language": "Lingua",
+      "preview": "Anteprima"
+    },
+    "search": {
+      "title": "Risultati della ricerca",
+      "description": "Risultati raggruppati in tutti i record supportati.",
+      "resultsFor": "Risultati per \"{query}\""
+    },
+    "admin": {
+      "title": "Amministrazione",
+      "users": "Gestire utenti, ruoli e struttura organizzativa.",
+      "assignmentGroups": "Gestire gruppi di assegnazione e appartenenze.",
+      "theming": "Personalizza il branding, i colori del tema chiaro e del tema scuro.",
+      "imports": "Importa e sincronizza dati esterni."
+    }
+  },
+  "status": {
+    "new": "Nuovo",
+    "open": "Aprire",
+    "inProgress": "In corso",
+    "pending": "In attesa di",
+    "resolved": "Risolto",
+    "closed": "Chiuso",
+    "cancelled": "Annullato",
+    "approved": "Approvato",
+    "rejected": "Respinto",
+    "draft": "Bozza",
+    "published": "Pubblicato",
+    "retired": "Pensionato"
+  },
+  "priority": {
+    "p1": "P1 critico",
+    "p2": "P2 Alto",
+    "p3": "P3 moderato",
+    "p4": "P4 Basso",
+    "p5": "P5 Pianificazione"
+  },
+  "errors": {
+    "generic": "Si è verificato un errore imprevisto.",
+    "network": "Errore di rete. ",
+    "forbidden": "Non hai l'autorizzazione per eseguire questa azione.",
+    "notFound": "La risorsa richiesta non è stata trovata.",
+    "validation": "Si prega di rivedere i campi evidenziati."
+  }
+}

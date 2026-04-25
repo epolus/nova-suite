@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker volumes (local dev)
+pg_data/
+
+# Coverage
+coverage/
+
+# Temp
+tmp/
+.tmp/
+packages/nova-web/tsconfig.tsbuildinfo

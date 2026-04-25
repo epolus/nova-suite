@@ -1,0 +1,162 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-dark-content-bg: #0b1220;
+    --color-dark-surface-bg: #1e293b;
+    --color-dark-muted-bg: #111827;
+    --color-dark-border: #475569;
+    --color-dark-text-primary: #f1f5f9;
+    --color-dark-text-muted: #94a3b8;
+  }
+
+  html {
+    @apply h-full;
+  }
+
+  body {
+    @apply h-full antialiased text-gray-900 bg-gray-50;
+  }
+
+  html.dark body {
+    background-color: var(--color-dark-content-bg);
+    color: var(--color-dark-text-primary);
+  }
+
+  #root {
+    @apply h-full;
+  }
+}
+
+/* Retrofit common light-only Tailwind utilities when `html.dark` is set */
+@layer utilities {
+  html.dark .bg-white {
+    background-color: var(--color-dark-surface-bg);
+    color: var(--color-dark-text-primary);
+  }
+
+  html.dark .bg-gray-50 {
+    background-color: var(--color-dark-muted-bg);
+  }
+
+  html.dark .bg-slate-50 {
+    background-color: var(--color-dark-content-bg);
+  }
+
+  html.dark .bg-gray-100 {
+    background-color: var(--color-dark-surface-bg);
+  }
+
+  html.dark .bg-indigo-50 {
+    background-color: color-mix(in srgb, var(--color-dark-surface-bg) 80%, transparent);
+  }
+
+  html.dark .border-gray-100,
+  html.dark .border-gray-200 {
+    border-color: var(--color-dark-border);
+  }
+
+  html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+  html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--color-dark-border);
+  }
+
+  html.dark .text-gray-900 {
+    color: var(--color-dark-text-primary);
+  }
+
+  html.dark .text-gray-800 {
+    color: var(--color-dark-text-primary);
+  }
+
+  html.dark .text-gray-700 {
+    color: color-mix(in srgb, var(--color-dark-text-primary) 90%, black);
+  }
+
+  html.dark .text-gray-600 {
+    color: color-mix(in srgb, var(--color-dark-text-primary) 80%, black);
+  }
+
+  html.dark .text-gray-500 {
+    color: var(--color-dark-text-muted);
+  }
+
+  html.dark .text-indigo-700 {
+    @apply text-indigo-300;
+  }
+
+  html.dark .text-indigo-600 {
+    @apply text-indigo-400;
+  }
+
+  html.dark .placeholder-gray-400::placeholder,
+  html.dark .placeholder-gray-500::placeholder {
+    color: color-mix(in srgb, var(--color-dark-text-muted) 80%, black);
+  }
+
+  html.dark input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  html.dark textarea,
+  html.dark select {
+    border-color: var(--color-dark-border);
+    background-color: var(--color-dark-muted-bg);
+    color: var(--color-dark-text-primary);
+  }
+
+  html.dark input[type='checkbox'],
+  html.dark input[type='radio'] {
+    border-color: var(--color-dark-border);
+    background-color: var(--color-dark-muted-bg);
+  }
+}
+
+/* Embedded catalog automation builder (React Flow) */
+.catalog-automation-builder .react-flow__node {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+}
+
+.catalog-automation-builder .react-flow__controls {
+  background: #ffffff;
+  border-color: #d1d5db;
+}
+
+html.dark .catalog-automation-builder .react-flow__node {
+  background: var(--color-dark-surface-bg);
+  color: var(--color-dark-text-primary);
+  border: 1px solid var(--color-dark-border);
+}
+
+html.dark .catalog-automation-builder .react-flow__controls {
+  background: var(--color-dark-surface-bg);
+  border-color: var(--color-dark-border);
+}
+
+html.dark .catalog-automation-builder .react-flow__controls-button {
+  background: var(--color-dark-surface-bg);
+  color: var(--color-dark-text-primary);
+  border-bottom-color: var(--color-dark-border);
+}
+
+/* Keep minimap + canvas pattern readable in both themes */
+.catalog-automation-builder .react-flow {
+  --xy-background-color: #f8fafc;
+  --xy-background-pattern-dots-color: #cbd5e1;
+  --xy-minimap-background-color: #ffffff;
+  --xy-minimap-mask-background-color: rgba(148, 163, 184, 0.2);
+  --xy-minimap-node-background-color: #cbd5e1;
+}
+
+html.dark .catalog-automation-builder .react-flow {
+  --xy-background-color: var(--color-dark-content-bg);
+  --xy-background-pattern-dots-color: #334155;
+  --xy-background-pattern-lines-color: #334155;
+  --xy-minimap-background-color: var(--color-dark-surface-bg);
+  --xy-minimap-mask-background-color: rgba(15, 23, 42, 0.55);
+  --xy-minimap-node-background-color: #475569;
+  --xy-edge-label-background-color: var(--color-dark-surface-bg);
+  --xy-edge-label-color: var(--color-dark-text-primary);
+}
