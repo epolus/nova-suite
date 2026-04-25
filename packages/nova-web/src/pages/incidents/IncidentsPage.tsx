@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { incidents as incidentsApi } from '../../api/client';
 import type { AssignmentGroupItem, Incident, Pagination } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -40,6 +40,7 @@ const DEFAULT_COLS = ['number', 'title', 'priority', 'status', 'assigned_to_name
 function createIncidentListParams(args: {
   statusFilter: string;
   assignedToMe: boolean;
+  slaBreached: boolean;
   search: string;
   sort: string;
   dir: string;
@@ -53,6 +54,9 @@ function createIncidentListParams(args: {
     apiParams.status_not_in = 'closed,cancelled';
   } else if (args.statusFilter !== 'all') {
     apiParams.status = args.statusFilter;
+  }
+  if (args.slaBreached) {
+    apiParams.sla_breached = 'true';
   }
   if (args.search) apiParams.search = args.search;
   if (args.sort) {
@@ -191,7 +195,7 @@ export default function IncidentsPage() {
 
   const { params, setSearch, setSort, setCols, setPage, setFilter, setColumnFilter, update } = useListParams({
     defaultCols: DEFAULT_COLS,
-    filterKeys: ['status', 'assigned_to_me'],
+    filterKeys: ['status', 'assigned_to_me', 'sla_breached'],
     storageKey: 'incidents',
   });
 
@@ -199,6 +203,7 @@ export default function IncidentsPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -221,7 +226,28 @@ export default function IncidentsPage() {
   const rawStatusFilter = params.filters.status || '';
   const statusFilter = rawStatusFilter || 'active';
   const assignedToMeFilter = params.filters.assigned_to_me === 'true';
+  const slaBreachedFilter = params.filters.sla_breached === 'true';
   const cfKey = JSON.stringify(params.columnFilters);
+
+  useEffect(() => {
+    // Dashboard SLA card should not inherit stale priority column filter state.
+    if (!slaBreachedFilter) return;
+    const hasPriorityColumnFilter = !!params.columnFilters.priority;
+    const hasRawPriorityFilter = searchParams.has('priority');
+    if (!hasPriorityColumnFilter && !hasRawPriorityFilter) return;
+
+    if (hasPriorityColumnFilter) {
+      const nextFilters = { ...params.columnFilters };
+      delete nextFilters.priority;
+      update({ columnFilters: nextFilters, page: 1 });
+    }
+
+    if (hasRawPriorityFilter) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('priority');
+      setSearchParams(next, { replace: true });
+    }
+  }, [slaBreachedFilter, params.columnFilters, searchParams, setSearchParams, update]);
 
   useEffect(() => {
     incidentsApi.assignmentGroups().then((r) => setGroups(r.assignment_groups)).catch(() => {});
@@ -233,6 +259,7 @@ export default function IncidentsPage() {
     const apiParams = createIncidentListParams({
       statusFilter,
       assignedToMe: assignedToMeFilter,
+      slaBreached: slaBreachedFilter,
       search: params.search,
       sort: params.sort,
       dir: params.dir,
@@ -243,11 +270,12 @@ export default function IncidentsPage() {
       setPagination(res.pagination);
       setLoading(false);
     });
-  }, [params.page, statusFilter, assignedToMeFilter, params.search, params.sort, params.dir, cfKey, refreshKey]);
+  }, [params.page, statusFilter, assignedToMeFilter, slaBreachedFilter, params.search, params.sort, params.dir, cfKey, refreshKey]);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};
     if (assignedToMeFilter) lp.assigned_to_me = 'true';
+    if (slaBreachedFilter) lp.sla_breached = 'true';
     if (statusFilter === 'active') {
       lp.status_not_in = 'closed,cancelled';
     }
@@ -259,7 +287,7 @@ export default function IncidentsPage() {
       lp.sort_dir = params.dir;
     }
     return lp;
-  }, [statusFilter, assignedToMeFilter, params.search, params.sort, params.dir]);
+  }, [statusFilter, assignedToMeFilter, slaBreachedFilter, params.search, params.sort, params.dir]);
 
   // ── Bulk actions ──
   const handleBulkAssign = async () => {
@@ -297,6 +325,7 @@ export default function IncidentsPage() {
             const paramsForExport = createIncidentListParams({
               statusFilter,
               assignedToMe: assignedToMeFilter,
+              slaBreached: slaBreachedFilter,
               search: params.search,
               sort: params.sort,
               dir: params.dir,
@@ -484,6 +513,14 @@ export default function IncidentsPage() {
               className="px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
             >
               Assigned to me active ×
+            </button>
+          )}
+          {slaBreachedFilter && (
+            <button
+              onClick={() => setFilter('sla_breached', '')}
+              className="px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+            >
+              SLA breached ×
             </button>
           )}
         </div>

@@ -223,7 +223,7 @@ router.get(
       const sortDir = req.query.sort_dir === 'desc' ? 'DESC' : 'ASC';
       const orderClause = sortCol
         ? `ORDER BY ${sortCol} ${sortDir}`
-        : 'ORDER BY i.priority ASC, i.created_at DESC';
+        : 'ORDER BY i.created_at DESC';
 
       paramIdx++;
       params.push(limit);
@@ -658,7 +658,7 @@ router.get('/nav', async (req: Request, res: Response, next: NextFunction) => {
     const sortDir = req.query.sort_dir === 'desc' ? 'DESC' : 'ASC';
     const orderClause = sortCol
       ? `ORDER BY ${sortCol} ${sortDir}`
-      : 'ORDER BY i.priority ASC, i.created_at DESC';
+      : 'ORDER BY i.created_at DESC';
 
     // Get the ordered list of IDs matching filters
     const result = await client.query(

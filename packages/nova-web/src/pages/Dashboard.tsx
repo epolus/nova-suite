@@ -164,7 +164,7 @@ export default function Dashboard() {
               color={incStats.sla_breached > 0 ? 'text-red-600' : 'text-gray-400'}
               bg="bg-red-50"
               icon={Icons.sla('w-5 h-5 text-red-500')}
-              link="/incidents"
+              link="/incidents?sla_breached=true"
               alert
             />
           </>
