@@ -160,3 +160,59 @@ html.dark .catalog-automation-builder .react-flow {
   --xy-edge-label-background-color: var(--color-dark-surface-bg);
   --xy-edge-label-color: var(--color-dark-text-primary);
 }
+
+/* CMDB relationship flow (React Flow) */
+.cmdb-relationship-flow .react-flow {
+  --xy-background-color: #f8fafc;
+  --xy-background-pattern-dots-color: #cbd5e1;
+  --xy-minimap-background-color: #ffffff;
+  --xy-minimap-mask-background-color: rgba(148, 163, 184, 0.2);
+  --xy-minimap-node-background-color: #cbd5e1;
+}
+
+.cmdb-relationship-flow .react-flow__node {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+}
+
+.cmdb-relationship-flow .react-flow__controls {
+  background: #ffffff;
+  border-color: #d1d5db;
+}
+
+html.dark .cmdb-relationship-flow .react-flow {
+  --xy-background-color: var(--color-dark-content-bg);
+  --xy-background-pattern-dots-color: #334155;
+  --xy-background-pattern-lines-color: #334155;
+  --xy-minimap-background-color: var(--color-dark-surface-bg);
+  --xy-minimap-mask-background-color: rgba(15, 23, 42, 0.55);
+  --xy-minimap-node-background-color: #475569;
+  --xy-edge-label-background-color: var(--color-dark-surface-bg);
+  --xy-edge-label-color: var(--color-dark-text-primary);
+}
+
+html.dark .cmdb-relationship-flow .react-flow__node {
+  background: var(--color-dark-surface-bg);
+  color: var(--color-dark-text-primary);
+  border: 1px solid var(--color-dark-border);
+}
+
+/* Force default node skin in dark mode (xyflow style can load later) */
+html.dark .cmdb-relationship-flow .react-flow .react-flow__node.react-flow__node-default {
+  background: var(--color-dark-surface-bg) !important;
+  color: var(--color-dark-text-primary) !important;
+  border: 1px solid var(--color-dark-border) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.dark .cmdb-relationship-flow .react-flow__controls {
+  background: var(--color-dark-surface-bg);
+  border-color: var(--color-dark-border);
+}
+
+html.dark .cmdb-relationship-flow .react-flow__controls-button {
+  background: var(--color-dark-surface-bg);
+  color: var(--color-dark-text-primary);
+  border-bottom-color: var(--color-dark-border);
+}

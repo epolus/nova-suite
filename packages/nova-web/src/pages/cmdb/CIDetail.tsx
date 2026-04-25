@@ -1,6 +1,16 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import {
+  Background,
+  Controls,
+  Edge,
+  MarkerType,
+  MiniMap,
+  Node,
+  ReactFlow,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { cmdb, auth, admin, problems } from '../../api/client';
 import type { CI, CIClass, CIRelationship, CIHistoryEntry, ImpactedCI, AssignmentGroupItem, Problem } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -183,6 +193,7 @@ export default function CIDetail() {
   const [ciSearch, setCiSearch] = useState('');
   const [ciSearchResults, setCiSearchResults] = useState<CI[]>([]);
   const [ciSearching, setCiSearching] = useState(false);
+  const [selectedFlowEdgeId, setSelectedFlowEdgeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (ciSearch.length < 2) { setCiSearchResults([]); return; }
@@ -256,6 +267,54 @@ export default function CIDetail() {
   ];
 
   const selectedTarget = ciSearchResults.find((c) => c.id === relForm.target);
+  const relationshipNodes: Node[] = [
+    {
+      id: ci.id,
+      position: { x: 320, y: 180 },
+      data: { label: ci.display_name || ci.name },
+      style: {
+        border: '2px solid #4f46e5',
+        borderRadius: 10,
+        background: '#eef2ff',
+        fontWeight: 600,
+      },
+    },
+    ...ci.relationships.incoming.map((rel, idx) => ({
+      id: rel.source_ci_id,
+      position: { x: 60, y: 60 + idx * 90 },
+      data: { label: rel.source_display_name || rel.source_name || rel.source_ci_id },
+      style: { borderRadius: 10 },
+    })),
+    ...ci.relationships.outgoing
+      .filter((rel) => rel.target_ci_id !== ci.id)
+      .map((rel, idx) => ({
+        id: rel.target_ci_id,
+        position: { x: 580, y: 60 + idx * 90 },
+        data: { label: rel.target_display_name || rel.target_name || rel.target_ci_id },
+        style: { borderRadius: 10 },
+      })),
+  ].filter((node, idx, arr) => arr.findIndex((n) => n.id === node.id) === idx);
+  const relationshipEdges: Edge[] = [
+    ...ci.relationships.incoming.map((rel) => ({
+      id: `rel-${rel.id}`,
+      source: rel.source_ci_id,
+      target: ci.id,
+      label: rel.relationship_type,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      data: { relationshipId: rel.id },
+      animated: rel.relationship_type === 'depends_on',
+    })),
+    ...ci.relationships.outgoing.map((rel) => ({
+      id: `rel-${rel.id}`,
+      source: ci.id,
+      target: rel.target_ci_id,
+      label: rel.relationship_type,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      data: { relationshipId: rel.id },
+      animated: rel.relationship_type === 'depends_on',
+    })),
+  ];
+  const selectedFlowRelationshipId = relationshipEdges.find((e) => e.id === selectedFlowEdgeId)?.data?.relationshipId as string | undefined;
 
   return (
     <>
@@ -419,6 +478,47 @@ export default function CIDetail() {
       {/* Relationships Tab */}
       {activeTab === 'relationships' && (
         <div className="space-y-6">
+          <Card>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Relationship Flow</h3>
+              {canEdit && selectedFlowRelationshipId && (
+                <button
+                  onClick={() => {
+                    void handleDeleteRelationship(selectedFlowRelationshipId);
+                    setSelectedFlowEdgeId(null);
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100"
+                >
+                  Remove selected edge
+                </button>
+              )}
+            </div>
+            <div className="cmdb-relationship-flow h-[380px] border border-gray-200 rounded-lg overflow-hidden bg-white">
+              <ReactFlow
+                nodes={relationshipNodes}
+                edges={relationshipEdges}
+                fitView
+                onEdgeClick={(_, edge) => setSelectedFlowEdgeId(edge.id)}
+                onPaneClick={() => setSelectedFlowEdgeId(null)}
+                onNodeClick={(_, node) => {
+                  if (node.id !== ci.id) {
+                    navigate(`/cmdb/${node.id}`);
+                  }
+                }}
+                nodesDraggable={false}
+                nodesConnectable={false}
+                elementsSelectable
+              >
+                <Background />
+                <MiniMap />
+                <Controls />
+              </ReactFlow>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Click a node to open that CI. Click an edge to select it for deletion.
+            </p>
+          </Card>
+
           {/* Add Relationship Button */}
           {canEdit && !showRelForm && (
             <div className="flex justify-end">
