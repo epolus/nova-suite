@@ -61,8 +61,9 @@ export async function catalogFulfillment(input: FulfillmentInput): Promise<strin
   // Create all request_task records
   const createdTasks = await createRequestTasks(input.requestId, input.tenantId, taskDefs);
 
-  // Update request to in_progress
-  await updateRequestStatus(input.requestId, input.tenantId, 'in_progress');
+  // Initial request status depends on whether the first active gate is approval.
+  const hasApprovalGate = createdTasks.some((t) => t.taskType === 'approval' && t.requiresUserCompletion);
+  await updateRequestStatus(input.requestId, input.tenantId, hasApprovalGate ? 'pending_approval' : 'in_progress');
 
   // Group tasks by order
   const orderGroups = new Map<number, { id: string; taskType: string; requiresUserCompletion: boolean }[]>();
@@ -77,9 +78,15 @@ export async function catalogFulfillment(input: FulfillmentInput): Promise<strin
   // Process each group sequentially
   for (const order of sortedOrders) {
     const group = orderGroups.get(order)!;
+    const groupHasApprovalGate = group.some((t) => t.taskType === 'approval' && t.requiresUserCompletion);
 
     // Activate this group
     await activateTaskGroup(input.requestId, input.tenantId, order);
+    await updateRequestStatus(
+      input.requestId,
+      input.tenantId,
+      groupHasApprovalGate ? 'pending_approval' : 'in_progress',
+    );
 
     const automatedInGroup = group.filter((t) => !t.requiresUserCompletion && t.taskType === 'automated');
     if (automatedInGroup.length > 0) {
