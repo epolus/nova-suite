@@ -8,6 +8,7 @@ import {
   type CostCenterItem,
   type CompanyItem,
 } from '../../api/client';
+import UserDateInput from '../../components/UserDateInput';
 
 interface Props {
   user: AdminUser | null;
@@ -59,6 +60,13 @@ function buildDisplayName(firstName: string, lastName: string, userId: string): 
   return userId ? `${name} (${userId})` : name;
 }
 
+function toDateOnly(value: string | null | undefined): string {
+  if (!value) return '';
+  const raw = String(value).trim();
+  const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m?.[1] ?? raw;
+}
+
 export default function UserFormModal({
   user, allUsers, roles, departments, costCenters, companies = [],
   onClose, onSaved, onNavigate, onDelete, prevUserId, nextUserId,
@@ -82,8 +90,8 @@ export default function UserFormModal({
     employee_type: user?.employee_type ?? 'employee',
     company: user?.company ?? '',
     preferred_language: user?.preferred_language ?? 'en',
-    start_date: user?.start_date ?? '',
-    last_working_date: user?.last_working_date ?? '',
+    start_date: toDateOnly(user?.start_date),
+    last_working_date: toDateOnly(user?.last_working_date),
     manager_id: user?.manager_id ?? '',
     department_id: user?.department_id ?? '',
     cost_center_id: user?.cost_center_id ?? '',
@@ -402,11 +410,11 @@ export default function UserFormModal({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Start Date</label>
-                  <input type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} className={inputCls} />
+                  <UserDateInput value={form.start_date} onChange={(value) => set('start_date', value)} className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Last Working Date</label>
-                  <input type="date" value={form.last_working_date} onChange={(e) => set('last_working_date', e.target.value)} className={inputCls} />
+                  <UserDateInput value={form.last_working_date} onChange={(value) => set('last_working_date', value)} className={inputCls} />
                 </div>
               </div>
             </fieldset>
