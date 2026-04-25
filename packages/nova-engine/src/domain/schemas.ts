@@ -297,7 +297,7 @@ export const createCISchema = z.object({
   managed_by: z.string().uuid().optional().nullable(),
   assigned_to: z.string().uuid().optional().nullable(),
   supported_by: z.string().uuid().optional().nullable(),
-  location: z.string().max(500).optional().nullable(),
+  location_id: z.string().uuid().optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
 });
 

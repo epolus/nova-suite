@@ -586,7 +586,7 @@ CREATE TABLE configuration_items (
   managed_by   uuid REFERENCES users(id),
   assigned_to    uuid REFERENCES users(id),
   supported_by   uuid REFERENCES assignment_groups(id),
-  location       text,
+  location_id    uuid REFERENCES locations(id) ON DELETE SET NULL,
   notes          text,
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
@@ -597,6 +597,7 @@ CREATE INDEX idx_ci_class ON configuration_items(class_id);
 CREATE INDEX idx_ci_status ON configuration_items(tenant_id, status);
 CREATE INDEX idx_ci_assigned ON configuration_items(tenant_id, assigned_to);
 CREATE INDEX idx_ci_supported_by ON configuration_items(tenant_id, supported_by);
+CREATE INDEX idx_ci_location_id ON configuration_items(tenant_id, location_id);
 CREATE INDEX idx_ci_attributes_gin ON configuration_items USING gin (attributes);
 
 -- ============================================================

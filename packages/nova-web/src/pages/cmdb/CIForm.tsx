@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { cmdb, auth, admin } from '../../api/client';
-import type { CI, CIClass, AssignmentGroupItem } from '../../api/client';
+import type { CI, CIClass, AssignmentGroupItem, LocationItem } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
@@ -22,6 +22,7 @@ export default function CIForm() {
   const [classes, setClasses] = useState<CIClass[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
+  const [locations, setLocations] = useState<LocationItem[]>([]);
   const [refData, setRefData] = useState<RefDataMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,7 +40,7 @@ export default function CIForm() {
   const [managedBy, setManagedBy] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [supportedBy, setSupportedBy] = useState('');
-  const [location, setLocation] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [notes, setNotes] = useState('');
   const [attributes, setAttributes] = useState<Record<string, string>>({});
 
@@ -71,15 +72,17 @@ export default function CIForm() {
       cmdb.classes(),
       auth.users(),
       admin.assignmentGroups(),
+      admin.locations(),
     ];
     if (isEdit) promises.push(cmdb.item(id!));
 
-    Promise.all(promises).then(async ([classRes, userRes, groupRes, ciRes]) => {
+    Promise.all(promises).then(async ([classRes, userRes, groupRes, locationRes, ciRes]) => {
       setClasses(classRes.classes);
       const userList = userRes.users.map((u: any) => ({ id: u.id, display_name: u.display_name || u.email, email: u.email }));
       setUsers(userList);
       const groupList = groupRes.assignment_groups.filter((g: AssignmentGroupItem) => g.is_active);
       setGroups(groupList);
+      setLocations(locationRes.locations.filter((l: LocationItem) => l.is_active));
 
       // Build reference data from already-loaded entities
       const refs: RefDataMap = {
@@ -122,7 +125,7 @@ export default function CIForm() {
         setManagedBy(ci.managed_by || '');
         setAssignedTo(ci.assigned_to || '');
         setSupportedBy(ci.supported_by || '');
-        setLocation(ci.location || '');
+        setLocationId(ci.location_id || '');
         setNotes(ci.notes || '');
         const attrMap: Record<string, string> = {};
         for (const [k, v] of Object.entries(ci.attributes || {})) {
@@ -165,7 +168,7 @@ export default function CIForm() {
       managed_by: managedBy || null,
       assigned_to: assignedTo || null,
       supported_by: supportedBy || null,
-      location: location || null,
+      location_id: locationId || null,
       notes: notes || null,
     };
 
@@ -320,12 +323,18 @@ export default function CIForm() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Location</label>
-                  <input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                  <select
+                    value={locationId}
+                    onChange={(e) => setLocationId(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g. Zurich DC-1"
-                  />
+                  >
+                    <option value="">— None —</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.code} - {loc.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {isEdit && (
                   <div>

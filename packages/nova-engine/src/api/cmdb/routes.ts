@@ -222,7 +222,7 @@ router.get(
         managed_by_name: 'u.display_name',
         assigned_to_name: 'ua.display_name',
         supported_by_name: 'ag.name',
-        location: 'ci.location',
+        location: 'l.name',
       };
       let needsExtraJoins = false;
       for (const [qKey, qVal] of Object.entries(req.query)) {
@@ -232,7 +232,7 @@ router.get(
             idx++;
             conditions.push(`${col} ILIKE $${idx}`);
             params.push(`${qVal}%`);
-            if (col.startsWith('cc.') || col.startsWith('u.') || col.startsWith('ua.') || col.startsWith('ag.')) needsExtraJoins = true;
+            if (col.startsWith('cc.') || col.startsWith('u.') || col.startsWith('ua.') || col.startsWith('ag.') || col.startsWith('COALESCE(l.')) needsExtraJoins = true;
           }
         }
       }
@@ -243,7 +243,8 @@ router.get(
       const countFrom = needsClassJoin
         ? `configuration_items ci JOIN ci_classes cc ON cc.id = ci.class_id
            LEFT JOIN users u ON u.id = ci.managed_by LEFT JOIN users ua ON ua.id = ci.assigned_to
-           LEFT JOIN assignment_groups ag ON ag.id = ci.supported_by`
+           LEFT JOIN assignment_groups ag ON ag.id = ci.supported_by
+           LEFT JOIN locations l ON l.id = ci.location_id`
         : 'configuration_items ci';
       const countResult = await client.query(
         `SELECT count(*) FROM ${countFrom} ${whereClause}`,
@@ -261,7 +262,7 @@ router.get(
         managed_by_name: 'u.display_name',
         assigned_to_name: 'ua.display_name',
         supported_by_name: 'ag.name',
-        location: 'ci.location',
+        location: 'l.name',
         created_at: 'ci.created_at',
         updated_at: 'ci.updated_at',
       };
@@ -277,7 +278,8 @@ router.get(
       params.push(offset);
 
       const result = await client.query(
-        `SELECT ci.*, cc.display_name AS class_display_name, cc.icon AS class_icon,
+        `SELECT ci.*, l.name AS location, l.id AS location_id, l.name AS location_name,
+                cc.display_name AS class_display_name, cc.icon AS class_icon,
                 u.display_name AS managed_by_name,
                 ua.display_name AS assigned_to_name,
                 ag.name AS supported_by_name
@@ -286,6 +288,7 @@ router.get(
          LEFT JOIN users u ON u.id = ci.managed_by
          LEFT JOIN users ua ON ua.id = ci.assigned_to
          LEFT JOIN assignment_groups ag ON ag.id = ci.supported_by
+         LEFT JOIN locations l ON l.id = ci.location_id
          ${whereClause}
          ${orderClause}
          LIMIT $${idx - 1} OFFSET $${idx}`,
@@ -351,7 +354,7 @@ router.get('/items/nav', async (req: Request, res: Response, next: NextFunction)
       managed_by_name: 'u.display_name',
       assigned_to_name: 'ua.display_name',
       supported_by_name: 'ag.name',
-      location: 'ci.location',
+      location: 'l.name',
     };
     for (const [qKey, qVal] of Object.entries(req.query)) {
       if (typeof qKey === 'string' && qKey.startsWith('cf.') && typeof qVal === 'string' && qVal) {
@@ -373,7 +376,7 @@ router.get('/items/nav', async (req: Request, res: Response, next: NextFunction)
       managed_by_name: 'u.display_name',
       assigned_to_name: 'ua.display_name',
       supported_by_name: 'ag.name',
-      location: 'ci.location',
+      location: 'l.name',
       created_at: 'ci.created_at', updated_at: 'ci.updated_at',
     };
     const sortCol = allowedSortCols[req.query.sort_by as string];
@@ -389,6 +392,7 @@ router.get('/items/nav', async (req: Request, res: Response, next: NextFunction)
        LEFT JOIN users u ON u.id = ci.managed_by
        LEFT JOIN users ua ON ua.id = ci.assigned_to
        LEFT JOIN assignment_groups ag ON ag.id = ci.supported_by
+       LEFT JOIN locations l ON l.id = ci.location_id
        ${whereClause}
        ${orderClause}`,
       params,
@@ -416,20 +420,20 @@ router.post(
       const client = getRequestClient(req);
       const {
         class_id, name, display_name, status, environment,
-        attributes, managed_by, assigned_to, supported_by, location, notes,
+        attributes, managed_by, assigned_to, supported_by, location_id, notes,
       } = req.body;
 
       const result = await client.query(
         `INSERT INTO configuration_items (
           tenant_id, class_id, name, display_name, status, environment,
-          attributes, managed_by, assigned_to, supported_by, location, notes
+          attributes, managed_by, assigned_to, supported_by, location_id, notes
         ) VALUES (
           current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
         ) RETURNING *`,
         [
           class_id, name, display_name || name, status, environment,
           JSON.stringify(attributes), managed_by || null, assigned_to || null,
-          supported_by || null, location || null, notes || null,
+          supported_by || null, location_id || null, notes || null,
         ],
       );
 
@@ -452,7 +456,8 @@ router.get('/items/:id', async (req: Request, res: Response, next: NextFunction)
   try {
     const client = getRequestClient(req);
     const result = await client.query(
-      `SELECT ci.*, cc.display_name AS class_display_name, cc.icon AS class_icon,
+      `SELECT ci.*, l.name AS location, l.id AS location_id, l.name AS location_name,
+              cc.display_name AS class_display_name, cc.icon AS class_icon,
               cc.attributes AS class_attributes, cc.name AS class_name,
               u.display_name AS managed_by_name,
               ua.display_name AS assigned_to_name,
@@ -462,6 +467,7 @@ router.get('/items/:id', async (req: Request, res: Response, next: NextFunction)
        LEFT JOIN users u ON u.id = ci.managed_by
        LEFT JOIN users ua ON ua.id = ci.assigned_to
        LEFT JOIN assignment_groups ag ON ag.id = ci.supported_by
+       LEFT JOIN locations l ON l.id = ci.location_id
        WHERE ci.id = $1`,
       [req.params.id],
     );

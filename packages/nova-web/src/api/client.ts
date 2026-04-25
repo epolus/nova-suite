@@ -1099,7 +1099,9 @@ export interface CI {
   managed_by: string | null;
   assigned_to: string | null;
   supported_by: string | null;
+  location_id: string | null;
   location: string | null;
+  location_name?: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
