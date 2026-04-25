@@ -17,7 +17,14 @@ import { cacheShutdown } from './cache/redis';
 const app = express();
 
 // ─── Global Middleware ───
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      // Keep /docs usable on plain-http LAN/dev setups (no forced https asset upgrade).
+      upgradeInsecureRequests: null,
+    },
+  },
+}));
 app.use(cors({ origin: config.cors.origin }));
 app.use(express.json({ limit: '1mb' }));
 
