@@ -162,12 +162,16 @@ export default function ProblemDetail() {
     setSaving(true);
     setError('');
     try {
+      if (!form.assignment_group_id) {
+        setError('Assignment Group is required');
+        return;
+      }
       const payload = {
         title: form.title,
         priority: form.priority,
         impact: form.impact,
         status: form.status,
-        assignment_group_id: form.assignment_group_id || null,
+        assignment_group_id: form.assignment_group_id,
         affected_ci: form.affected_ci || null,
         ...(form.description ? { description: form.description } : {}),
         ...(form.category ? { category: form.category } : {}),
@@ -317,7 +321,7 @@ export default function ProblemDetail() {
         title={isNew ? 'New Problem' : `${problem?.number} — ${form.title}`}
         action={
           <div className="flex items-center gap-2">
-            <Button onClick={save} disabled={saving || !form.title}>
+            <Button onClick={save} disabled={saving || !form.title || !form.assignment_group_id}>
               {saving ? 'Saving...' : isNew ? 'Create Problem' : 'Save Changes'}
             </Button>
             <Button variant="outline" size="icon" onClick={() => prevId && goTo(prevId)} disabled={!prevId} title="Previous (Left Arrow)">&#8592;</Button>
@@ -360,9 +364,11 @@ export default function ProblemDetail() {
             <input value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} className={inputCls} placeholder="Category" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Assignment Group</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">
+              Assignment Group <span className="text-red-500">*</span>
+            </label>
             <select value={form.assignment_group_id} onChange={(e) => setForm((p) => ({ ...p, assignment_group_id: e.target.value }))} className={selectCls}>
-              <option value="">— Unassigned —</option>
+              <option value="">Select assignment group...</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>

@@ -386,10 +386,11 @@ router.post('/', validateBody(createProblemSchema), async (req: Request, res: Re
     const client = getRequestClient(req);
     const b = req.body || {};
 
-    if (b.assignment_group_id) {
-      const ok = await isProblemEnabledGroup(client, b.assignment_group_id);
-      if (!ok) throw new AppError(400, 'Assignment group is not enabled for Problem Management');
+    if (!b.assignment_group_id) {
+      throw new AppError(400, 'assignment_group_id is required');
     }
+    const createGroupOk = await isProblemEnabledGroup(client, b.assignment_group_id);
+    if (!createGroupOk) throw new AppError(400, 'Assignment group is not enabled for Problem Management');
 
     const seq = await client.query(`SELECT nextval('problem_number_seq') AS n`);
     const number = `PRB${String(seq.rows[0].n).padStart(7, '0')}`;
@@ -450,7 +451,17 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
 
     const updates = req.body || {};
-    if (updates.assignment_group_id !== undefined && updates.assignment_group_id !== null) {
+    if (
+      updates.assignment_group_id !== undefined
+      && (updates.assignment_group_id === null || String(updates.assignment_group_id).trim() === '')
+    ) {
+      throw new AppError(400, 'assignment_group_id is required');
+    }
+    const effectiveAssignmentGroupId = updates.assignment_group_id ?? current.assignment_group_id;
+    if (!effectiveAssignmentGroupId) {
+      throw new AppError(400, 'assignment_group_id is required');
+    }
+    if (updates.assignment_group_id !== undefined) {
       const ok = await isProblemEnabledGroup(client, updates.assignment_group_id);
       if (!ok) throw new AppError(400, 'Assignment group is not enabled for Problem Management');
     }

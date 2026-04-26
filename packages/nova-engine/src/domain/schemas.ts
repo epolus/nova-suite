@@ -165,7 +165,7 @@ export const createProblemSchema = z.object({
   permanent_fix: z.string().max(10000).optional(),
   reported_by: z.string().uuid().optional(),
   assigned_to: z.string().uuid().nullable().optional(),
-  assignment_group_id: z.string().uuid().nullable().optional(),
+  assignment_group_id: z.string().uuid(),
   affected_ci: z.string().uuid().nullable().optional(),
   resolution_notes: z.string().max(10000).optional(),
 });
