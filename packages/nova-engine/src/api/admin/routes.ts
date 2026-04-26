@@ -6,8 +6,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import { db } from '../../data/db';
 import { authenticate, requireRole } from '../../middleware/auth';
+import { validateBody } from '../../middleware/validate';
 import { AppError } from '../../middleware/errorHandler';
 import { startNotificationDispatch } from '../../temporal/workflows';
+import { adminCreateUserSchema, adminUpdateUserSchema } from '../../domain/schemas';
 
 const router = Router();
 
@@ -484,7 +486,7 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
 });
 
 // ─── PATCH /api/admin/users/:id ───
-router.patch('/users/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
     const userId = req.params.id;
@@ -563,7 +565,7 @@ router.patch('/users/:id', async (req: Request, res: Response, next: NextFunctio
 });
 
 // ─── POST /api/admin/users ───
-router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/users', validateBody(adminCreateUserSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
     const {
@@ -601,7 +603,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       [
         tenantId, user_id || null, email, passwordHash,
         first_name || null, last_name || null, display_name, jobTitle || null,
-        phone || '+41', mobile || null, location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
+        phone || null, mobile || null, location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
         employee_type || 'employee', company || null, preferred_language || 'en',
         start_date || null, last_working_date || null,
         manager_id || null, department_id || null, cost_center_id || null,

@@ -15,6 +15,15 @@ export const rankedSuggestionsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(5),
 }).passthrough();
 
+const e164PhoneSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') return value;
+    // Normalize common user formatting before E.164 validation.
+    return value.trim().replace(/[()\-\s]/g, '');
+  },
+  z.string().regex(/^\+[1-9]\d{1,14}$/, 'Must be a valid E.164 phone number'),
+);
+
 // ─── Auth ───
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -28,8 +37,8 @@ export const registerSchema = z.object({
   last_name: z.string().max(255).optional(),
   display_name: z.string().min(1).max(255),
   title: z.string().max(255).optional(),
-  phone: z.string().max(50).default('+41'),
-  mobile: z.string().max(50).optional(),
+  phone: e164PhoneSchema.optional(),
+  mobile: e164PhoneSchema.optional(),
   location: z.string().max(255).default('Zurich'),
   timezone: z.string().max(100).default('UTC'),
   time_format: z.enum(['12h', '24h']).default('24h'),
@@ -250,6 +259,19 @@ export const createChangeTypeSchema = z.object({
 });
 
 export const updateChangeTypeSchema = createChangeTypeSchema.partial();
+
+export const adminCreateUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+  display_name: z.string().min(1).max(255),
+  phone: e164PhoneSchema.optional().nullable(),
+  mobile: e164PhoneSchema.optional().nullable(),
+}).passthrough();
+
+export const adminUpdateUserSchema = z.object({
+  phone: e164PhoneSchema.optional().nullable(),
+  mobile: e164PhoneSchema.optional().nullable(),
+}).passthrough();
 
 export const createCabMeetingSchema = z.object({
   title: z.string().min(1).max(255),

@@ -33,7 +33,21 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error || `Request failed: ${res.status}`);
+    const details = Array.isArray(body?.details)
+      ? body.details
+        .map((detail: { path?: string; message?: string }) => {
+          const path = typeof detail?.path === 'string' && detail.path ? `${detail.path}: ` : '';
+          const message = typeof detail?.message === 'string' ? detail.message : 'Invalid value';
+          return `${path}${message}`;
+        })
+        .filter(Boolean)
+      : [];
+    const baseMessage =
+      typeof body?.error === 'string' && body.error.trim().length > 0
+        ? body.error
+        : `Request failed: ${res.status}`;
+    const fullMessage = details.length > 0 ? `${baseMessage} (${details.join('; ')})` : baseMessage;
+    throw new Error(fullMessage);
   }
 
   if (res.status === 204) return undefined as unknown as T;
@@ -670,7 +684,21 @@ async function uploadFile<T>(path: string, formData: FormData): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error || `Request failed: ${res.status}`);
+    const details = Array.isArray(body?.details)
+      ? body.details
+        .map((detail: { path?: string; message?: string }) => {
+          const path = typeof detail?.path === 'string' && detail.path ? `${detail.path}: ` : '';
+          const message = typeof detail?.message === 'string' ? detail.message : 'Invalid value';
+          return `${path}${message}`;
+        })
+        .filter(Boolean)
+      : [];
+    const baseMessage =
+      typeof body?.error === 'string' && body.error.trim().length > 0
+        ? body.error
+        : `Request failed: ${res.status}`;
+    const fullMessage = details.length > 0 ? `${baseMessage} (${details.join('; ')})` : baseMessage;
+    throw new Error(fullMessage);
   }
   return res.json();
 }

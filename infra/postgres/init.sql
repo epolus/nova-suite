@@ -875,7 +875,7 @@ INSERT INTO users (
    'EMP003', 'user@acme.local',
    '$2b$10$WI5eBebgKFrYIXgHEKUdF.X7ogfJWMaDkLg7UUOb2paF8sUAjxf4y',
    'Jane', 'Employee', 'Jane Employee', 'Software Engineer',
-  '+41 20 555 0102', '+41 6 3456 7890', 'Rotterdam Office', 'Europe/Zurich', '24h', 'DD.MM.YYYY',
+  '+41 20 555 0102', '+41 6 3456 7890', 'Zurich Office', 'Europe/Zurich', '24h', 'DD.MM.YYYY',
    'employee', 'a4000000-0000-0000-0000-000000000001', 'en',
    '2022-03-15',
    'a1000000-0000-0000-0000-000000000002',

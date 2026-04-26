@@ -145,7 +145,7 @@ router.post(
         [
           tenantId, user_id || null, email, passwordHash,
           first_name || null, last_name || null, display_name, jobTitle || null,
-          phone || '+41', mobile || null, location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
+          phone || null, mobile || null, location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
           employee_type || 'employee', company || null, preferred_language || 'en',
           start_date || null, last_working_date || null,
           manager_id || null, department_id || null, cost_center_id || null,

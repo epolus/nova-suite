@@ -56,6 +56,20 @@ function toDateOnly(value: string | null | undefined): string {
   return m?.[1] ?? raw;
 }
 
+function normalizePhoneForValidation(value: string): string {
+  return value.trim().replace(/[()\-\s]/g, '');
+}
+
+function validateE164PhoneField(value: string, fieldLabel: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = normalizePhoneForValidation(trimmed);
+  if (!/^\+[1-9]\d{1,14}$/.test(normalized)) {
+    return `${fieldLabel} must be a valid E.164 number (example: +41791234567).`;
+  }
+  return null;
+}
+
 function getSortValue(user: AdminUser, key: string): unknown {
   if (key === 'user') return user.display_name;
   if (key === '_status') return user.is_active ? 0 : 1;
@@ -306,6 +320,16 @@ export default function UserDetailPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const phoneError = validateE164PhoneField(form.phone, 'Phone');
+    if (phoneError) {
+      setError(phoneError);
+      return;
+    }
+    const mobileError = validateE164PhoneField(form.mobile, 'Mobile');
+    if (mobileError) {
+      setError(mobileError);
+      return;
+    }
     setSaving(true);
     try {
       if (isNew) {
