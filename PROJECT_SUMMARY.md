@@ -4,6 +4,16 @@
 
 Nova Suite is a production-ready, open-source ITSM Suite.
 
+## Implemented Modules
+
+- **Service Catalog & Requests**: Dynamic request forms, approval/fulfillment workflows, request task queues, automation builder, and cart/checkout flows.
+- **Incident Management**: Full lifecycle handling, assignment/group routing, SLA tracking, journal/work notes, bulk actions, and dashboard insights.
+- **Change Management**: Change lifecycle, approvals, scheduling/conflict checks, blackout windows, CAB support, and user-format-aware date/time UX.
+- **Problem Management**: Problem records, linked incidents, known errors, and task tracking.
+- **Knowledge Management**: Article authoring/versioning/review/publishing, approval workflows, ratings, suggestions, and markdown + attachment support.
+- **CMDB**: CI class modeling, relationship mapping, impact traversal, relationship graph UI, and audit/history support.
+- **Admin Platform**: Users/roles/groups/departments/cost-centers/locations/companies/services, branding/theming, notification workflows, and data source integrations.
+
 
 ## Core Modules
 
@@ -47,9 +57,8 @@ Nova Suite is a production-ready, open-source ITSM Suite.
 
 ## What's Next
 
-- Frontend UI (Backstage.io or custom React)
-- Email notifications
-- SLA compliance dashboards
-- Knowledge base
-- Change management module
-- Problem management module
+- Advanced dashboard analytics and trend views
+- Broader notification channels (email/teams/slack)
+- Expanded workflow templates and governance controls
+- Performance optimizations and frontend chunk splitting
+- Additional demo packs and import/export tooling
