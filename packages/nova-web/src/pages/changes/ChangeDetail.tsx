@@ -298,6 +298,11 @@ export default function ChangeDetailPage() {
   const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
   const selectCls = `${inputCls} bg-white`;
   const textareaCls = `${inputCls} resize-none`;
+  const pageTitle = isNew
+    ? 'New Change'
+    : change?.number
+      ? `${change.number} — ${form.title || change.title || ''}`.trim()
+      : form.title || 'Change';
 
   const tabs = [
     { key: 'overview' as const, label: 'Assessment' },
@@ -310,7 +315,7 @@ export default function ChangeDetailPage() {
   return (
     <>
       <PageHeader
-        title={isNew ? 'New Change' : `${change?.number} — ${form.title}`}
+        title={pageTitle}
         action={
           <div className="flex items-center gap-2">
             <Button onClick={save} disabled={saving || !hasRequiredFields}>
