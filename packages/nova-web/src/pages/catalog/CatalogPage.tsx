@@ -9,6 +9,8 @@ import Spinner from '../../components/Spinner';
 import SearchBar from '../../components/SearchBar';
 import { useCart } from '../../context/CartContext';
 import { catalogPictureFrameBaseClass } from './catalogPictureFrame';
+import { useTheme } from '../../context/ThemeContext';
+import { formatCurrency } from '../../utils/currency';
 
 function CatalogImage({ itemId }: { itemId: string }) {
   const [src, setSrc] = useState<string>('');
@@ -37,6 +39,7 @@ export default function CatalogPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const { cartCount } = useCart();
+  const { theme } = useTheme();
 
   useEffect(() => {
     catalog.categories().then((res) => {
@@ -139,7 +142,9 @@ export default function CatalogPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     {item.price != null && (
-                      <span className="text-sm font-semibold text-green-700">${Number(item.price).toFixed(2)}</span>
+                      <span className="text-sm font-semibold text-green-700">
+                        {formatCurrency(Number(item.price), theme.catalog_currency)}
+                      </span>
                     )}
                     {item.approval_required && (
                       <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">

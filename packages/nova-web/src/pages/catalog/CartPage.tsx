@@ -8,6 +8,8 @@ import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import UserDateInput from '../../components/UserDateInput';
 import { catalogPictureFrameBaseClass } from './catalogPictureFrame';
+import { useTheme } from '../../context/ThemeContext';
+import { formatCurrency } from '../../utils/currency';
 
 const STEPS = ['Review Cart', 'Delivery & Recipient', 'Confirm Order'] as const;
 
@@ -71,10 +73,11 @@ const PRIORITY_COLORS: Record<string, string> = {
   critical: 'bg-red-100 text-red-700',
 };
 
-function ReviewStep({ items, onRemove, onUpdate }: {
+function ReviewStep({ items, onRemove, onUpdate, currencyCode }: {
   items: CartItem[];
   onRemove: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Pick<CartItem, 'priority' | 'notes'>>) => void;
+  currencyCode: string;
 }) {
   const total = items.reduce((sum, i) => sum + (Number(i.serviceItem.price) || 0), 0);
 
@@ -92,7 +95,7 @@ function ReviewStep({ items, onRemove, onUpdate }: {
               <div className="flex items-center gap-2 flex-shrink-0">
                 {item.serviceItem.price != null && (
                   <span className="text-sm font-semibold text-green-700">
-                    ${Number(item.serviceItem.price).toFixed(2)}
+                    {formatCurrency(Number(item.serviceItem.price), currencyCode)}
                   </span>
                 )}
                 <button
@@ -143,7 +146,7 @@ function ReviewStep({ items, onRemove, onUpdate }: {
       {total > 0 && (
         <div className="flex justify-end items-center gap-2 pt-4 border-t border-gray-100">
           <span className="text-sm text-gray-500">Estimated total:</span>
-          <span className="text-lg font-bold text-green-700">${total.toFixed(2)}</span>
+          <span className="text-lg font-bold text-green-700">{formatCurrency(total, currencyCode)}</span>
         </div>
       )}
     </div>
@@ -267,12 +270,13 @@ function DeliveryStep({ delivery, setDelivery, orderForSelf, setOrderForSelf, se
   );
 }
 
-function ConfirmStep({ items, delivery, orderForSelf, selectedUserName, total }: {
+function ConfirmStep({ items, delivery, orderForSelf, selectedUserName, total, currencyCode }: {
   items: CartItem[];
   delivery: { location: string; date_needed: string; instructions: string };
   orderForSelf: boolean;
   selectedUserName: string;
   total: number;
+  currencyCode: string;
 }) {
   return (
     <div className="space-y-6">
@@ -287,7 +291,7 @@ function ConfirmStep({ items, delivery, orderForSelf, selectedUserName, total }:
               </div>
               {item.serviceItem.price != null && (
                 <span className="text-sm font-semibold text-green-700">
-                  ${Number(item.serviceItem.price).toFixed(2)}
+                  {formatCurrency(Number(item.serviceItem.price), currencyCode)}
                 </span>
               )}
             </div>
@@ -295,7 +299,7 @@ function ConfirmStep({ items, delivery, orderForSelf, selectedUserName, total }:
           {total > 0 && (
             <div className="flex items-center justify-between pt-3 border-t border-gray-200">
               <span className="font-semibold text-gray-900">Total</span>
-              <span className="text-lg font-bold text-green-700">${total.toFixed(2)}</span>
+              <span className="text-lg font-bold text-green-700">{formatCurrency(total, currencyCode)}</span>
             </div>
           )}
         </div>
@@ -372,6 +376,7 @@ function SuccessView({ batchId, createdRequests }: { batchId: string; createdReq
 export default function CartPage() {
   const navigate = useNavigate();
   const { items, cartCount, cartTotal, removeItem, updateItem, clearCart } = useCart();
+  const { theme } = useTheme();
   const [step, setStep] = useState(0);
   const [delivery, setDelivery] = useState({ location: '', date_needed: '', instructions: '' });
   const [orderForSelf, setOrderForSelf] = useState(true);
@@ -477,7 +482,7 @@ export default function CartPage() {
       )}
 
       {step === 0 && (
-        <ReviewStep items={items} onRemove={removeItem} onUpdate={updateItem} />
+        <ReviewStep items={items} onRemove={removeItem} onUpdate={updateItem} currencyCode={theme.catalog_currency} />
       )}
 
       {step === 1 && (
@@ -498,6 +503,7 @@ export default function CartPage() {
           orderForSelf={orderForSelf}
           selectedUserName={selectedUserName}
           total={cartTotal}
+          currencyCode={theme.catalog_currency}
         />
       )}
 

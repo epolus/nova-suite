@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
+import { normalizeCurrencyCode } from '../../utils/currency';
 
 const DEFAULT_LOGO_SRC = '/default-logo.svg';
 
@@ -179,6 +180,18 @@ export default function ThemingPage() {
                   placeholder="Service Management"
                 />
                 <p className="text-xs text-gray-400 mt-1">Displayed below the app name</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Catalog Currency</label>
+                <input
+                  type="text"
+                  value={form.catalog_currency || 'USD'}
+                  onChange={(e) => setField('catalog_currency', normalizeCurrencyCode(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none uppercase"
+                  placeholder="USD"
+                  maxLength={8}
+                />
+                <p className="text-xs text-gray-400 mt-1">Currency code used to display service item prices (for example: USD, EUR, CHF)</p>
               </div>
             </div>
           </Card>

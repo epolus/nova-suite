@@ -29,6 +29,7 @@ const DEFAULT_THEME: ThemeSettings = {
   dark_border_color: '#475569',
   dark_text_primary: '#f1f5f9',
   dark_text_muted: '#94a3b8',
+  catalog_currency: 'USD',
   logo_url: '',
 };
 

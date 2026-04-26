@@ -56,6 +56,7 @@ export interface ThemeSettings {
   dark_border_color: string;
   dark_text_primary: string;
   dark_text_muted: string;
+  catalog_currency: string;
   logo_url: string;
   [key: string]: string;
 }

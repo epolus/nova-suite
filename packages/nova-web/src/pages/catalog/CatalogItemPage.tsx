@@ -9,6 +9,8 @@ import Spinner from '../../components/Spinner';
 import DynamicFormField from '../../components/DynamicFormField';
 import { useCart, type CartItem } from '../../context/CartContext';
 import { catalogPictureFrameBaseClass } from './catalogPictureFrame';
+import { useTheme } from '../../context/ThemeContext';
+import { formatCurrency } from '../../utils/currency';
 
 function CatalogImage({ itemId }: { itemId: string }) {
   const [src, setSrc] = useState<string>('');
@@ -70,6 +72,7 @@ export default function CatalogItemPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addItem } = useCart();
+  const { theme } = useTheme();
 
   const [item, setItem] = useState<ServiceItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,7 +225,9 @@ export default function CatalogItemPage() {
                 {item.price != null && (
                   <div className="flex items-center justify-between text-sm mb-3">
                     <span className="text-gray-500">Estimated cost</span>
-                    <span className="font-semibold text-green-700">${Number(item.price).toFixed(2)}</span>
+                    <span className="font-semibold text-green-700">
+                      {formatCurrency(Number(item.price), theme.catalog_currency)}
+                    </span>
                   </div>
                 )}
 

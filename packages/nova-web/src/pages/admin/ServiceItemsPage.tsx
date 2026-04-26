@@ -8,6 +8,8 @@ import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import SearchBar from '../../components/SearchBar';
 import FormBuilder from '../../components/FormBuilder';
+import { useTheme } from '../../context/ThemeContext';
+import { formatCurrency, normalizeCurrencyCode } from '../../utils/currency';
 
 const EMPTY_ITEM: Partial<ServiceItem> = {
   name: '',
@@ -24,6 +26,7 @@ const EMPTY_ITEM: Partial<ServiceItem> = {
 
 export default function ServiceItemsPage() {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +78,7 @@ export default function ServiceItemsPage() {
       <ServiceItemForm
         item={editing || undefined}
         categories={categories}
+        currencyCode={theme.catalog_currency}
         onSave={handleSaved}
         onCancel={() => { setEditing(null); setCreating(false); }}
       />
@@ -121,7 +125,7 @@ export default function ServiceItemsPage() {
                 </div>
                 {item.price != null && (
                   <span className="text-sm font-semibold text-green-700 flex-shrink-0 ml-2">
-                    ${Number(item.price).toFixed(2)}
+                    {formatCurrency(Number(item.price), theme.catalog_currency)}
                   </span>
                 )}
               </div>
@@ -188,11 +192,13 @@ function AuthImage({ itemId, className }: { itemId: string; className?: string }
 function ServiceItemForm({
   item,
   categories,
+  currencyCode,
   onSave,
   onCancel,
 }: {
   item?: ServiceItem;
   categories: Category[];
+  currencyCode: string;
   onSave: (item: ServiceItem) => void;
   onCancel: () => void;
 }) {
@@ -206,6 +212,7 @@ function ServiceItemForm({
   const [picturePreview, setPicturePreview] = useState<string>('');
   const fileRef = useRef<HTMLInputElement>(null);
   const [ciClasses, setCiClasses] = useState<CIClass[]>([]);
+  const normalizedCurrency = normalizeCurrencyCode(currencyCode);
 
   useEffect(() => {
     cmdb.classes().then((res) => setCiClasses(res.classes)).catch(() => {});
@@ -462,14 +469,16 @@ function ServiceItemForm({
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs uppercase">
+                    {normalizedCurrency}
+                  </span>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     value={form.price != null && form.price !== '' ? String(form.price) : ''}
                     onChange={(e) => set('price', e.target.value === '' ? null : e.target.value)}
-                    className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-16 pr-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="0.00"
                   />
                 </div>
@@ -524,7 +533,9 @@ function ServiceItemForm({
                 <p className="text-xs text-gray-500 mt-1">{(form.short_description as string) || 'Short description...'}</p>
                 <div className="flex items-center justify-between mt-2">
                   {form.price != null && form.price !== '' ? (
-                    <span className="text-sm font-semibold text-green-700">${Number(form.price).toFixed(2)}</span>
+                    <span className="text-sm font-semibold text-green-700">
+                      {formatCurrency(Number(form.price), normalizedCurrency)}
+                    </span>
                   ) : (
                     <span className="text-xs text-gray-400">Free</span>
                   )}
