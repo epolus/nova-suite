@@ -23,10 +23,10 @@ const EMPLOYEE_TYPES = [
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
-  { value: 'nl', label: 'Dutch' },
   { value: 'de', label: 'German' },
+  { value: 'de-ch', label: 'German Switzerland' },
   { value: 'fr', label: 'French' },
-  { value: 'es', label: 'Spanish' },
+  { value: 'it', label: 'Italian' },
 ];
 
 const TIME_FORMATS = [
