@@ -314,11 +314,16 @@ export default function ProblemDetail() {
   const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
   const selectCls = `${inputCls} bg-white`;
   const textareaCls = `${inputCls} resize-none`;
+  const pageTitle = isNew
+    ? 'New Problem'
+    : problem?.number
+      ? `${problem.number} — ${form.title || problem.title || ''}`.trim()
+      : form.title || 'Problem';
 
   return (
     <>
       <PageHeader
-        title={isNew ? 'New Problem' : `${problem?.number} — ${form.title}`}
+        title={pageTitle}
         action={
           <div className="flex items-center gap-2">
             <Button onClick={save} disabled={saving || !form.title || !form.assignment_group_id}>
