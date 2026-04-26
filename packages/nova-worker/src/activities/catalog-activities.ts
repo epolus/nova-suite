@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { log } from '@temporalio/activity';
 import { withTenantContext } from '../db';
+import { dispatchConfiguredNotifications } from './notification-activities';
 
 export interface TaskDefinition {
   id: string | null;
@@ -216,12 +217,42 @@ export async function updateRequestStatus(
   status: string,
 ): Promise<void> {
   log.info('Updating request status', { requestId, status });
-  await withTenantContext(tenantId, async (client) => {
-    await client.query(
-      `UPDATE requests SET status = $1, updated_at = now() WHERE id = $2`,
+  const transition = await withTenantContext(tenantId, async (client) => {
+    const result = await client.query<{
+      previous_status: string | null;
+      current_status: string | null;
+    }>(
+      `WITH previous AS (
+         SELECT status AS previous_status
+         FROM requests
+         WHERE id = $2
+       ),
+       updated AS (
+         UPDATE requests
+         SET status = $1, updated_at = now()
+         WHERE id = $2
+         RETURNING status AS current_status
+       )
+       SELECT previous.previous_status, updated.current_status
+       FROM previous
+       JOIN updated ON true`,
       [status, requestId],
     );
+    return result.rows[0] || null;
   });
+
+  if (!transition) return;
+  if (transition.previous_status === transition.current_status) return;
+
+  if (status === 'fulfilled' || status === 'cancelled') {
+    await dispatchConfiguredNotifications({
+      tenantId,
+      entityType: 'request',
+      triggerKey: `request.${status}`,
+      entityId: requestId,
+      actorUserId: null,
+    });
+  }
 }
 
 export async function getPendingTaskCount(

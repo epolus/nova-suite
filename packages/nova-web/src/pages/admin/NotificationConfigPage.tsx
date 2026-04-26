@@ -14,6 +14,8 @@ const TRIGGERS = [
   { entity: 'request', id: 'request.created', label: 'Request created' },
   { entity: 'request', id: 'request.approved', label: 'Request approved' },
   { entity: 'request', id: 'request.rejected', label: 'Request rejected' },
+  { entity: 'request', id: 'request.fulfilled', label: 'Request fulfilled' },
+  { entity: 'request', id: 'request.cancelled', label: 'Request cancelled' },
   { entity: 'change', id: 'change.created', label: 'Change created' },
   { entity: 'change', id: 'change.pending_approval', label: 'Change pending approval' },
   { entity: 'change', id: 'change.approved', label: 'Change approved' },

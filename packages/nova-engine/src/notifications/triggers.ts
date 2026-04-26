@@ -10,6 +10,8 @@ export const NOTIFICATION_TRIGGER_KEYS = {
     'request.created',
     'request.approved',
     'request.rejected',
+    'request.fulfilled',
+    'request.cancelled',
   ],
   change: [
     'change.created',

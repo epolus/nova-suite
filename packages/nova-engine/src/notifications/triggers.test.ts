@@ -8,6 +8,8 @@ describe('notification trigger matrix', () => {
       'request.created',
       'request.approved',
       'request.rejected',
+      'request.fulfilled',
+      'request.cancelled',
     ]);
   });
 
