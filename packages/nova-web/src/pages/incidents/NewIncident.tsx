@@ -1,7 +1,12 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { attachments as attachmentsApi, incidents as incidentsApi, knowledge as knowledgeApi } from '../../api/client';
+import {
+  attachments as attachmentsApi,
+  incidents as incidentsApi,
+  knowledge as knowledgeApi,
+  problems as problemsApi,
+} from '../../api/client';
 import { admin as adminApi, cmdb as cmdbApi } from '../../api/client';
 import type {
   UserListItem,
@@ -9,6 +14,7 @@ import type {
   CI,
   ServiceListItem,
   KnowledgeArticleDetail,
+  Problem,
 } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
@@ -37,6 +43,7 @@ export default function NewIncident() {
   const [configItemId, setConfigItemId] = useState('');
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
+  const [relatedProblemId, setRelatedProblemId] = useState('');
 
   // UI state
   const [submitting, setSubmitting] = useState(false);
@@ -56,6 +63,7 @@ export default function NewIncident() {
   const [assignmentGroups, setAssignmentGroups] = useState<AssignmentGroupItem[]>([]);
   const [services, setServices] = useState<ServiceListItem[]>([]);
   const [cis, setCis] = useState<CI[]>([]);
+  const [problems, setProblems] = useState<Problem[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -72,6 +80,7 @@ export default function NewIncident() {
       adminApi.assignmentGroups().then((res) => setAssignmentGroups(res.assignment_groups)).catch(() => {});
       incidentsApi.services().then((res) => setServices(res.services)).catch(() => {});
       cmdbApi.items({ status: 'active' }, 1, 100).then((res) => setCis(res.items)).catch(() => {});
+      problemsApi.list({}, 1, 100).then((res) => setProblems(res.problems)).catch(() => {});
     }
   }, [user, isEss]);
 
@@ -141,6 +150,9 @@ export default function NewIncident() {
       const res = isEss
         ? await incidentsApi.createEss(createPayload)
         : await incidentsApi.create(createPayload);
+      if (!isEss && relatedProblemId) {
+        await incidentsApi.relateProblem(res.id, relatedProblemId, 'related_to');
+      }
       navigate(`/incidents/${res.id}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create incident');
@@ -360,6 +372,19 @@ export default function NewIncident() {
                         onChange={(e) => setSubcategory(e.target.value)}
                         placeholder="Subcategory"
                         className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Related Problem</label>
+                      <SearchableDropdown<Problem>
+                        items={problems}
+                        selectedId={relatedProblemId}
+                        onSelect={setRelatedProblemId}
+                        onClear={() => setRelatedProblemId('')}
+                        getItemId={(p) => p.id}
+                        getDisplayText={(p) => `${p.number} - ${p.title}`}
+                        placeholder="Search problem..."
+                        renderItem={(p) => `${p.number} - ${p.title}`}
                       />
                     </div>
                   </div>

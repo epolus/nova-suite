@@ -13,7 +13,7 @@ import { Button } from '../../components/ui/button';
 import { Card as UiCard, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useIncidentDetail } from './useIncidentDetail';
 import { SimilarIncidentsSection, KbSuggestionsSection } from '../../components/IncidentSidebarSections';
-import type { UserListItem, ServiceListItem, CI } from '../../api/client';
+import type { UserListItem, ServiceListItem, CI, Problem } from '../../api/client';
 
 export default function IncidentDetail() {
   const [previewArticle, setPreviewArticle] = useState<KnowledgeArticleDetail | null>(null);
@@ -24,9 +24,9 @@ export default function IncidentDetail() {
   const {
     user, navigate, prevId, nextId, goTo,
     inc, journal, loading, loadError,
-    assignmentGroups, services, ciOptions, users, groupMembers,
+    assignmentGroups, services, ciOptions, users, problemOptions, groupMembers,
     fields, setField,
-    callerInfo, requiredFieldMissing,
+    callerInfo, selectedProblem, requiredFieldMissing,
     isFulfiller, isClosed, isResolved, isCaller, readonly,
     saving, formError, intelligenceOpen, setIntelligenceOpen,
     fileAttachments, uploading, dragOver, setDragOver, fileInputRef,
@@ -386,6 +386,29 @@ export default function IncidentDetail() {
                         inc.subcategory || '—'
                       ) : (
                         <input type="text" value={fields.subcategory} onChange={(e) => setField('subcategory', e.target.value)} placeholder="Subcategory" className={inputCls} />
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500 mb-1">Related Problem</dt>
+                    <dd className="mt-0.5">
+                      {readonly ? (
+                        selectedProblem ? (
+                          <a href={`/problems/${selectedProblem.id}`} className="text-indigo-600 font-medium hover:text-indigo-800">
+                            {selectedProblem.number} - {selectedProblem.title}
+                          </a>
+                        ) : '—'
+                      ) : (
+                        <SearchableDropdown<Problem>
+                          items={problemOptions}
+                          selectedId={fields.relatedProblemId}
+                          onSelect={(id) => setField('relatedProblemId', id)}
+                          onClear={() => setField('relatedProblemId', '')}
+                          getItemId={(p) => p.id}
+                          getDisplayText={(p) => `${p.number} - ${p.title}`}
+                          placeholder="Search problem..."
+                          renderItem={(p) => `${p.number} - ${p.title}`}
+                        />
                       )}
                     </dd>
                   </div>

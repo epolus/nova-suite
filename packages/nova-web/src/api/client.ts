@@ -228,6 +228,15 @@ export const incidents = {
   },
   callers: () => request<{ users: UserListItem[] }>('/incidents/callers'),
   services: () => request<{ services: ServiceListItem[] }>('/incidents/services'),
+  linkedProblems: (incidentId: string) =>
+    request<{ problems: IncidentProblemLink[] }>(`/incidents/${incidentId}/problems`),
+  relateProblem: (incidentId: string, problemId: string, relationshipType = 'related_to') =>
+    request<{ success: boolean }>(`/incidents/${incidentId}/problems`, {
+      method: 'POST',
+      body: JSON.stringify({ problem_id: problemId, relationship_type: relationshipType }),
+    }),
+  unrelateProblem: (incidentId: string, problemId: string) =>
+    request<{ success: boolean }>(`/incidents/${incidentId}/problems/${problemId}`, { method: 'DELETE' }),
   similar: (id: string, params: { limit?: number } = {}) => {
     const qs = new URLSearchParams();
     if (params.limit !== undefined) qs.set('limit', String(params.limit));
@@ -815,6 +824,17 @@ export interface Incident {
   service_name?: string;
   ci_name?: string;
   ci_display_name?: string;
+}
+
+export interface IncidentProblemLink {
+  problem_id: string;
+  incident_id: string;
+  relationship_type: 'caused_by' | 'related_to' | 'symptom_of';
+  created_at: string;
+  problem_number?: string;
+  problem_title?: string;
+  problem_status?: string;
+  problem_priority?: 'low' | 'medium' | 'high' | 'critical';
 }
 
 export interface SimilarIncident {

@@ -8,6 +8,7 @@ import {
   attachments as attachmentsApi,
   knowledge as knowledgeApi,
   cmdb as cmdbApi,
+  problems as problemsApi,
 } from '../../api/client';
 import type {
   Incident,
@@ -19,6 +20,7 @@ import type {
   SimilarIncident,
   KnowledgeSuggestion,
   CI,
+  Problem,
 } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { isFulfillerRole } from '../../utils/roles';
@@ -42,6 +44,7 @@ const EMPTY_FIELDS = {
   category: '',
   subcategory: '',
   resolutionNotes: '',
+  relatedProblemId: '',
 };
 
 export function useIncidentDetail() {
@@ -66,6 +69,8 @@ export function useIncidentDetail() {
   const [services, setServices] = useState<ServiceListItem[]>([]);
   const [ciOptions, setCiOptions] = useState<CI[]>([]);
   const [users, setUsers] = useState<UserListItem[]>([]);
+  const [problemOptions, setProblemOptions] = useState<Problem[]>([]);
+  const [linkedProblemIds, setLinkedProblemIds] = useState<string[]>([]);
 
   // Edit fields — all grouped
   const [fields, setFields] = useState(EMPTY_FIELDS);
@@ -129,18 +134,23 @@ export function useIncidentDetail() {
       category: i.category || '',
       subcategory: i.subcategory || '',
       resolutionNotes: i.resolution_notes || '',
+      relatedProblemId: '',
     });
   };
 
   const refresh = useCallback(async () => {
     if (!id) return;
-    const [full, jRes] = await Promise.all([
+    const [full, jRes, linkedProblemsRes] = await Promise.all([
       incidentsApi.get(id),
       incidentsApi.journal(id),
+      incidentsApi.linkedProblems(id).catch(() => ({ problems: [] })),
     ]);
     setInc(full);
     syncFields(full);
     setJournal(jRes.entries);
+    const linkedIds = linkedProblemsRes.problems.map((p) => p.problem_id);
+    setLinkedProblemIds(linkedIds);
+    setField('relatedProblemId', linkedIds[0] || '');
   }, [id]);
 
   const withSave = async (fn: () => Promise<void>) => {
@@ -182,6 +192,8 @@ export function useIncidentDetail() {
       setServices([]);
       setCiOptions([]);
       setUsers([]);
+      setProblemOptions([]);
+      setLinkedProblemIds([]);
     };
 
     const load = isFulfiller
@@ -191,7 +203,9 @@ export function useIncidentDetail() {
           incidentsApi.services().catch(() => ({ services: [] as ServiceListItem[] })),
           cmdbApi.items({ status: 'active' }, 1, 100).catch(() => ({ items: [] as CI[] })),
           authApi.users().catch(() => ({ users: [] as UserListItem[] })),
-        ]).then(([incRes, jRes, navRes, attRes, agRes, svcRes, ciRes, usersRes]) => {
+          problemsApi.list({}, 1, 100).catch(() => ({ problems: [] as Problem[] })),
+          incidentsApi.linkedProblems(id).catch(() => ({ problems: [] })),
+        ]).then(([incRes, jRes, navRes, attRes, agRes, svcRes, ciRes, usersRes, problemRes, linkedProblemsRes]) => {
           if (cancelled) return;
           setInc(incRes);
           setJournal(jRes.entries);
@@ -203,6 +217,10 @@ export function useIncidentDetail() {
           setServices(svcRes.services);
           setCiOptions(ciRes.items);
           setUsers(usersRes.users);
+          setProblemOptions(problemRes.problems);
+          const linkedIds = linkedProblemsRes.problems.map((p) => p.problem_id);
+          setLinkedProblemIds(linkedIds);
+          setField('relatedProblemId', linkedIds[0] || '');
           setLoadError(null);
         })
       : Promise.all(basePromises).then(([incRes, jRes, navRes, attRes]) => {
@@ -290,6 +308,10 @@ export function useIncidentDetail() {
   const selectedCi = useMemo(
     () => ciOptions.find((ci) => ci.id === fields.configurationItemId) ?? null,
     [fields.configurationItemId, ciOptions],
+  );
+  const selectedProblem = useMemo(
+    () => problemOptions.find((p) => p.id === fields.relatedProblemId) ?? null,
+    [fields.relatedProblemId, problemOptions],
   );
 
   const callerInfo =
@@ -383,6 +405,18 @@ export function useIncidentDetail() {
 
       if (Object.keys(updates).length > 0) {
         await incidentsApi.update(id, updates as Partial<Incident>);
+      }
+
+      const currentPrimaryProblemId = linkedProblemIds[0] || '';
+      const nextPrimaryProblemId = fields.relatedProblemId || '';
+      if (currentPrimaryProblemId && currentPrimaryProblemId !== nextPrimaryProblemId) {
+        await incidentsApi.unrelateProblem(id, currentPrimaryProblemId);
+      }
+      if (nextPrimaryProblemId && nextPrimaryProblemId !== currentPrimaryProblemId) {
+        await incidentsApi.relateProblem(id, nextPrimaryProblemId, 'related_to');
+      }
+
+      if (Object.keys(updates).length > 0 || currentPrimaryProblemId !== nextPrimaryProblemId) {
         await refresh();
       }
     });
@@ -519,6 +553,7 @@ export function useIncidentDetail() {
     services,
     ciOptions,
     users,
+    problemOptions,
     groupMembers,
     // Edit fields
     fields,
@@ -527,6 +562,7 @@ export function useIncidentDetail() {
     callerUser,
     selectedService,
     selectedCi,
+    selectedProblem,
     callerInfo,
     requiredFieldMissing,
     // Permissions

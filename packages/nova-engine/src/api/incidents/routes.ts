@@ -956,6 +956,95 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// ─── GET /api/incidents/:id/problems ───
+router.get('/:id/problems', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const incident = await client.query(
+      `SELECT id, caller_id FROM incidents WHERE id = $1`,
+      [req.params.id],
+    );
+    if (incident.rows.length === 0) throw NotFound('Incident not found');
+
+    const isFulfiller = isFulfillerRole(req);
+    if (!isFulfiller && incident.rows[0].caller_id !== req.user!.id) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+
+    const result = await client.query(
+      `SELECT
+         pi.problem_id,
+         pi.incident_id,
+         pi.relationship_type,
+         pi.created_at,
+         p.number AS problem_number,
+         p.title AS problem_title,
+         p.status AS problem_status,
+         p.priority AS problem_priority
+       FROM problem_incidents pi
+       JOIN problems p ON p.id = pi.problem_id
+       WHERE pi.incident_id = $1
+         AND pi.tenant_id = current_tenant_id()
+       ORDER BY pi.created_at DESC`,
+      [req.params.id],
+    );
+    res.json({ problems: result.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /api/incidents/:id/problems ───
+router.post(
+  '/:id/problems',
+  requireRole('admin', 'fulfiller'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const { problem_id, relationship_type } = req.body || {};
+      if (!problem_id) throw new AppError(400, 'problem_id is required');
+
+      const incident = await client.query(`SELECT id FROM incidents WHERE id = $1`, [req.params.id]);
+      if (incident.rows.length === 0) throw NotFound('Incident not found');
+      const problem = await client.query(`SELECT id FROM problems WHERE id = $1`, [problem_id]);
+      if (problem.rows.length === 0) throw NotFound('Problem not found');
+
+      await client.query(
+        `INSERT INTO problem_incidents (tenant_id, problem_id, incident_id, relationship_type)
+         VALUES (current_tenant_id(), $1, $2, $3)
+         ON CONFLICT (tenant_id, problem_id, incident_id) DO UPDATE
+         SET relationship_type = EXCLUDED.relationship_type`,
+        [problem_id, req.params.id, relationship_type || 'related_to'],
+      );
+      res.status(201).json({ success: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── DELETE /api/incidents/:id/problems/:problemId ───
+router.delete(
+  '/:id/problems/:problemId',
+  requireRole('admin', 'fulfiller'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      await client.query(
+        `DELETE FROM problem_incidents
+         WHERE tenant_id = current_tenant_id()
+           AND incident_id = $1
+           AND problem_id = $2`,
+        [req.params.id, req.params.problemId],
+      );
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── PATCH /api/incidents/:id ───
 router.patch(
   '/:id',
