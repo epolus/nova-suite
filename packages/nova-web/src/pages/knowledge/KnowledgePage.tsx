@@ -203,7 +203,14 @@ function renderMarkdown(md: string, attachmentUrls: Record<string, string> = {})
     if (!finalSrc) return `<span style="color:#9ca3af;">[image not available: ${escapeHtml(String(alt || 'image'))}]</span>`;
     return `<img alt="${escapeHtml(String(alt || ''))}" src="${finalSrc}" style="max-width:100%;border-radius:8px;margin:8px 0;" />`;
   });
-  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer" style="color:#4f46e5;text-decoration:underline;">$1</a>');
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
+    const rawHref = String(href || '');
+    const finalHref = rawHref.startsWith('attachment:')
+      ? (attachmentUrls[rawHref.slice('attachment:'.length)] || '')
+      : rawHref;
+    if (!finalHref) return `<span style="color:#9ca3af;">[link not available: ${escapeHtml(String(label || 'link'))}]</span>`;
+    return `<a href="${escapeHtml(finalHref)}" target="_blank" rel="noreferrer" style="color:#4f46e5;text-decoration:underline;">${label}</a>`;
+  });
   out = out.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0;" />');
   out = out.replace(/\n/g, '<br />');
   return sanitizeKnowledgeHtml(out);
@@ -463,10 +470,14 @@ export default function KnowledgePage() {
   // Resolve attachment URLs referenced in content
   useEffect(() => {
     let cancelled = false;
-    const matches = Array.from(form.content.matchAll(/!\[[^\]]*]\(attachment:([^)]+)\)/g));
-    const ids = Array.from(
-      new Set(matches.map((m) => m[1]).filter((id): id is string => typeof id === 'string' && id.length > 0)),
-    );
+    const imageMatches = Array.from(form.content.matchAll(/!\[[^\]]*]\(attachment:([^)]+)\)/g));
+    const linkMatches = Array.from(form.content.matchAll(/\[[^\]]+]\(attachment:([^)]+)\)/g));
+    const allMatches = [...imageMatches, ...linkMatches];
+    const ids = Array.from(new Set(
+      allMatches
+        .map((m) => m[1])
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    ));
     if (ids.length === 0) { setAttachmentUrls({}); return; }
     Promise.all(ids.map(async (id) => ({ id, url: await attachments.previewUrl(id) })))
       .then((pairs) => {
@@ -515,6 +526,23 @@ export default function KnowledgePage() {
         insertAroundSelection(`![${file.name}](attachment:${uploaded.id})`);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to upload image');
+      }
+    };
+    input.click();
+  };
+
+  const insertAttachment = async () => {
+    if (!selectedId || selectedId === 'new') { setError('Please create the article first, then upload attachments.'); return; }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const uploaded = await attachments.upload('knowledge_article', selectedId, file);
+        insertAroundSelection(`[${file.name}](attachment:${uploaded.id})`);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to upload attachment');
       }
     };
     input.click();
@@ -813,6 +841,7 @@ export default function KnowledgePage() {
                         <span className="w-px h-4 bg-gray-300 mx-0.5" />
                         <button type="button" onClick={insertLink} className={toolbarBtnCls} title="Link">Link</button>
                         <button type="button" onClick={insertImage} className={toolbarBtnCls} title="Upload image">Image</button>
+                        <button type="button" onClick={insertAttachment} className={toolbarBtnCls} title="Upload attachment">Attach</button>
                         <button type="button" onClick={() => insertAtLineStart('---')} className={toolbarBtnCls} title="Horizontal rule">HR</button>
                       </div>
 
