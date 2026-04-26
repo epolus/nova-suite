@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { attachments as attachmentsApi, knowledge as knowledgeApi } from '../../api/client';
 import type { JournalEntry, KnowledgeSuggestion, KnowledgeArticleDetail } from '../../api/client';
 import { AttachmentCard } from '../../components/AttachmentCard';
@@ -19,6 +19,7 @@ export default function IncidentDetail() {
   const [previewArticle, setPreviewArticle] = useState<KnowledgeArticleDetail | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
+  const [previewAttachmentUrls, setPreviewAttachmentUrls] = useState<Record<string, string>>({});
 
   const {
     user, navigate, prevId, nextId, goTo,
@@ -50,6 +51,28 @@ export default function IncidentDetail() {
       setPreviewLoading(false);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!previewArticle?.content) { setPreviewAttachmentUrls({}); return; }
+    const imageMatches = Array.from(previewArticle.content.matchAll(/!\[[^\]]*]\(attachment:([^)]+)\)/g));
+    const linkMatches = Array.from(previewArticle.content.matchAll(/\[[^\]]+]\(attachment:([^)]+)\)/g));
+    const ids = Array.from(new Set(
+      [...imageMatches, ...linkMatches]
+        .map((m) => m[1])
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    ));
+    if (ids.length === 0) { setPreviewAttachmentUrls({}); return; }
+    Promise.all(ids.map(async (id) => ({ id, url: await attachmentsApi.previewUrl(id) })))
+      .then((pairs) => {
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        for (const p of pairs) map[p.id] = p.url;
+        setPreviewAttachmentUrls(map);
+      })
+      .catch(() => { if (!cancelled) setPreviewAttachmentUrls({}); });
+    return () => { cancelled = true; };
+  }, [previewArticle?.content]);
 
   if (loading) return <Spinner />;
   if (!inc) {
@@ -495,9 +518,33 @@ export default function IncidentDetail() {
                       <div className="space-y-2">
                         <p className="text-xs font-mono text-indigo-600">{previewArticle.number}</p>
                         <p className="text-sm font-semibold text-gray-900">{previewArticle.title}</p>
-                        <p className="text-xs text-gray-700 whitespace-pre-wrap max-h-44 overflow-y-auto">
-                          {previewArticle.content || 'No content'}
-                        </p>
+                        <div className="text-xs text-gray-700 whitespace-pre-wrap max-h-44 overflow-y-auto space-y-2">
+                          {previewArticle.content
+                            ? previewArticle.content.split('\n').map((line, idx) => {
+                              const img = line.match(/^!\[([^\]]*)\]\(attachment:([^)]+)\)\s*$/);
+                              if (img) {
+                                const alt = img[1] || 'attachment image';
+                                const url = previewAttachmentUrls[img[2] || ''];
+                                return url
+                                  ? <img key={`img-${idx}`} src={url} alt={alt} className="max-w-full rounded border border-indigo-100" />
+                                  : <p key={`img-missing-${idx}`} className="text-gray-400">[image not available: {alt}]</p>;
+                              }
+                              const link = line.match(/^\[([^\]]+)\]\(attachment:([^)]+)\)\s*$/);
+                              if (link) {
+                                const label = link[1] || 'attachment';
+                                const url = previewAttachmentUrls[link[2] || ''];
+                                return url
+                                  ? (
+                                    <a key={`link-${idx}`} href={url} target="_blank" rel="noreferrer" className="text-indigo-700 underline">
+                                      {label}
+                                    </a>
+                                  )
+                                  : <p key={`link-missing-${idx}`} className="text-gray-400">[attachment not available: {label}]</p>;
+                              }
+                              return <p key={`line-${idx}`}>{line}</p>;
+                            })
+                            : <p>No content</p>}
+                        </div>
                         <button
                           type="button"
                           onClick={() => navigate(`/knowledge?articleId=${previewArticle.id}`)}
