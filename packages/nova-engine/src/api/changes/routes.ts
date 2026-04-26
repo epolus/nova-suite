@@ -27,6 +27,20 @@ const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
 
 const CHANGE_PROCESS_NAME = 'Change Management';
+const CHANGE_TRANSITION_ACTIONS = [
+  'submit_assessment',
+  'request_approval',
+  'approve',
+  'reject',
+  'start_planning',
+  'schedule',
+  'start_implementation',
+  'mark_implemented',
+  'start_review',
+  'close',
+  'cancel',
+] as const;
+type ChangeTransitionAction = (typeof CHANGE_TRANSITION_ACTIONS)[number];
 
 async function isChangeEnabledGroup(client: any, groupId: string): Promise<boolean> {
   const row = await client.query(
@@ -106,6 +120,40 @@ function normalizeStatusAndStage(action: string): { stage: string; status: strin
     default:
       return { stage: 'request', status: 'draft' };
   }
+}
+
+function computeAllowedChangeActions(
+  change: any,
+  pendingApprovals: number,
+  hasCiContext: boolean,
+): ChangeTransitionAction[] {
+  const actions: ChangeTransitionAction[] = [];
+  const status = String(change.status || '');
+  const hasSchedule = Boolean(change.scheduled_start && change.scheduled_end);
+  const hasServiceOrCiContext = hasCiContext || Boolean(change.service_id);
+
+  if (status === 'draft') actions.push('submit_assessment');
+  if (
+    status === 'assessment'
+    && !!change.implementation_plan
+    && hasSchedule
+    && hasServiceOrCiContext
+  ) {
+    actions.push('request_approval');
+  }
+  if (status === 'approved') actions.push('start_planning');
+  if (status === 'planning') actions.push('schedule');
+  if (status === 'scheduled') actions.push('start_implementation');
+  if (status === 'implementing') actions.push('mark_implemented');
+  if (status === 'implemented') actions.push('start_review');
+  if (status === 'reviewing') actions.push('close');
+  if (status === 'pending_approval') {
+    actions.push('reject');
+    if (pendingApprovals === 0 && hasSchedule) actions.push('approve');
+  }
+  if (!['closed', 'cancelled'].includes(status)) actions.push('cancel');
+
+  return actions;
 }
 
 async function syncRelatedRecords(client: any, change: any): Promise<void> {
@@ -769,11 +817,13 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const row = await client.query(
       `SELECT c.*,
               ct.name AS change_type_name,
+              svc.name AS service_name,
               ag.name AS assignment_group_name,
               u.display_name AS assigned_to_name,
               r.display_name AS requested_by_name
        FROM changes c
        JOIN change_types ct ON ct.id = c.change_type_id
+       LEFT JOIN services svc ON svc.id = c.service_id
        LEFT JOIN assignment_groups ag ON ag.id = c.assignment_group_id
        LEFT JOIN users u ON u.id = c.assigned_to
        LEFT JOIN users r ON r.id = c.requested_by
@@ -815,11 +865,14 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
         [req.params.id],
       ),
     ]);
+    const pendingApprovals = approvals.rows.filter((a: { status: string }) => a.status === 'pending').length;
+    const allowedActions = computeAllowedChangeActions(change, pendingApprovals, cis.rows.length > 0);
     res.json({
       ...change,
       affected_cis: cis.rows,
       approvals: approvals.rows,
       conflicts: conflicts.rows,
+      allowed_actions: allowedActions,
     });
   } catch (err) {
     next(err);
@@ -865,15 +918,15 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
       `INSERT INTO changes (
         tenant_id, number, change_type_id, standard_change_id, category, title, description, reason_for_change,
         stage, status, risk_level, impact, impact_description, implementation_plan, backout_plan, test_plan,
-        requested_by, assigned_to, assignment_group_id, scheduled_start, scheduled_end, actual_start, actual_end,
+        requested_by, assigned_to, assignment_group_id, service_id, scheduled_start, scheduled_end, actual_start, actual_end,
         downtime_required, maintenance_window, implementation_notes, success, actual_downtime_minutes,
         related_problem_id, related_incident_id, priority, business_justification, estimated_cost, review_notes
       ) VALUES (
         current_tenant_id(), $1, $2, $3, $4, $5, $6, $7,
         $8::change_stage_enum, $9::change_status_enum, $10::change_risk_enum, $11, $12, $13, $14, $15,
-        $16, $17, $18, $19, $20, $21, $22,
-        COALESCE($23, false), $24, $25, $26, $27,
-        $28, $29, $30::change_priority_enum, $31, $32, $33
+        $16, $17, $18, $19, $20, $21, $22, $23,
+        COALESCE($24, false), $25, $26, $27, $28,
+        $29, $30, $31::change_priority_enum, $32, $33, $34
       ) RETURNING *`,
       [
         number,
@@ -894,6 +947,7 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
         b.requested_by || req.user!.id,
         b.assigned_to || null,
         b.assignment_group_id || null,
+        b.service_id || null,
         b.scheduled_start || null,
         b.scheduled_end || null,
         b.actual_start || null,
@@ -920,35 +974,6 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
          ON CONFLICT (tenant_id, change_id, ci_id) DO NOTHING`,
         [change.id, ciId],
       );
-    }
-
-    if (!changeType.auto_approve) {
-      const requiredApprovals = Number(changeType.approval_config?.required_approvals || 1);
-      const approvalRows: Array<{ type: string; userId: string | null }> = [];
-      if (changeType.requires_manager_approval) {
-        const requesterManager = await client.query(
-          `SELECT manager_id
-           FROM users
-           WHERE tenant_id = current_tenant_id()
-             AND id = $1`,
-          [b.requested_by || req.user!.id],
-        );
-        approvalRows.push({ type: 'manager', userId: requesterManager.rows[0]?.manager_id || null });
-      }
-      if (changeType.requires_cab_approval) {
-        approvalRows.push({ type: 'cab', userId: null });
-      }
-      while (approvalRows.length < requiredApprovals) {
-        approvalRows.push({ type: 'technical', userId: null });
-      }
-      for (const a of approvalRows) {
-        await client.query(
-          `INSERT INTO change_approvals
-           (tenant_id, change_id, approval_type, approver_user_id, approver_group_id)
-           VALUES (current_tenant_id(), $1, $2, $3, $4)`,
-          [change.id, a.type, a.userId, change.assignment_group_id || null],
-        );
-      }
     }
 
     await refreshChangeConflicts(client, change.id);
@@ -1072,23 +1097,98 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
     if (!canWork) throw new AppError(403, 'Insufficient permissions');
 
     const { action, notes, scheduled_start, scheduled_end } = req.body;
+    const pendingApprovalsRes = await client.query(
+      `SELECT count(*) AS c
+       FROM change_approvals
+       WHERE tenant_id = current_tenant_id()
+         AND change_id = $1
+         AND status = 'pending'`,
+      [change.id],
+    );
+    const pendingApprovals = Number(pendingApprovalsRes.rows[0]?.c || 0);
+    const changeCiRes = await client.query(
+      `SELECT count(*) AS c
+       FROM change_cis
+       WHERE tenant_id = current_tenant_id()
+         AND change_id = $1`,
+      [change.id],
+    );
+    const hasCiContext = Number(changeCiRes.rows[0]?.c || 0) > 0;
+    const allowedActions = computeAllowedChangeActions(change, pendingApprovals, hasCiContext);
+    if (!allowedActions.includes(action as ChangeTransitionAction)) {
+      throw new AppError(400, `Action "${action}" is not allowed for current change status`);
+    }
     if (action === 'request_approval' && !change.implementation_plan) {
       throw new AppError(400, 'Implementation plan is required before requesting approval');
+    }
+    if (action === 'request_approval' && (!change.scheduled_start || !change.scheduled_end)) {
+      throw new AppError(400, 'scheduled_start and scheduled_end are required before requesting approval');
+    }
+    if (action === 'request_approval' && !hasCiContext && !change.service_id) {
+      throw new AppError(400, 'Service / CI context is required before requesting approval');
     }
     if (action === 'schedule' && (!scheduled_start || !scheduled_end)) {
       throw new AppError(400, 'scheduled_start and scheduled_end are required to schedule');
     }
     if (action === 'approve') {
-      const pending = await client.query(
+      if (!change.scheduled_start || !change.scheduled_end) {
+        throw new AppError(400, 'scheduled_start and scheduled_end are required before approval');
+      }
+      if (pendingApprovals > 0) {
+        throw new AppError(400, 'All required approvals must be completed before approving the change');
+      }
+    }
+    if (action === 'submit_assessment') {
+      await client.query(
+        `DELETE FROM change_approvals
+         WHERE tenant_id = current_tenant_id()
+           AND change_id = $1`,
+        [change.id],
+      );
+    }
+    if (action === 'request_approval') {
+      const existingApprovals = await client.query(
         `SELECT count(*) AS c
          FROM change_approvals
          WHERE tenant_id = current_tenant_id()
-           AND change_id = $1
-           AND status = 'pending'`,
+           AND change_id = $1`,
         [change.id],
       );
-      if (Number(pending.rows[0]?.c || 0) > 0) {
-        throw new AppError(400, 'All required approvals must be completed before approving the change');
+      if (Number(existingApprovals.rows[0]?.c || 0) === 0) {
+        const typeRes = await client.query(
+          `SELECT requires_cab_approval, requires_manager_approval, approval_config
+           FROM change_types
+           WHERE tenant_id = current_tenant_id()
+             AND id = $1`,
+          [change.change_type_id],
+        );
+        const changeType = typeRes.rows[0];
+        const requiredApprovals = Number(changeType?.approval_config?.required_approvals || 1);
+        const approvalRows: Array<{ type: string; userId: string | null }> = [];
+        if (changeType?.requires_manager_approval) {
+          const requesterManager = await client.query(
+            `SELECT manager_id
+             FROM users
+             WHERE tenant_id = current_tenant_id()
+               AND id = $1`,
+            [change.requested_by],
+          );
+          approvalRows.push({ type: 'manager', userId: requesterManager.rows[0]?.manager_id || null });
+        }
+        if (changeType?.requires_cab_approval) {
+          approvalRows.push({ type: 'cab', userId: null });
+        }
+        while (approvalRows.length < requiredApprovals) {
+          approvalRows.push({ type: 'technical', userId: null });
+        }
+        for (const a of approvalRows) {
+          await client.query(
+            `INSERT INTO change_approvals
+             (tenant_id, change_id, approval_type, approver_user_id, approver_group_id)
+             VALUES (current_tenant_id(), $1, $2, $3, $4)`,
+            [change.id, a.type, a.userId, change.assignment_group_id || null],
+          );
+        }
       }
     }
 
@@ -1170,6 +1270,31 @@ router.post('/:id/approvals/:approvalId/decision', validateBody(changeApprovalDe
     }
 
     const { decision, notes } = req.body;
+    if (decision === 'approved' || decision === 'waived') {
+      const pendingAfterDecision = await client.query(
+        `SELECT count(*) AS c
+         FROM change_approvals
+         WHERE tenant_id = current_tenant_id()
+           AND change_id = $1
+           AND status = 'pending'
+           AND id <> $2`,
+        [req.params.id, req.params.approvalId],
+      );
+      const remainingPending = Number(pendingAfterDecision.rows[0]?.c || 0);
+      if (remainingPending === 0) {
+        const changeDates = await client.query(
+          `SELECT scheduled_start, scheduled_end
+           FROM changes
+           WHERE tenant_id = current_tenant_id()
+             AND id = $1`,
+          [req.params.id],
+        );
+        const readyToApprove = changeDates.rows[0];
+        if (!readyToApprove?.scheduled_start || !readyToApprove?.scheduled_end) {
+          throw new AppError(400, 'scheduled_start and scheduled_end are required before approval');
+        }
+      }
+    }
     await client.query(
       `UPDATE change_approvals
        SET status = $1::approval_status_enum,

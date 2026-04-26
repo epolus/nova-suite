@@ -204,6 +204,7 @@ export const createChangeSchema = z.object({
   requested_by: z.string().uuid().optional(),
   assigned_to: z.string().uuid().nullable().optional(),
   assignment_group_id: z.string().uuid(),
+  service_id: z.string().uuid().nullable().optional(),
   affected_cis: z.array(z.string().uuid()).default([]),
   scheduled_start: z.string().nullable().optional(),
   scheduled_end: z.string().nullable().optional(),

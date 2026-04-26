@@ -1008,6 +1008,7 @@ export interface Change {
   requested_by: string;
   assigned_to: string | null;
   assignment_group_id: string | null;
+  service_id: string | null;
   scheduled_start: string | null;
   scheduled_end: string | null;
   actual_start: string | null;
@@ -1027,6 +1028,7 @@ export interface Change {
   updated_at: string;
   change_type_name?: string;
   assignment_group_name?: string;
+  service_name?: string;
   assigned_to_name?: string;
   requested_by_name?: string;
   conflict_count?: number;
@@ -1037,6 +1039,19 @@ export interface ChangeDetail extends Change {
   affected_cis: ChangeAffectedCI[];
   approvals: ChangeApproval[];
   conflicts: ChangeConflict[];
+  allowed_actions?: Array<
+    | 'submit_assessment'
+    | 'request_approval'
+    | 'approve'
+    | 'reject'
+    | 'start_planning'
+    | 'schedule'
+    | 'start_implementation'
+    | 'mark_implemented'
+    | 'start_review'
+    | 'close'
+    | 'cancel'
+  >;
 }
 
 export interface StandardChangeTemplate {

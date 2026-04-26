@@ -2,11 +2,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { changes, cmdb, incidents, problems } from '../../api/client';
-import type { AssignmentGroupItem, Change, ChangeApproval, ChangeConflict, ChangeDetail, ChangeType, CI, Incident, Problem, StandardChangeTemplate } from '../../api/client';
+import type { AssignmentGroupItem, Change, ChangeApproval, ChangeConflict, ChangeDetail, ChangeType, CI, Incident, Problem, ServiceListItem, StandardChangeTemplate } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
+import { SearchableDropdown } from '../../components/SearchableDropdown';
 import { Button } from '../../components/ui/button';
 import UserDateTimeInput from '../../components/UserDateTimeInput';
 import { formatDateTime } from '../../utils/dateTime';
@@ -26,6 +27,7 @@ type FormState = {
   test_plan: string;
   assigned_to: string;
   assignment_group_id: string;
+  service_id: string;
   scheduled_start: string;
   scheduled_end: string;
   maintenance_window: string;
@@ -54,6 +56,7 @@ const EMPTY_FORM: FormState = {
   test_plan: '',
   assigned_to: '',
   assignment_group_id: '',
+  service_id: '',
   scheduled_start: '',
   scheduled_end: '',
   maintenance_window: '',
@@ -90,6 +93,7 @@ export default function ChangeDetailPage() {
   const [types, setTypes] = useState<ChangeType[]>([]);
   const [templates, setTemplates] = useState<StandardChangeTemplate[]>([]);
   const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
+  const [services, setServices] = useState<ServiceListItem[]>([]);
   const [cis, setCis] = useState<CI[]>([]);
   const [incidentsList, setIncidentsList] = useState<Incident[]>([]);
   const [problemsList, setProblemsList] = useState<Problem[]>([]);
@@ -103,10 +107,11 @@ export default function ChangeDetailPage() {
     setLoading(true);
     setError('');
     try {
-      const [typesRes, templatesRes, groupsRes, ciRes, incRes, prbRes] = await Promise.all([
+      const [typesRes, templatesRes, groupsRes, servicesRes, ciRes, incRes, prbRes] = await Promise.all([
         changes.types(),
         changes.standardTemplates(),
         changes.assignmentGroups(),
+        incidents.services(),
         cmdb.items({ status: 'active' }, 1, 100),
         incidents.list({ status: 'new' }, 1, 100),
         problems.list({}, 1, 100),
@@ -114,6 +119,7 @@ export default function ChangeDetailPage() {
       setTypes(typesRes.change_types);
       setTemplates(templatesRes.templates);
       setGroups(groupsRes.assignment_groups);
+      setServices(servicesRes.services);
       setCis(ciRes.items);
       setIncidentsList(incRes.incidents);
       setProblemsList(prbRes.problems);
@@ -152,6 +158,7 @@ export default function ChangeDetailPage() {
           test_plan: detail.test_plan || '',
           assigned_to: detail.assigned_to || '',
           assignment_group_id: detail.assignment_group_id || '',
+          service_id: detail.service_id || '',
           scheduled_start: detail.scheduled_start ? detail.scheduled_start.slice(0, 16) : '',
           scheduled_end: detail.scheduled_end ? detail.scheduled_end.slice(0, 16) : '',
           maintenance_window: detail.maintenance_window || '',
@@ -244,6 +251,7 @@ export default function ChangeDetailPage() {
         test_plan: form.test_plan || undefined,
         assigned_to: form.assigned_to || null,
         assignment_group_id: form.assignment_group_id,
+        service_id: form.service_id || null,
         scheduled_start: form.scheduled_start ? new Date(form.scheduled_start).toISOString() : null,
         scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null,
         maintenance_window: form.maintenance_window || undefined,
@@ -317,6 +325,29 @@ export default function ChangeDetailPage() {
     { key: 'implementation' as const, label: 'Implementation' },
     { key: 'review' as const, label: 'Review' },
   ];
+  const allowedActions = !isNew ? (change?.allowed_actions || []) : [];
+  const canRequestApprovalFromForm =
+    !!form.implementation_plan.trim()
+    && !!form.scheduled_start
+    && !!form.scheduled_end
+    && (form.affected_cis.length > 0 || !!form.service_id);
+  const showAssessmentHint =
+    !isNew
+    && change?.status === 'assessment'
+    && !allowedActions.includes('request_approval');
+  const actionMeta: Record<string, { label: string; variant?: 'outline' | 'warning' }> = {
+    submit_assessment: { label: 'Submit Assessment', variant: 'outline' },
+    request_approval: { label: 'Request Approval', variant: 'outline' },
+    approve: { label: 'Approve', variant: 'outline' },
+    reject: { label: 'Reject', variant: 'warning' },
+    start_planning: { label: 'Start Planning', variant: 'outline' },
+    schedule: { label: 'Schedule', variant: 'outline' },
+    start_implementation: { label: 'Start Implementation', variant: 'outline' },
+    mark_implemented: { label: 'Mark Implemented', variant: 'outline' },
+    start_review: { label: 'Start Review', variant: 'outline' },
+    close: { label: 'Close', variant: 'outline' },
+    cancel: { label: 'Cancel', variant: 'warning' },
+  };
 
   return (
     <>
@@ -327,6 +358,20 @@ export default function ChangeDetailPage() {
             <Button onClick={save} disabled={saving || !hasRequiredFields}>
               {saving ? 'Saving...' : isNew ? 'Create Change' : 'Save Changes'}
             </Button>
+            {!isNew && allowedActions.map((action) => {
+              const meta = actionMeta[action];
+              if (!meta) return null;
+              return (
+                <Button
+                  key={action}
+                  variant={meta.variant || 'outline'}
+                  size="sm"
+                  onClick={() => runTransition(action)}
+                >
+                  {meta.label}
+                </Button>
+              );
+            })}
             <Button variant="outline" size="icon" onClick={() => prevId && goTo(prevId)} disabled={!prevId} title="Previous (Left Arrow)">&#8592;</Button>
             <Button variant="outline" size="icon" onClick={() => nextId && goTo(nextId)} disabled={!nextId} title="Next (Right Arrow)">&#8594;</Button>
             <Button variant="outline" onClick={() => navigate('/changes')}>Back to list</Button>
@@ -336,6 +381,21 @@ export default function ChangeDetailPage() {
 
       {error && (
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">{error}</div>
+      )}
+      {showAssessmentHint && (
+        <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <p className="font-medium mb-1">Complete required fields to unlock Request Approval:</p>
+          <p className="text-xs">
+            - Scheduled Start and Scheduled End must be set
+            {' · '}
+            - Service/CI context: set Service or Configuration Item
+            {' · '}
+            - Save changes
+          </p>
+          {canRequestApprovalFromForm && (
+            <p className="text-xs mt-1 font-medium">All required fields are set in the form. Click Save Changes to enable Request Approval.</p>
+          )}
+        </div>
       )}
 
       {/* ── Summary ── */}
@@ -444,6 +504,38 @@ export default function ChangeDetailPage() {
               </div>
             </Card>
             <Card>
+              <h3 className="font-semibold text-gray-900 mb-3">Service / CI Context</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Service</label>
+                  <SearchableDropdown<ServiceListItem>
+                    items={services}
+                    selectedId={form.service_id}
+                    onSelect={(id) => setForm((p) => ({ ...p, service_id: id }))}
+                    onClear={() => setForm((p) => ({ ...p, service_id: '' }))}
+                    getItemId={(s) => s.id}
+                    getDisplayText={(s) => s.name}
+                    fallbackDisplayText={change?.service_name || ''}
+                    placeholder="Search service..."
+                    renderItem={(s) => s.name}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Configuration Item</label>
+                  <SearchableDropdown<CI>
+                    items={cis}
+                    selectedId={form.affected_cis[0] || ''}
+                    onSelect={(id) => setForm((p) => ({ ...p, affected_cis: [id] }))}
+                    onClear={() => setForm((p) => ({ ...p, affected_cis: [] }))}
+                    getItemId={(ci) => ci.id}
+                    getDisplayText={(ci) => ci.display_name || ci.name}
+                    placeholder="Search CI..."
+                    renderItem={(ci) => ci.display_name || ci.name}
+                  />
+                </div>
+              </div>
+            </Card>
+            <Card>
               <h3 className="font-semibold text-gray-900 mb-4">Relationships</h3>
               <div className="space-y-4">
                 <div>
@@ -464,25 +556,6 @@ export default function ChangeDetailPage() {
                   <label className="block text-xs font-medium text-gray-500 mb-1">Estimated Cost</label>
                   <input type="number" value={form.estimated_cost} onChange={(e) => setForm((p) => ({ ...p, estimated_cost: e.target.value }))} className={inputCls} placeholder="0.00" />
                 </div>
-              </div>
-            </Card>
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-3">Affected CIs</h3>
-              <div className="max-h-48 overflow-y-auto space-y-1">
-                {cis.map((ci) => (
-                  <label key={ci.id} className="flex items-center gap-2 text-sm text-gray-700 py-0.5 cursor-pointer hover:text-gray-900">
-                    <input
-                      type="checkbox"
-                      checked={form.affected_cis.includes(ci.id)}
-                      onChange={(e) => setForm((p) => ({
-                        ...p,
-                        affected_cis: e.target.checked ? [...p.affected_cis, ci.id] : p.affected_cis.filter((id) => id !== ci.id),
-                      }))}
-                      className="rounded"
-                    />
-                    {ci.display_name || ci.name}
-                  </label>
-                ))}
               </div>
             </Card>
           </div>
@@ -605,23 +678,6 @@ export default function ChangeDetailPage() {
         </Card>
       )}
 
-      {/* ── Workflow transitions ── */}
-      {!isNew && (
-        <Card className="mt-6">
-          <h3 className="font-semibold text-gray-900 mb-3">Workflow Actions</h3>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => runTransition('submit_assessment')}>Submit Assessment</Button>
-            <Button variant="outline" size="sm" onClick={() => runTransition('request_approval')}>Request Approval</Button>
-            <Button variant="outline" size="sm" onClick={() => runTransition('approve')}>Approve</Button>
-            <Button variant="outline" size="sm" onClick={() => runTransition('schedule')}>Schedule</Button>
-            <Button variant="outline" size="sm" onClick={() => runTransition('start_implementation')}>Start Implementation</Button>
-            <Button variant="outline" size="sm" onClick={() => runTransition('mark_implemented')}>Mark Implemented</Button>
-            <Button variant="outline" size="sm" onClick={() => runTransition('start_review')}>Start Review</Button>
-            <Button variant="outline" size="sm" onClick={() => runTransition('close')}>Close</Button>
-            <Button variant="warning" size="sm" onClick={() => runTransition('cancel')}>Cancel</Button>
-          </div>
-        </Card>
-      )}
     </>
   );
 }

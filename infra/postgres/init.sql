@@ -1786,6 +1786,7 @@ CREATE TABLE changes (
   requested_by              uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   assigned_to               uuid REFERENCES users(id) ON DELETE SET NULL,
   assignment_group_id       uuid REFERENCES assignment_groups(id) ON DELETE SET NULL,
+  service_id                uuid REFERENCES services(id) ON DELETE SET NULL,
   scheduled_start           timestamptz,
   scheduled_end             timestamptz,
   actual_start              timestamptz,
@@ -1875,6 +1876,7 @@ CREATE INDEX idx_changes_tenant_stage ON changes(tenant_id, stage, updated_at DE
 CREATE INDEX idx_changes_tenant_risk ON changes(tenant_id, risk_level, priority, updated_at DESC);
 CREATE INDEX idx_changes_type ON changes(tenant_id, change_type_id);
 CREATE INDEX idx_changes_assignment_group ON changes(tenant_id, assignment_group_id);
+CREATE INDEX idx_changes_service ON changes(tenant_id, service_id);
 CREATE INDEX idx_changes_assigned_to ON changes(tenant_id, assigned_to);
 CREATE INDEX idx_changes_requested_by ON changes(tenant_id, requested_by);
 CREATE INDEX idx_changes_scheduled_window ON changes(tenant_id, scheduled_start, scheduled_end);
