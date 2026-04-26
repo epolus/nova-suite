@@ -832,10 +832,11 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
     const client = getRequestClient(req);
     const b = req.body || {};
     validateScheduleRange(b.scheduled_start, b.scheduled_end);
-    if (b.assignment_group_id) {
-      const ok = await isChangeEnabledGroup(client, b.assignment_group_id);
-      if (!ok) throw new AppError(400, 'Assignment group is not enabled for Change Management');
+    if (!b.assignment_group_id) {
+      throw new AppError(400, 'assignment_group_id is required');
     }
+    const createGroupOk = await isChangeEnabledGroup(client, b.assignment_group_id);
+    if (!createGroupOk) throw new AppError(400, 'Assignment group is not enabled for Change Management');
     const typeRes = await client.query(
       `SELECT * FROM change_types
        WHERE tenant_id = current_tenant_id()
@@ -982,7 +983,17 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
       updates.scheduled_start ?? current.scheduled_start,
       updates.scheduled_end ?? current.scheduled_end,
     );
-    if (updates.assignment_group_id !== undefined && updates.assignment_group_id !== null) {
+    if (
+      updates.assignment_group_id !== undefined
+      && (updates.assignment_group_id === null || String(updates.assignment_group_id).trim() === '')
+    ) {
+      throw new AppError(400, 'assignment_group_id is required');
+    }
+    const effectiveAssignmentGroupId = updates.assignment_group_id ?? current.assignment_group_id;
+    if (!effectiveAssignmentGroupId) {
+      throw new AppError(400, 'assignment_group_id is required');
+    }
+    if (updates.assignment_group_id !== undefined) {
       const ok = await isChangeEnabledGroup(client, updates.assignment_group_id);
       if (!ok) throw new AppError(400, 'Assignment group is not enabled for Change Management');
     }

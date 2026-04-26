@@ -198,7 +198,8 @@ export default function ChangeDetailPage() {
   );
   const hasRequiredFields =
     !!form.change_type_id &&
-    !!form.title.trim();
+    !!form.title.trim() &&
+    !!form.assignment_group_id;
 
   const applyTemplate = (templateId: string) => {
     const tpl = templates.find((t) => t.id === templateId);
@@ -217,6 +218,11 @@ export default function ChangeDetailPage() {
   const save = async () => {
     setSaving(true);
     setError('');
+    if (!form.assignment_group_id) {
+      setError('Assignment Group is required');
+      setSaving(false);
+      return;
+    }
     if (hasInvalidScheduleRange(form.scheduled_start, form.scheduled_end)) {
       setError('Scheduled end must be greater than or equal to scheduled start.');
       setSaving(false);
@@ -237,7 +243,7 @@ export default function ChangeDetailPage() {
         backout_plan: form.backout_plan,
         test_plan: form.test_plan || undefined,
         assigned_to: form.assigned_to || null,
-        assignment_group_id: form.assignment_group_id || null,
+        assignment_group_id: form.assignment_group_id,
         scheduled_start: form.scheduled_start ? new Date(form.scheduled_start).toISOString() : null,
         scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null,
         maintenance_window: form.maintenance_window || undefined,
@@ -371,9 +377,9 @@ export default function ChangeDetailPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Assignment Group</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Assignment Group <span className="text-red-500">*</span></label>
             <select value={form.assignment_group_id} onChange={(e) => setForm((p) => ({ ...p, assignment_group_id: e.target.value }))} className={selectCls}>
-              <option value="">— Unassigned —</option>
+              <option value="">Select assignment group...</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
