@@ -53,7 +53,7 @@ export async function markSlaBreached(incidentId: string, tenantId: string): Pro
     );
     await client.query(
       `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'system', $3)`,
+       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'state_change', $3)`,
       [tenantId, incidentId, 'SLA breached — automated escalation triggered'],
     );
   });
@@ -72,7 +72,7 @@ export async function escalateIncident(
     );
     await client.query(
       `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'system', $3)`,
+       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'state_change', $3)`,
       [tenantId, incidentId, `Priority escalated to P${newPriority} by automated SLA workflow`],
     );
   });
@@ -110,7 +110,7 @@ export async function autoAssignIncident(
     const assigneeName = managerId ? 'group manager' : 'assignment group';
     await client.query(
       `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'system', $3)`,
+       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'assignment', $3)`,
       [tenantId, incidentId, `Auto-assigned to ${assigneeName} via SLA escalation workflow`],
     );
     return true;
@@ -127,7 +127,7 @@ export async function sendNotification(
   await withTenantContext(tenantId, async (client) => {
     await client.query(
       `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'notification', $3)`,
+       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'work_note', $3)`,
       [tenantId, incidentId, `[Notification] ${message}`],
     );
   });
