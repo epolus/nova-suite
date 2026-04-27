@@ -20,5 +20,10 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "docker:reset": "docker compose down -v && docker compose up -d"
+  },
+  "overrides": {
+    "protobufjs": "7.5.5",
+    "serialize-javascript": "7.0.5",
+    "picomatch": "4.0.4"
   }
 }
