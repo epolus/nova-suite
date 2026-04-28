@@ -212,7 +212,7 @@ async function resolveCredentialForDataSourcePreview(
   }
   return db.withTenantTransaction(tenantId, userId, 'admin', async (client) => {
     const r = await client.query<{ secret: string }>(
-      `SELECT convert_from(pgp_sym_decrypt(secret_enc, $1), 'UTF8') AS secret
+      `SELECT pgp_sym_decrypt(secret_enc, $1)::text AS secret
        FROM tenant_credentials
        WHERE tenant_id = current_tenant_id() AND slug = $2`,
       [config.credentials.masterKey, slug],

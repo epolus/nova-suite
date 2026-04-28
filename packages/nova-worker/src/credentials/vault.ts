@@ -16,7 +16,7 @@ export async function decryptCredentialSecret(
 ): Promise<string> {
   const key = requireKey();
   const r = await client.query(
-    `SELECT convert_from(pgp_sym_decrypt(secret_enc, $1), 'UTF8') AS secret
+    `SELECT pgp_sym_decrypt(secret_enc, $1)::text AS secret
      FROM tenant_credentials
      WHERE tenant_id = $2 AND slug = $3`,
     [key, tenantId, slug],
@@ -35,7 +35,7 @@ export async function loadCredentialSecretsBySlugs(
   if (slugs.length === 0) return {};
   const key = requireKey();
   const r = await client.query(
-    `SELECT slug, convert_from(pgp_sym_decrypt(secret_enc, $1), 'UTF8') AS secret
+    `SELECT slug, pgp_sym_decrypt(secret_enc, $1)::text AS secret
      FROM tenant_credentials
      WHERE tenant_id = $2 AND slug = ANY($3::text[])`,
     [key, tenantId, slugs],
