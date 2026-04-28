@@ -22,9 +22,8 @@
     "docker:reset": "docker compose down -v && docker compose up -d"
   },
   "overrides": {
-    "multer": ">=2.1.1",
     "picomatch": "4.0.4",
     "protobufjs": "7.5.5",
     "serialize-javascript": "7.0.5"
-  }
+    }
 }
