@@ -10,10 +10,10 @@
     "dev": "tsx watch src/worker.ts"
   },
   "dependencies": {
-    "@temporalio/activity": "^1.14.1",
-    "@temporalio/client": "^1.14.1",
-    "@temporalio/worker": "^1.14.1",
-    "@temporalio/workflow": "^1.14.1",
+    "@temporalio/activity": "^1.16.1",
+    "@temporalio/client": "^1.16.1",
+    "@temporalio/worker": "^1.16.1",
+    "@temporalio/workflow": "^1.16.1",
     "pg": "^8.13.1",
     "pino": "^9.5.0",
     "pino-pretty": "^13.0.0",
