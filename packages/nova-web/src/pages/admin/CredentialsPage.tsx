@@ -12,6 +12,8 @@ import { useAuth } from '../../context/AuthContext';
 import { hasRole } from '../../utils/roles';
 import { formatDateTime } from '../../utils/dateTime';
 
+type SecretMode = 'plain' | 'oauth2_client_credentials';
+
 export default function CredentialsPage() {
   const { user } = useAuth();
   const canManage = hasRole(user?.roles, 'admin') || hasRole(user?.roles, 'credential_manager');
@@ -27,7 +29,14 @@ export default function CredentialsPage() {
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
   const [secret, setSecret] = useState('');
+  const [secretMode, setSecretMode] = useState<SecretMode>('plain');
+  const [oauthTokenUrl, setOauthTokenUrl] = useState('');
+  const [oauthClientId, setOauthClientId] = useState('');
+  const [oauthClientSecret, setOauthClientSecret] = useState('');
+  const [oauthScope, setOauthScope] = useState('');
+  const [oauthAudience, setOauthAudience] = useState('');
   const [saving, setSaving] = useState(false);
+  const [tokenTestResult, setTokenTestResult] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,6 +63,13 @@ export default function CredentialsPage() {
     setLabel('');
     setDescription('');
     setSecret('');
+    setSecretMode('plain');
+    setOauthTokenUrl('');
+    setOauthClientId('');
+    setOauthClientSecret('');
+    setOauthScope('');
+    setOauthAudience('');
+    setTokenTestResult('');
   };
 
   const openEdit = async (id: string) => {
@@ -69,6 +85,22 @@ export default function CredentialsPage() {
       setLabel(c.label);
       setDescription(c.description || '');
       setSecret('');
+      if (c.secret_type === 'oauth2_client_credentials') {
+        setSecretMode('oauth2_client_credentials');
+        setOauthTokenUrl(c.oauth2?.token_url || '');
+        setOauthClientId(c.oauth2?.client_id || '');
+        setOauthClientSecret('');
+        setOauthScope(c.oauth2?.scope || '');
+        setOauthAudience(c.oauth2?.audience || '');
+      } else {
+        setSecretMode('plain');
+        setOauthTokenUrl('');
+        setOauthClientId('');
+        setOauthClientSecret('');
+        setOauthScope('');
+        setOauthAudience('');
+      }
+      setTokenTestResult('');
       setMode('edit');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load credential');
@@ -82,27 +114,109 @@ export default function CredentialsPage() {
     setSaving(true);
     setError('');
     try {
+      const oauthSecretJson = JSON.stringify({
+        auth_type: 'oauth2_client_credentials',
+        token_url: oauthTokenUrl.trim(),
+        client_id: oauthClientId.trim(),
+        client_secret: oauthClientSecret.trim(),
+        ...(oauthScope.trim() ? { scope: oauthScope.trim() } : {}),
+        ...(oauthAudience.trim() ? { audience: oauthAudience.trim() } : {}),
+      });
+      const secretToSave = secretMode === 'oauth2_client_credentials' ? oauthSecretJson : secret.trim();
       if (mode === 'create') {
-        await credentialsApi.create({
+        if (secretMode === 'oauth2_client_credentials') {
+          if (!oauthTokenUrl.trim() || !oauthClientId.trim() || !oauthClientSecret.trim()) {
+            throw new Error('OAuth2 credentials require token URL, client ID, and client secret.');
+          }
+        } else if (!secret.trim()) {
+          throw new Error('Secret is required on create.');
+        }
+        const created = await credentialsApi.create({
           slug: slug.trim(),
           label: label.trim(),
           description: description.trim() || null,
-          secret,
+          secret: secretToSave,
         });
+        const createdDetail = await credentialsApi.get(created.credential.id);
+        const c = createdDetail.credential;
+        setDetail(c);
+        setEditId(c.id);
+        setSlug(c.slug);
+        setLabel(c.label);
+        setDescription(c.description || '');
+        setSecret('');
+        setOauthClientSecret('');
+        setMode('edit');
       } else if (editId) {
-        await credentialsApi.update(editId, {
+        const updateBody: {
+          label: string;
+          description: string | null;
+          secret?: string;
+          secret_type?: 'oauth2_client_credentials';
+          oauth2?: { token_url: string; client_id: string; scope: string | null; audience: string | null };
+        } = {
           label: label.trim(),
           description: description.trim() || null,
-          ...(secret.trim() ? { secret: secret.trim() } : {}),
+        };
+        if (secretMode === 'oauth2_client_credentials') {
+          if (!oauthTokenUrl.trim() || !oauthClientId.trim()) {
+            throw new Error('OAuth2 credentials require token URL and client ID.');
+          }
+          updateBody.secret_type = 'oauth2_client_credentials';
+          updateBody.oauth2 = {
+            token_url: oauthTokenUrl.trim(),
+            client_id: oauthClientId.trim(),
+            scope: oauthScope.trim() || null,
+            audience: oauthAudience.trim() || null,
+          };
+          if (oauthClientSecret.trim()) updateBody.secret = oauthSecretJson;
+        } else if (secret.trim()) {
+          updateBody.secret = secretToSave;
+        }
+        await credentialsApi.update(editId, {
+          ...updateBody,
         });
+        const updatedDetail = await credentialsApi.get(editId);
+        const c = updatedDetail.credential;
+        setDetail(c);
+        setLabel(c.label);
+        setDescription(c.description || '');
+        setSecret('');
+        setOauthClientSecret('');
+        if (c.secret_type === 'oauth2_client_credentials') {
+          setSecretMode('oauth2_client_credentials');
+          setOauthTokenUrl(c.oauth2?.token_url || '');
+          setOauthClientId(c.oauth2?.client_id || '');
+          setOauthScope(c.oauth2?.scope || '');
+          setOauthAudience(c.oauth2?.audience || '');
+        }
       }
       await load();
-      setMode('list');
-      setEditId(null);
-      setDetail(null);
-      setSecret('');
+      setTokenTestResult('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestToken = async () => {
+    if (!canManage || !editId) return;
+    setSaving(true);
+    setError('');
+    setTokenTestResult('');
+    try {
+      const result = await credentialsApi.testToken(editId);
+      if (!result.ok) {
+        setError(result.error || 'Token test failed');
+        return;
+      }
+      const expiresInfo = result.expires_in ? `${result.expires_in}s` : 'unknown';
+      setTokenTestResult(
+        `OK - token_type=${result.token_type}, expires_in=${expiresInfo}, preview=${result.access_token_preview}`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Token test failed');
     } finally {
       setSaving(false);
     }
@@ -133,7 +247,7 @@ export default function CredentialsPage() {
     <>
       <PageHeader
         title="Credentials"
-        description="Encrypted integration secrets (PostgreSQL pgcrypto). Use {{cred.slug}} in catalog automation or credential_slug in data sources. Set CREDENTIALS_MASTER_KEY on API and worker."
+        description="Encrypted integration secrets (PostgreSQL pgcrypto). Use {{cred.slug}} for plain secrets or {{cred.slug.access_token}} for OAuth2 client-credentials. Set CREDENTIALS_MASTER_KEY on API and worker."
       />
 
       {error && (
@@ -227,6 +341,92 @@ export default function CredentialsPage() {
               />
             </div>
             <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Secret Type</label>
+              <select
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+                value={secretMode}
+                onChange={(e) => setSecretMode(e.target.value as SecretMode)}
+              >
+                <option value="plain">Plain secret (token/password/API key)</option>
+                <option value="oauth2_client_credentials">OAuth2 client credentials</option>
+              </select>
+            </div>
+            {secretMode === 'oauth2_client_credentials' ? (
+              <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs text-gray-600">
+                  Stored as encrypted JSON once in this credential. Automation tasks only reference the slug using
+                  {' '}
+                  <code className="rounded bg-gray-100 px-1 py-0.5">{"{{cred.slug.access_token}}"}</code>.
+                </p>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Token URL</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+                    value={oauthTokenUrl}
+                    onChange={(e) => setOauthTokenUrl(e.target.value)}
+                    placeholder="https://idp.example.com/oauth/token"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Client ID</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+                    value={oauthClientId}
+                    onChange={(e) => setOauthClientId(e.target.value)}
+                    placeholder="svc_catalog"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Client Secret {mode === 'edit' ? '(fill to rotate, blank keeps existing)' : ''}
+                  </label>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+                    value={oauthClientSecret}
+                    onChange={(e) => setOauthClientSecret(e.target.value)}
+                    placeholder={mode === 'edit' ? '••••••••' : ''}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Scope (optional)</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+                    value={oauthScope}
+                    onChange={(e) => setOauthScope(e.target.value)}
+                    placeholder="group.write users.read"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Audience (optional)</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+                    value={oauthAudience}
+                    onChange={(e) => setOauthAudience(e.target.value)}
+                    placeholder="https://api.example.com"
+                  />
+                </div>
+                {mode === 'edit' && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={handleTestToken}
+                      disabled={saving || !editId}
+                      className="px-3 py-1.5 text-xs font-medium text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-50 disabled:opacity-50"
+                    >
+                      Get token (test)
+                    </button>
+                  </div>
+                )}
+                {tokenTestResult && (
+                  <p className="text-xs text-emerald-700 rounded bg-emerald-50 border border-emerald-200 px-2 py-1">
+                    {tokenTestResult}
+                  </p>
+                )}
+              </div>
+            ) : (
+            <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 Secret {mode === 'edit' ? '(leave blank to keep existing)' : ''}
               </label>
@@ -242,10 +442,25 @@ export default function CredentialsPage() {
                 <p className="text-xs text-gray-500 mt-1">Stored encrypted. has_secret: {detail.has_secret ? 'yes' : 'no'}</p>
               )}
             </div>
+            )}
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
-                disabled={saving || (mode === 'create' && (!slug.trim() || !label.trim() || !secret))}
+                disabled={
+                  saving
+                  || (mode === 'create' && !slug.trim())
+                  || (mode === 'create' && !label.trim())
+                  || (
+                    mode === 'create'
+                    && secretMode === 'plain'
+                    && !secret.trim()
+                  )
+                  || (
+                    mode === 'create'
+                    && secretMode === 'oauth2_client_credentials'
+                    && (!oauthTokenUrl.trim() || !oauthClientId.trim() || !oauthClientSecret.trim())
+                  )
+                }
                 onClick={handleSave}
                 className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
               >
@@ -257,6 +472,12 @@ export default function CredentialsPage() {
                   setMode('list');
                   setSecret('');
                   setDetail(null);
+                  setSecretMode('plain');
+                  setOauthTokenUrl('');
+                  setOauthClientId('');
+                  setOauthClientSecret('');
+                  setOauthScope('');
+                  setOauthAudience('');
                 }}
                 className="px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
               >
