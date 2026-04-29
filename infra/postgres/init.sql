@@ -1074,7 +1074,18 @@ INSERT INTO service_items (id, tenant_id, category_id, name, short_description, 
      {"name": "issue_description", "label": "Describe your issue", "type": "textarea", "required": true},
      {"name": "asset_tag", "label": "Asset Tag (if applicable)", "type": "text", "required": false}
    ]}',
-   false, 8);
+   false, 8),
+  ('d0000000-0000-0000-0000-000000000005',
+   'a0000000-0000-0000-0000-000000000001',
+   'c0000000-0000-0000-0000-000000000003',
+   'Add User To Support Group',
+   'Request membership in a support assignment group',
+   '{"fields": [
+     {"name": "target_user_id", "label": "User", "type": "user_ref", "required": true},
+     {"name": "target_group_name", "label": "Support Group", "type": "select", "required": true, "options": ["Service Desk", "Network Operations"]},
+     {"name": "reason", "label": "Business Justification", "type": "textarea", "required": true}
+   ]}',
+   true, 24);
 
 -- CMDB – CI Classes
 INSERT INTO ci_classes (id, tenant_id, name, display_name, description, attributes, icon) VALUES
@@ -1242,6 +1253,75 @@ CREATE TABLE request_tasks (
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_request_tasks_request ON request_tasks(request_id, task_order);
+
+-- Demo catalog workflow tasks (request fulfillment)
+INSERT INTO catalog_tasks (
+  id, tenant_id, service_item_id, name, description, instructions, task_type, task_order, assigned_group_id, sla_hours, automation_config, is_active
+) VALUES
+  ('d1000000-0000-0000-0000-000000000501',
+   'a0000000-0000-0000-0000-000000000001',
+   'd0000000-0000-0000-0000-000000000005',
+   'Support Group Manager Approval',
+   'Approval from the selected support group manager is required.',
+   'Approval mode is group_manager. This gate is auto-assigned to the selected group manager.',
+   'approval',
+   1,
+   'a5000000-0000-0000-0000-000000000001',
+   8,
+   '{"approval_mode":"group_manager"}',
+   true),
+  ('d1000000-0000-0000-0000-000000000502',
+   'a0000000-0000-0000-0000-000000000001',
+   'd0000000-0000-0000-0000-000000000005',
+   'Add Membership (Automated)',
+   'Demo Temporal automation: add selected user to selected support group.',
+  'Requires env CATALOG_AUTOMATION_SHARED_KEY on API/worker. Uses X-Automation-Key for internal automation auth.',
+   'automated',
+   2,
+   'a5000000-0000-0000-0000-000000000001',
+   4,
+   '{
+      "kind":"state_machine",
+      "startAt":"add_member",
+      "states":[
+        {
+          "id":"add_member",
+          "type":"activity",
+          "method":"POST",
+          "url":"http://nova-engine:4000/api/catalog/automation/add-support-group-member",
+          "headers":{
+            "X-Automation-Key":"{{env.CATALOG_AUTOMATION_SHARED_KEY}}",
+            "Content-Type":"application/json"
+          },
+          "body":"{\"request_id\":\"{{request.id}}\",\"user_id\":\"{{request.form_data.target_user_id}}\",\"group_name\":\"{{request.form_data.target_group_name}}\"}",
+          "timeoutSeconds":30,
+          "retryAttempts":2,
+          "retryBackoffSec":2,
+          "onError":"fail",
+          "onSuccess":{
+            "mergeFormData":{
+              "membership_result":"{{response.body}}"
+            }
+          },
+          "transitions":[{"to":"done","when":"success"},{"to":"failed","when":"failure"}]
+        },
+        {"id":"done","type":"end","result":"success"},
+        {"id":"failed","type":"end","result":"failure","onFailure":{"rejectRequest":true}}
+      ]
+    }'::jsonb,
+   true),
+  ('d1000000-0000-0000-0000-000000000503',
+   'a0000000-0000-0000-0000-000000000001',
+   'd0000000-0000-0000-0000-000000000005',
+   'Fulfillment Verification',
+   'Manual check and requester communication.',
+   'Confirm the user appears in assignment group members and notify requester.',
+   'manual',
+   3,
+   'a5000000-0000-0000-0000-000000000001',
+   8,
+   '{}'::jsonb,
+   true);
 
 -- ============================================================
 -- ATTACHMENTS

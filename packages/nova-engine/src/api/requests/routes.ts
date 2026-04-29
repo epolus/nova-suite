@@ -922,6 +922,10 @@ router.post('/:id/tasks/:taskId/complete',
       if (task.task_type === 'approval') {
         if (isAdmin) {
           // admin override allowed
+        } else if (task.assigned_to) {
+          if (!isAssignee) {
+            throw BadRequest('Only the assigned approver can decide this approval');
+          }
         } else if (task.assigned_group_id) {
           if (!isGroupMember) {
             throw BadRequest('Only members of the approver group can decide this approval');

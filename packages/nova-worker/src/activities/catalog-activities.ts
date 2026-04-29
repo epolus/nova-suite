@@ -15,6 +15,13 @@ export interface TaskDefinition {
   automationConfig: unknown;
 }
 
+function getApprovalMode(task: TaskDefinition): 'group_members' | 'group_manager' {
+  const raw = task.automationConfig;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'group_members';
+  const mode = (raw as { approval_mode?: unknown }).approval_mode;
+  return mode === 'group_manager' ? 'group_manager' : 'group_members';
+}
+
 function automatedRunsWithoutUserSignal(task: TaskDefinition): boolean {
   if (task.taskType !== 'automated') return false;
   const raw = task.automationConfig;
@@ -85,25 +92,70 @@ export async function createRequestTasks(
     // Manager approval is represented by approval tasks without an assigned group.
     // Resolve the request subject's manager (requested_for when set, otherwise requester).
     const requestResult = await client.query(
-      `SELECT u.manager_id
+      `SELECT u.manager_id, r.form_data
        FROM requests r
        LEFT JOIN users u ON u.id = COALESCE(r.requested_for, r.requester_id)
        WHERE r.id = $1`,
       [requestId],
     );
     const subjectManagerId = requestResult.rows[0]?.manager_id as string | null | undefined;
+    const requestFormData = (requestResult.rows[0]?.form_data as Record<string, unknown> | null | undefined) || {};
+    const groupManagerCache = new Map<string, string | null>();
 
     const created: { id: string; taskOrder: number; taskType: string; requiresUserCompletion: boolean }[] = [];
     for (const task of tasks) {
       const seqResult = await client.query("SELECT nextval('task_number_seq')");
       const number = `TASK${seqResult.rows[0].nextval.toString().padStart(7, '0')}`;
       const isManagerApproval = task.taskType === 'approval' && !task.assignedGroupId;
-      const assignedTo = isManagerApproval ? subjectManagerId || null : null;
+      const approvalMode = task.taskType === 'approval' ? getApprovalMode(task) : 'group_members';
+      let assignedTo: string | null = isManagerApproval ? subjectManagerId || null : null;
+      let assignedGroupId = task.assignedGroupId;
+      if (task.taskType === 'approval' && task.assignedGroupId && approvalMode === 'group_manager') {
+        const requestedGroupId = typeof requestFormData.target_group_id === 'string'
+          ? requestFormData.target_group_id.trim()
+          : '';
+        const requestedGroupName = typeof requestFormData.target_group_name === 'string'
+          ? requestFormData.target_group_name.trim()
+          : '';
+        const managerLookupKey = requestedGroupId || requestedGroupName || task.assignedGroupId;
+        if (!groupManagerCache.has(managerLookupKey)) {
+          const managerResult = await client.query(
+            `SELECT manager_id
+             FROM assignment_groups
+             WHERE tenant_id = $1
+               AND (
+                 id = $2
+                 OR lower(name) = lower($3)
+               )
+             ORDER BY CASE
+               WHEN id = $2 THEN 0
+               WHEN lower(name) = lower($3) THEN 1
+               ELSE 2
+             END
+             LIMIT 1`,
+            [tenantId, requestedGroupId || task.assignedGroupId, requestedGroupName || ''],
+          );
+          groupManagerCache.set(
+            managerLookupKey,
+            (managerResult.rows[0]?.manager_id as string | null | undefined) ?? null,
+          );
+        }
+        assignedTo = groupManagerCache.get(managerLookupKey) || null;
+        // Manager-only gate: use explicit assignee, not "any group member".
+        assignedGroupId = null;
+      }
       const skipManagerApproval = isManagerApproval && !assignedTo;
-      const status = skipManagerApproval ? 'skipped' : 'pending';
-      const completedAt = skipManagerApproval ? new Date() : null;
-      const notes = skipManagerApproval
-        ? 'No manager for the request subject; manager approval was skipped.'
+      const skipGroupManagerApproval =
+        task.taskType === 'approval' && task.assignedGroupId && approvalMode === 'group_manager' && !assignedTo;
+      const skipApproval = skipManagerApproval || skipGroupManagerApproval;
+      const status = skipApproval ? 'skipped' : 'pending';
+      const completedAt = skipApproval ? new Date() : null;
+      const notes = skipApproval
+        ? (
+          skipManagerApproval
+            ? 'No manager for the request subject; manager approval was skipped.'
+            : 'No manager defined for the selected approval group; manager approval was skipped.'
+        )
         : null;
       const result = await client.query(
         `INSERT INTO request_tasks (
@@ -120,7 +172,7 @@ export async function createRequestTasks(
           task.instructions,
           task.taskType,
           assignedTo,
-          task.assignedGroupId,
+          assignedGroupId,
           status,
           completedAt,
           notes,

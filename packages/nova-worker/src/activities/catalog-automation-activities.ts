@@ -80,6 +80,22 @@ interface AutomationGraphConfig {
 }
 
 const MAX_EXECUTION_STEPS = 120;
+const OAUTH_TOKEN_SAFETY_MS = 60_000;
+
+type CredentialTemplateValue = string | Record<string, unknown>;
+type OAuthTokenCacheEntry = { accessToken: string; expiresAtMs: number };
+const oauthTokenCache = new Map<string, OAuthTokenCacheEntry>();
+
+interface OAuth2ClientCredentialsSecret {
+  type?: string;
+  auth_type?: string;
+  token_url?: string;
+  client_id?: string;
+  client_secret?: string;
+  scope?: string;
+  audience?: string;
+  grant_type?: string;
+}
 
 function getByPath(obj: unknown, path: string): unknown {
   if (!path) return obj;
@@ -96,7 +112,7 @@ function getByPath(obj: unknown, path: string): unknown {
 function buildTemplateContext(params: {
   request: Record<string, unknown>;
   response?: { status: number; bodyText: string; bodyJson: unknown };
-  cred?: Record<string, string>;
+  cred?: Record<string, CredentialTemplateValue>;
 }): Record<string, unknown> {
   const { request, response, cred } = params;
   const formData = (request.form_data as Record<string, unknown>) || {};
@@ -164,9 +180,133 @@ function parseConfig(raw: unknown): AutomationGraphConfig | null {
 }
 
 function collectCredSlugsFromText(raw: string, out: Set<string>): void {
-  const re = /\{\{\s*cred\.([A-Za-z0-9_]+)\s*\}\}/g;
+  const re = /\{\{\s*cred\.([A-Za-z0-9_]+)(?:\.[^}\s]+)?\s*\}\}/g;
   let m;
   while ((m = re.exec(raw)) !== null) out.add(m[1]);
+}
+
+function parseOAuth2CredentialSecret(raw: string): OAuth2ClientCredentialsSecret | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const obj = parsed as Record<string, unknown>;
+  const authType = String(obj.auth_type ?? obj.type ?? '').trim().toLowerCase();
+  if (authType !== 'oauth2_client_credentials' && authType !== 'oauth2') return null;
+  return {
+    type: typeof obj.type === 'string' ? obj.type : undefined,
+    auth_type: typeof obj.auth_type === 'string' ? obj.auth_type : undefined,
+    token_url: typeof obj.token_url === 'string' ? obj.token_url : undefined,
+    client_id: typeof obj.client_id === 'string' ? obj.client_id : undefined,
+    client_secret: typeof obj.client_secret === 'string' ? obj.client_secret : undefined,
+    scope: typeof obj.scope === 'string' ? obj.scope : undefined,
+    audience: typeof obj.audience === 'string' ? obj.audience : undefined,
+    grant_type: typeof obj.grant_type === 'string' ? obj.grant_type : undefined,
+  };
+}
+
+function oauthCacheKey(tenantId: string, slug: string, oauth: OAuth2ClientCredentialsSecret): string {
+  return [
+    tenantId,
+    slug,
+    oauth.token_url || '',
+    oauth.client_id || '',
+    oauth.scope || '',
+    oauth.audience || '',
+  ].join('|');
+}
+
+async function fetchOAuth2AccessToken(
+  tenantId: string,
+  slug: string,
+  oauth: OAuth2ClientCredentialsSecret,
+): Promise<{ accessToken: string; expiresInSec: number }> {
+  if (!oauth.token_url || !oauth.client_id || !oauth.client_secret) {
+    throw new Error(
+      `Credential "${slug}" OAuth2 config is incomplete (token_url, client_id, client_secret required).`,
+    );
+  }
+  const grantType = oauth.grant_type?.trim() || 'client_credentials';
+  const body = new URLSearchParams({
+    grant_type: grantType,
+    client_id: oauth.client_id,
+    client_secret: oauth.client_secret,
+  });
+  if (oauth.scope) body.set('scope', oauth.scope);
+  if (oauth.audience) body.set('audience', oauth.audience);
+  const res = await fetch(oauth.token_url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`OAuth2 token request failed for "${slug}": ${res.status} ${text.slice(0, 300)}`);
+  }
+  const text = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`OAuth2 token response for "${slug}" is not valid JSON.`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`OAuth2 token response for "${slug}" has invalid shape.`);
+  }
+  const token = (parsed as Record<string, unknown>).access_token;
+  const expiresIn = (parsed as Record<string, unknown>).expires_in;
+  if (typeof token !== 'string' || !token.trim()) {
+    throw new Error(`OAuth2 token response for "${slug}" is missing access_token.`);
+  }
+  const expiresInSec =
+    typeof expiresIn === 'number' && Number.isFinite(expiresIn) && expiresIn > 0
+      ? Math.floor(expiresIn)
+      : 300;
+  log.info('Obtained OAuth2 access token for automation credential', { tenantId, slug, expiresInSec });
+  return { accessToken: token, expiresInSec };
+}
+
+async function getOAuth2AccessTokenCached(
+  tenantId: string,
+  slug: string,
+  oauth: OAuth2ClientCredentialsSecret,
+): Promise<string> {
+  const now = Date.now();
+  const key = oauthCacheKey(tenantId, slug, oauth);
+  const existing = oauthTokenCache.get(key);
+  if (existing && existing.expiresAtMs - OAUTH_TOKEN_SAFETY_MS > now) {
+    return existing.accessToken;
+  }
+  const fresh = await fetchOAuth2AccessToken(tenantId, slug, oauth);
+  oauthTokenCache.set(key, {
+    accessToken: fresh.accessToken,
+    expiresAtMs: now + fresh.expiresInSec * 1000,
+  });
+  return fresh.accessToken;
+}
+
+async function resolveCredentialTemplateValues(
+  tenantId: string,
+  rawCredMap: Record<string, string>,
+): Promise<Record<string, CredentialTemplateValue>> {
+  const out: Record<string, CredentialTemplateValue> = {};
+  for (const [slug, secret] of Object.entries(rawCredMap)) {
+    const oauth = parseOAuth2CredentialSecret(secret);
+    if (!oauth) {
+      out[slug] = secret;
+      continue;
+    }
+    const accessToken = await getOAuth2AccessTokenCached(tenantId, slug, oauth);
+    out[slug] = {
+      ...oauth,
+      access_token: accessToken,
+      token_type: 'Bearer',
+    };
+  }
+  return out;
 }
 
 function collectCredSlugsFromAutomation(cfg: AutomationGraphConfig): string[] {
@@ -202,6 +342,14 @@ async function runHttpStep(
       ? undefined
       : interpolateString(state.body, ctxBeforeRequest);
   const timeoutMs = Math.min(Math.max((state.timeoutSeconds ?? 30) * 1000, 1000), 120_000);
+  const automationKey = process.env.CATALOG_AUTOMATION_SHARED_KEY?.trim();
+  let injectAutomationKey = false;
+  try {
+    const parsedUrl = new URL(url);
+    injectAutomationKey = parsedUrl.pathname.startsWith('/api/catalog/automation/');
+  } catch {
+    injectAutomationKey = false;
+  }
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -210,6 +358,7 @@ async function runHttpStep(
       method,
       headers: {
         ...headers,
+        ...(injectAutomationKey && automationKey ? { 'X-Automation-Key': automationKey } : {}),
         ...(body !== undefined && !headers['Content-Type'] ? { 'Content-Type': 'application/json' } : {}),
       },
       body: method === 'GET' || method === 'HEAD' ? undefined : body,
@@ -276,7 +425,7 @@ async function sleepMs(ms: number): Promise<void> {
 async function executeAutomationGraph(params: {
   cfg: AutomationGraphConfig;
   request: Record<string, unknown>;
-  credMap: Record<string, string>;
+  credMap: Record<string, CredentialTemplateValue>;
   requestId: string;
   client: {
     query: (sql: string, values?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }>;
@@ -508,27 +657,40 @@ export async function executeAutomatedCatalogTask(
     if (reqRes.rows.length === 0) return { ok: false, message: 'Request not found' };
 
     const request = reqRes.rows[0] as Record<string, unknown>;
-    const slugList = collectCredSlugsFromAutomation(cfg);
-    const credMap = await loadCredentialSecretsBySlugs(client, tenantId, slugList);
+    try {
+      const slugList = collectCredSlugsFromAutomation(cfg);
+      const rawCredMap = await loadCredentialSecretsBySlugs(client, tenantId, slugList);
+      const credMap = await resolveCredentialTemplateValues(tenantId, rawCredMap);
 
-    const result = await executeAutomationGraph({
-      cfg,
-      request,
-      credMap,
-      requestId,
-      client,
-    });
+      const result = await executeAutomationGraph({
+        cfg,
+        request,
+        credMap,
+        requestId,
+        client,
+      });
 
-    await client.query(
-      `UPDATE request_tasks SET status = $1, completed_at = now(), completed_by = NULL, notes = $2 WHERE id = $3`,
-      [result.ok ? 'completed' : 'failed', truncateNotes(JSON.stringify(result.notes)), requestTaskId],
-    );
+      await client.query(
+        `UPDATE request_tasks SET status = $1, completed_at = now(), completed_by = NULL, notes = $2 WHERE id = $3`,
+        [result.ok ? 'completed' : 'failed', truncateNotes(JSON.stringify(result.notes)), requestTaskId],
+      );
 
-    return {
-      ok: result.ok,
-      message: result.message,
-      rejectRequest: result.rejectRequest,
-      skipTaskOrders: result.skipTaskOrders,
-    };
+      return {
+        ok: result.ok,
+        message: result.message,
+        rejectRequest: result.rejectRequest,
+        skipTaskOrders: result.skipTaskOrders,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await client.query(
+        `UPDATE request_tasks
+         SET status = 'failed', completed_at = now(), completed_by = NULL, notes = $1
+         WHERE id = $2`,
+        [truncateNotes(`Automated execution failed: ${message}`), requestTaskId],
+      );
+      // Infra/config failures should not leave requests hanging in progress.
+      return { ok: false, message, rejectRequest: true };
+    }
   });
 }

@@ -278,11 +278,11 @@ router.put('/me/preferences/:scope', authenticate, async (req: Request, res: Res
   }
 });
 
-// ─── GET /api/auth/users (admin/fulfiller – for dropdowns) ───
+// ─── GET /api/auth/users (for user_ref dropdowns) ───
 router.get(
   '/users',
   authenticate,
-  requireRole('admin', 'fulfiller'),
+  requireRole('admin', 'fulfiller', 'user'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = req.user!.tenant_id;

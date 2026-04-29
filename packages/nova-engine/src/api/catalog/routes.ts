@@ -5,6 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { db } from '../../data/db';
 import { authenticate, requireRole, getRequestClient, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { createCategorySchema, createServiceItemSchema, updateServiceItemSchema } from '../../domain/schemas';
@@ -12,6 +13,105 @@ import { NotFound, BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
 
 const router = Router();
+
+function requireAutomationSharedKey(req: Request, res: Response, next: NextFunction): void {
+  const configured = config.catalogAutomation.sharedKey;
+  if (!configured) {
+    res.status(503).json({
+      error: 'Catalog automation key is not configured',
+      hint: 'Set CATALOG_AUTOMATION_SHARED_KEY on the API server and restart.',
+    });
+    return;
+  }
+  const provided = req.headers['x-automation-key'];
+  const headerKey = typeof provided === 'string' ? provided.trim() : Array.isArray(provided) ? provided[0]?.trim() : '';
+  const authHeader = req.headers.authorization;
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const key = headerKey || bearer;
+  if (!key || key !== configured) {
+    res.status(401).json({ error: 'Invalid automation key' });
+    return;
+  }
+  next();
+}
+
+// ─── POST /api/catalog/automation/add-support-group-member ───
+// Helper endpoint for demo catalog automation state machines.
+router.post(
+  '/automation/add-support-group-member',
+  requireAutomationSharedKey,
+  async (req: Request, res: Response, next: NextFunction) => {
+    let client: Awaited<ReturnType<typeof db.getClient>> | null = null;
+    try {
+      const userId = typeof req.body?.user_id === 'string' ? req.body.user_id.trim() : '';
+      const groupIdRaw = typeof req.body?.group_id === 'string' ? req.body.group_id.trim() : '';
+      const groupNameRaw = typeof req.body?.group_name === 'string' ? req.body.group_name.trim() : '';
+      const requestId = typeof req.body?.request_id === 'string' ? req.body.request_id.trim() : '';
+      if (!requestId) throw BadRequest('request_id is required');
+      if (!userId) throw BadRequest('user_id is required');
+      if (!groupIdRaw && !groupNameRaw) throw BadRequest('group_id or group_name is required');
+
+      client = await db.getClient();
+      const requestRes = await client.query(
+        `SELECT tenant_id FROM requests WHERE id = $1`,
+        [requestId],
+      );
+      if (requestRes.rows.length === 0) throw NotFound('Request not found');
+      const tenantId = String(requestRes.rows[0].tenant_id);
+
+      const userResult = await client.query(
+        `SELECT id, display_name
+         FROM users
+         WHERE id = $1
+           AND tenant_id = $2`,
+        [userId, tenantId],
+      );
+      if (userResult.rows.length === 0) throw NotFound('User not found');
+
+      const groupResult = groupIdRaw
+        ? await client.query(
+          `SELECT id, name, manager_id
+           FROM assignment_groups
+           WHERE id = $1
+             AND tenant_id = $2`,
+          [groupIdRaw, tenantId],
+        )
+        : await client.query(
+          `SELECT id, name, manager_id
+           FROM assignment_groups
+           WHERE tenant_id = $1
+             AND lower(name) = lower($2)
+           ORDER BY name
+           LIMIT 1`,
+          [tenantId, groupNameRaw],
+        );
+      if (groupResult.rows.length === 0) throw NotFound('Assignment group not found');
+      const group = groupResult.rows[0] as { id: string; name: string; manager_id: string | null };
+
+      const insertResult = await client.query(
+        `INSERT INTO assignment_group_members (tenant_id, group_id, user_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (tenant_id, group_id, user_id) DO NOTHING
+         RETURNING user_id`,
+        [tenantId, group.id, userId],
+      );
+      const added = insertResult.rows.length > 0;
+
+      res.json({
+        success: true,
+        added,
+        group_id: group.id,
+        group_name: group.name,
+        group_manager_id: group.manager_id,
+        user_id: userId,
+      });
+    } catch (err) {
+      next(err);
+    } finally {
+      client?.release();
+    }
+  },
+);
 
 router.use(authenticate, setTenantRLS, releaseTenantClient);
 
@@ -34,6 +134,63 @@ type AutomationState = {
   onError?: 'fail' | 'continue' | 'fallback';
   fallbackNodeId?: string;
 };
+
+function collectCredentialSlugsFromString(raw: string, out: Set<string>): void {
+  const re = /\{\{\s*cred\.([A-Za-z0-9_]+)(?:\.[^}\s]+)?\s*\}\}/g;
+  let m: RegExpExecArray | null = null;
+  while ((m = re.exec(raw)) !== null) out.add(m[1]);
+}
+
+function collectCredentialSlugsFromAutomationConfig(raw: unknown): string[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  const cfg = raw as Record<string, unknown>;
+  const states = Array.isArray(cfg.states) ? cfg.states : [];
+  const out = new Set<string>();
+  for (const s of states) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
+    const state = s as Record<string, unknown>;
+    for (const key of ['url', 'body', 'condition'] as const) {
+      const val = state[key];
+      if (typeof val === 'string') collectCredentialSlugsFromString(val, out);
+    }
+    const headers = state.headers;
+    if (headers && typeof headers === 'object' && !Array.isArray(headers)) {
+      for (const v of Object.values(headers as Record<string, unknown>)) {
+        if (typeof v === 'string') collectCredentialSlugsFromString(v, out);
+      }
+    }
+    for (const branchKey of ['onSuccess', 'onFailure'] as const) {
+      const branch = state[branchKey];
+      if (!branch || typeof branch !== 'object' || Array.isArray(branch)) continue;
+      const merge = (branch as Record<string, unknown>).mergeFormData;
+      if (merge && typeof merge === 'object' && !Array.isArray(merge)) {
+        for (const v of Object.values(merge as Record<string, unknown>)) {
+          if (typeof v === 'string') collectCredentialSlugsFromString(v, out);
+        }
+      }
+    }
+  }
+  return [...out];
+}
+
+async function ensureCredentialSlugsExist(
+  client: { query: (sql: string, values?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }> },
+  slugs: string[],
+): Promise<void> {
+  if (slugs.length === 0) return;
+  const result = await client.query(
+    `SELECT slug
+     FROM tenant_credentials
+     WHERE tenant_id = current_tenant_id()
+       AND slug = ANY($1::text[])`,
+    [slugs],
+  );
+  const existing = new Set(result.rows.map((r) => String(r.slug)));
+  const missing = slugs.filter((slug) => !existing.has(slug));
+  if (missing.length > 0) {
+    throw BadRequest(`Unknown credential slug(s) in automation_config: ${missing.join(', ')}`);
+  }
+}
 
 function validateAutomationConfig(raw: unknown): string[] {
   const errors: string[] = [];
@@ -458,6 +615,8 @@ router.post('/items/:id/tasks', requireRole('admin', 'catalog_designer'),
           res.status(400).json({ error: 'Invalid automation_config', details: errors });
           return;
         }
+        const slugRefs = collectCredentialSlugsFromAutomationConfig(automationJson);
+        await ensureCredentialSlugsExist(client, slugRefs);
       }
 
       const result = await client.query(
@@ -497,6 +656,8 @@ router.put('/items/:id/tasks/:taskId', requireRole('admin', 'catalog_designer'),
             res.status(400).json({ error: 'Invalid automation_config', details: errors });
             return;
           }
+          const slugRefs = collectCredentialSlugsFromAutomationConfig(automation_config ?? {});
+          await ensureCredentialSlugsExist(client, slugRefs);
         }
         automationSql = ', automation_config = COALESCE($11::jsonb, \'{}\'::jsonb)';
         params.push(JSON.stringify(automation_config ?? {}));

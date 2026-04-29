@@ -72,4 +72,8 @@ export const config = {
   credentials: {
     masterKey: env('CREDENTIALS_MASTER_KEY', ''),
   },
+
+  catalogAutomation: {
+    sharedKey: env('CATALOG_AUTOMATION_SHARED_KEY', ''),
+  },
 } as const;
