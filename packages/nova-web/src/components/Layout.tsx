@@ -208,6 +208,29 @@ type RawNavItemDef = { to: string; labelKey: string; icon: string };
 type AdminSection = { key: string; label: string; icon: string; items: NavItemDef[] };
 type RawAdminSection = { key: string; labelKey: string; icon: string; items: RawNavItemDef[] };
 
+function isWorkflowEditorPath(pathname: string): boolean {
+  return pathname === '/admin/workflows/editor' || pathname.startsWith('/admin/workflows/editor/')
+    || pathname === '/admin/workflows/designer' || pathname.startsWith('/admin/workflows/designer/');
+}
+
+function isWorkflowExecutionDetailPath(pathname: string): boolean {
+  return /^\/admin\/workflows\/[^/]+\/[^/]+$/.test(pathname);
+}
+
+function isNavItemActive(itemTo: string, pathname: string | undefined, fallbackIsActive: boolean): boolean {
+  if (!pathname) return fallbackIsActive;
+
+  if (itemTo === '/admin/workflows') {
+    return pathname === '/admin/workflows' || isWorkflowExecutionDetailPath(pathname);
+  }
+
+  if (itemTo === '/admin/workflows/editor') {
+    return isWorkflowEditorPath(pathname);
+  }
+
+  return fallbackIsActive;
+}
+
 const adminSections: RawAdminSection[] = [
   {
     key: 'org',
@@ -244,7 +267,7 @@ const adminSections: RawAdminSection[] = [
       { to: '/admin/change-management', labelKey: 'admin.changeManagement', icon: '🛠️' },
       { to: '/admin/knowledge-workflows', labelKey: 'admin.knowledgeWorkflows', icon: '📚' },
       { to: '/admin/workflows', labelKey: 'admin.workflows', icon: '🔄' },
-      { to: '/admin/workflows/designer', labelKey: 'admin.workflowEditorBeta', icon: '🧪' },
+      { to: '/admin/workflows/editor', labelKey: 'admin.workflowEditor', icon: '🧩' },
     ],
   },
   {
@@ -296,22 +319,30 @@ function NavItem({ item }: { item: NavItemDef }) {
   );
 }
 
-function CollapsibleNavItem({ item, collapsed }: { item: NavItemDef; collapsed: boolean }) {
+function CollapsibleNavItem({ item, collapsed, currentPath }: { item: NavItemDef; collapsed: boolean; currentPath?: string }) {
   return (
     <NavLink
       to={item.to}
       end={item.to === '/'}
       title={item.label}
       className={({ isActive }) =>
+        {
+          const active = isNavItemActive(item.to, currentPath, isActive);
+          return (
         `flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
           collapsed ? 'justify-center' : 'gap-3'
         } ${
-          isActive
+          active
             ? 'nav-active text-white'
             : 'text-slate-300 hover:bg-white/10 hover:text-white'
         }`
+          );
+        }
       }
-      style={({ isActive }) => isActive ? { backgroundColor: 'var(--color-sidebar-active)' } : {}}
+      style={({ isActive }) => {
+        const active = isNavItemActive(item.to, currentPath, isActive);
+        return active ? { backgroundColor: 'var(--color-sidebar-active)' } : {};
+      }}
     >
       <span className="text-lg">{item.icon}</span>
       {!collapsed && item.label}
@@ -319,17 +350,18 @@ function CollapsibleNavItem({ item, collapsed }: { item: NavItemDef; collapsed: 
   );
 }
 
-function AdminSubMenu({ section, expanded, onToggle, collapsed = false }: {
+function AdminSubMenu({ section, expanded, onToggle, collapsed = false, currentPath }: {
   section: AdminSection;
   expanded: boolean;
   onToggle: () => void;
   collapsed?: boolean;
+  currentPath?: string;
 }) {
   if (collapsed) {
     return (
       <div className="space-y-0.5">
         {section.items.map((item) => (
-          <CollapsibleNavItem key={item.to} item={item} collapsed />
+          <CollapsibleNavItem key={item.to} item={item} collapsed currentPath={currentPath} />
         ))}
       </div>
     );
@@ -362,13 +394,21 @@ function AdminSubMenu({ section, expanded, onToggle, collapsed = false }: {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
+                {
+                  const active = isNavItemActive(item.to, currentPath, isActive);
+                  return (
                 `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
-                  isActive
+                  active
                     ? 'text-white'
                     : 'text-slate-400 hover:bg-white/10 hover:text-slate-200'
                 }`
+                  );
+                }
               }
-              style={({ isActive }) => isActive ? { backgroundColor: 'var(--color-sidebar-active)' } : {}}
+              style={({ isActive }) => {
+                const active = isNavItemActive(item.to, currentPath, isActive);
+                return active ? { backgroundColor: 'var(--color-sidebar-active)' } : {};
+              }}
             >
               <span className="text-sm">{item.icon}</span>
               {item.label}
@@ -539,7 +579,7 @@ export default function Layout() {
         </div>
 
         <nav className={`flex-1 py-2 space-y-1 overflow-y-auto ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
-          {localizedNav.map((item) => <CollapsibleNavItem key={item.to} item={item} collapsed={sidebarCollapsed} />)}
+          {localizedNav.map((item) => <CollapsibleNavItem key={item.to} item={item} collapsed={sidebarCollapsed} currentPath={location.pathname} />)}
 
           <NavLink
             to="/cart"
@@ -590,6 +630,7 @@ export default function Layout() {
                     section={section}
                     expanded={expandedSections.has(section.key)}
                     collapsed={sidebarCollapsed}
+                    currentPath={location.pathname}
                     onToggle={() => toggleSection(section.key)}
                   />
                 ))}

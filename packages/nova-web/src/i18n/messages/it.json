@@ -173,7 +173,7 @@
       "changeManagement": "Gestione del cambiamento",
       "knowledgeWorkflows": "Workflow della conoscenza",
       "workflows": "Workflow",
-      "workflowEditorBeta": "Editor workflow (beta)",
+      "workflowEditor": "Editor workflow",
       "ciClasses": "Classi CI",
       "dataSources": "Fonti dei dati",
       "credentials": "Credenziali",

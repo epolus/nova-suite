@@ -159,7 +159,8 @@ function AppRoutes() {
           <Route path="assignment-groups/new" element={<AssignmentGroupDetailPage />} />
           <Route path="assignment-groups/:id" element={<AssignmentGroupDetailPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
-          <Route path="workflows/designer" element={<WorkflowEditorPage />} />
+          <Route path="workflows/editor" element={<WorkflowEditorPage />} />
+          <Route path="workflows/designer" element={<Navigate to="/admin/workflows/editor" replace />} />
           <Route path="workflows/:workflowId/:runId" element={<WorkflowDetailPage />} />
           <Route path="service-items" element={<ServiceItemsPage />} />
           <Route path="catalog-tasks" element={<CatalogTasksPage />} />

@@ -147,7 +147,7 @@ export default function WorkflowsPage() {
         description={`Temporal workflow executions${overview ? ` — ${overview.namespace} namespace` : ''}`}
         action={
           <button
-            onClick={() => navigate('/admin/workflows/designer')}
+            onClick={() => navigate('/admin/workflows/editor')}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
           >
             Open Workflow Editor
