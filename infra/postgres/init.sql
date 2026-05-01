@@ -1108,7 +1108,12 @@ INSERT INTO ci_classes (id, tenant_id, name, display_name, description, attribut
    'a0000000-0000-0000-0000-000000000001',
    'network_device', 'Network Device', 'Router, switch, or firewall',
    '{"device_type": {"type": "string"}, "ip_address": {"type": "string"}, "firmware_version": {"type": "string"}}',
-   'wifi');
+   'wifi'),
+  ('e0000000-0000-0000-0000-000000000005',
+   'a0000000-0000-0000-0000-000000000001',
+   'laptop', 'Laptop', 'End-user laptop device',
+   '{"asset_tag": {"type": "string"}, "serial_number": {"type": "string"}, "os": {"type": "string"}, "procurement_order_id": {"type": "string"}}',
+   'laptop');
 
 -- CMDB – Configuration Items (sample infrastructure)
 INSERT INTO configuration_items (id, tenant_id, class_id, name, display_name, status, environment, attributes) VALUES
@@ -1258,6 +1263,79 @@ CREATE INDEX idx_request_tasks_request ON request_tasks(request_id, task_order);
 INSERT INTO catalog_tasks (
   id, tenant_id, service_item_id, name, description, instructions, task_type, task_order, assigned_group_id, sla_hours, automation_config, is_active
 ) VALUES
+  ('d1000000-0000-0000-0000-000000000601',
+   'a0000000-0000-0000-0000-000000000001',
+   'd0000000-0000-0000-0000-000000000001',
+   'Provision Laptop (Automated)',
+   'Demo workflow: external procurement API call followed by internal CI creation/assignment.',
+   'Runs an external demo REST call first. If successful, creates a laptop CI and assigns it to requested_for/requester.',
+   'automated',
+   1,
+   'a5000000-0000-0000-0000-000000000001',
+   8,
+   '{
+      "kind":"state_machine",
+      "schemaVersion":1,
+      "startAt":"external_procurement",
+      "states":[
+        {
+          "id":"external_procurement",
+          "type":"activity",
+          "method":"POST",
+          "url":"https://postman-echo.com/post",
+          "headers":{
+            "Content-Type":"application/json"
+          },
+          "body":"{\"catalog_item\":\"new_laptop\",\"request_id\":\"{{request.id}}\",\"requested_for\":\"{{request.requested_for}}\",\"os_preference\":\"{{request.form_data.os_preference}}\"}",
+          "timeoutSeconds":30,
+          "retryAttempts":2,
+          "retryBackoffSec":2,
+          "onError":"fail",
+          "onSuccess":{
+            "mergeFormData":{
+              "laptop_external_response":"{{response.body}}"
+            }
+          },
+          "transitions":[{"to":"create_ci","when":"success"},{"to":"failed","when":"failure"}]
+        },
+        {
+          "id":"create_ci",
+          "type":"activity",
+          "method":"POST",
+          "url":"http://nova-engine:4000/api/catalog/automation/create-laptop-ci",
+          "headers":{
+            "X-Automation-Key":"{{env.CATALOG_AUTOMATION_SHARED_KEY}}",
+            "Content-Type":"application/json"
+          },
+          "body":"{\"request_id\":\"{{request.id}}\",\"asset_tag\":\"LAP-{{request.number}}\",\"vendor_order_id\":\"{{request.id}}\"}",
+          "timeoutSeconds":30,
+          "retryAttempts":2,
+          "retryBackoffSec":2,
+          "onError":"fail",
+          "onSuccess":{
+            "mergeFormData":{
+              "laptop_ci_result":"{{response.body}}"
+            }
+          },
+          "transitions":[{"to":"done","when":"success"},{"to":"failed","when":"failure"}]
+        },
+        {"id":"done","type":"end","result":"success"},
+        {"id":"failed","type":"end","result":"failure","onFailure":{"rejectRequest":true}}
+      ]
+    }'::jsonb,
+   true),
+  ('d1000000-0000-0000-0000-000000000602',
+   'a0000000-0000-0000-0000-000000000001',
+   'd0000000-0000-0000-0000-000000000001',
+   'IT Fulfillment Confirmation',
+   'Optional manual QA of procurement payload and created CI record.',
+   'Verify CI was created and assigned to the target user before closing the request.',
+   'manual',
+   2,
+   'a5000000-0000-0000-0000-000000000001',
+   8,
+   '{}'::jsonb,
+   true),
   ('d1000000-0000-0000-0000-000000000501',
    'a0000000-0000-0000-0000-000000000001',
    'd0000000-0000-0000-0000-000000000005',
@@ -1282,6 +1360,7 @@ INSERT INTO catalog_tasks (
    4,
    '{
       "kind":"state_machine",
+      "schemaVersion":1,
       "startAt":"add_member",
       "states":[
         {

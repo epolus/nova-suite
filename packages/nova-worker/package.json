@@ -7,9 +7,11 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/worker.js",
-    "dev": "tsx watch src/worker.ts"
+    "dev": "tsx watch src/worker.ts",
+    "test": "vitest run src/**/*.test.ts"
   },
   "dependencies": {
+    "@nova-suite/shared": "1.0.0",
     "@temporalio/activity": "^1.16.1",
     "@temporalio/client": "^1.16.1",
     "@temporalio/worker": "^1.16.1",
@@ -24,7 +26,8 @@
     "@types/pg": "^8.11.10",
     "@types/ssh2-sftp-client": "^9.0.6",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.5"
   },
   "engines": {
     "node": ">=24.0.0"

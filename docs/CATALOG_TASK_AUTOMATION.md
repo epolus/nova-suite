@@ -28,6 +28,10 @@ Supported state types:
 - **`decision`** — boolean branch using a condition template.
 - **`delay`** — wait a bounded number of seconds before next state.
 - **`end`** — terminate with `result: success|failure`.
+- **`action.rest`** — reusable HTTP action.
+- **`action.ci.lookup`** — built-in CI lookup action (calls automation CI lookup endpoint).
+- **`action.ci.create`** — built-in CI creation action (calls automation CI create endpoint).
+- **`decision.advanced`** — structured expression branch (`and/or/not/eq/ne/gt/gte/lt/lte/contains/in`).
 
 Common branch effects (supported on activity success/failure branches and end branches):
 
@@ -51,6 +55,85 @@ Interpolated before the request, and again for `mergeFormData` after a response:
 | `{{env.VAR_NAME}}` | **Worker** `process.env` only |
 | `{{cred.slug}}` | Secret stored in **tenant_credentials** (decrypted by the worker at runtime; slug must match an entry from Admin → Credentials). |
 
+For runs with action nodes, prior step results are available under `state.<stepId>.body`, for example:
+- `{{state.lookup.body.count}}`
+- `{{state.create.body.ci.id}}`
+
+## Reusable action examples
+
+### REST + advanced decision
+
+```json
+{
+  "kind": "state_machine",
+  "schemaVersion": 1,
+  "startAt": "restFetch",
+  "states": [
+    {
+      "id": "restFetch",
+      "type": "action.rest",
+      "method": "GET",
+      "url": "https://api.example.com/orders/{{request.form_data.vendor_order_id}}",
+      "headers": { "Authorization": "Bearer {{cred.vendor_api}}" },
+      "transitions": [{ "to": "branch", "when": "success" }, { "to": "failed", "when": "failure" }]
+    },
+    {
+      "id": "branch",
+      "type": "decision.advanced",
+      "expression": {
+        "op": "or",
+        "conditions": [
+          { "op": "eq", "left": { "var": "response.status" }, "right": 200 },
+          { "op": "contains", "left": { "var": "response.text" }, "right": "already_exists" }
+        ]
+      },
+      "transitions": [{ "to": "done", "when": "true" }, { "to": "failed", "when": "false" }]
+    },
+    { "id": "done", "type": "end", "result": "success" },
+    { "id": "failed", "type": "end", "result": "failure" }
+  ]
+}
+```
+
+### CI lookup -> if -> CI create
+
+```json
+{
+  "kind": "state_machine",
+  "schemaVersion": 1,
+  "startAt": "lookup",
+  "states": [
+    {
+      "id": "lookup",
+      "type": "action.ci.lookup",
+      "url": "http://nova-engine:4000/api/catalog/automation/ci/lookup",
+      "className": "laptop",
+      "attributes": { "asset_tag": "{{request.form_data.asset_tag}}" },
+      "limit": 1,
+      "transitions": [{ "to": "exists", "when": "success" }, { "to": "failed", "when": "failure" }]
+    },
+    {
+      "id": "exists",
+      "type": "decision.advanced",
+      "expression": { "op": "gt", "left": { "var": "state.lookup.body.count" }, "right": 0 },
+      "transitions": [{ "to": "done", "when": "true" }, { "to": "create", "when": "false" }]
+    },
+    {
+      "id": "create",
+      "type": "action.ci.create",
+      "url": "http://nova-engine:4000/api/catalog/automation/ci/create",
+      "className": "laptop",
+      "name": "{{request.form_data.asset_tag}}",
+      "displayName": "Laptop {{request.form_data.asset_tag}}",
+      "attributes": { "serial_number": "{{request.form_data.serial_number}}" },
+      "transitions": [{ "to": "done", "when": "success" }, { "to": "failed", "when": "failure" }]
+    },
+    { "id": "done", "type": "end", "result": "success" },
+    { "id": "failed", "type": "end", "result": "failure" }
+  ]
+}
+```
+
 ## REST authentication (no credentials in the script)
 
 ### Option A — Vault (recommended for rotation / UI-managed secrets)
@@ -71,6 +154,7 @@ Interpolated before the request, and again for `mergeFormData` after a response:
 ```json
 {
   "kind": "state_machine",
+  "schemaVersion": 1,
   "startAt": "fetch",
   "states": [
     {

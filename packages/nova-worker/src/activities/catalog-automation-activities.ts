@@ -1,5 +1,17 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { log } from '@temporalio/activity';
+import { AUTOMATION_SCHEMA_VERSION, parseAutomationConfig } from '@nova-suite/shared';
+import type {
+  AdvancedCondition,
+  AutomationActivityState,
+  AutomationBranch,
+  AutomationCiCreateActionState,
+  AutomationCiLookupActionState,
+  AutomationConfig,
+  AutomationRestActionState,
+  AutomationState,
+  AutomationTransition,
+} from '@nova-suite/shared';
 import { withTenantContext } from '../db';
 import { loadCredentialSecretsBySlugs } from '../credentials/vault';
 
@@ -14,69 +26,6 @@ export interface ExecuteAutomatedCatalogTaskResult {
   message?: string;
   rejectRequest?: boolean;
   skipTaskOrders?: number[];
-}
-
-interface AutomationBranch {
-  skipTaskOrders?: number[];
-  rejectRequest?: boolean;
-  mergeFormData?: Record<string, string>;
-  nextStateId?: string;
-}
-
-interface AutomationTransition {
-  to: string;
-  when?: string;
-}
-
-interface AutomationActivityState {
-  id: string;
-  type: 'activity';
-  method?: string;
-  url: string;
-  headers?: Record<string, string>;
-  body?: string | null;
-  timeoutSeconds?: number;
-  retryAttempts?: number;
-  retryBackoffSec?: number;
-  onError?: 'fail' | 'continue' | 'fallback';
-  fallbackNodeId?: string;
-  transitions?: AutomationTransition[];
-  onSuccess?: AutomationBranch;
-  onFailure?: AutomationBranch;
-}
-
-interface AutomationDecisionState {
-  id: string;
-  type: 'decision';
-  condition: string;
-  transitions: AutomationTransition[];
-}
-
-interface AutomationDelayState {
-  id: string;
-  type: 'delay';
-  delaySeconds: number;
-  transitions: AutomationTransition[];
-}
-
-interface AutomationEndState {
-  id: string;
-  type: 'end';
-  result?: 'success' | 'failure';
-  onSuccess?: AutomationBranch;
-  onFailure?: AutomationBranch;
-}
-
-type AutomationState =
-  | AutomationActivityState
-  | AutomationDecisionState
-  | AutomationDelayState
-  | AutomationEndState;
-
-interface AutomationGraphConfig {
-  kind: 'state_machine';
-  startAt: string;
-  states: AutomationState[];
 }
 
 const MAX_EXECUTION_STEPS = 120;
@@ -113,8 +62,9 @@ function buildTemplateContext(params: {
   request: Record<string, unknown>;
   response?: { status: number; bodyText: string; bodyJson: unknown };
   cred?: Record<string, CredentialTemplateValue>;
+  state?: Record<string, unknown>;
 }): Record<string, unknown> {
-  const { request, response, cred } = params;
+  const { request, response, cred, state } = params;
   const formData = (request.form_data as Record<string, unknown>) || {};
   const deliveryInfo = (request.delivery_info as Record<string, unknown>) || {};
   return {
@@ -133,6 +83,7 @@ function buildTemplateContext(params: {
         }
       : {},
     cred: cred ?? {},
+    state: state ?? {},
   };
 }
 
@@ -161,22 +112,6 @@ function interpolateRecord(
     out[k] = interpolateString(v, ctx);
   }
   return out;
-}
-
-function parseConfig(raw: unknown): AutomationGraphConfig | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const cfg = raw as Record<string, unknown>;
-  if (cfg.kind !== 'state_machine') return null;
-  if (typeof cfg.startAt !== 'string' || !cfg.startAt.trim()) return null;
-  if (!Array.isArray(cfg.states) || cfg.states.length === 0) return null;
-  const states = cfg.states as AutomationState[];
-  const byId = new Set(states.map((s) => s.id));
-  if (!byId.has(cfg.startAt)) return null;
-  return {
-    kind: 'state_machine',
-    startAt: cfg.startAt,
-    states,
-  };
 }
 
 function collectCredSlugsFromText(raw: string, out: Set<string>): void {
@@ -309,12 +244,12 @@ async function resolveCredentialTemplateValues(
   return out;
 }
 
-function collectCredSlugsFromAutomation(cfg: AutomationGraphConfig): string[] {
+function collectCredSlugsFromAutomation(cfg: AutomationConfig): string[] {
   const slugs = new Set<string>();
   for (const s of cfg.states) {
-    if (s.type === 'activity') {
+    if (s.type === 'activity' || s.type === 'action.rest' || s.type === 'action.ci.create' || s.type === 'action.ci.lookup') {
       collectCredSlugsFromText(s.url || '', slugs);
-      if (s.body) collectCredSlugsFromText(s.body, slugs);
+      if ('body' in s && s.body) collectCredSlugsFromText(s.body, slugs);
       for (const v of Object.values(s.headers || {})) collectCredSlugsFromText(v, slugs);
       for (const b of [s.onSuccess, s.onFailure]) {
         for (const v of Object.values(b?.mergeFormData || {})) collectCredSlugsFromText(v, slugs);
@@ -377,6 +312,58 @@ async function runHttpStep(
   }
 }
 
+function interpolateUnknown(input: unknown, ctx: Record<string, unknown>): unknown {
+  if (typeof input === 'string') return interpolateString(input, ctx);
+  if (Array.isArray(input)) return input.map((v) => interpolateUnknown(v, ctx));
+  if (input && typeof input === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input as Record<string, unknown>)) out[k] = interpolateUnknown(v, ctx);
+    return out;
+  }
+  return input;
+}
+
+function toHttpActivityState(
+  state: AutomationActivityState | AutomationRestActionState | AutomationCiCreateActionState | AutomationCiLookupActionState,
+  ctxBeforeRequest: Record<string, unknown>,
+): AutomationActivityState {
+  if (state.type === 'action.ci.create') {
+    const payload = {
+      request_id: getByPath(ctxBeforeRequest, 'request.id'),
+      class_name: interpolateString(state.className, ctxBeforeRequest),
+      name: interpolateString(state.name, ctxBeforeRequest),
+      display_name: state.displayName ? interpolateString(state.displayName, ctxBeforeRequest) : undefined,
+      status: state.status ? interpolateString(state.status, ctxBeforeRequest) : undefined,
+      environment: state.environment ? interpolateString(state.environment, ctxBeforeRequest) : undefined,
+      attributes: interpolateUnknown(state.attributes || {}, ctxBeforeRequest),
+    };
+    return {
+      ...state,
+      type: 'activity',
+      method: 'POST',
+      body: JSON.stringify(payload),
+    };
+  }
+  if (state.type === 'action.ci.lookup') {
+    const payload = {
+      request_id: getByPath(ctxBeforeRequest, 'request.id'),
+      class_name: state.className ? interpolateString(state.className, ctxBeforeRequest) : undefined,
+      attributes: interpolateUnknown(state.attributes || {}, ctxBeforeRequest),
+      limit: state.limit ?? 10,
+    };
+    return {
+      ...state,
+      type: 'activity',
+      method: 'POST',
+      body: JSON.stringify(payload),
+    };
+  }
+  return {
+    ...state,
+    type: 'activity',
+  };
+}
+
 function truncateNotes(s: string, max = 8000): string {
   if (s.length <= max) return s;
   return `${s.slice(0, max)}…`;
@@ -418,12 +405,67 @@ function evaluateDecision(condition: string, ctx: Record<string, unknown>): bool
   return ['true', '1', 'yes', 'ok', 'approved', 'success'].includes(v);
 }
 
+function resolveOperand(input: unknown, ctx: Record<string, unknown>): unknown {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  const obj = input as Record<string, unknown>;
+  if (typeof obj.var === 'string') {
+    return getByPath(ctx, obj.var.replace(/\[(\w+)\]/g, '.$1'));
+  }
+  return input;
+}
+
+function compareValues(op: string, leftRaw: unknown, rightRaw: unknown): boolean {
+  const left = leftRaw as string | number | boolean | null | undefined;
+  const right = rightRaw as string | number | boolean | null | undefined;
+  if (op === 'eq') return left === right;
+  if (op === 'ne') return left !== right;
+  if (op === 'gt') return Number(left) > Number(right);
+  if (op === 'gte') return Number(left) >= Number(right);
+  if (op === 'lt') return Number(left) < Number(right);
+  if (op === 'lte') return Number(left) <= Number(right);
+  if (op === 'contains') {
+    if (typeof left === 'string') return left.includes(String(right ?? ''));
+    if (Array.isArray(leftRaw)) return (leftRaw as unknown[]).includes(rightRaw);
+    return false;
+  }
+  if (op === 'in') {
+    if (Array.isArray(rightRaw)) return (rightRaw as unknown[]).includes(leftRaw);
+    return false;
+  }
+  return false;
+}
+
+function evaluateAdvancedCondition(expr: AdvancedCondition, ctx: Record<string, unknown>): boolean {
+  switch (expr.op) {
+    case 'and':
+      return expr.conditions.every((c) => evaluateAdvancedCondition(c, ctx));
+    case 'or':
+      return expr.conditions.some((c) => evaluateAdvancedCondition(c, ctx));
+    case 'not':
+      return !evaluateAdvancedCondition(expr.condition, ctx);
+    case 'eq':
+    case 'ne':
+    case 'gt':
+    case 'gte':
+    case 'lt':
+    case 'lte':
+    case 'contains':
+    case 'in': {
+      const left = resolveOperand(expr.left, ctx);
+      const right = resolveOperand(expr.right, ctx);
+      return compareValues(expr.op, left, right);
+    }
+    default:
+      return false;
+  }
+}
+
 async function sleepMs(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function executeAutomationGraph(params: {
-  cfg: AutomationGraphConfig;
+  cfg: AutomationConfig;
   request: Record<string, unknown>;
   credMap: Record<string, CredentialTemplateValue>;
   requestId: string;
@@ -442,6 +484,7 @@ async function executeAutomationGraph(params: {
   const skipOrders = new Set<number>();
   const mergePatch: Record<string, unknown> = {};
   const trace: string[] = [];
+  const stateResults: Record<string, unknown> = {};
 
   let step = 0;
   let current: string | null = cfg.startAt;
@@ -459,7 +502,7 @@ async function executeAutomationGraph(params: {
 
     if (state.type === 'end') {
       const endOk = state.result !== 'failure';
-      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap });
+      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
       const branch = endOk ? state.onSuccess : state.onFailure;
       const fx = applyBranchEffects(branch, ctx, mergePatch, skipOrders);
       terminal = {
@@ -482,9 +525,27 @@ async function executeAutomationGraph(params: {
     }
 
     if (state.type === 'decision') {
-      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap });
+      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
       const branchBool = evaluateDecision(state.condition, ctx);
       const when = branchBool ? 'true' : 'false';
+      stateResults[state.id] = { result: branchBool };
+      mergePatch[`automation_${state.id}_result`] = branchBool;
+      mergePatch[`automation_${state.id}_when`] = when;
+      current = selectTransition(state.transitions, when);
+      if (!current) {
+        terminal = { ok: false, message: `Decision state ${state.id} has no ${when} transition`, rejectRequest: false };
+        break;
+      }
+      continue;
+    }
+
+    if (state.type === 'decision.advanced') {
+      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
+      const branchBool = evaluateAdvancedCondition(state.expression, ctx);
+      const when = branchBool ? 'true' : 'false';
+      stateResults[state.id] = { result: branchBool };
+      mergePatch[`automation_${state.id}_result`] = branchBool;
+      mergePatch[`automation_${state.id}_when`] = when;
       current = selectTransition(state.transitions, when);
       if (!current) {
         terminal = { ok: false, message: `Decision state ${state.id} has no ${when} transition`, rejectRequest: false };
@@ -501,9 +562,19 @@ async function executeAutomationGraph(params: {
     let http: { ok: boolean; status: number; bodyText: string; bodyJson: unknown } | null = null;
 
     for (let i = 1; i <= attempts; i += 1) {
-      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap });
+      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
+      const resolvedActivity =
+        activity.type === 'activity' ||
+        activity.type === 'action.rest' ||
+        activity.type === 'action.ci.create' ||
+        activity.type === 'action.ci.lookup'
+          ? toHttpActivityState(activity, ctx)
+          : null;
       try {
-        http = await runHttpStep(activity, ctx);
+        if (!resolvedActivity) {
+          throw new Error(`Unsupported action state type: ${(activity as AutomationState).type}`);
+        }
+        http = await runHttpStep(resolvedActivity, ctx);
         if (http.ok) break;
         lastErr = `HTTP ${http.status}`;
       } catch (err) {
@@ -519,7 +590,15 @@ async function executeAutomationGraph(params: {
       bodyText: effectiveResponse.bodyText,
       bodyJson: effectiveResponse.bodyJson,
     };
-    const ctxAfter = buildTemplateContext({ request, response: lastResponse, cred: credMap });
+    const ctxAfter = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
+    stateResults[state.id] = {
+      ok: effectiveResponse.ok,
+      status: effectiveResponse.status,
+      body: effectiveResponse.bodyJson !== undefined ? effectiveResponse.bodyJson : effectiveResponse.bodyText,
+      text: effectiveResponse.bodyText,
+    };
+    mergePatch[`automation_${state.id}_status`] = effectiveResponse.status;
+    mergePatch[`automation_${state.id}_ok`] = effectiveResponse.ok;
 
     if (effectiveResponse.ok) {
       const fx = applyBranchEffects(activity.onSuccess, ctxAfter, mergePatch, skipOrders);
@@ -640,9 +719,9 @@ export async function executeAutomatedCatalogTask(
     if (row.task_type !== 'automated') return { ok: false, message: 'Not an automated task' };
     if (row.status !== 'in_progress' && row.status !== 'pending') return { ok: true, message: 'Task already finalized' };
 
-    const cfg = parseConfig(row.automation_config);
+    const cfg = parseAutomationConfig(row.automation_config);
     if (!cfg) {
-      const msg = 'Invalid or missing automation_config (expected kind state_machine with startAt/states).';
+      const msg = `Invalid or missing automation_config (expected kind state_machine, schemaVersion=${AUTOMATION_SCHEMA_VERSION}, startAt/states).`;
       await client.query(
         `UPDATE request_tasks SET status = 'failed', completed_at = now(), notes = $1 WHERE id = $2`,
         [msg, requestTaskId],
@@ -694,3 +773,8 @@ export async function executeAutomatedCatalogTask(
     }
   });
 }
+
+export const __test__ = {
+  evaluateAdvancedCondition,
+  toHttpActivityState,
+};

@@ -11,6 +11,11 @@ import { validateBody } from '../../middleware/validate';
 import { createCategorySchema, createServiceItemSchema, updateServiceItemSchema } from '../../domain/schemas';
 import { NotFound, BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
+import {
+  collectCredentialSlugsFromAutomationConfig,
+  ensureCredentialSlugsExist,
+  validateAndParseAutomationConfig,
+} from './automation-config';
 
 const router = Router();
 
@@ -113,182 +118,237 @@ router.post(
   },
 );
 
+// ─── POST /api/catalog/automation/create-laptop-ci ───
+// Helper endpoint for demo catalog automation state machines.
+router.post(
+  '/automation/create-laptop-ci',
+  requireAutomationSharedKey,
+  async (req: Request, res: Response, next: NextFunction) => {
+    let client: Awaited<ReturnType<typeof db.getClient>> | null = null;
+    try {
+      const requestId = typeof req.body?.request_id === 'string' ? req.body.request_id.trim() : '';
+      const assetTag = typeof req.body?.asset_tag === 'string' ? req.body.asset_tag.trim() : '';
+      const serialNumber = typeof req.body?.serial_number === 'string' ? req.body.serial_number.trim() : '';
+      const vendorOrderId = typeof req.body?.vendor_order_id === 'string' ? req.body.vendor_order_id.trim() : '';
+      if (!requestId) throw BadRequest('request_id is required');
+
+      client = await db.getClient();
+      const requestRes = await client.query(
+        `SELECT id, tenant_id, requester_id, requested_for, form_data
+         FROM requests
+         WHERE id = $1`,
+        [requestId],
+      );
+      if (requestRes.rows.length === 0) throw NotFound('Request not found');
+      const requestRow = requestRes.rows[0] as {
+        tenant_id: string;
+        requester_id: string;
+        requested_for: string | null;
+        form_data: Record<string, unknown> | null;
+      };
+      const tenantId = String(requestRow.tenant_id);
+      const targetUserId = requestRow.requested_for || requestRow.requester_id;
+      const formData = requestRow.form_data && typeof requestRow.form_data === 'object' ? requestRow.form_data : {};
+      const osPreferenceRaw = typeof formData.os_preference === 'string' ? formData.os_preference : '';
+      const osPreference = osPreferenceRaw.trim() || 'Windows 11';
+
+      const classRes = await client.query(
+        `SELECT id
+         FROM ci_classes
+         WHERE tenant_id = $1
+           AND name = 'laptop'
+         LIMIT 1`,
+        [tenantId],
+      );
+      if (classRes.rows.length === 0) {
+        throw NotFound('CI class "laptop" not found');
+      }
+      const classId = String(classRes.rows[0].id);
+
+      const normalizedAssetTag = assetTag || `LAP-${Date.now().toString().slice(-8)}`;
+      const ciName = normalizedAssetTag.toLowerCase();
+      const ciDisplayName = `Laptop ${normalizedAssetTag}`;
+      const attributes = {
+        asset_tag: normalizedAssetTag,
+        serial_number: serialNumber || null,
+        os: osPreference,
+        procurement_order_id: vendorOrderId || null,
+      };
+
+      const ciResult = await client.query(
+        `INSERT INTO configuration_items (
+          tenant_id, class_id, name, display_name, status, environment,
+          attributes, managed_by, assigned_to, notes
+        ) VALUES (
+          $1, $2, $3, $4, 'active', 'production', $5::jsonb, $6, $6, $7
+        ) RETURNING id, name, display_name, assigned_to`,
+        [
+          tenantId,
+          classId,
+          ciName,
+          ciDisplayName,
+          JSON.stringify(attributes),
+          targetUserId,
+          'Created by catalog automation (New Laptop workflow).',
+        ],
+      );
+      const createdCi = ciResult.rows[0] as { id: string; name: string; display_name: string; assigned_to: string };
+
+      await client.query(
+        `INSERT INTO ci_history (tenant_id, ci_id, changed_by, change_type, new_value)
+         VALUES ($1, $2, $3, 'create', $4)`,
+        [tenantId, createdCi.id, targetUserId, JSON.stringify(createdCi)],
+      );
+
+      res.json({
+        success: true,
+        ci_id: createdCi.id,
+        ci_name: createdCi.name,
+        ci_display_name: createdCi.display_name,
+        assigned_to: createdCi.assigned_to,
+      });
+    } catch (err) {
+      next(err);
+    } finally {
+      client?.release();
+    }
+  },
+);
+
+router.post(
+  '/automation/ci/create',
+  requireAutomationSharedKey,
+  async (req: Request, res: Response, next: NextFunction) => {
+    let client: Awaited<ReturnType<typeof db.getClient>> | null = null;
+    try {
+      const requestId = typeof req.body?.request_id === 'string' ? req.body.request_id.trim() : '';
+      const className = typeof req.body?.class_name === 'string' ? req.body.class_name.trim() : '';
+      const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+      const displayName = typeof req.body?.display_name === 'string' ? req.body.display_name.trim() : '';
+      const status = typeof req.body?.status === 'string' ? req.body.status.trim() : 'active';
+      const environment = typeof req.body?.environment === 'string' ? req.body.environment.trim() : 'production';
+      const attributes =
+        req.body?.attributes && typeof req.body.attributes === 'object' && !Array.isArray(req.body.attributes)
+          ? (req.body.attributes as Record<string, unknown>)
+          : {};
+      if (!requestId) throw BadRequest('request_id is required');
+      if (!className) throw BadRequest('class_name is required');
+      if (!name) throw BadRequest('name is required');
+
+      client = await db.getClient();
+      const requestRes = await client.query(
+        `SELECT tenant_id, requester_id, requested_for
+         FROM requests
+         WHERE id = $1`,
+        [requestId],
+      );
+      if (requestRes.rows.length === 0) throw NotFound('Request not found');
+      const tenantId = String(requestRes.rows[0].tenant_id);
+      const changedBy = String(requestRes.rows[0].requested_for || requestRes.rows[0].requester_id);
+
+      const classRes = await client.query(
+        `SELECT id
+         FROM ci_classes
+         WHERE tenant_id = $1
+           AND lower(name) = lower($2)
+         LIMIT 1`,
+        [tenantId, className],
+      );
+      if (classRes.rows.length === 0) throw NotFound(`CI class "${className}" not found`);
+      const classId = String(classRes.rows[0].id);
+
+      const ciResult = await client.query(
+        `INSERT INTO configuration_items (
+          tenant_id, class_id, name, display_name, status, environment, attributes, managed_by, assigned_to
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $8
+        ) RETURNING id, class_id, name, display_name, status, environment, attributes`,
+        [tenantId, classId, name, displayName || name, status, environment, JSON.stringify(attributes), changedBy],
+      );
+      const created = ciResult.rows[0];
+
+      await client.query(
+        `INSERT INTO ci_history (tenant_id, ci_id, changed_by, change_type, new_value)
+         VALUES ($1, $2, $3, 'create', $4::jsonb)`,
+        [tenantId, created.id, changedBy, JSON.stringify(created)],
+      );
+
+      res.json({ success: true, ci: created });
+    } catch (err) {
+      next(err);
+    } finally {
+      client?.release();
+    }
+  },
+);
+
+router.post(
+  '/automation/ci/lookup',
+  requireAutomationSharedKey,
+  async (req: Request, res: Response, next: NextFunction) => {
+    let client: Awaited<ReturnType<typeof db.getClient>> | null = null;
+    try {
+      const requestId = typeof req.body?.request_id === 'string' ? req.body.request_id.trim() : '';
+      const className = typeof req.body?.class_name === 'string' ? req.body.class_name.trim() : '';
+      const limitRaw = Number(req.body?.limit ?? 10);
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(Math.floor(limitRaw), 100)) : 10;
+      const attributes =
+        req.body?.attributes && typeof req.body.attributes === 'object' && !Array.isArray(req.body.attributes)
+          ? (req.body.attributes as Record<string, unknown>)
+          : null;
+      if (!requestId) throw BadRequest('request_id is required');
+
+      client = await db.getClient();
+      const requestRes = await client.query(
+        `SELECT tenant_id
+         FROM requests
+         WHERE id = $1`,
+        [requestId],
+      );
+      if (requestRes.rows.length === 0) throw NotFound('Request not found');
+      const tenantId = String(requestRes.rows[0].tenant_id);
+
+      const params: unknown[] = [tenantId];
+      const where: string[] = ['ci.tenant_id = $1'];
+      if (className) {
+        params.push(className);
+        where.push(`lower(cc.name) = lower($${params.length})`);
+      }
+      if (attributes) {
+        params.push(JSON.stringify(attributes));
+        where.push(`ci.attributes @> $${params.length}::jsonb`);
+      }
+      params.push(limit);
+
+      const result = await client.query(
+        `SELECT ci.id, ci.class_id, cc.name AS class_name, ci.name, ci.display_name, ci.status, ci.environment, ci.attributes
+         FROM configuration_items ci
+         JOIN ci_classes cc ON cc.id = ci.class_id
+         WHERE ${where.join(' AND ')}
+         ORDER BY ci.updated_at DESC, ci.created_at DESC
+         LIMIT $${params.length}`,
+        params,
+      );
+
+      res.json({
+        success: true,
+        count: result.rows.length,
+        items: result.rows,
+      });
+    } catch (err) {
+      next(err);
+    } finally {
+      client?.release();
+    }
+  },
+);
+
 router.use(authenticate, setTenantRLS, releaseTenantClient);
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: config.uploads.maxFileSize },
 });
-
-type AutomationTransition = { to: string; when?: string };
-type AutomationState = {
-  id: string;
-  type: 'activity' | 'decision' | 'delay' | 'end';
-  transitions?: AutomationTransition[];
-  method?: string;
-  url?: string;
-  condition?: string;
-  delaySeconds?: number;
-  retryAttempts?: number;
-  retryBackoffSec?: number;
-  onError?: 'fail' | 'continue' | 'fallback';
-  fallbackNodeId?: string;
-};
-
-function collectCredentialSlugsFromString(raw: string, out: Set<string>): void {
-  const re = /\{\{\s*cred\.([A-Za-z0-9_]+)(?:\.[^}\s]+)?\s*\}\}/g;
-  let m: RegExpExecArray | null = null;
-  while ((m = re.exec(raw)) !== null) out.add(m[1]);
-}
-
-function collectCredentialSlugsFromAutomationConfig(raw: unknown): string[] {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
-  const cfg = raw as Record<string, unknown>;
-  const states = Array.isArray(cfg.states) ? cfg.states : [];
-  const out = new Set<string>();
-  for (const s of states) {
-    if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
-    const state = s as Record<string, unknown>;
-    for (const key of ['url', 'body', 'condition'] as const) {
-      const val = state[key];
-      if (typeof val === 'string') collectCredentialSlugsFromString(val, out);
-    }
-    const headers = state.headers;
-    if (headers && typeof headers === 'object' && !Array.isArray(headers)) {
-      for (const v of Object.values(headers as Record<string, unknown>)) {
-        if (typeof v === 'string') collectCredentialSlugsFromString(v, out);
-      }
-    }
-    for (const branchKey of ['onSuccess', 'onFailure'] as const) {
-      const branch = state[branchKey];
-      if (!branch || typeof branch !== 'object' || Array.isArray(branch)) continue;
-      const merge = (branch as Record<string, unknown>).mergeFormData;
-      if (merge && typeof merge === 'object' && !Array.isArray(merge)) {
-        for (const v of Object.values(merge as Record<string, unknown>)) {
-          if (typeof v === 'string') collectCredentialSlugsFromString(v, out);
-        }
-      }
-    }
-  }
-  return [...out];
-}
-
-async function ensureCredentialSlugsExist(
-  client: { query: (sql: string, values?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }> },
-  slugs: string[],
-): Promise<void> {
-  if (slugs.length === 0) return;
-  const result = await client.query(
-    `SELECT slug
-     FROM tenant_credentials
-     WHERE tenant_id = current_tenant_id()
-       AND slug = ANY($1::text[])`,
-    [slugs],
-  );
-  const existing = new Set(result.rows.map((r) => String(r.slug)));
-  const missing = slugs.filter((slug) => !existing.has(slug));
-  if (missing.length > 0) {
-    throw BadRequest(`Unknown credential slug(s) in automation_config: ${missing.join(', ')}`);
-  }
-}
-
-function validateAutomationConfig(raw: unknown): string[] {
-  const errors: string[] = [];
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return ['automation_config must be a JSON object'];
-  }
-  const cfg = raw as Record<string, unknown>;
-  if (cfg.kind !== 'state_machine') {
-    errors.push('automation_config.kind must be "state_machine"');
-  }
-  if (typeof cfg.startAt !== 'string' || !cfg.startAt.trim()) {
-    errors.push('automation_config.startAt is required');
-  }
-  if (!Array.isArray(cfg.states) || cfg.states.length === 0) {
-    errors.push('automation_config.states must be a non-empty array');
-    return errors;
-  }
-  if (cfg.states.length > 80) {
-    errors.push('automation_config.states cannot exceed 80 states');
-  }
-
-  const states = cfg.states as unknown[];
-  const byId = new Map<string, AutomationState>();
-  for (const s of states) {
-    if (!s || typeof s !== 'object' || Array.isArray(s)) {
-      errors.push('Each automation state must be an object');
-      continue;
-    }
-    const st = s as AutomationState;
-    if (typeof st.id !== 'string' || !st.id.trim()) {
-      errors.push('Each automation state requires a non-empty id');
-      continue;
-    }
-    if (byId.has(st.id)) {
-      errors.push(`Duplicate automation state id: ${st.id}`);
-      continue;
-    }
-    byId.set(st.id, st);
-  }
-
-  const startAt = cfg.startAt as string;
-  if (startAt && !byId.has(startAt)) {
-    errors.push('automation_config.startAt must reference a state id');
-  }
-
-  for (const st of byId.values()) {
-    if (!['activity', 'decision', 'delay', 'end'].includes(st.type)) {
-      errors.push(`State "${st.id}" has invalid type`);
-      continue;
-    }
-    const transitions = Array.isArray(st.transitions) ? st.transitions : [];
-    if (st.type !== 'end' && transitions.length === 0) {
-      errors.push(`State "${st.id}" requires at least one transition`);
-    }
-    if (st.type === 'activity') {
-      if (typeof st.url !== 'string' || !st.url.trim()) errors.push(`Activity "${st.id}" requires url`);
-      if (st.method !== undefined && typeof st.method !== 'string') errors.push(`Activity "${st.id}" method must be a string`);
-      if (st.retryAttempts !== undefined && (!Number.isInteger(st.retryAttempts) || st.retryAttempts < 1 || st.retryAttempts > 10)) {
-        errors.push(`Activity "${st.id}" retryAttempts must be an integer between 1 and 10`);
-      }
-      if (st.retryBackoffSec !== undefined && (typeof st.retryBackoffSec !== 'number' || st.retryBackoffSec < 0 || st.retryBackoffSec > 300)) {
-        errors.push(`Activity "${st.id}" retryBackoffSec must be between 0 and 300`);
-      }
-      if (st.onError === 'fallback' && (!st.fallbackNodeId || typeof st.fallbackNodeId !== 'string')) {
-        errors.push(`Activity "${st.id}" onError=fallback requires fallbackNodeId`);
-      }
-    } else if (st.type === 'decision') {
-      if (typeof st.condition !== 'string' || !st.condition.trim()) {
-        errors.push(`Decision "${st.id}" requires condition`);
-      }
-      const labels = new Set(transitions.map((t) => String((t as AutomationTransition).when || '')));
-      if (!labels.has('true') || !labels.has('false')) {
-        errors.push(`Decision "${st.id}" transitions must include when=true and when=false`);
-      }
-    } else if (st.type === 'delay') {
-      if (typeof st.delaySeconds !== 'number' || st.delaySeconds <= 0 || st.delaySeconds > 3600) {
-        errors.push(`Delay "${st.id}" requires delaySeconds between 1 and 3600`);
-      }
-    } else if (st.type === 'end' && transitions.length > 0) {
-      errors.push(`End state "${st.id}" cannot define transitions`);
-    }
-
-    for (const t of transitions) {
-      const tr = t as AutomationTransition;
-      if (!tr || typeof tr !== 'object' || typeof tr.to !== 'string' || !tr.to.trim()) {
-        errors.push(`State "${st.id}" has an invalid transition`);
-        continue;
-      }
-      if (!byId.has(tr.to)) {
-        errors.push(`State "${st.id}" transition points to unknown state "${tr.to}"`);
-      }
-    }
-    if (st.onError === 'fallback' && st.fallbackNodeId && !byId.has(st.fallbackNodeId)) {
-      errors.push(`Activity "${st.id}" fallbackNodeId points to unknown state "${st.fallbackNodeId}"`);
-    }
-  }
-  return errors;
-}
 
 function ensureDir(dir: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -610,7 +670,7 @@ router.post('/items/:id/tasks', requireRole('admin', 'catalog_designer'),
         automationJson = automation_config as Record<string, unknown>;
       }
       if (task_type === 'automated') {
-        const errors = validateAutomationConfig(automationJson);
+        const { errors } = validateAndParseAutomationConfig(automationJson);
         if (errors.length > 0) {
           res.status(400).json({ error: 'Invalid automation_config', details: errors });
           return;
@@ -651,7 +711,7 @@ router.put('/items/:id/tasks/:taskId', requireRole('admin', 'catalog_designer'),
           return;
         }
         if (task_type === 'automated') {
-          const errors = validateAutomationConfig(automation_config ?? {});
+          const { errors } = validateAndParseAutomationConfig(automation_config ?? {});
           if (errors.length > 0) {
             res.status(400).json({ error: 'Invalid automation_config', details: errors });
             return;
