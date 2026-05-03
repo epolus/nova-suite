@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { settings as settingsApi, type CacheMetrics } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
+import { formatDateTime } from '../../utils/dateTime';
 
 export default function SystemStatusPage() {
   const [metrics, setMetrics] = useState<CacheMetrics | null>(null);
@@ -146,7 +147,7 @@ export default function SystemStatusPage() {
               <p><span className="font-medium text-gray-600">Redis URL:</span> {metrics.url}</p>
               {metrics.lastErrorAt && metrics.lastErrorMessage && (
                 <p className="text-red-600">
-                  <span className="font-medium">Last error:</span> {metrics.lastErrorMessage} ({new Date(metrics.lastErrorAt).toLocaleString()})
+                  <span className="font-medium">Last error:</span> {metrics.lastErrorMessage} ({formatDateTime(metrics.lastErrorAt)})
                 </p>
               )}
             </div>

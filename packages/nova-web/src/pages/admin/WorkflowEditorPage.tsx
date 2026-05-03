@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '../../components/PageHeader';
 import UnifiedAutomationDesigner from '../../components/workflow/UnifiedAutomationDesigner';
 import { admin, type WorkflowDefinition } from '../../api/client';
+import { formatDateTime } from '../../utils/dateTime';
 import { diffObjects, formatDiffValue } from './workflow-editor/diff';
 
 type PersistedUnifiedDefinition = {
@@ -239,7 +240,7 @@ export default function WorkflowEditorPage() {
             <p className="text-xs text-gray-600">No published version yet. Publish this draft to establish a baseline.</p>
           ) : (
             <>
-              <p className="text-xs text-gray-600 mb-2">Published version: v{loadedVersion}{loadedPublishedAt ? ` at ${new Date(loadedPublishedAt).toLocaleString()}` : ''}</p>
+              <p className="text-xs text-gray-600 mb-2">Published version: v{loadedVersion}{loadedPublishedAt ? ` at ${formatDateTime(loadedPublishedAt)}` : ''}</p>
               <p className="text-xs text-gray-700 mb-2">{diffChanges.length === 0 ? 'Draft matches published.' : `${diffChanges.length} field-level change(s) since publish.`}</p>
               {diffChanges.length > 0 && (
                 <div className="max-h-40 overflow-auto bg-white border border-gray-200 rounded p-2">

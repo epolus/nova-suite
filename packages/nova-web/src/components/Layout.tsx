@@ -10,6 +10,7 @@ import DarkModeToggle from './DarkModeToggle';
 import { isAdminRole } from '../utils/roles';
 import { canAccessAdminRoute } from '../utils/adminRouteAccess';
 import { useUserPreferenceState } from '../hooks/useUserPreferenceState';
+import { formatDateTime } from '../utils/dateTime';
 import { useTranslations } from 'use-intl';
 
 const DEFAULT_LOGO_SRC = '/default-logo.svg';
@@ -169,7 +170,7 @@ function NotificationBell() {
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs leading-snug truncate ${n.is_read ? 'text-slate-400' : 'text-white font-medium'}`}>{n.title}</p>
                     {n.body && <p className="text-xs text-slate-400 truncate mt-0.5">{n.body}</p>}
-                    <p className="text-[10px] text-slate-500 mt-1">{new Date(n.created_at).toLocaleString()}</p>
+                    <p className="text-[10px] text-slate-500 mt-1">{formatDateTime(n.created_at)}</p>
                   </div>
                   {!n.is_read && (
                     <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: 'var(--color-primary)' }} />
