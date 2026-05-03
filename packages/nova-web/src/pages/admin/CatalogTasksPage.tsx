@@ -7,6 +7,7 @@ import PageHeader from '../../components/PageHeader';
 import Spinner from '../../components/Spinner';
 import SearchBar from '../../components/SearchBar';
 import ServiceItemCombobox from '../../components/ServiceItemCombobox';
+import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 
 const TYPE_COLORS: Record<string, string> = {
   approval: 'bg-amber-100 text-amber-700',
@@ -30,6 +31,7 @@ type SavedAllTasksView = {
 };
 
 const ALL_TASKS_SAVED_VIEWS_KEY = 'nova:catalogTasks:allTasksSavedViews';
+const ALL_TASKS_SAVED_VIEWS_SCOPE = 'catalog_tasks_all_tasks_saved_views';
 
 /** Passed from `CatalogTaskDetailPage` via `navigate(..., { state })` when returning to this list. */
 export type CatalogTasksListLocationState = {
@@ -158,23 +160,11 @@ function AllTasksView({ tasks }: { tasks: AllCatalogTask[] }) {
     },
   );
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [savedViews, setSavedViews] = useState<SavedAllTasksView[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = localStorage.getItem(ALL_TASKS_SAVED_VIEWS_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) return [];
-      return parsed.filter((entry) =>
-        typeof entry?.id === 'string'
-        && typeof entry?.name === 'string'
-        && typeof entry?.filters === 'object'
-        && entry.filters !== null,
-      ) as SavedAllTasksView[];
-    } catch {
-      return [];
-    }
-  });
+  const [savedViews, setSavedViews] = useUserPreferenceState<SavedAllTasksView[]>(
+    ALL_TASKS_SAVED_VIEWS_SCOPE,
+    [],
+    ALL_TASKS_SAVED_VIEWS_KEY,
+  );
   const [savedViewName, setSavedViewName] = useState('');
   const [selectedSavedViewId, setSelectedSavedViewId] = useState('');
 
@@ -207,11 +197,6 @@ function AllTasksView({ tasks }: { tasks: AllCatalogTask[] }) {
 
     setSearchParams(params, { replace: true });
   }, [searchParams, setSearchParams]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(ALL_TASKS_SAVED_VIEWS_KEY, JSON.stringify(savedViews));
-  }, [savedViews]);
 
   const currentFilterSet = useMemo(
     () => ({ search, groupFilter, typeFilter, automationFilter, itemActivityFilter, sortBy }),
