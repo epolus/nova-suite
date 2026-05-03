@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Fragment, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { catalog } from '../../api/client';
 import type { ServiceItem, CatalogTask, AllCatalogTask } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -15,6 +15,21 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 type ViewMode = 'all' | 'by-item';
+type AllTasksSort = 'taskCountDesc' | 'nameAsc' | 'automationFirst';
+type SavedAllTasksView = {
+  id: string;
+  name: string;
+  filters: {
+    search: string;
+    groupFilter: string;
+    typeFilter: string;
+    automationFilter: 'all' | 'with' | 'without';
+    itemActivityFilter: 'all' | 'active' | 'inactive';
+    sortBy: AllTasksSort;
+  };
+};
+
+const ALL_TASKS_SAVED_VIEWS_KEY = 'nova:catalogTasks:allTasksSavedViews';
 
 /** Passed from `CatalogTaskDetailPage` via `navigate(..., { state })` when returning to this list. */
 export type CatalogTasksListLocationState = {
@@ -119,75 +134,297 @@ export default function CatalogTasksPage() {
 /* ─── All Tasks View (grouped by assignment group) ─── */
 
 function AllTasksView({ tasks }: { tasks: AllCatalogTask[] }) {
-  const [search, setSearch] = useState('');
-  const [groupFilter, setGroupFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [itemActivityFilter, setItemActivityFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get('q') || '');
+  const [groupFilter, setGroupFilter] = useState(() => searchParams.get('group') || '');
+  const [typeFilter, setTypeFilter] = useState(() => searchParams.get('type') || '');
+  const [automationFilter, setAutomationFilter] = useState<'all' | 'with' | 'without'>(
+    () => {
+      const value = searchParams.get('automation');
+      return value === 'with' || value === 'without' ? value : 'all';
+    },
+  );
+  const [itemActivityFilter, setItemActivityFilter] = useState<'all' | 'active' | 'inactive'>(
+    () => {
+      const value = searchParams.get('itemActivity');
+      return value === 'active' || value === 'inactive' ? value : 'all';
+    },
+  );
+  const [sortBy, setSortBy] = useState<AllTasksSort>(
+    () => {
+      const value = searchParams.get('sort');
+      return value === 'nameAsc' || value === 'automationFirst' ? value : 'taskCountDesc';
+    },
+  );
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [savedViews, setSavedViews] = useState<SavedAllTasksView[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(ALL_TASKS_SAVED_VIEWS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((entry) =>
+        typeof entry?.id === 'string'
+        && typeof entry?.name === 'string'
+        && typeof entry?.filters === 'object'
+        && entry.filters !== null,
+      ) as SavedAllTasksView[];
+    } catch {
+      return [];
+    }
+  });
+  const [savedViewName, setSavedViewName] = useState('');
+  const [selectedSavedViewId, setSelectedSavedViewId] = useState('');
 
-  const filtered = useMemo(() => {
-    let result = tasks;
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (t) =>
-          t.name.toLowerCase().includes(q) ||
-          t.service_item_name.toLowerCase().includes(q) ||
-          (t.assigned_group_name && t.assigned_group_name.toLowerCase().includes(q)) ||
-          (t.description && t.description.toLowerCase().includes(q)),
-      );
-    }
-    if (groupFilter) {
-      result = result.filter((t) => t.assigned_group_id === groupFilter);
-    }
-    if (typeFilter) {
-      result = result.filter((t) => t.task_type === typeFilter);
-    }
-    if (itemActivityFilter === 'active') {
-      result = result.filter((t) => t.service_item_is_active !== false);
-    }
-    if (itemActivityFilter === 'inactive') {
-      result = result.filter((t) => t.service_item_is_active === false);
-    }
-    return result;
-  }, [tasks, search, groupFilter, typeFilter, itemActivityFilter]);
+  const syncParams = useCallback((next: {
+    search: string;
+    groupFilter: string;
+    typeFilter: string;
+    automationFilter: 'all' | 'with' | 'without';
+    itemActivityFilter: 'all' | 'active' | 'inactive';
+    sortBy: AllTasksSort;
+  }) => {
+    const params = new URLSearchParams(searchParams);
+    if (next.search.trim()) params.set('q', next.search.trim());
+    else params.delete('q');
 
-  // Group by assignment group
-  const byGroup = useMemo(() => {
-    const map = new Map<string, { groupName: string; tasks: AllCatalogTask[] }>();
-    for (const task of filtered) {
-      const key = task.assigned_group_id || '__none__';
-      const entry = map.get(key) || { groupName: task.assigned_group_name || 'Unassigned', tasks: [] };
-      entry.tasks.push(task);
-      map.set(key, entry);
-    }
-    return Array.from(map.entries()).sort((a, b) => {
-      if (a[0] === '__none__') return 1;
-      if (b[0] === '__none__') return -1;
-      return a[1].groupName.localeCompare(b[1].groupName);
-    });
-  }, [filtered]);
+    if (next.groupFilter) params.set('group', next.groupFilter);
+    else params.delete('group');
 
-  // Unique groups for the filter
+    if (next.typeFilter) params.set('type', next.typeFilter);
+    else params.delete('type');
+
+    if (next.automationFilter !== 'all') params.set('automation', next.automationFilter);
+    else params.delete('automation');
+
+    if (next.itemActivityFilter !== 'all') params.set('itemActivity', next.itemActivityFilter);
+    else params.delete('itemActivity');
+
+    if (next.sortBy !== 'taskCountDesc') params.set('sort', next.sortBy);
+    else params.delete('sort');
+
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(ALL_TASKS_SAVED_VIEWS_KEY, JSON.stringify(savedViews));
+  }, [savedViews]);
+
+  const currentFilterSet = useMemo(
+    () => ({ search, groupFilter, typeFilter, automationFilter, itemActivityFilter, sortBy }),
+    [search, groupFilter, typeFilter, automationFilter, itemActivityFilter, sortBy],
+  );
+
+  const applyFilters = useCallback((next: SavedAllTasksView['filters']) => {
+    setSearch(next.search);
+    setGroupFilter(next.groupFilter);
+    setTypeFilter(next.typeFilter);
+    setAutomationFilter(next.automationFilter);
+    setItemActivityFilter(next.itemActivityFilter);
+    setSortBy(next.sortBy);
+    syncParams(next);
+  }, [syncParams]);
+
+  const saveCurrentView = () => {
+    const name = savedViewName.trim();
+    if (!name) return;
+    const view: SavedAllTasksView = {
+      id: `${Date.now()}`,
+      name,
+      filters: currentFilterSet,
+    };
+    setSavedViews((prev) => [view, ...prev.filter((v) => v.name !== name)].slice(0, 12));
+    setSelectedSavedViewId(view.id);
+    setSavedViewName('');
+  };
+
+  const deleteSelectedView = () => {
+    if (!selectedSavedViewId) return;
+    setSavedViews((prev) => prev.filter((v) => v.id !== selectedSavedViewId));
+    setSelectedSavedViewId('');
+  };
+
   const uniqueGroups = useMemo(() => {
     const seen = new Map<string, string>();
+    let hasUnassigned = false;
     for (const t of tasks) {
       if (t.assigned_group_id && t.assigned_group_name) {
         seen.set(t.assigned_group_id, t.assigned_group_name);
+      } else {
+        hasUnassigned = true;
       }
     }
-    return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+    const groups = Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+    if (hasUnassigned) groups.push(['__none__', 'Unassigned']);
+    return groups;
   }, [tasks]);
+
+  const rows = useMemo(() => {
+    const grouped = new Map<string, {
+      service_item_id: string;
+      service_item_name: string;
+      category_name: string;
+      service_item_is_active: boolean;
+      tasks: AllCatalogTask[];
+    }>();
+
+    for (const task of tasks) {
+      const existing = grouped.get(task.service_item_id);
+      if (existing) {
+        existing.tasks.push(task);
+        if (!existing.category_name && task.category_name) existing.category_name = task.category_name;
+      } else {
+        grouped.set(task.service_item_id, {
+          service_item_id: task.service_item_id,
+          service_item_name: task.service_item_name,
+          category_name: task.category_name,
+          service_item_is_active: task.service_item_is_active !== false,
+          tasks: [task],
+        });
+      }
+    }
+
+    return Array.from(grouped.values())
+      .map((group) => {
+        const sortedTasks = [...group.tasks].sort((a, b) => {
+          if (a.task_order !== b.task_order) return a.task_order - b.task_order;
+          return a.name.localeCompare(b.name);
+        });
+
+        const counts = { approval: 0, manual: 0, automated: 0 };
+        let unassignedCount = 0;
+        const stepMap = new Map<number, number>();
+        for (const task of sortedTasks) {
+          counts[task.task_type] += 1;
+          if (!task.assigned_group_id) unassignedCount += 1;
+          stepMap.set(task.task_order, (stepMap.get(task.task_order) || 0) + 1);
+        }
+        const parallelStepCount = Array.from(stepMap.values()).filter((v) => v > 1).length;
+
+        return {
+          ...group,
+          tasks: sortedTasks,
+          taskCount: sortedTasks.length,
+          stepCount: stepMap.size,
+          parallelStepCount,
+          counts,
+          hasAutomation: counts.automated > 0,
+          unassignedCount,
+        };
+      })
+      .sort((a, b) => {
+        if (a.service_item_is_active !== b.service_item_is_active) return a.service_item_is_active ? -1 : 1;
+        const category = (a.category_name || '').localeCompare(b.category_name || '');
+        if (category !== 0) return category;
+        return a.service_item_name.localeCompare(b.service_item_name);
+      });
+  }, [tasks]);
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (itemActivityFilter === 'active' && !row.service_item_is_active) return false;
+      if (itemActivityFilter === 'inactive' && row.service_item_is_active) return false;
+
+      if (automationFilter === 'with' && !row.hasAutomation) return false;
+      if (automationFilter === 'without' && row.hasAutomation) return false;
+
+      if (typeFilter && !row.tasks.some((t) => t.task_type === typeFilter)) return false;
+
+      if (groupFilter === '__none__' && !row.tasks.some((t) => !t.assigned_group_id)) return false;
+      if (groupFilter && groupFilter !== '__none__' && !row.tasks.some((t) => t.assigned_group_id === groupFilter)) return false;
+
+      if (!q) return true;
+      return (
+        row.service_item_name.toLowerCase().includes(q) ||
+        (row.category_name || '').toLowerCase().includes(q) ||
+        row.tasks.some(
+          (t) =>
+            t.name.toLowerCase().includes(q) ||
+            (t.description || '').toLowerCase().includes(q) ||
+            (t.assigned_group_name || '').toLowerCase().includes(q),
+        )
+      );
+    }).sort((a, b) => {
+      if (sortBy === 'nameAsc') return a.service_item_name.localeCompare(b.service_item_name);
+      if (sortBy === 'automationFirst') {
+        if (a.hasAutomation !== b.hasAutomation) return a.hasAutomation ? -1 : 1;
+        if (a.taskCount !== b.taskCount) return b.taskCount - a.taskCount;
+        return a.service_item_name.localeCompare(b.service_item_name);
+      }
+      if (a.service_item_is_active !== b.service_item_is_active) return a.service_item_is_active ? -1 : 1;
+      if (a.taskCount !== b.taskCount) return b.taskCount - a.taskCount;
+      return a.service_item_name.localeCompare(b.service_item_name);
+    });
+  }, [rows, search, itemActivityFilter, automationFilter, typeFilter, groupFilter, sortBy]);
+
+  useEffect(() => {
+    setExpandedItems((prev) => {
+      const visibleIds = new Set(filteredRows.map((r) => r.service_item_id));
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (visibleIds.has(id)) next.add(id);
+      }
+      return next;
+    });
+  }, [filteredRows]);
+
+  const totalTasks = useMemo(
+    () => filteredRows.reduce((acc, row) => acc + row.taskCount, 0),
+    [filteredRows],
+  );
+  const totalAutomatedItems = useMemo(
+    () => filteredRows.filter((row) => row.hasAutomation).length,
+    [filteredRows],
+  );
+  const totalInactiveItems = useMemo(
+    () => filteredRows.filter((row) => !row.service_item_is_active).length,
+    [filteredRows],
+  );
+
+  const toggleExpanded = (serviceItemId: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(serviceItemId)) next.delete(serviceItemId);
+      else next.add(serviceItemId);
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    setExpandedItems(new Set(filteredRows.map((row) => row.service_item_id)));
+  };
+
+  const collapseAll = () => {
+    setExpandedItems(new Set());
+  };
 
   return (
     <>
       {/* Filters */}
       <div className="flex flex-col xl:flex-row flex-wrap gap-3 mb-4">
         <div className="w-full sm:w-72 min-w-[12rem]">
-          <SearchBar value={search} onChange={setSearch} placeholder="Search tasks, items, groups..." />
+          <SearchBar
+            value={search}
+            onChange={(value) => {
+              const next = { ...currentFilterSet, search: value };
+              setSearch(value);
+              syncParams(next);
+            }}
+            placeholder="Search tasks, items, groups..."
+          />
         </div>
         <select
           value={groupFilter}
-          onChange={(e) => setGroupFilter(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            const next = { ...currentFilterSet, groupFilter: value };
+            setGroupFilter(value);
+            syncParams(next);
+          }}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[10rem]"
         >
           <option value="">All Groups</option>
@@ -198,7 +435,12 @@ function AllTasksView({ tasks }: { tasks: AllCatalogTask[] }) {
         </select>
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            const next = { ...currentFilterSet, typeFilter: value };
+            setTypeFilter(value);
+            syncParams(next);
+          }}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[9rem]"
         >
           <option value="">All Types</option>
@@ -207,107 +449,274 @@ function AllTasksView({ tasks }: { tasks: AllCatalogTask[] }) {
           <option value="automated">Automated</option>
         </select>
         <select
+          value={automationFilter}
+          onChange={(e) => {
+            const value = e.target.value as 'all' | 'with' | 'without';
+            const next = { ...currentFilterSet, automationFilter: value };
+            setAutomationFilter(value);
+            syncParams(next);
+          }}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[12rem]"
+        >
+          <option value="all">All automation states</option>
+          <option value="with">With automated steps</option>
+          <option value="without">Without automated steps</option>
+        </select>
+        <select
           value={itemActivityFilter}
-          onChange={(e) => setItemActivityFilter(e.target.value as 'all' | 'active' | 'inactive')}
+          onChange={(e) => {
+            const value = e.target.value as 'all' | 'active' | 'inactive';
+            const next = { ...currentFilterSet, itemActivityFilter: value };
+            setItemActivityFilter(value);
+            syncParams(next);
+          }}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[12rem]"
         >
           <option value="all">All catalog items</option>
           <option value="active">Active catalog items only</option>
           <option value="inactive">Inactive catalog items only</option>
         </select>
+        <select
+          value={sortBy}
+          onChange={(e) => {
+            const value = e.target.value as AllTasksSort;
+            const next = { ...currentFilterSet, sortBy: value };
+            setSortBy(value);
+            syncParams(next);
+          }}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[14rem]"
+        >
+          <option value="taskCountDesc">Sort: Most tasks first</option>
+          <option value="nameAsc">Sort: Item name A-Z</option>
+          <option value="automationFirst">Sort: Automation first</option>
+        </select>
+      </div>
+
+      {/* Saved views */}
+      <div className="flex flex-col xl:flex-row flex-wrap gap-3 mb-5">
+        <select
+          value={selectedSavedViewId}
+          onChange={(e) => {
+            const id = e.target.value;
+            setSelectedSavedViewId(id);
+            const selected = savedViews.find((view) => view.id === id);
+            if (selected) applyFilters(selected.filters);
+          }}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[16rem]"
+        >
+          <option value="">Saved views</option>
+          {savedViews.map((view) => (
+            <option key={view.id} value={view.id}>{view.name}</option>
+          ))}
+        </select>
+        <input
+          value={savedViewName}
+          onChange={(e) => setSavedViewName(e.target.value)}
+          placeholder="Save current filters as..."
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[16rem]"
+        />
+        <button
+          type="button"
+          onClick={saveCurrentView}
+          className="px-3 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
+          disabled={!savedViewName.trim()}
+        >
+          Save view
+        </button>
+        <button
+          type="button"
+          onClick={deleteSelectedView}
+          className="px-3 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+          disabled={!selectedSavedViewId}
+        >
+          Delete selected view
+        </button>
       </div>
 
       {/* Summary */}
       <div className="flex gap-4 mb-6">
         <div className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
-          <span className="text-gray-500">Total tasks:</span>{' '}
-          <span className="font-semibold text-gray-900">{filtered.length}</span>
-        </div>
-        <div className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
-          <span className="text-gray-500">Groups:</span>{' '}
-          <span className="font-semibold text-gray-900">{byGroup.length}</span>
-        </div>
-        <div className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
           <span className="text-gray-500">Service items:</span>{' '}
-          <span className="font-semibold text-gray-900">
-            {new Set(filtered.map((t) => t.service_item_id)).size}
-          </span>
+          <span className="font-semibold text-gray-900">{filteredRows.length}</span>
+        </div>
+        <div className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
+          <span className="text-gray-500">Total tasks:</span>{' '}
+          <span className="font-semibold text-gray-900">{totalTasks}</span>
+        </div>
+        <div className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
+          <span className="text-gray-500">With automation:</span>{' '}
+          <span className="font-semibold text-gray-900">{totalAutomatedItems}</span>
+        </div>
+        <div className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
+          <span className="text-gray-500">Inactive items:</span>{' '}
+          <span className="font-semibold text-gray-900">{totalInactiveItems}</span>
         </div>
       </div>
 
-      {/* Tasks grouped by assignment group */}
-      {filtered.length === 0 ? (
+      {/* Service item overview table */}
+      {filteredRows.length === 0 ? (
         <div className="text-center py-16 text-gray-400 text-sm">
-          {search || groupFilter || typeFilter || itemActivityFilter !== 'all'
-            ? 'No tasks matching the current filters.'
+          {search || groupFilter || typeFilter || automationFilter !== 'all' || itemActivityFilter !== 'all'
+            ? 'No service items matching the current filters.'
             : 'No catalog tasks defined yet.'}
         </div>
       ) : (
-        <div className="space-y-6">
-          {byGroup.map(([groupId, { groupName, tasks }]) => (
-            <div key={groupId} className="rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">
-                    {tasks.length}
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900">{groupName}</h3>
-                    <p className="text-xs text-gray-400">
-                      {new Set(tasks.map((t) => t.service_item_name)).size} service item(s)
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {['approval', 'manual', 'automated'].map((type) => {
-                    const count = tasks.filter((t) => t.task_type === type).length;
-                    if (count === 0) return null;
-                    return (
-                      <span key={type} className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[type]}`}>
-                        {count} {type}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {tasks.map((task) => (
-                  <div key={task.id} className="px-5 py-3 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-gray-900">{task.name}</p>
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[task.task_type]}`}>
-                          {task.task_type}
-                        </span>
-                        {!task.is_active && (
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400">inactive</span>
-                        )}
-                      </div>
-                      {task.description && <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>}
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xs font-medium text-indigo-600 flex items-center justify-end gap-1 flex-wrap">
-                        <span>{task.service_item_name}</span>
-                        {task.service_item_is_active === false && (
-                          <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">item inactive</span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-400">{task.category_name} &middot; Step {task.task_order}</p>
-                    </div>
-                    {task.sla_hours && (
-                      <span className="text-xs text-gray-400 flex-shrink-0">SLA {task.sla_hours}h</span>
-                    )}
-                    <Link
-                      to={`/admin/catalog-tasks/${task.service_item_id}/${task.id}`}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                    >
-                      Details
-                    </Link>
-                  </div>
-                ))}
-              </div>
+        <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
+          <div className="px-4 py-2.5 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              Expand service items to inspect step details and open a task directly.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={expandAll}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+              >
+                Expand all
+              </button>
+              <button
+                type="button"
+                onClick={collapseAll}
+                className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+              >
+                Collapse all
+              </button>
             </div>
-          ))}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-white">
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">Service Item</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">Category</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">Steps</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">Tasks</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">Types</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredRows.map((row) => {
+                  const expanded = expandedItems.has(row.service_item_id);
+                  return (
+                    <Fragment key={row.service_item_id}>
+                      <tr key={row.service_item_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(row.service_item_id)}
+                            className="flex items-center gap-2 text-left"
+                          >
+                            <span className={`inline-block transition-transform ${expanded ? 'rotate-90' : ''}`}>▸</span>
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-900 truncate">{row.service_item_name}</p>
+                              {row.unassignedCount > 0 && (
+                                <p className="text-xs text-amber-700 mt-0.5">
+                                  {row.unassignedCount} task(s) without assignment group
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{row.category_name || '—'}</td>
+                        <td className="px-4 py-3 text-gray-700">
+                          {row.stepCount}
+                          {row.parallelStepCount > 0 && (
+                            <span className="text-xs text-indigo-600 ml-1">({row.parallelStepCount} parallel)</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">{row.taskCount}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {row.counts.approval > 0 && (
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS.approval}`}>
+                                {row.counts.approval} approval
+                              </span>
+                            )}
+                            {row.counts.manual > 0 && (
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS.manual}`}>
+                                {row.counts.manual} manual
+                              </span>
+                            )}
+                            {row.counts.automated > 0 && (
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS.automated}`}>
+                                {row.counts.automated} automated
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {row.service_item_is_active ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                              active
+                            </span>
+                          ) : (
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                              inactive
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => navigate('.', {
+                              state: {
+                                catalogTasksTab: 'by-item',
+                                focusServiceItemId: row.service_item_id,
+                              } satisfies CatalogTasksListLocationState,
+                            })}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                          >
+                            Open editor
+                          </button>
+                        </td>
+                      </tr>
+                      {expanded && (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-3 bg-gray-50/60">
+                            <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                              <div className="divide-y divide-gray-100">
+                                {row.tasks.map((task) => (
+                                  <div key={task.id} className="px-4 py-3 flex items-center gap-3">
+                                    <div className="w-14 shrink-0">
+                                      <span className="inline-flex items-center justify-center rounded-full bg-indigo-600 text-white text-[11px] font-semibold w-8 h-8">
+                                        {task.task_order}
+                                      </span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-sm font-medium text-gray-900">{task.name}</p>
+                                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[task.task_type]}`}>
+                                          {task.task_type}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-gray-500 mt-0.5">
+                                        {task.assigned_group_name || 'Unassigned'}
+                                        {task.sla_hours ? ` · SLA ${task.sla_hours}h` : ''}
+                                        {task.description ? ` · ${task.description}` : ''}
+                                      </p>
+                                    </div>
+                                    <Link
+                                      to={`/admin/catalog-tasks/${task.service_item_id}/${task.id}`}
+                                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                                    >
+                                      Details
+                                    </Link>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </>
