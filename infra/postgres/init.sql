@@ -2229,6 +2229,7 @@ CREATE TABLE notification_rules (
   recipient_type     text        NOT NULL, -- caller | assignee | requester | requested_for | requested_by | reported_by | author | assignment_group_manager | specific_user | assignment_group_members
   recipient_user_id  uuid        REFERENCES users(id) ON DELETE SET NULL,
   recipient_group_id uuid        REFERENCES assignment_groups(id) ON DELETE SET NULL,
+  channels           text[]      NOT NULL DEFAULT ARRAY['in_app']::text[],
   title_template     text        NOT NULL,
   body_template      text,
   is_active          boolean     NOT NULL DEFAULT true,
@@ -2239,6 +2240,55 @@ CREATE TABLE notification_rules (
 CREATE INDEX IF NOT EXISTS idx_notification_rules_tenant ON notification_rules(tenant_id, entity_type, trigger_key, is_active, sort_order);
 CREATE TRIGGER trg_notification_rules_updated_at
   BEFORE UPDATE ON notification_rules
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE notification_rule_templates (
+  id                    uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id             uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  notification_rule_id  uuid        NOT NULL REFERENCES notification_rules(id) ON DELETE CASCADE,
+  locale                text        NOT NULL,
+  title_template        text        NOT NULL,
+  body_template         text,
+  body_html_template    text,
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, notification_rule_id, locale)
+);
+CREATE INDEX IF NOT EXISTS idx_notification_rule_templates_lookup
+  ON notification_rule_templates(tenant_id, notification_rule_id, locale);
+CREATE TRIGGER trg_notification_rule_templates_updated_at
+  BEFORE UPDATE ON notification_rule_templates
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE notification_email_deliveries (
+  id                    uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id             uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  notification_rule_id  uuid        REFERENCES notification_rules(id) ON DELETE SET NULL,
+  recipient_user_id     uuid        REFERENCES users(id) ON DELETE SET NULL,
+  recipient_email       text        NOT NULL,
+  recipient_locale      text        NOT NULL DEFAULT 'en',
+  entity_type           text        NOT NULL,
+  entity_id             uuid        NOT NULL,
+  trigger_key           text        NOT NULL,
+  template_locale       text        NOT NULL,
+  subject               text        NOT NULL,
+  body_text             text,
+  body_html             text,
+  status                text        NOT NULL DEFAULT 'queued',
+  provider              text        NOT NULL DEFAULT 'smtp',
+  provider_message_id   text,
+  retry_count           int         NOT NULL DEFAULT 0,
+  last_error            text,
+  sent_at               timestamptz,
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_notification_email_deliveries_lookup
+  ON notification_email_deliveries(tenant_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notification_email_deliveries_entity
+  ON notification_email_deliveries(tenant_id, entity_type, entity_id, trigger_key);
+CREATE TRIGGER trg_notification_email_deliveries_updated_at
+  BEFORE UPDATE ON notification_email_deliveries
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 INSERT INTO notification_rules (
@@ -2259,6 +2309,12 @@ INSERT INTO notification_rules (
   ('a0000000-0000-0000-0000-000000000001', 'Knowledge submitted for review to group', 'Notify assignment group members when article is submitted', 'knowledge', 'knowledge.submitted_for_review', 'assignment_group_members', 'Article {knowledge_number} submitted for review', '{knowledge_title} is awaiting review.', 10),
   ('a0000000-0000-0000-0000-000000000001', 'Knowledge published to author', 'Notify author when article is published', 'knowledge', 'knowledge.published', 'author', 'Article {knowledge_number} published', 'Your article "{knowledge_title}" has been published.', 20),
   ('a0000000-0000-0000-0000-000000000001', 'Knowledge rejected to author', 'Notify author when article is rejected', 'knowledge', 'knowledge.rejected', 'author', 'Article {knowledge_number} rejected', 'Your article "{knowledge_title}" was rejected.', 30);
+
+INSERT INTO notification_rule_templates (
+  tenant_id, notification_rule_id, locale, title_template, body_template
+)
+SELECT tenant_id, id, 'en', title_template, body_template
+FROM notification_rules;
 
 -- ─── Workflow Builder Definitions ────────────────────────────
 CREATE TABLE workflow_definitions (

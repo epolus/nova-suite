@@ -170,6 +170,7 @@
       "processes": "Processi",
       "slaConfiguration": "Configurazione SLA",
       "notificationWorkflows": "Workflow di notifica",
+      "notificationDeliveries": "Consegne notifiche",
       "changeManagement": "Gestione del cambiamento",
       "knowledgeWorkflows": "Workflow della conoscenza",
       "workflows": "Workflow",

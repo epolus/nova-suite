@@ -451,6 +451,16 @@ export const admin = {
       `/admin/notification-rules/${id}/test`,
       { method: 'POST', body: JSON.stringify(data || {}) },
     ),
+  notificationEmailDeliveries: (params: { status?: string; trigger_key?: string; recipient?: string; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set('status', params.status);
+    if (params.trigger_key) qs.set('trigger_key', params.trigger_key);
+    if (params.recipient) qs.set('recipient', params.recipient);
+    if (params.limit !== undefined) qs.set('limit', String(params.limit));
+    return request<{ deliveries: NotificationEmailDelivery[]; summary: NotificationEmailDeliverySummary[] }>(
+      `/admin/notification-email-deliveries${qs.size > 0 ? `?${qs}` : ''}`,
+    );
+  },
   // Workflow builder definitions
   workflowDefinitions: () =>
     request<{ workflow_definitions: WorkflowDefinition[] }>('/admin/workflow-definitions'),
@@ -1686,12 +1696,51 @@ export interface NotificationRule {
   recipient_user_name?: string | null;
   recipient_group_id: string | null;
   recipient_group_name?: string | null;
+  channels: Array<'in_app' | 'email'>;
+  templates?: NotificationRuleTemplate[];
   title_template: string;
   body_template: string | null;
   is_active: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface NotificationRuleTemplate {
+  locale: string;
+  title_template: string;
+  body_template: string | null;
+  body_html_template: string | null;
+}
+
+export interface NotificationEmailDelivery {
+  id: string;
+  notification_rule_id: string | null;
+  notification_rule_name?: string | null;
+  recipient_user_id: string | null;
+  recipient_user_name?: string | null;
+  recipient_email: string;
+  recipient_locale: string;
+  entity_type: string;
+  entity_id: string;
+  trigger_key: string;
+  template_locale: string;
+  subject: string;
+  body_text: string | null;
+  body_html: string | null;
+  status: 'queued' | 'sent' | 'failed';
+  provider: string;
+  provider_message_id: string | null;
+  retry_count: number;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationEmailDeliverySummary {
+  status: 'queued' | 'sent' | 'failed';
+  count: number;
 }
 
 export interface KnowledgeCategory {

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState } from 'react';
 import { admin as adminApi } from '../../api/client';
-import type { AssignmentGroupItem, AdminUser, NotificationRule } from '../../api/client';
+import type { AssignmentGroupItem, AdminUser, NotificationRule, NotificationRuleTemplate } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
@@ -43,8 +43,24 @@ const RECIPIENTS = [
 ];
 
 const ENTITY_OPTIONS: NotificationRule['entity_type'][] = ['incident', 'request', 'change', 'problem', 'knowledge'];
+const TEMPLATE_LOCALES = ['en', 'de', 'de-ch', 'fr', 'it'] as const;
+type TemplateLocale = typeof TEMPLATE_LOCALES[number];
 
-const EMPTY_FORM: Partial<NotificationRule> = {
+type NotificationRuleForm = {
+  id?: string;
+  name: string;
+  description: string;
+  entity_type: NotificationRule['entity_type'];
+  trigger_key: string;
+  recipient_type: NotificationRule['recipient_type'];
+  recipient_user_id: string | null;
+  recipient_group_id: string | null;
+  channels: Array<'in_app' | 'email'>;
+  templates: NotificationRuleTemplate[];
+  sort_order: number;
+};
+
+const EMPTY_FORM: NotificationRuleForm = {
   name: '',
   description: '',
   entity_type: 'incident',
@@ -52,10 +68,34 @@ const EMPTY_FORM: Partial<NotificationRule> = {
   recipient_type: 'assignee',
   recipient_user_id: null,
   recipient_group_id: null,
-  title_template: 'Incident {incident_number} updated',
-  body_template: '{incident_title}',
+  channels: ['in_app'],
+  templates: [
+    {
+      locale: 'en',
+      title_template: 'Incident {incident_number} updated',
+      body_template: '{incident_title}',
+      body_html_template: null,
+    },
+  ],
   sort_order: 100,
 };
+
+function getTemplatesFromRule(rule: NotificationRule): NotificationRuleTemplate[] {
+  if (Array.isArray(rule.templates) && rule.templates.length > 0) {
+    return rule.templates.map((template) => ({
+      locale: template.locale,
+      title_template: template.title_template,
+      body_template: template.body_template,
+      body_html_template: template.body_html_template ?? null,
+    }));
+  }
+  return [{
+    locale: 'en',
+    title_template: rule.title_template,
+    body_template: rule.body_template,
+    body_html_template: null,
+  }];
+}
 
 export default function NotificationConfigPage() {
   const [rules, setRules] = useState<NotificationRule[]>([]);
@@ -65,7 +105,8 @@ export default function NotificationConfigPage() {
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
-  const [form, setForm] = useState<Partial<NotificationRule>>(EMPTY_FORM);
+  const [form, setForm] = useState<NotificationRuleForm>(EMPTY_FORM);
+  const [activeTemplateLocale, setActiveTemplateLocale] = useState<TemplateLocale>('en');
 
   const load = async () => {
     const [rRes, uRes, gRes] = await Promise.all([
@@ -89,22 +130,40 @@ export default function NotificationConfigPage() {
     setCreating(true);
     setEditing(null);
     setForm({ ...EMPTY_FORM });
+    setActiveTemplateLocale('en');
   };
 
   const startEdit = (rule: NotificationRule) => {
     setCreating(false);
     setEditing(rule.id);
-    setForm({ ...rule });
+    setForm({
+      id: rule.id,
+      name: rule.name,
+      description: rule.description || '',
+      entity_type: rule.entity_type,
+      trigger_key: rule.trigger_key,
+      recipient_type: rule.recipient_type,
+      recipient_user_id: rule.recipient_user_id,
+      recipient_group_id: rule.recipient_group_id,
+      channels: rule.channels?.length ? rule.channels : ['in_app'],
+      templates: getTemplatesFromRule(rule),
+      sort_order: rule.sort_order,
+    });
+    setActiveTemplateLocale('en');
   };
 
   const cancelEdit = () => {
     setCreating(false);
     setEditing(null);
     setForm({ ...EMPTY_FORM });
+    setActiveTemplateLocale('en');
   };
 
   const save = async () => {
-    if (!form.name || !form.trigger_key || !form.recipient_type || !form.title_template) return;
+    if (!form.name || !form.trigger_key || !form.recipient_type) return;
+    if (form.templates.length === 0) return;
+    if (form.templates.some((template) => !template.title_template.trim())) return;
+    if (form.channels.includes('email') && form.templates.some((template) => !template.body_template?.trim())) return;
     setSaving(true);
     try {
       const payload: Partial<NotificationRule> = {
@@ -115,8 +174,15 @@ export default function NotificationConfigPage() {
         recipient_type: form.recipient_type,
         recipient_user_id: form.recipient_user_id || null,
         recipient_group_id: form.recipient_group_id || null,
-        title_template: form.title_template,
-        body_template: form.body_template || null,
+        channels: form.channels,
+        templates: form.templates.map((template) => ({
+          locale: template.locale,
+          title_template: template.title_template,
+          body_template: template.body_template || null,
+          body_html_template: template.body_html_template || null,
+        })),
+        title_template: form.templates[0]?.title_template || '',
+        body_template: form.templates[0]?.body_template || null,
         sort_order: form.sort_order ?? 100,
       };
       if (creating) await adminApi.createNotificationRule(payload);
@@ -146,6 +212,34 @@ export default function NotificationConfigPage() {
   };
 
   const availableTriggers = TRIGGERS.filter((t) => t.entity === (form.entity_type || 'incident'));
+  const activeTemplate = form.templates.find((template) => template.locale === activeTemplateLocale)
+    || form.templates[0];
+  const activeTemplateIndex = activeTemplate
+    ? form.templates.findIndex((template) => template.locale === activeTemplate.locale)
+    : -1;
+
+  const toggleChannel = (channel: 'in_app' | 'email') => {
+    const has = form.channels.includes(channel);
+    const next = has ? form.channels.filter((c) => c !== channel) : [...form.channels, channel];
+    setForm({ ...form, channels: next.length > 0 ? next : ['in_app'] });
+  };
+
+  const ensureLocaleTemplate = (locale: TemplateLocale) => {
+    const existing = form.templates.find((template) => template.locale === locale);
+    if (existing) return;
+    setForm({
+      ...form,
+      templates: [
+        ...form.templates,
+        {
+          locale,
+          title_template: '',
+          body_template: '',
+          body_html_template: null,
+        },
+      ],
+    });
+  };
 
   if (loading) return <Spinner />;
 
@@ -219,6 +313,27 @@ export default function NotificationConfigPage() {
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Channels</label>
+              <div className="flex items-center gap-3 pt-2">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.channels.includes('in_app')}
+                    onChange={() => toggleChannel('in_app')}
+                  />
+                  In-app
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.channels.includes('email')}
+                    onChange={() => toggleChannel('email')}
+                  />
+                  Email
+                </label>
+              </div>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
               <input
                 type="number"
@@ -257,29 +372,101 @@ export default function NotificationConfigPage() {
             )}
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title Template *</label>
-              <input
-                value={form.title_template || ''}
-                onChange={(e) => setForm({ ...form, title_template: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="e.g. {entity_number} updated"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Body Template</label>
-              <textarea
-                value={form.body_template || ''}
-                onChange={(e) => setForm({ ...form, body_template: e.target.value })}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                placeholder="Use placeholders like {entity_number} and {entity_title}"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-2">Localized Templates</label>
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                {TEMPLATE_LOCALES.map((locale) => {
+                  const hasTemplate = form.templates.some((template) => template.locale === locale);
+                  return (
+                    <button
+                      key={locale}
+                      type="button"
+                      onClick={() => {
+                        ensureLocaleTemplate(locale);
+                        setActiveTemplateLocale(locale);
+                      }}
+                      className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                        activeTemplateLocale === locale
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : hasTemplate
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                            : 'bg-white text-gray-500 border-gray-200'
+                      }`}
+                    >
+                      {locale}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeTemplate && activeTemplateIndex >= 0 && (
+                <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Subject Template * ({activeTemplate.locale})
+                    </label>
+                    <input
+                      value={activeTemplate.title_template}
+                      onChange={(e) => {
+                        const templates = [...form.templates];
+                        const currentTemplate = templates[activeTemplateIndex];
+                        if (!currentTemplate) return;
+                        templates[activeTemplateIndex] = { ...currentTemplate, title_template: e.target.value };
+                        setForm({ ...form, templates });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="e.g. {entity_number} updated"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Body Template {form.channels.includes('email') ? '*' : ''}
+                    </label>
+                    <textarea
+                      value={activeTemplate.body_template || ''}
+                      onChange={(e) => {
+                        const templates = [...form.templates];
+                        const currentTemplate = templates[activeTemplateIndex];
+                        if (!currentTemplate) return;
+                        templates[activeTemplateIndex] = { ...currentTemplate, body_template: e.target.value };
+                        setForm({ ...form, templates });
+                      }}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                      placeholder="Use placeholders like {entity_number} and {entity_title}"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">HTML Body Template (optional)</label>
+                    <textarea
+                      value={activeTemplate.body_html_template || ''}
+                      onChange={(e) => {
+                        const templates = [...form.templates];
+                        const currentTemplate = templates[activeTemplateIndex];
+                        if (!currentTemplate) return;
+                        templates[activeTemplateIndex] = { ...currentTemplate, body_html_template: e.target.value };
+                        setForm({ ...form, templates });
+                      }}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono"
+                      placeholder="<p>{entity_title}</p>"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="mt-6 flex gap-3 pt-4 border-t border-gray-100">
             <button
               onClick={save}
-              disabled={saving || !form.name || !form.trigger_key || !form.recipient_type || !form.title_template}
+              disabled={
+                saving
+                || !form.name
+                || !form.trigger_key
+                || !form.recipient_type
+                || form.templates.length === 0
+                || form.templates.some((template) => !template.title_template.trim())
+                || (form.channels.includes('email') && form.templates.some((template) => !template.body_template?.trim()))
+              }
               className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
               {saving ? 'Saving...' : creating ? 'Create Rule' : 'Update Rule'}
@@ -310,6 +497,11 @@ export default function NotificationConfigPage() {
                       <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">{rule.entity_type}</span>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">{rule.trigger_key}</span>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{rule.recipient_type}</span>
+                      {(rule.channels?.length ? rule.channels : ['in_app']).map((channel) => (
+                        <span key={channel} className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                          {channel}
+                        </span>
+                      ))}
                       {!rule.is_active && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Inactive</span>}
                     </div>
                     {rule.description && <p className="text-sm text-gray-500 mt-1">{rule.description}</p>}
@@ -318,6 +510,11 @@ export default function NotificationConfigPage() {
                     </p>
                     {rule.body_template && (
                       <p className="text-xs text-gray-500 mt-1">Body: {rule.body_template}</p>
+                    )}
+                    {rule.templates && rule.templates.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Locales: {rule.templates.map((template) => template.locale).join(', ')}
+                      </p>
                     )}
                     {(rule.recipient_user_name || rule.recipient_group_name) && (
                       <p className="text-xs text-gray-500 mt-1">

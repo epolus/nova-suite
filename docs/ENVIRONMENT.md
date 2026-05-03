@@ -31,6 +31,15 @@ VITE_DEFAULT_LOCALE=en
 VITE_SUPPORTED_LOCALES=en,de,de-ch,fr,it
 VITE_LOCALE_STORAGE_KEY=nova_locale
 VITE_LOCALE_PREFERENCE_SCOPE=ui:locale
+
+# Notification mail delivery (nova-worker)
+MAIL_NOTIFICATIONS_ENABLED=false
+MAIL_FROM=no-reply@nova.local
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=
+SMTP_PASS=
 ```
 
 ## Behavior Notes
@@ -44,6 +53,10 @@ VITE_LOCALE_PREFERENCE_SCOPE=ui:locale
   `docker compose exec temporal temporal operator namespace update default --retention 720h`
   (adjust `720h` to match your policy).
 - **GET `/api/temporal/overview`** returns **`retentionDaysServer`** (actual namespace TTL), **`retentionDaysConfigured`** (`TEMPORAL_RETENTION_DAYS`), and **`retentionDays`** (server value, or configured if server metadata is missing).
+- **Mail notifications rollout controls (worker):**
+  - `MAIL_NOTIFICATIONS_ENABLED=false` keeps email dispatch disabled while still allowing in-app notifications.
+  - Set `SMTP_HOST` and related SMTP credentials before enabling mail delivery.
+  - `MAIL_FROM` sets the sender identity for outbound notification mail.
 - Redis caching is optional; when enabled, `GET /api/settings/theme` and `GET /api/settings` are cached and invalidated on settings update/logo change.
 - Cache telemetry endpoint: `GET /api/settings/cache/metrics` (admin only) reports hits/misses/errors and connection status.
 - `VITE_*` values are injected at frontend build time; rebuild `nova-web` after changing them.

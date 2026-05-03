@@ -29,4 +29,15 @@ export const config = {
   credentials: {
     masterKey: env('CREDENTIALS_MASTER_KEY', ''),
   },
+  notifications: {
+    emailEnabled: env('MAIL_NOTIFICATIONS_ENABLED', 'false') === 'true',
+    sender: env('MAIL_FROM', 'no-reply@nova.local'),
+    smtp: {
+      host: env('SMTP_HOST', ''),
+      port: envInt('SMTP_PORT', 587),
+      user: env('SMTP_USER', ''),
+      pass: env('SMTP_PASS', ''),
+      secure: env('SMTP_SECURE', 'false') === 'true',
+    },
+  },
 } as const;

@@ -515,10 +515,10 @@ router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Requ
     if (last_name !== undefined) { sets.push(`last_name = $${idx++}`); values.push(last_name || null); }
     if (display_name !== undefined) { sets.push(`display_name = $${idx++}`); values.push(display_name); }
     if (jobTitle !== undefined) { sets.push(`title = $${idx++}`); values.push(jobTitle || null); }
-    if (phone !== undefined) { sets.push(`phone = $${idx++}`); values.push(phone || null); }
-    if (mobile !== undefined) { sets.push(`mobile = $${idx++}`); values.push(mobile || null); }
-    if (location !== undefined) { sets.push(`location = $${idx++}`); values.push(location || null); }
-    if (timezone !== undefined) { sets.push(`timezone = $${idx++}`); values.push(timezone); }
+    if (phone !== undefined) { sets.push(`phone = $${idx++}`); values.push(phone || ''); }
+    if (mobile !== undefined) { sets.push(`mobile = $${idx++}`); values.push(mobile || ''); }
+    if (location !== undefined) { sets.push(`location = $${idx++}`); values.push(location || ''); }
+    if (timezone !== undefined) { sets.push(`timezone = $${idx++}`); values.push(timezone || 'UTC'); }
     if (time_format !== undefined) { sets.push(`time_format = $${idx++}`); values.push(time_format); }
     if (date_format !== undefined) { sets.push(`date_format = $${idx++}`); values.push(date_format); }
     if (employee_type !== undefined) { sets.push(`employee_type = $${idx++}`); values.push(employee_type); }
@@ -603,7 +603,7 @@ router.post('/users', validateBody(adminCreateUserSchema), async (req: Request, 
       [
         tenantId, user_id || null, email, passwordHash,
         first_name || null, last_name || null, display_name, jobTitle || null,
-        phone || null, mobile || null, location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
+        phone || '', mobile || '', location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
         employee_type || 'employee', company || null, preferred_language || 'en',
         start_date || null, last_working_date || null,
         manager_id || null, department_id || null, cost_center_id || null,
@@ -972,13 +972,130 @@ router.delete('/sla-definitions/:id', async (req: Request, res: Response, next: 
 // NOTIFICATION RULES
 // ════════════════════════════════════════════
 
+type NotificationRuleChannel = 'in_app' | 'email';
+type NotificationRuleTemplateInput = {
+  locale: string;
+  title_template: string;
+  body_template: string | null;
+  body_html_template: string | null;
+};
+
+function normalizeNotificationChannels(raw: unknown): NotificationRuleChannel[] {
+  if (raw === undefined || raw === null) return ['in_app'];
+  if (!Array.isArray(raw)) throw new AppError(400, 'channels must be an array');
+  const allowed = new Set<NotificationRuleChannel>(['in_app', 'email']);
+  const channels = Array.from(new Set(raw.map((v) => String(v).trim())))
+    .filter((v): v is NotificationRuleChannel => allowed.has(v as NotificationRuleChannel));
+  if (channels.length === 0) throw new AppError(400, 'at least one valid channel is required');
+  return channels;
+}
+
+function normalizeNotificationTemplates(raw: unknown, legacyTitle?: unknown, legacyBody?: unknown): NotificationRuleTemplateInput[] {
+  if (!Array.isArray(raw)) {
+    const fallbackTitle = String(legacyTitle || '').trim();
+    if (!fallbackTitle) throw new AppError(400, 'title_template is required');
+    const fallbackBody = legacyBody == null ? null : String(legacyBody);
+    return [{
+      locale: 'en',
+      title_template: fallbackTitle,
+      body_template: fallbackBody,
+      body_html_template: null,
+    }];
+  }
+
+  const seen = new Set<string>();
+  const templates: NotificationRuleTemplateInput[] = [];
+  for (const entry of raw as Array<Record<string, unknown>>) {
+    const locale = String(entry.locale || '').trim().toLowerCase();
+    const titleTemplate = String(entry.title_template || '').trim();
+    if (!locale) throw new AppError(400, 'template locale is required');
+    if (!/^[a-z]{2}(?:-[a-z]{2})?$/.test(locale)) {
+      throw new AppError(400, `unsupported locale format "${locale}"`);
+    }
+    if (!titleTemplate) throw new AppError(400, `title_template is required for locale "${locale}"`);
+    if (seen.has(locale)) throw new AppError(400, `duplicate locale "${locale}" in templates`);
+    seen.add(locale);
+    templates.push({
+      locale,
+      title_template: titleTemplate,
+      body_template: entry.body_template == null ? null : String(entry.body_template),
+      body_html_template: entry.body_html_template == null ? null : String(entry.body_html_template),
+    });
+  }
+  if (templates.length === 0) throw new AppError(400, 'at least one template locale is required');
+  return templates;
+}
+
+function ensureEmailTemplateBodies(templates: NotificationRuleTemplateInput[]) {
+  for (const template of templates) {
+    if (!template.body_template || !template.body_template.trim()) {
+      throw new AppError(400, `body_template is required for email template locale "${template.locale}"`);
+    }
+  }
+}
+
+async function loadNotificationRuleTemplates(tenantId: string, ruleId: string): Promise<NotificationRuleTemplateInput[]> {
+  const rows = await db.getMany<NotificationRuleTemplateInput>(
+    `SELECT locale, title_template, body_template, body_html_template
+     FROM notification_rule_templates
+     WHERE tenant_id = $1 AND notification_rule_id = $2
+     ORDER BY locale`,
+    [tenantId, ruleId],
+  );
+  return rows;
+}
+
+async function upsertNotificationRuleTemplates(
+  tenantId: string,
+  ruleId: string,
+  templates: NotificationRuleTemplateInput[],
+): Promise<void> {
+  await db.query(
+    `DELETE FROM notification_rule_templates
+     WHERE tenant_id = $1 AND notification_rule_id = $2`,
+    [tenantId, ruleId],
+  );
+  for (const template of templates) {
+    await db.query(
+      `INSERT INTO notification_rule_templates (
+        tenant_id, notification_rule_id, locale, title_template, body_template, body_html_template
+      ) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        tenantId,
+        ruleId,
+        template.locale,
+        template.title_template,
+        template.body_template,
+        template.body_html_template,
+      ],
+    );
+  }
+}
+
 router.get('/notification-rules', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
     const rows = await db.getMany(
       `SELECT nr.*,
               u.display_name AS recipient_user_name,
-              ag.name AS recipient_group_name
+              ag.name AS recipient_group_name,
+              COALESCE(
+                (
+                  SELECT json_agg(
+                    json_build_object(
+                      'locale', nrt.locale,
+                      'title_template', nrt.title_template,
+                      'body_template', nrt.body_template,
+                      'body_html_template', nrt.body_html_template
+                    )
+                    ORDER BY nrt.locale
+                  )
+                  FROM notification_rule_templates nrt
+                  WHERE nrt.tenant_id = nr.tenant_id
+                    AND nrt.notification_rule_id = nr.id
+                ),
+                '[]'::json
+              ) AS templates
        FROM notification_rules nr
        LEFT JOIN users u ON u.id = nr.recipient_user_id
        LEFT JOIN assignment_groups ag ON ag.id = nr.recipient_group_id
@@ -995,13 +1112,12 @@ router.post('/notification-rules', async (req: Request, res: Response, next: Nex
     const tenantId = req.user!.tenant_id;
     const {
       name, description, entity_type, trigger_key, recipient_type,
-      recipient_user_id, recipient_group_id, title_template, body_template, sort_order,
+      recipient_user_id, recipient_group_id, title_template, body_template, sort_order, channels, templates,
     } = req.body;
 
     if (!name) throw new AppError(400, 'name is required');
     if (!trigger_key) throw new AppError(400, 'trigger_key is required');
     if (!recipient_type) throw new AppError(400, 'recipient_type is required');
-    if (!title_template) throw new AppError(400, 'title_template is required');
 
     if (recipient_type === 'specific_user' && !recipient_user_id) {
       throw new AppError(400, 'recipient_user_id is required for specific_user');
@@ -1010,12 +1126,17 @@ router.post('/notification-rules', async (req: Request, res: Response, next: Nex
       throw new AppError(400, 'recipient_group_id is required for assignment_group_members');
     }
 
+    const normalizedChannels = normalizeNotificationChannels(channels);
+    const normalizedTemplates = normalizeNotificationTemplates(templates, title_template, body_template);
+    if (normalizedChannels.includes('email')) ensureEmailTemplateBodies(normalizedTemplates);
+    const defaultTemplate = normalizedTemplates.find((template) => template.locale === 'en') || normalizedTemplates[0];
+
     const row = await db.getOne<{ id: string }>(
       `INSERT INTO notification_rules (
         tenant_id, name, description, entity_type, trigger_key, recipient_type,
-        recipient_user_id, recipient_group_id, title_template, body_template, sort_order
+        recipient_user_id, recipient_group_id, channels, title_template, body_template, sort_order
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+        $1, $2, $3, $4, $5, $6, $7, $8, $9::text[], $10, $11, $12
       ) RETURNING id`,
       [
         tenantId,
@@ -1026,11 +1147,13 @@ router.post('/notification-rules', async (req: Request, res: Response, next: Nex
         recipient_type,
         recipient_user_id || null,
         recipient_group_id || null,
-        title_template,
-        body_template || null,
+        normalizedChannels,
+        defaultTemplate.title_template,
+        defaultTemplate.body_template,
         sort_order ?? 100,
       ],
     );
+    await upsertNotificationRuleTemplates(tenantId, row!.id, normalizedTemplates);
     res.status(201).json(row);
   } catch (err) { next(err); }
 });
@@ -1038,10 +1161,11 @@ router.post('/notification-rules', async (req: Request, res: Response, next: Nex
 router.patch('/notification-rules/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
+    const ruleId = String(req.params.id);
     const {
       name, description, entity_type, trigger_key, recipient_type,
       recipient_user_id, recipient_group_id, title_template, body_template,
-      is_active, sort_order,
+      is_active, sort_order, channels, templates,
     } = req.body;
 
     const sets: string[] = [];
@@ -1055,20 +1179,60 @@ router.patch('/notification-rules/:id', async (req: Request, res: Response, next
     if (recipient_type !== undefined) { sets.push(`recipient_type = $${i++}`); vals.push(recipient_type); }
     if (recipient_user_id !== undefined) { sets.push(`recipient_user_id = $${i++}`); vals.push(recipient_user_id || null); }
     if (recipient_group_id !== undefined) { sets.push(`recipient_group_id = $${i++}`); vals.push(recipient_group_id || null); }
-    if (title_template !== undefined) { sets.push(`title_template = $${i++}`); vals.push(title_template); }
-    if (body_template !== undefined) { sets.push(`body_template = $${i++}`); vals.push(body_template || null); }
+    if (channels !== undefined) {
+      const normalizedChannels = normalizeNotificationChannels(channels);
+      sets.push(`channels = $${i++}::text[]`);
+      vals.push(normalizedChannels);
+    }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
     if (sort_order !== undefined) { sets.push(`sort_order = $${i++}`); vals.push(sort_order); }
 
-    if (sets.length === 0) { res.json({ success: true }); return; }
+    let normalizedTemplates: NotificationRuleTemplateInput[] | null = null;
+    if (templates !== undefined || title_template !== undefined || body_template !== undefined) {
+      normalizedTemplates = normalizeNotificationTemplates(
+        templates,
+        title_template,
+        body_template,
+      );
+      const defaultTemplate = normalizedTemplates.find((template) => template.locale === 'en') || normalizedTemplates[0];
+      sets.push(`title_template = $${i++}`);
+      vals.push(defaultTemplate.title_template);
+      sets.push(`body_template = $${i++}`);
+      vals.push(defaultTemplate.body_template);
+    }
 
-    vals.push(req.params.id, tenantId);
-    await db.query(
+    if (sets.length === 0 && !normalizedTemplates) { res.json({ success: true }); return; }
+
+    vals.push(ruleId, tenantId);
+    const result = await db.query(
       `UPDATE notification_rules
        SET ${sets.join(', ')}
        WHERE id = $${i++} AND tenant_id = $${i}`,
       vals,
     );
+    if (result.rowCount === 0) throw new AppError(404, 'Notification rule not found');
+
+    if (normalizedTemplates) {
+      await upsertNotificationRuleTemplates(tenantId, ruleId, normalizedTemplates);
+    }
+
+    const activeChannels = channels !== undefined
+      ? normalizeNotificationChannels(channels)
+      : (
+        await db.getOne<{ channels: NotificationRuleChannel[] }>(
+          'SELECT channels FROM notification_rules WHERE id = $1 AND tenant_id = $2',
+          [ruleId, tenantId],
+        )
+      )?.channels || ['in_app'];
+
+    if (activeChannels.includes('email')) {
+      const effectiveTemplates = normalizedTemplates || await loadNotificationRuleTemplates(tenantId, ruleId);
+      if (effectiveTemplates.length === 0) {
+        throw new AppError(400, 'at least one locale template is required when email channel is enabled');
+      }
+      ensureEmailTemplateBodies(effectiveTemplates);
+    }
+
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -1126,6 +1290,82 @@ router.post('/notification-rules/:id/test', async (req: Request, res: Response, 
     });
 
     res.json({ success: true, workflow_id: workflowId, entity_id: entityId });
+  } catch (err) { next(err); }
+});
+
+router.get('/notification-email-deliveries', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const status = String(req.query.status || '').trim();
+    const triggerKey = String(req.query.trigger_key || '').trim();
+    const recipient = String(req.query.recipient || '').trim();
+    const limitRaw = Number.parseInt(String(req.query.limit || '100'), 10);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 500)) : 100;
+
+    const filters: string[] = ['ned.tenant_id = $1'];
+    const vals: unknown[] = [tenantId];
+    let i = 2;
+
+    if (status) {
+      filters.push(`ned.status = $${i++}`);
+      vals.push(status);
+    }
+    if (triggerKey) {
+      filters.push(`ned.trigger_key = $${i++}`);
+      vals.push(triggerKey);
+    }
+    if (recipient) {
+      filters.push(`LOWER(ned.recipient_email) LIKE $${i++}`);
+      vals.push(`%${recipient.toLowerCase()}%`);
+    }
+
+    const filterWhereClause = filters.join(' AND ');
+    const filterValues = [...vals];
+
+    vals.push(limit);
+    const rows = await db.getMany(
+      `SELECT
+         ned.id,
+         ned.notification_rule_id,
+         nr.name AS notification_rule_name,
+         ned.recipient_user_id,
+         u.display_name AS recipient_user_name,
+         ned.recipient_email,
+         ned.recipient_locale,
+         ned.entity_type,
+         ned.entity_id,
+         ned.trigger_key,
+         ned.template_locale,
+         ned.subject,
+         ned.body_text,
+         ned.body_html,
+         ned.status,
+         ned.provider,
+         ned.provider_message_id,
+         ned.retry_count,
+         ned.last_error,
+         ned.sent_at,
+         ned.created_at,
+         ned.updated_at
+       FROM notification_email_deliveries ned
+       LEFT JOIN notification_rules nr ON nr.id = ned.notification_rule_id
+       LEFT JOIN users u ON u.id = ned.recipient_user_id
+       WHERE ${filterWhereClause}
+       ORDER BY ned.created_at DESC
+       LIMIT $${i}`,
+      vals,
+    );
+
+    const summary = await db.getMany<{ status: string; count: number }>(
+      `SELECT status, count(*)::int AS count
+       FROM notification_email_deliveries ned
+       WHERE ${filterWhereClause}
+       GROUP BY status
+       ORDER BY status`,
+      filterValues,
+    );
+
+    res.json({ deliveries: rows, summary });
   } catch (err) { next(err); }
 });
 

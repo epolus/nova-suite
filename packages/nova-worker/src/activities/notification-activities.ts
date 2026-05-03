@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { log } from '@temporalio/activity';
 import { withTenantContext } from '../db';
+import { getEmailProvider } from './email-provider';
 
 export interface NotificationDispatchInput {
   tenantId: string;
@@ -10,12 +11,97 @@ export interface NotificationDispatchInput {
   actorUserId?: string | null;
 }
 
+type NotificationRuleChannel = 'in_app' | 'email';
+type NotificationRuleTemplate = {
+  locale: string;
+  title_template: string;
+  body_template: string | null;
+  body_html_template: string | null;
+};
+
+type NotificationRuleRow = {
+  id: string;
+  recipient_type: string;
+  recipient_user_id: string | null;
+  recipient_group_id: string | null;
+  channels: NotificationRuleChannel[] | null;
+  title_template: string | null;
+  body_template: string | null;
+};
+
+type RecipientRow = {
+  id: string;
+  email: string;
+  preferred_language: string | null;
+  locale_preference: string | null;
+};
+
+const SUPPORTED_LOCALES = new Set(['en', 'de', 'de-ch', 'fr', 'it']);
+const EMAIL_IDEMPOTENCY_WINDOW_MINUTES = 15;
+
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_m, key: string) => vars[key] ?? '');
 }
 
+function normalizeLocale(raw: string | null | undefined): string {
+  const value = String(raw || '').trim().toLowerCase();
+  if (!value) return '';
+  if (SUPPORTED_LOCALES.has(value)) return value;
+  const base = value.split('-')[0] || '';
+  if (SUPPORTED_LOCALES.has(base)) return base;
+  return '';
+}
+
+function resolveRecipientLocale(
+  recipient: Pick<RecipientRow, 'locale_preference' | 'preferred_language'>,
+  tenantDefaultLocale: string,
+): string {
+  return (
+    normalizeLocale(recipient.locale_preference)
+    || normalizeLocale(recipient.preferred_language)
+    || normalizeLocale(tenantDefaultLocale)
+    || 'en'
+  );
+}
+
+function resolveTemplateForLocale(
+  templates: NotificationRuleTemplate[],
+  requestedLocale: string,
+): { locale: string; template: NotificationRuleTemplate } {
+  if (templates.length === 0) {
+    return {
+      locale: 'en',
+      template: {
+        locale: 'en',
+        title_template: '',
+        body_template: null,
+        body_html_template: null,
+      },
+    };
+  }
+
+  const normalizedRequested = normalizeLocale(requestedLocale);
+  const byLocale = new Map(templates.map((template) => [normalizeLocale(template.locale), template]));
+  const exact = normalizedRequested ? byLocale.get(normalizedRequested) : undefined;
+  if (exact) return { locale: normalizedRequested, template: exact };
+  const base = normalizedRequested.split('-')[0] || '';
+  if (base && byLocale.has(base)) {
+    return { locale: base, template: byLocale.get(base)! };
+  }
+  const english = byLocale.get('en');
+  if (english) return { locale: 'en', template: english };
+  const first = templates[0]!;
+  return { locale: normalizeLocale(first.locale) || 'en', template: first };
+}
+
+function toPlainTextFromHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export async function dispatchConfiguredNotifications(input: NotificationDispatchInput): Promise<number> {
   return withTenantContext(input.tenantId, async (client) => {
+    const emailProvider = getEmailProvider();
+
     let entity: Record<string, string | null> | null = null;
     if (input.entityType === 'incident') {
       const r = await client.query(
@@ -65,8 +151,17 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
     }
     if (!entity) return 0;
 
+    const tenantLocaleRes = await client.query<{ value: string }>(
+      `SELECT value
+       FROM tenant_settings
+       WHERE tenant_id = current_tenant_id()
+         AND key = 'default_locale'
+       LIMIT 1`,
+    );
+    const tenantDefaultLocale = tenantLocaleRes.rows[0]?.value || 'en';
+
     const rulesRes = await client.query(
-      `SELECT id, recipient_type, recipient_user_id, recipient_group_id, title_template, body_template
+      `SELECT id, recipient_type, recipient_user_id, recipient_group_id, channels, title_template, body_template
        FROM notification_rules
        WHERE tenant_id = current_tenant_id()
          AND entity_type = $1
@@ -75,6 +170,34 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
        ORDER BY sort_order, created_at`,
       [input.entityType, input.triggerKey],
     );
+    const rules = rulesRes.rows as NotificationRuleRow[];
+    if (rules.length === 0) return 0;
+
+    const ruleIds = rules.map((rule) => rule.id);
+    const templateRes = await client.query<{
+      notification_rule_id: string;
+      locale: string;
+      title_template: string;
+      body_template: string | null;
+      body_html_template: string | null;
+    }>(
+      `SELECT notification_rule_id, locale, title_template, body_template, body_html_template
+       FROM notification_rule_templates
+       WHERE tenant_id = current_tenant_id()
+         AND notification_rule_id = ANY($1::uuid[])`,
+      [ruleIds],
+    );
+    const templatesByRule = new Map<string, NotificationRuleTemplate[]>();
+    for (const row of templateRes.rows) {
+      const list = templatesByRule.get(row.notification_rule_id) || [];
+      list.push({
+        locale: row.locale,
+        title_template: row.title_template,
+        body_template: row.body_template,
+        body_html_template: row.body_html_template,
+      });
+      templatesByRule.set(row.notification_rule_id, list);
+    }
 
     const vars = {
       entity_number: String(entity.number || ''),
@@ -92,9 +215,14 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
     };
 
     let inserted = 0;
-    for (const rule of rulesRes.rows as Array<Record<string, string | null>>) {
+    let emailQueued = 0;
+    let emailSent = 0;
+    let emailFailed = 0;
+    let emailSuppressedByIdempotency = 0;
+    let localeFallbackCount = 0;
+    for (const rule of rules) {
       const recipients = new Set<string>();
-      const recipientType = String(rule.recipient_type || '');
+      const recipientType = String(rule.recipient_type);
 
       if (recipientType === 'caller' && entity.caller_id) recipients.add(entity.caller_id);
       if (recipientType === 'assignee' && entity.assigned_to) recipients.add(entity.assigned_to);
@@ -122,17 +250,120 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       if (input.actorUserId) recipients.delete(input.actorUserId);
       if (recipients.size === 0) continue;
 
-      const title = renderTemplate(String(rule.title_template || ''), vars).trim();
-      const bodyTpl = String(rule.body_template || '');
-      const body = bodyTpl ? renderTemplate(bodyTpl, vars) : null;
+      const recipientIds = Array.from(recipients);
+      const recipientRes = await client.query<RecipientRow>(
+        `SELECT u.id, u.email, u.preferred_language, up.value->>'value' AS locale_preference
+         FROM users u
+         LEFT JOIN user_preferences up
+           ON up.tenant_id = current_tenant_id()
+          AND up.user_id = u.id
+          AND up.scope = 'ui:locale'
+         WHERE u.tenant_id = current_tenant_id()
+           AND u.id = ANY($1::uuid[])`,
+        [recipientIds],
+      );
 
-      for (const userId of recipients) {
-        await client.query(
-          `INSERT INTO notifications (tenant_id, user_id, type, title, body, entity_type, entity_id)
-           VALUES (current_tenant_id(), $1::uuid, 'workflow', $2, $3, $4, $5::uuid)`,
-          [userId, title || `${input.entityType} ${vars.entity_number} update`, body, input.entityType, input.entityId],
-        );
-        inserted += 1;
+      const channelSet = new Set<NotificationRuleChannel>((rule.channels || ['in_app']) as NotificationRuleChannel[]);
+      const localizedTemplates = templatesByRule.get(rule.id) || [{
+        locale: 'en',
+        title_template: String(rule.title_template || ''),
+        body_template: rule.body_template,
+        body_html_template: null,
+      }];
+
+      for (const recipient of recipientRes.rows) {
+        const recipientLocale = resolveRecipientLocale(recipient, tenantDefaultLocale);
+        const resolved = resolveTemplateForLocale(localizedTemplates, recipientLocale);
+        if (resolved.locale !== normalizeLocale(recipientLocale)) localeFallbackCount += 1;
+        const subject = renderTemplate(String(resolved.template.title_template || ''), vars).trim()
+          || `${input.entityType} ${vars.entity_number} update`;
+        const textBody = resolved.template.body_template
+          ? renderTemplate(resolved.template.body_template, vars)
+          : null;
+        const htmlBody = resolved.template.body_html_template
+          ? renderTemplate(resolved.template.body_html_template, vars)
+          : null;
+
+        if (channelSet.has('in_app')) {
+          await client.query(
+            `INSERT INTO notifications (tenant_id, user_id, type, title, body, entity_type, entity_id)
+             VALUES (current_tenant_id(), $1::uuid, 'workflow', $2, $3, $4, $5::uuid)`,
+            [recipient.id, subject, textBody, input.entityType, input.entityId],
+          );
+          inserted += 1;
+        }
+
+        if (channelSet.has('email')) {
+          const dedupeRes = await client.query<{ count: string }>(
+            `SELECT count(*)::text AS count
+             FROM notification_email_deliveries
+             WHERE tenant_id = current_tenant_id()
+               AND notification_rule_id = $1::uuid
+               AND recipient_user_id = $2::uuid
+               AND entity_type = $3
+               AND entity_id = $4::uuid
+               AND trigger_key = $5
+               AND status IN ('queued', 'sent')
+               AND created_at > now() - make_interval(mins => $6::int)`,
+            [rule.id, recipient.id, input.entityType, input.entityId, input.triggerKey, EMAIL_IDEMPOTENCY_WINDOW_MINUTES],
+          );
+          if (Number.parseInt(dedupeRes.rows[0]?.count || '0', 10) > 0) {
+            emailSuppressedByIdempotency += 1;
+            continue;
+          }
+
+          const deliveryInsertRes = await client.query<{ id: string }>(
+            `INSERT INTO notification_email_deliveries (
+              tenant_id, notification_rule_id, recipient_user_id, recipient_email, recipient_locale,
+              entity_type, entity_id, trigger_key, template_locale,
+              subject, body_text, body_html, status, provider
+            ) VALUES (
+              current_tenant_id(), $1::uuid, $2::uuid, $3, $4, $5, $6::uuid, $7, $8, $9, $10, $11, 'queued', 'smtp'
+            )
+            RETURNING id`,
+            [
+              rule.id,
+              recipient.id,
+              recipient.email,
+              recipientLocale,
+              input.entityType,
+              input.entityId,
+              input.triggerKey,
+              resolved.locale,
+              subject,
+              textBody,
+              htmlBody,
+            ],
+          );
+          const deliveryId = deliveryInsertRes.rows[0]?.id;
+          if (!deliveryId) continue;
+          emailQueued += 1;
+
+          const emailResult = await emailProvider.send({
+            to: recipient.email,
+            subject,
+            text: textBody || (htmlBody ? toPlainTextFromHtml(htmlBody) : null),
+            html: htmlBody,
+          });
+
+          if (emailResult.accepted) {
+            await client.query(
+              `UPDATE notification_email_deliveries
+               SET status = 'sent', provider_message_id = $2, sent_at = now(), updated_at = now()
+               WHERE id = $1::uuid`,
+              [deliveryId, emailResult.providerMessageId],
+            );
+            emailSent += 1;
+          } else {
+            await client.query(
+              `UPDATE notification_email_deliveries
+               SET status = 'failed', retry_count = retry_count + 1, last_error = $2, updated_at = now()
+               WHERE id = $1::uuid`,
+              [deliveryId, emailResult.error || 'email send failed'],
+            );
+            emailFailed += 1;
+          }
+        }
       }
     }
 
@@ -140,7 +371,20 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       triggerKey: input.triggerKey,
       incidentId: input.entityId,
       inserted,
+      emailQueued,
+      emailSent,
+      emailFailed,
+      emailSuppressedByIdempotency,
+      localeFallbackCount,
     });
     return inserted;
   });
 }
+
+export const __test__ = {
+  normalizeLocale,
+  resolveRecipientLocale,
+  resolveTemplateForLocale,
+  toPlainTextFromHtml,
+  renderTemplate,
+};

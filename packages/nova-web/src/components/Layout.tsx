@@ -264,6 +264,7 @@ const adminSections: RawAdminSection[] = [
       { to: '/admin/processes', labelKey: 'admin.processes', icon: '⚙️' },
       { to: '/admin/sla-config', labelKey: 'admin.slaConfiguration', icon: '⏱️' },
       { to: '/admin/notification-config', labelKey: 'admin.notificationWorkflows', icon: '🔔' },
+      { to: '/admin/notification-deliveries', labelKey: 'admin.notificationDeliveries', icon: '📨' },
       { to: '/admin/change-management', labelKey: 'admin.changeManagement', icon: '🛠️' },
       { to: '/admin/knowledge-workflows', labelKey: 'admin.knowledgeWorkflows', icon: '📚' },
       { to: '/admin/workflows', labelKey: 'admin.workflows', icon: '🔄' },

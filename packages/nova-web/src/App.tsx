@@ -67,6 +67,7 @@ import ChangeDetailPage from './pages/changes/ChangeDetail';
 import ChangeCalendarPage from './pages/changes/ChangeCalendarPage';
 import ChangeAdminPage from './pages/admin/ChangeAdminPage';
 import NotificationConfigPage from './pages/admin/NotificationConfigPage';
+import NotificationEmailDeliveriesPage from './pages/admin/NotificationEmailDeliveriesPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import SystemStatusPage from './pages/admin/SystemStatusPage';
 import AdminAccessGuard from './components/AdminAccessGuard';
@@ -169,6 +170,7 @@ function AppRoutes() {
           <Route path="services" element={<ServicesPage />} />
           <Route path="sla-config" element={<SlaConfigPage />} />
           <Route path="notification-config" element={<NotificationConfigPage />} />
+          <Route path="notification-deliveries" element={<NotificationEmailDeliveriesPage />} />
           <Route path="change-management" element={<ChangeAdminPage />} />
           <Route path="knowledge-workflows" element={<KnowledgeWorkflowsPage />} />
           <Route path="system-status" element={<SystemStatusPage />} />
