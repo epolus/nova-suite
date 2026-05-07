@@ -26,8 +26,15 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...opts, headers });
 
   if (res.status === 401) {
-    clearToken();
-    window.location.href = '/login';
+    // Only hard-redirect when an existing authenticated session expires.
+    // For unauthenticated calls (for example login with wrong credentials),
+    // let the caller handle the error so the message stays visible.
+    if (token) {
+      clearToken();
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
     throw new Error('Unauthorized');
   }
 
@@ -688,8 +695,12 @@ async function uploadFile<T>(path: string, formData: FormData): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { method: 'POST', headers, body: formData });
 
   if (res.status === 401) {
-    clearToken();
-    window.location.href = '/login';
+    if (token) {
+      clearToken();
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
     throw new Error('Unauthorized');
   }
   if (!res.ok) {

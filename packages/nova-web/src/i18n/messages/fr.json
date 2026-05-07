@@ -193,6 +193,8 @@
       "signInWith": "Connectez-vous avec {provider}",
       "orContinueWithPassword": "ou continuez avec le mot de passe",
       "demoCredentials": "Identifiants de démonstration",
+      "invalidCredentials": "E-mail ou mot de passe invalide. Veuillez réessayer.",
+      "loginFailed": "La connexion a échoué. Veuillez réessayer.",
       "serviceManagementPlatform": "Plateforme de gestion de services",
       "localDisabledSsoMissing": "La connexion locale est désactivée et SSO n'est pas configuré."
     },

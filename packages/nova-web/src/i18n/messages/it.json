@@ -193,6 +193,8 @@
       "signInWith": "Accedi con {provider}",
       "orContinueWithPassword": "oppure proseguire con la password",
       "demoCredentials": "Credenziali dimostrative",
+      "invalidCredentials": "E-mail o password non valide. Riprova.",
+      "loginFailed": "Accesso non riuscito. Riprova.",
       "serviceManagementPlatform": "Piattaforma di gestione dei servizi",
       "localDisabledSsoMissing": "L'accesso locale è disabilitato e SSO non è configurato."
     },

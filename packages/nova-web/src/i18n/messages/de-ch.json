@@ -193,6 +193,8 @@
       "signInWith": "Mit {provider} anmelden",
       "orContinueWithPassword": "oder mit Passwort fortfahren",
       "demoCredentials": "Demo-Zugangsdaten",
+      "invalidCredentials": "Ungültige E-Mail oder ungültiges Passwort. Bitte versuchen Sie es erneut.",
+      "loginFailed": "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.",
       "serviceManagementPlatform": "Service-Management-Plattform",
       "localDisabledSsoMissing": "Die lokale Anmeldung ist deaktiviert und SSO ist nicht konfiguriert."
     },

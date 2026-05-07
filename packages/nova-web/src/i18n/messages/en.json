@@ -193,6 +193,8 @@
       "signInWith": "Sign in with {provider}",
       "orContinueWithPassword": "or continue with password",
       "demoCredentials": "Demo credentials",
+      "invalidCredentials": "Invalid email or password. Please try again.",
+      "loginFailed": "Login failed. Please try again.",
       "serviceManagementPlatform": "Service Management Platform",
       "localDisabledSsoMissing": "Local login is disabled and SSO is not configured."
     },
