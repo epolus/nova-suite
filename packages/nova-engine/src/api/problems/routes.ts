@@ -11,6 +11,7 @@ import { createProblemSchema, paginationSchema, updateProblemSchema } from '../.
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { isAdminRole, hasProblemRole } from '../roles';
 import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-start-queue';
+import { resolveSlaDueAt } from '../../domain/sla';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -394,15 +395,22 @@ router.post('/', validateBody(createProblemSchema), async (req: Request, res: Re
 
     const seq = await client.query(`SELECT nextval('problem_number_seq') AS n`);
     const number = `PRB${String(seq.rows[0].n).padStart(7, '0')}`;
+    const slaDueAt = await resolveSlaDueAt(client, 'problem', {
+      priority: b.priority || 'medium',
+      impact: b.impact || 'medium',
+      category: b.category || null,
+      serviceId: null,
+    });
     const created = await client.query(
       `INSERT INTO problems (
          tenant_id, number, title, description, priority, impact, category, status,
          root_cause, symptoms, workaround, permanent_fix,
-         reported_by, assigned_to, assignment_group_id, affected_ci, resolution_notes
+         reported_by, assigned_to, assignment_group_id, affected_ci, resolution_notes,
+         sla_due_at, sla_breached
        ) VALUES (
          current_tenant_id(), $1, $2, $3, $4, $5, $6, COALESCE($7::problem_status_enum, 'new'::problem_status_enum),
          $8, $9, $10, $11,
-         $12, $13, $14, $15, $16
+         $12, $13, $14, $15, $16, $17, false
        ) RETURNING *`,
       [
         number,
@@ -421,6 +429,7 @@ router.post('/', validateBody(createProblemSchema), async (req: Request, res: Re
         b.assignment_group_id || null,
         b.affected_ci || null,
         b.resolution_notes || null,
+        slaDueAt,
       ],
     );
     const createdProblem = created.rows[0];
@@ -477,11 +486,33 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
       sets.push(`resolved_at = now()`);
       sets.push(`resolved_by = $${i++}`);
       vals.push(req.user!.id);
+      sets.push(`sla_breached = CASE WHEN sla_due_at IS NOT NULL AND now() > sla_due_at THEN true ELSE sla_breached END`);
     }
     if (updates.status === 'closed' && !current.closed_at) {
       sets.push(`closed_at = now()`);
       sets.push(`closed_by = $${i++}`);
       vals.push(req.user!.id);
+    }
+    if (updates.status && ['resolved', 'closed'].includes(String(updates.status))) {
+      sets.push(`sla_due_at = NULL`);
+    } else if (
+      updates.priority !== undefined
+      || updates.impact !== undefined
+      || updates.category !== undefined
+      || updates.status !== undefined
+    ) {
+      const nextStatus = String(updates.status ?? current.status);
+      if (!['resolved', 'closed'].includes(nextStatus)) {
+        const dueAt = await resolveSlaDueAt(client, 'problem', {
+          priority: updates.priority ?? current.priority,
+          impact: updates.impact ?? current.impact,
+          category: updates.category ?? current.category,
+          serviceId: null,
+        });
+        sets.push(`sla_due_at = $${i++}`);
+        vals.push(dueAt);
+        sets.push('sla_breached = false');
+      }
     }
     if (sets.length === 0) return void res.json(current);
     vals.push(req.params.id);

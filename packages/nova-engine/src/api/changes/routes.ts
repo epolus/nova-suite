@@ -22,6 +22,7 @@ import {
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { hasChangeRole, isAdminRole } from '../roles';
 import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-start-queue';
+import { resolveSlaDueAt } from '../../domain/sla';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -913,6 +914,12 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
     const reasonForChange = String(b.reason_for_change || '').trim() || 'Pending assessment';
     const implementationPlan = String(b.implementation_plan || '').trim() || 'Implementation plan to be defined during planning.';
     const backoutPlan = String(b.backout_plan || '').trim() || 'Backout plan to be defined during planning.';
+    const slaDueAt = await resolveSlaDueAt(client, 'change', {
+      priority: b.priority || 'medium',
+      impact: b.impact || 'medium',
+      category: b.category || null,
+      serviceId: b.service_id || null,
+    });
 
     const created = await client.query(
       `INSERT INTO changes (
@@ -920,13 +927,14 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
         stage, status, risk_level, impact, impact_description, implementation_plan, backout_plan, test_plan,
         requested_by, assigned_to, assignment_group_id, service_id, scheduled_start, scheduled_end, actual_start, actual_end,
         downtime_required, maintenance_window, implementation_notes, success, actual_downtime_minutes,
-        related_problem_id, related_incident_id, priority, business_justification, estimated_cost, review_notes
+        related_problem_id, related_incident_id, priority, business_justification, estimated_cost, review_notes,
+        sla_due_at, sla_breached
       ) VALUES (
         current_tenant_id(), $1, $2, $3, $4, $5, $6, $7,
         $8::change_stage_enum, $9::change_status_enum, $10::change_risk_enum, $11, $12, $13, $14, $15,
         $16, $17, $18, $19, $20, $21, $22, $23,
         COALESCE($24, false), $25, $26, $27, $28,
-        $29, $30, $31::change_priority_enum, $32, $33, $34
+        $29, $30, $31::change_priority_enum, $32, $33, $34, $35, false
       ) RETURNING *`,
       [
         number,
@@ -963,6 +971,7 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
         b.business_justification || null,
         b.estimated_cost ?? null,
         b.review_notes || null,
+        slaDueAt,
       ],
     );
     const change = created.rows[0];
@@ -1039,6 +1048,28 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
         sets.push(`${k} = $${i++}`);
       }
       vals.push(v);
+    }
+    if (
+      updates.priority !== undefined
+      || updates.impact !== undefined
+      || updates.category !== undefined
+      || updates.service_id !== undefined
+      || updates.status !== undefined
+    ) {
+      const nextStatus = String(updates.status ?? current.status);
+      if (['closed', 'cancelled', 'rejected'].includes(nextStatus)) {
+        sets.push('sla_due_at = NULL');
+      } else {
+        const dueAt = await resolveSlaDueAt(client, 'change', {
+          priority: updates.priority ?? current.priority,
+          impact: updates.impact ?? current.impact,
+          category: updates.category ?? current.category,
+          serviceId: updates.service_id ?? current.service_id,
+        });
+        sets.push(`sla_due_at = $${i++}`);
+        vals.push(dueAt);
+        sets.push('sla_breached = false');
+      }
     }
     if (sets.length) {
       vals.push(req.params.id);
