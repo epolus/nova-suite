@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useMemo, useState } from 'react';
-import { settings as settingsApi, type CacheMetrics } from '../../api/client';
+import { admin as adminApi, settings as settingsApi, type AuditEvent, type CacheMetrics } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import { formatDateTime } from '../../utils/dateTime';
@@ -11,14 +11,22 @@ export default function SystemStatusPage() {
   const [error, setError] = useState('');
   const [resetting, setResetting] = useState(false);
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
+  const [runtimeHealth, setRuntimeHealth] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
-        const res = await settingsApi.cacheMetrics();
+        const [res, audit, healthResp] = await Promise.all([
+          settingsApi.cacheMetrics(),
+          adminApi.auditEvents(20),
+          fetch('/health').then(async (r) => (r.ok ? r.json() : null)).catch(() => null),
+        ]);
         if (!alive) return;
         setMetrics(res.cache);
+        setAuditEvents(audit.events || []);
+        setRuntimeHealth(healthResp);
         setError('');
       } catch (err) {
         if (!alive) return;
@@ -151,6 +159,62 @@ export default function SystemStatusPage() {
                 </p>
               )}
             </div>
+          </div>
+        )}
+      </Card>
+
+      {runtimeHealth && (
+        <Card className="mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-900">Runtime health</h3>
+            <span className="text-xs text-gray-500">{String(runtimeHealth.status || 'unknown')}</span>
+          </div>
+          <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+            {JSON.stringify(runtimeHealth.checks || {}, null, 2)}
+          </pre>
+        </Card>
+      )}
+
+      <Card className="mt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-gray-900">Recent audit events</h3>
+          <span className="text-xs text-gray-500">admin and security actions</span>
+        </div>
+        {auditEvents.length === 0 ? (
+          <p className="text-sm text-gray-500">No recent audit events.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="text-left text-gray-500 border-b">
+                  <th className="py-2 pr-3 font-medium">Time</th>
+                  <th className="py-2 pr-3 font-medium">Level</th>
+                  <th className="py-2 pr-3 font-medium">Actor</th>
+                  <th className="py-2 pr-3 font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditEvents.map((evt) => (
+                  <tr key={evt.id} className="border-b border-gray-100">
+                    <td className="py-2 pr-3 text-gray-600">{formatDateTime(evt.created_at)}</td>
+                    <td className="py-2 pr-3">
+                      <span className={`inline-flex rounded px-1.5 py-0.5 text-[11px] ${
+                        evt.level === 'critical'
+                          ? 'bg-red-100 text-red-700'
+                          : evt.level === 'warning'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-green-100 text-green-700'
+                      }`}
+                      >
+                        {evt.level}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-3 text-gray-800">{evt.actor_name || 'System'}</td>
+                    <td className="py-2 pr-3 text-gray-800">{evt.action}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>

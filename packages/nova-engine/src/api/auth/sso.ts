@@ -8,10 +8,12 @@ import { Router, Request, Response as ExpressResponse, NextFunction } from 'expr
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
+import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 import { config } from '../../config';
 import { db } from '../../data/db';
 import { logger } from '../../logger';
 import { AuthUser } from '../../middleware/auth';
+import { recordAuditEvent } from '../../audit/events';
 
 const router = Router();
 
@@ -24,7 +26,7 @@ interface OidcMetadata {
   issuer: string;
 }
 
-type OidcClaims = {
+type OidcClaims = JWTPayload & {
   sub: string;
   email?: string;
   name?: string;
@@ -39,6 +41,7 @@ type OidcClaims = {
 let cachedMetadata: OidcMetadata | null = null;
 let metadataFetchedAt = 0;
 const METADATA_TTL = 300_000; // 5 min
+const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
 function normalizeClaims(claims: OidcClaims): OidcClaims {
   const fallbackEmail = claims.email || claims.preferred_username || claims.upn || claims.unique_name;
@@ -66,6 +69,32 @@ async function getOidcMetadata(): Promise<OidcMetadata> {
   return cachedMetadata;
 }
 
+function getJwks(metadata: OidcMetadata) {
+  if (!metadata.jwks_uri) {
+    throw new Error('OIDC metadata does not include jwks_uri');
+  }
+  const existing = jwksCache.get(metadata.jwks_uri);
+  if (existing) return existing;
+  const jwks = createRemoteJWKSet(new URL(metadata.jwks_uri));
+  jwksCache.set(metadata.jwks_uri, jwks);
+  return jwks;
+}
+
+async function verifyIdToken(idToken: string, metadata: OidcMetadata, expectedNonce: string): Promise<OidcClaims> {
+  const verified = await jwtVerify(idToken, getJwks(metadata), {
+    issuer: metadata.issuer || config.oidc.issuer,
+    audience: config.oidc.clientId,
+  });
+  const claims = normalizeClaims(verified.payload as OidcClaims);
+  if (!claims.nonce || claims.nonce !== expectedNonce) {
+    throw new Error('Invalid OIDC nonce');
+  }
+  if (!claims.sub) {
+    throw new Error('Missing sub claim in id_token');
+  }
+  return claims;
+}
+
 // ─── PKCE Helpers ───
 function generateCodeVerifier(): string {
   return crypto.randomBytes(32).toString('base64url');
@@ -79,11 +108,20 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 // ─── In-memory state store (short-lived) ───
 const pendingStates = new Map<string, { codeVerifier: string; nonce: string; createdAt: number }>();
 const STATE_TTL = 600_000; // 10 min
+const pendingSsoCodes = new Map<string, { token: string; user: AuthUser; createdAt: number }>();
+const SSO_CODE_TTL = 120_000; // 2 min
 
 function cleanupStates() {
   const now = Date.now();
   for (const [key, val] of pendingStates) {
     if (now - val.createdAt > STATE_TTL) pendingStates.delete(key);
+  }
+}
+
+function cleanupSsoCodes() {
+  const now = Date.now();
+  for (const [key, val] of pendingSsoCodes) {
+    if (now - val.createdAt > SSO_CODE_TTL) pendingSsoCodes.delete(key);
   }
 }
 
@@ -191,19 +229,11 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       token_type: string;
     };
 
-    // Decode ID token claims
-    let claims: OidcClaims = { sub: '' };
-
-    if (tokens.id_token) {
-      const parts = tokens.id_token.split('.');
-      if (parts.length !== 3) throw new Error('Malformed id_token');
-      claims = normalizeClaims(JSON.parse(Buffer.from(parts[1], 'base64url').toString()) as OidcClaims);
-      const nonceClaim = claims.nonce;
-      if (nonceClaim && nonceClaim !== pending.nonce) {
-        res.redirect('/login?sso_error=Invalid+OIDC+nonce');
-        return;
-      }
+    if (!tokens.id_token) {
+      res.redirect('/login?sso_error=Missing+id_token+in+SSO+response');
+      return;
     }
+    let claims: OidcClaims = await verifyIdToken(tokens.id_token, metadata, pending.nonce);
 
     // Fetch userinfo when key claims are missing from ID token
     if (!claims.sub || !claims.email || !claims.name) {
@@ -245,8 +275,8 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
     if (!user) {
       // Try matching by email
       user = await db.getOne(
-        'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM users WHERE email = $1',
-        [claims.email],
+        'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM users WHERE email = $1 AND tenant_id = $2',
+        [claims.email, DEFAULT_TENANT],
       );
 
       if (user) {
@@ -331,13 +361,40 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
     } as jwt.SignOptions);
 
     logger.info({ userId: user.id, roles }, 'SSO login successful');
+    void recordAuditEvent({
+      tenantId: user.tenant_id,
+      actorUserId: user.id,
+      category: 'auth',
+      action: 'auth.login.success',
+      metadata: { method: 'sso', provider: config.oidc.providerName },
+    });
 
-    // Redirect to frontend with token
-    res.redirect(`/login?sso_token=${encodeURIComponent(token)}`);
+    // Redirect via one-time code (avoid token in URL/query logs).
+    cleanupSsoCodes();
+    const ssoCode = crypto.randomBytes(24).toString('hex');
+    pendingSsoCodes.set(ssoCode, { token, user: payload, createdAt: Date.now() });
+    res.redirect(`/login?sso_code=${encodeURIComponent(ssoCode)}`);
   } catch (err) {
     logger.error({ err }, 'SSO callback error');
     next(err);
   }
+});
+
+router.post('/exchange', async (req: Request, res: ExpressResponse) => {
+  const code = String(req.body?.code || '').trim();
+  if (!code) {
+    res.status(400).json({ error: 'code is required' });
+    return;
+  }
+
+  cleanupSsoCodes();
+  const pending = pendingSsoCodes.get(code);
+  if (!pending) {
+    res.status(400).json({ error: 'invalid or expired SSO code' });
+    return;
+  }
+  pendingSsoCodes.delete(code);
+  res.json({ token: pending.token, user: pending.user });
 });
 
 export default router;

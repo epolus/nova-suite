@@ -13,6 +13,7 @@ import { loginSchema, registerSchema } from '../../domain/schemas';
 import { validateBody } from '../../middleware/validate';
 import { authenticate, requireRole, AuthUser } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
+import { recordAuditEvent } from '../../audit/events';
 
 const router = Router();
 
@@ -44,11 +45,29 @@ router.post(
       );
 
       if (!user || !user.is_active) {
+        if (user?.tenant_id) {
+          void recordAuditEvent({
+            tenantId: user.tenant_id,
+            actorUserId: user.id,
+            category: 'auth',
+            action: 'auth.login.failed',
+            level: 'warning',
+            metadata: { email, reason: 'inactive_or_unknown' },
+          });
+        }
         throw new AppError(401, 'Invalid email or password');
       }
 
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid) {
+        void recordAuditEvent({
+          tenantId: user.tenant_id,
+          actorUserId: user.id,
+          category: 'auth',
+          action: 'auth.login.failed',
+          level: 'warning',
+          metadata: { email, reason: 'invalid_password' },
+        });
         throw new AppError(401, 'Invalid email or password');
       }
 
@@ -92,6 +111,13 @@ router.post(
       res.json({
         token,
         user: payload,
+      });
+      void recordAuditEvent({
+        tenantId: user.tenant_id,
+        actorUserId: user.id,
+        category: 'auth',
+        action: 'auth.login.success',
+        metadata: { method: 'password' },
       });
     } catch (err) {
       next(err);

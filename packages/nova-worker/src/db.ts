@@ -41,3 +41,13 @@ export async function withTenantContext<T>(
 export async function shutdown(): Promise<void> {
   await pool.end();
 }
+
+export async function heartbeat(workerName: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO worker_heartbeats (worker_name, last_seen_at)
+     VALUES ($1, now())
+     ON CONFLICT (worker_name)
+     DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at`,
+    [workerName],
+  );
+}

@@ -10,6 +10,7 @@ import { validateBody } from '../../middleware/validate';
 import { AppError } from '../../middleware/errorHandler';
 import { startNotificationDispatch } from '../../temporal/workflows';
 import { adminCreateUserSchema, adminUpdateUserSchema } from '../../domain/schemas';
+import { recordAuditEvent } from '../../audit/events';
 
 const router = Router();
 
@@ -69,6 +70,49 @@ router.get(
 
 // All admin routes require authentication + admin role
 router.use(authenticate, requireRole('admin'));
+
+router.use((req: Request, res: Response, next: NextFunction) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method.toUpperCase())) {
+    next();
+    return;
+  }
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    void recordAuditEvent({
+      tenantId: req.user!.tenant_id,
+      actorUserId: req.user!.id,
+      category: 'admin',
+      action: `${req.method} ${req.baseUrl}${req.path}`,
+      level: res.statusCode >= 400 ? 'warning' : 'info',
+      metadata: {
+        status: res.statusCode,
+        duration_ms: Date.now() - startedAt,
+      },
+    });
+  });
+  next();
+});
+
+router.get('/audit-events', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const limitRaw = Number.parseInt(String(req.query.limit || '100'), 10);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 500)) : 100;
+    const rows = await db.getMany(
+      `SELECT ae.id, ae.category, ae.action, ae.level, ae.entity_type, ae.entity_id,
+              ae.metadata, ae.created_at, ae.actor_user_id, u.display_name AS actor_name
+       FROM audit_events ae
+       LEFT JOIN users u ON u.id = ae.actor_user_id
+       WHERE ae.tenant_id = $1
+       ORDER BY ae.created_at DESC
+       LIMIT $2`,
+      [tenantId, limit],
+    );
+    res.json({ events: rows });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ════════════════════════════════════════════
 // ROLES

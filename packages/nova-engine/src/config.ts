@@ -14,9 +14,21 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function assertProductionSecurityConfig(nodeEnv: string): void {
+  if (nodeEnv !== 'production') return;
+
+  const jwtSecret = process.env.JWT_SECRET || '';
+  if (!jwtSecret || jwtSecret === 'dev-secret-change-me' || jwtSecret.length < 32) {
+    throw new Error('JWT_SECRET must be set to a strong value (>=32 chars) in production');
+  }
+}
+
+const nodeEnv = env('NODE_ENV', 'development');
+assertProductionSecurityConfig(nodeEnv);
+
 export const config = {
   port: envInt('API_PORT', 4000),
-  nodeEnv: env('NODE_ENV', 'development'),
+  nodeEnv,
   logLevel: env('LOG_LEVEL', 'info'),
 
   db: {

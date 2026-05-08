@@ -23,6 +23,9 @@ import searchRoutes from './search/routes';
 import approvalRoutes from './approvals/routes';
 import cartRoutes from './cart/routes';
 import credentialsRoutes from './credentials/routes';
+import assetRoutes from './assets/routes';
+import releaseRoutes from './releases/routes';
+import reportRoutes from './reports/routes';
 
 const router = Router();
 
@@ -46,5 +49,8 @@ router.use('/notifications', notificationRoutes);
 router.use('/search', searchRoutes);
 router.use('/approvals', approvalRoutes);
 router.use('/credentials', credentialsRoutes);
+router.use('/assets', assetRoutes);
+router.use('/releases', releaseRoutes);
+router.use('/reports', reportRoutes);
 
 export default router;

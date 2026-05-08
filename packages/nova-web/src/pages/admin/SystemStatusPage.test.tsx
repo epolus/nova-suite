@@ -5,11 +5,15 @@ import SystemStatusPage from './SystemStatusPage';
 
 const mockCacheMetrics = vi.fn();
 const mockResetCacheMetrics = vi.fn();
+const mockAuditEvents = vi.fn();
 
 vi.mock('../../api/client', () => ({
   settings: {
     cacheMetrics: (...args: unknown[]) => mockCacheMetrics(...args),
     resetCacheMetrics: (...args: unknown[]) => mockResetCacheMetrics(...args),
+  },
+  admin: {
+    auditEvents: (...args: unknown[]) => mockAuditEvents(...args),
   },
 }));
 
@@ -17,6 +21,16 @@ describe('SystemStatusPage', () => {
   beforeEach(() => {
     mockCacheMetrics.mockReset();
     mockResetCacheMetrics.mockReset();
+    mockAuditEvents.mockReset();
+    mockAuditEvents.mockResolvedValue({ events: [] });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'healthy', checks: { database: 'connected' } }),
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders cache metrics loaded from API', async () => {
@@ -39,6 +53,7 @@ describe('SystemStatusPage', () => {
         lastErrorMessage: null,
       },
     });
+    mockAuditEvents.mockResolvedValue({ events: [] });
 
     render(<SystemStatusPage />);
 
@@ -88,6 +103,7 @@ describe('SystemStatusPage', () => {
         lastErrorMessage: null,
       },
     });
+    mockAuditEvents.mockResolvedValue({ events: [] });
 
     render(<SystemStatusPage />);
     const user = userEvent.setup();

@@ -144,6 +144,11 @@ export const auth = {
   users: () => request<{ users: UserListItem[] }>('/auth/users'),
   ssoConfig: () =>
     request<{ enabled: boolean; provider_name: string; local_login_enabled?: boolean }>('/auth/sso/config'),
+  exchangeSsoCode: (code: string) =>
+    request<{ token: string; user: User }>('/auth/sso/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
 };
 
 // ─── Catalog ───
@@ -379,6 +384,40 @@ export const changes = {
   stats: () => request<ChangeStats>('/changes/stats'),
 };
 
+// ─── Assets (ITAM) ───
+export const assets = {
+  list: () => request<{ assets: Asset[] }>('/assets'),
+  create: (data: Partial<Asset>) =>
+    request<Asset>('/assets', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Asset>) =>
+    request<Asset>(`/assets/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+};
+
+// ─── Releases ───
+export const releases = {
+  list: () => request<{ releases: Release[] }>('/releases'),
+  create: (data: Partial<Release>) =>
+    request<Release>('/releases', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Release>) =>
+    request<Release>(`/releases/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+};
+
+// ─── Reporting ───
+export const reports = {
+  kpis: () => request<{
+    incidents: { open_count: number; sla_breached: number; mttr_hours: number | null };
+    changes: { closed_count: number; successful_count: number; success_rate: number | null };
+    requests: { open_count: number; backlog_age_hours: number | null };
+    problems: { open_count: number };
+  }>('/reports/kpis'),
+  createExport: (report_key: 'incidents.sla' | 'changes.success') =>
+    request<{ export: ReportExport }>('/reports/exports', {
+      method: 'POST',
+      body: JSON.stringify({ report_key }),
+    }),
+  listExports: () => request<{ exports: ReportExport[] }>('/reports/exports'),
+};
+
 // ─── Admin ───
 export const admin = {
   // Users
@@ -502,6 +541,8 @@ export const admin = {
       method: 'POST',
       body: JSON.stringify({}),
     }),
+  auditEvents: (limit = 200) =>
+    request<{ events: AuditEvent[] }>(`/admin/audit-events?limit=${limit}`),
 };
 
 // ─── CMDB ───
@@ -938,6 +979,8 @@ export interface Problem {
   resolved_by: string | null;
   closed_at: string | null;
   closed_by: string | null;
+  sla_due_at?: string | null;
+  sla_breached?: boolean;
   created_at: string;
   updated_at: string;
   reported_by_name?: string;
@@ -1073,6 +1116,8 @@ export interface Change {
   business_justification: string | null;
   estimated_cost: number | null;
   review_notes: string | null;
+  sla_due_at?: string | null;
+  sla_breached?: boolean;
   created_at: string;
   updated_at: string;
   change_type_name?: string;
@@ -1101,6 +1146,59 @@ export interface ChangeDetail extends Change {
     | 'close'
     | 'cancel'
   >;
+}
+
+export interface Asset {
+  id: string;
+  asset_tag: string;
+  name: string;
+  category: string;
+  status: string;
+  owner_user_id: string | null;
+  linked_ci_id: string | null;
+  vendor_name: string | null;
+  purchase_cost: number | null;
+  purchase_currency: string;
+  purchase_date: string | null;
+  warranty_expires_at: string | null;
+  contract_ref: string | null;
+  depreciation_months: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  owner_name?: string;
+  linked_ci_name?: string;
+}
+
+export interface Release {
+  id: string;
+  number: string;
+  title: string;
+  description: string | null;
+  status: string;
+  release_type: string;
+  risk_level: string;
+  planned_start: string | null;
+  planned_end: string | null;
+  deployed_at: string | null;
+  owner_user_id: string | null;
+  change_id: string | null;
+  validation_notes: string | null;
+  rollback_plan: string | null;
+  created_at: string;
+  updated_at: string;
+  owner_name?: string;
+  change_number?: string;
+  change_title?: string;
+}
+
+export interface ReportExport {
+  id: string;
+  report_key: string;
+  status: string;
+  row_count: number;
+  generated_at: string;
+  created_by: string | null;
 }
 
 export interface StandardChangeTemplate {
@@ -1479,6 +1577,19 @@ export interface WorkflowDefinition {
   updated_at: string;
 }
 
+export interface AuditEvent {
+  id: string;
+  category: string;
+  action: string;
+  level: 'info' | 'warning' | 'critical';
+  entity_type: string | null;
+  entity_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  actor_user_id: string | null;
+  actor_name?: string | null;
+}
+
 // ─── Temporal Types ───
 export interface TemporalOverview {
   namespace: string;
@@ -1667,7 +1778,7 @@ export interface SlaDefinition {
   id: string;
   name: string;
   description: string | null;
-  process_type: 'incident' | 'request' | 'task';
+  process_type: 'incident' | 'request' | 'task' | 'problem' | 'change';
   condition_priority: number | null;
   condition_impact: string | null;
   condition_urgency: string | null;

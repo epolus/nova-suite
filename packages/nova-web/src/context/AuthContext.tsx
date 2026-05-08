@@ -36,24 +36,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for SSO token in URL (from OIDC callback redirect)
-    const params = new URLSearchParams(window.location.search);
-    const ssoToken = params.get('sso_token');
-    if (ssoToken) {
-      setToken(ssoToken);
-      // Clean URL without triggering navigation
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, '', cleanUrl);
-    }
+    const bootstrapAuth = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const ssoCode = params.get('sso_code');
+      if (ssoCode) {
+        try {
+          const sso = await auth.exchangeSsoCode(ssoCode);
+          setToken(sso.token);
+        } catch {
+          clearToken();
+        } finally {
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+        }
+      }
 
-    const token = localStorage.getItem('nova_token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    auth
-      .me()
-      .then(async (res) => {
+      const token = localStorage.getItem('nova_token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await auth.me();
         setUser(res.user);
         cacheDateTimeFormats(res.user.time_format || '24h', res.user.date_format || 'YYYY-MM-DD');
 
@@ -75,9 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // Non-critical: keep server user profile values.
         }
-      })
-      .catch(() => clearToken())
-      .finally(() => setLoading(false));
+      } catch {
+        clearToken();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void bootstrapAuth();
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

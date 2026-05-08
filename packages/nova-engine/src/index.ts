@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
+import rateLimit from 'express-rate-limit';
 
 import { config } from './config';
 import { logger } from './logger';
@@ -12,13 +13,17 @@ import { db } from './data/db';
 import { errorHandler } from './middleware/errorHandler';
 import apiRouter from './api/routes';
 import { openApiSpec } from './openapi';
-import { cacheShutdown } from './cache/redis';
+import { cacheMetrics, cacheShutdown } from './cache/redis';
 import {
+  getWorkflowStartQueueStats,
   startWorkflowStartQueueDispatcher,
   stopWorkflowStartQueueDispatcher,
 } from './temporal/workflow-start-queue';
+import { checkTemporalHealth } from './temporal/workflows';
+import { metricsHandler, metricsMiddleware } from './observability/metrics';
 
 const app = express();
+app.set('trust proxy', 1);
 
 // ─── Global Middleware ───
 app.use(helmet({
@@ -31,6 +36,31 @@ app.use(helmet({
 }));
 app.use(cors({ origin: config.cors.origin }));
 app.use(express.json({ limit: '1mb' }));
+app.use(metricsMiddleware);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please retry later.' },
+});
+const mutatingLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 240,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Rate limit exceeded. Please slow down and retry.' },
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/sso', authLimiter);
+app.use('/api', (req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method.toUpperCase())) {
+    mutatingLimiter(req, res, next);
+    return;
+  }
+  next();
+});
 
 // ─── Request Logging ───
 app.use((req, _res, next) => {
@@ -41,16 +71,32 @@ app.use((req, _res, next) => {
 // ─── Health Check ───
 app.get('/health', async (_req, res) => {
   const dbOk = await db.healthCheck();
-  const status = dbOk ? 'healthy' : 'degraded';
-  res.status(dbOk ? 200 : 503).json({
+  const redis = cacheMetrics() as { connected?: boolean; enabled?: boolean };
+  const temporalOk = await checkTemporalHealth();
+  const queueStats = await getWorkflowStartQueueStats().catch(() => ({ pending: 0, failed: 0 }));
+  const workerHeartbeat = await db.getOne<{ last_seen_at: string | null }>(
+    'SELECT max(last_seen_at) AS last_seen_at FROM worker_heartbeats',
+  ).catch(() => ({ last_seen_at: null }));
+  const lastSeenAt = workerHeartbeat?.last_seen_at ? new Date(workerHeartbeat.last_seen_at).getTime() : null;
+  const workerRecent = lastSeenAt !== null && Date.now() - lastSeenAt < 120_000;
+
+  const status = dbOk && temporalOk && workerRecent ? 'healthy' : 'degraded';
+  res.status(status === 'healthy' ? 200 : 503).json({
     status,
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     checks: {
       database: dbOk ? 'connected' : 'disconnected',
+      redis: redis.enabled ? (redis.connected ? 'connected' : 'disconnected') : 'disabled',
+      temporal: temporalOk ? 'connected' : 'disconnected',
+      worker: workerRecent ? 'alive' : 'stale',
+      workflow_start_queue_pending: queueStats.pending,
+      workflow_start_queue_failed: queueStats.failed,
     },
   });
 });
+
+app.get('/metrics', metricsHandler);
 
 // ─── OpenAPI / Swagger UI ───
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
