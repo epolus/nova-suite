@@ -21,7 +21,11 @@ import {
   paginationSchema,
 } from '../../domain/schemas';
 import { NotFound, BadRequest } from '../../middleware/errorHandler';
-import { startCatalogFulfillment, signalTaskCompleted, startNotificationDispatch } from '../../temporal/workflows';
+import { signalTaskCompleted } from '../../temporal/workflows';
+import {
+  enqueueCatalogFulfillmentStartJob,
+  enqueueNotificationDispatchStartJob,
+} from '../../temporal/workflow-start-queue';
 import { isAdminRole, isFulfillerRole } from '../roles';
 import { getRequestApprovalTrigger } from '../../notifications/triggers';
 
@@ -363,35 +367,39 @@ router.post(
         status = serviceItem.approval_required ? 'pending_approval' : 'in_progress';
       }
 
-      const result = await client.query(
-        `INSERT INTO requests (
-          tenant_id, number, requester_id, requested_for, service_item_id,
-          form_data, delivery_info, batch_id, status, priority, notes
-        ) VALUES (
-          current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-        ) RETURNING *`,
-        [
-          number, userId, requested_for || null, service_item_id,
-          JSON.stringify(form_data), JSON.stringify(delivery_info || {}),
-          batch_id || null, status, priority, notes || null,
-        ],
-      );
+      await client.query('BEGIN');
+      let newRequest: any;
+      try {
+        const result = await client.query(
+          `INSERT INTO requests (
+            tenant_id, number, requester_id, requested_for, service_item_id,
+            form_data, delivery_info, batch_id, status, priority, notes
+          ) VALUES (
+            current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+          ) RETURNING *`,
+          [
+            number, userId, requested_for || null, service_item_id,
+            JSON.stringify(form_data), JSON.stringify(delivery_info || {}),
+            batch_id || null, status, priority, notes || null,
+          ],
+        );
+        newRequest = result.rows[0];
 
-      const newRequest = result.rows[0];
-
-      if (hasWorkflowTasks) {
-        try {
-          await startCatalogFulfillment({
-            requestId: newRequest.id,
+        if (hasWorkflowTasks) {
+          await enqueueCatalogFulfillmentStartJob({
+            requestId: String(newRequest.id),
             tenantId: req.user!.tenant_id,
             serviceItemId: service_item_id,
+            queryable: client,
           });
-        } catch {
-          // Don't fail the request creation if workflow start fails
         }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
       }
 
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'request',
         triggerKey: 'request.created',
@@ -493,31 +501,21 @@ router.post(
             ],
           );
 
-          createdRequests.push(result.rows[0]);
+          const newRequest = result.rows[0];
+          if (hasWorkflowTasks) {
+            await enqueueCatalogFulfillmentStartJob({
+              requestId: String(newRequest.id),
+              tenantId: req.user!.tenant_id,
+              serviceItemId: item.service_item_id,
+              queryable: client,
+            });
+          }
+          createdRequests.push(newRequest);
         }
         await client.query('COMMIT');
       } catch (err) {
         await client.query('ROLLBACK');
         throw err;
-      }
-
-      // Start workflows outside the DB transaction
-      for (const newReq of createdRequests) {
-        const taskCheck = await client.query(
-          'SELECT count(*) FROM catalog_tasks WHERE service_item_id = $1 AND is_active = true',
-          [newReq.service_item_id],
-        );
-        if (parseInt(taskCheck.rows[0].count, 10) > 0) {
-          try {
-            await startCatalogFulfillment({
-              requestId: newReq.id,
-              tenantId: req.user!.tenant_id,
-              serviceItemId: newReq.service_item_id,
-            });
-          } catch {
-            // Don't fail checkout if a workflow start fails
-          }
-        }
       }
 
       res.status(201).json({ batch_id: batchId, requests: createdRequests });
@@ -825,7 +823,7 @@ router.post(
       }
 
       const updatedRequest = result.rows[0];
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'request',
         triggerKey: getRequestApprovalTrigger(action),
@@ -949,7 +947,7 @@ router.post('/:id/tasks/:taskId/complete',
       await signalTaskCompleted(requestId, taskId, finalOutcome, notes || null, userId);
 
       if (task.task_type === 'approval' && (finalOutcome === 'approved' || finalOutcome === 'rejected')) {
-        startNotificationDispatch({
+        enqueueNotificationDispatchStartJob({
           tenantId: req.user!.tenant_id,
           entityType: 'request',
           triggerKey: getRequestApprovalTrigger(finalOutcome),

@@ -10,7 +10,7 @@ import { validateBody, validateQuery } from '../../middleware/validate';
 import { createProblemSchema, paginationSchema, updateProblemSchema } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { isAdminRole, hasProblemRole } from '../roles';
-import { startNotificationDispatch } from '../../temporal/workflows';
+import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-start-queue';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -424,7 +424,7 @@ router.post('/', validateBody(createProblemSchema), async (req: Request, res: Re
       ],
     );
     const createdProblem = created.rows[0];
-    startNotificationDispatch({
+    enqueueNotificationDispatchStartJob({
       tenantId: req.user!.tenant_id,
       entityType: 'problem',
       triggerKey: 'problem.created',
@@ -494,7 +494,7 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
     );
     const updatedProblem = updated.rows[0];
     if (updates.assigned_to !== undefined && String(updates.assigned_to || '') !== String(current.assigned_to || '')) {
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'problem',
         triggerKey: 'problem.assigned',
@@ -503,7 +503,7 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
       }).catch(() => {});
     }
     if (updates.status === 'resolved' && current.status !== 'resolved') {
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'problem',
         triggerKey: 'problem.resolved',

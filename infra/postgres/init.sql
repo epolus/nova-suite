@@ -663,6 +663,40 @@ INSERT INTO priority_matrix (impact, urgency, priority) VALUES
   ('low',    'low',    5);  -- Planning
 
 -- ============================================================
+-- 17. WORKFLOW START JOBS (Durable Temporal start queue)
+-- ============================================================
+CREATE TABLE workflow_start_jobs (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  job_type        text NOT NULL CHECK (job_type IN (
+                    'catalog_fulfillment_start',
+                    'notification_dispatch_start',
+                    'incident_escalation_start',
+                    'incident_autoclose_start',
+                    'datasource_schedule_start',
+                    'knowledge_approval_start'
+                  )),
+  workflow_id     text NOT NULL,
+  payload         jsonb NOT NULL,
+  status          text NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+  attempt_count   integer NOT NULL DEFAULT 0,
+  max_attempts    integer NOT NULL DEFAULT 0,
+  next_attempt_at timestamptz NOT NULL DEFAULT now(),
+  locked_at       timestamptz,
+  completed_at    timestamptz,
+  last_error      text,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, job_type, workflow_id)
+);
+
+CREATE INDEX idx_workflow_start_jobs_due
+  ON workflow_start_jobs(status, next_attempt_at, created_at);
+CREATE INDEX idx_workflow_start_jobs_tenant
+  ON workflow_start_jobs(tenant_id, status, created_at DESC);
+
+-- ============================================================
 -- TRIGGERS – auto-update updated_at
 -- ============================================================
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -682,7 +716,7 @@ BEGIN
       'tenants', 'departments', 'cost_centers', 'roles', 'processes',
       'users', 'companies', 'locations', 'user_preferences', 'assignment_groups', 'services',
       'service_categories', 'service_items',
-      'requests', 'incidents', 'ci_classes', 'configuration_items'
+      'requests', 'workflow_start_jobs', 'incidents', 'ci_classes', 'configuration_items'
     ])
   LOOP
     EXECUTE format(

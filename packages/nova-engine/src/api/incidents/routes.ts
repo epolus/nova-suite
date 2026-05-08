@@ -25,12 +25,14 @@ import {
 } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import {
-  startIncidentEscalation,
   signalIncidentResolved,
-  startIncidentAutoClose,
   cancelIncidentAutoClose,
-  startNotificationDispatch,
 } from '../../temporal/workflows';
+import {
+  enqueueIncidentAutoCloseStartJob,
+  enqueueIncidentEscalationStartJob,
+  enqueueNotificationDispatchStartJob,
+} from '../../temporal/workflow-start-queue';
 import { isFulfillerRole } from '../roles';
 
 const router = Router();
@@ -322,15 +324,15 @@ router.post(
         [result.rows[0].id, req.user!.id, `Incident created with priority ${priority}`],
       );
 
-      // Fire-and-forget: start SLA escalation workflow
-      startIncidentEscalation({
+      // Fire-and-forget via durable queue: start SLA escalation workflow
+      enqueueIncidentEscalationStartJob({
         incidentId: result.rows[0].id,
         tenantId: req.user!.tenant_id,
         priority,
         slaDueAt: slaDueAt.toISOString(),
       }).catch(() => {});
 
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'incident',
         triggerKey: 'incident.created',
@@ -420,14 +422,14 @@ router.post(
         [result.rows[0].id, req.user!.id, `Incident created with priority ${priority}`],
       );
 
-      startIncidentEscalation({
+      enqueueIncidentEscalationStartJob({
         incidentId: result.rows[0].id,
         tenantId: req.user!.tenant_id,
         priority,
         slaDueAt: slaDueAt.toISOString(),
       }).catch(() => {});
 
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'incident',
         triggerKey: 'incident.created',
@@ -1177,7 +1179,7 @@ router.patch(
         }
 
         if (updates.status === 'resolved') {
-          startNotificationDispatch({
+          enqueueNotificationDispatchStartJob({
             tenantId: req.user!.tenant_id,
             entityType: 'incident',
             triggerKey: 'incident.resolved',
@@ -1211,7 +1213,7 @@ router.patch(
           );
           const autoCloseDays = Number(autoCloseCfg.rows[0]?.auto_close_days ?? 7);
 
-          startIncidentAutoClose({
+          enqueueIncidentAutoCloseStartJob({
             incidentId: incidentId as string,
             tenantId: req.user!.tenant_id,
             autoCloseAfterDays: autoCloseDays > 0 ? autoCloseDays : 7,
@@ -1232,7 +1234,7 @@ router.patch(
            VALUES (current_tenant_id(), $1, $2, 'assignment', $3)`,
           [incidentId, req.user!.id, `Assigned to ${assigneeName}`],
         );
-        startNotificationDispatch({
+        enqueueNotificationDispatchStartJob({
           tenantId: req.user!.tenant_id,
           entityType: 'incident',
           triggerKey: 'incident.assigned',
@@ -1303,7 +1305,7 @@ router.post(
       );
 
       if (entry_type !== 'state_change') {
-        startNotificationDispatch({
+        enqueueNotificationDispatchStartJob({
           tenantId: req.user!.tenant_id,
           entityType: 'incident',
           triggerKey: 'incident.commented',

@@ -11,9 +11,11 @@ import { AppError, NotFound } from '../../middleware/errorHandler';
 import { rankedSuggestionsQuerySchema } from '../../domain/schemas';
 import {
   signalKnowledgeApprovalDecision,
-  startNotificationDispatch,
-  startKnowledgeApproval,
 } from '../../temporal/workflows';
+import {
+  enqueueKnowledgeApprovalStartJob,
+  enqueueNotificationDispatchStartJob,
+} from '../../temporal/workflow-start-queue';
 import { hasKnowledgeRole, isAdminRole, isFulfillerRole } from '../roles';
 
 const router = Router();
@@ -502,7 +504,7 @@ router.post('/articles/:id/submit', async (req: Request, res: Response, next: Ne
 
     if (wf.rows.length === 0) {
       await publishArticleAndRetirePrevious(client, String(req.params.id));
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'knowledge',
         triggerKey: 'knowledge.published',
@@ -515,7 +517,7 @@ router.post('/articles/:id/submit', async (req: Request, res: Response, next: Ne
     const steps = Array.isArray(wf.rows[0].steps) ? wf.rows[0].steps : [];
     if (steps.length === 0) {
       await publishArticleAndRetirePrevious(client, String(req.params.id));
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'knowledge',
         triggerKey: 'knowledge.published',
@@ -539,7 +541,7 @@ router.post('/articles/:id/submit', async (req: Request, res: Response, next: Ne
       );
     }
 
-    await startKnowledgeApproval({
+    await enqueueKnowledgeApprovalStartJob({
       articleId: String(req.params.id),
       tenantId: req.user!.tenant_id,
       steps: steps.map((s: any) => ({
@@ -548,7 +550,7 @@ router.post('/articles/:id/submit', async (req: Request, res: Response, next: Ne
       })),
     });
 
-    startNotificationDispatch({
+    enqueueNotificationDispatchStartJob({
       tenantId: req.user!.tenant_id,
       entityType: 'knowledge',
       triggerKey: 'knowledge.submitted_for_review',
@@ -598,7 +600,7 @@ router.post('/articles/:id/approvals/:approvalId/decision', async (req: Request,
 
     await signalKnowledgeApprovalDecision(String(req.params.id), Number(row.step_order), normalizedDecision);
     if (normalizedDecision === 'rejected') {
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'knowledge',
         triggerKey: 'knowledge.rejected',

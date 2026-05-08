@@ -16,7 +16,9 @@ ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assignment_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assignment_group_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_processes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE carts ENABLE ROW LEVEL SECURITY;
@@ -42,6 +44,19 @@ ALTER TABLE cab_meeting_changes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE change_blackouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_start_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sla_definitions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE incident_kb_resolutions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kb_approval_workflows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kb_article_approvals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kb_article_ratings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_rule_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_email_deliveries ENABLE ROW LEVEL SECURITY;
 
 -- ─── Departments ───
 CREATE POLICY tenant_isolation_departments ON departments
@@ -90,8 +105,16 @@ CREATE POLICY tenant_isolation_assignment_groups ON assignment_groups
 CREATE POLICY tenant_isolation_agm ON assignment_group_members
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Assignment Group Roles ───
+CREATE POLICY tenant_isolation_agr ON assignment_group_roles
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Assignment Group Processes ───
 CREATE POLICY tenant_isolation_agp ON assignment_group_processes
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Services ───
+CREATE POLICY tenant_isolation_services ON services
   FOR ALL USING (tenant_id = current_tenant_id());
 
 -- ─── Service Categories ───
@@ -250,6 +273,105 @@ CREATE POLICY tenant_isolation_change_conflicts ON change_conflicts
 CREATE POLICY tenant_isolation_workflow_definitions ON workflow_definitions
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Workflow Start Jobs ───
+-- Tenant-scoped access in normal request context, plus system role for dispatcher.
+CREATE POLICY workflow_start_jobs_tenant_or_system_policy ON workflow_start_jobs
+  FOR ALL
+  USING (tenant_id = current_tenant_id() OR current_user_has_role('system'))
+  WITH CHECK (tenant_id = current_tenant_id() OR current_user_has_role('system'));
+
+-- ─── SLA Definitions ───
+CREATE POLICY tenant_isolation_sla_definitions ON sla_definitions
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Tenant Settings ───
+CREATE POLICY tenant_isolation_tenant_settings ON tenant_settings
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Knowledge Categories ───
+CREATE POLICY tenant_isolation_knowledge_categories ON knowledge_categories
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Knowledge Articles ───
+CREATE POLICY tenant_isolation_knowledge_articles ON knowledge_articles
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Incident KB Resolutions ───
+-- Table has no tenant_id, so derive tenant visibility through linked incident/article.
+CREATE POLICY tenant_isolation_incident_kb_resolutions ON incident_kb_resolutions
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1
+      FROM incidents i
+      JOIN knowledge_articles ka ON ka.id = incident_kb_resolutions.kb_id
+      WHERE i.id = incident_kb_resolutions.incident_id
+        AND i.tenant_id = current_tenant_id()
+        AND ka.tenant_id = current_tenant_id()
+    )
+  );
+
+-- ─── Knowledge Approval Workflows ───
+CREATE POLICY tenant_isolation_kb_approval_workflows ON kb_approval_workflows
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Knowledge Article Approvals ───
+CREATE POLICY tenant_isolation_kb_article_approvals ON kb_article_approvals
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Knowledge Article Ratings ───
+CREATE POLICY tenant_isolation_kb_article_ratings ON kb_article_ratings
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Notifications ───
+CREATE POLICY tenant_isolation_notifications ON notifications
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND (
+      current_user_has_role('admin', 'fulfiller', 'system')
+      OR user_id = current_user_id()
+    )
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND (
+      current_user_has_role('admin', 'fulfiller', 'system')
+      OR user_id = current_user_id()
+    )
+  );
+
+-- ─── Notification Rules ───
+CREATE POLICY tenant_isolation_notification_rules ON notification_rules
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  );
+
+-- ─── Notification Rule Templates ───
+CREATE POLICY tenant_isolation_notification_rule_templates ON notification_rule_templates
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  );
+
+-- ─── Notification Email Deliveries ───
+CREATE POLICY tenant_isolation_notification_email_deliveries ON notification_email_deliveries
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  );
+
 -- ============================================================
 -- Force RLS even for the table owner (the app user)
 -- This is critical – without it the app user bypasses RLS
@@ -265,7 +387,9 @@ ALTER TABLE companies FORCE ROW LEVEL SECURITY;
 ALTER TABLE locations FORCE ROW LEVEL SECURITY;
 ALTER TABLE assignment_groups FORCE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_members FORCE ROW LEVEL SECURITY;
+ALTER TABLE assignment_group_roles FORCE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_processes FORCE ROW LEVEL SECURITY;
+ALTER TABLE services FORCE ROW LEVEL SECURITY;
 ALTER TABLE service_categories FORCE ROW LEVEL SECURITY;
 ALTER TABLE service_items FORCE ROW LEVEL SECURITY;
 ALTER TABLE carts FORCE ROW LEVEL SECURITY;
@@ -291,6 +415,19 @@ ALTER TABLE cab_meeting_changes FORCE ROW LEVEL SECURITY;
 ALTER TABLE change_blackouts FORCE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions FORCE ROW LEVEL SECURITY;
+ALTER TABLE workflow_start_jobs FORCE ROW LEVEL SECURITY;
+ALTER TABLE sla_definitions FORCE ROW LEVEL SECURITY;
+ALTER TABLE tenant_settings FORCE ROW LEVEL SECURITY;
+ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;
+ALTER TABLE knowledge_articles FORCE ROW LEVEL SECURITY;
+ALTER TABLE incident_kb_resolutions FORCE ROW LEVEL SECURITY;
+ALTER TABLE kb_approval_workflows FORCE ROW LEVEL SECURITY;
+ALTER TABLE kb_article_approvals FORCE ROW LEVEL SECURITY;
+ALTER TABLE kb_article_ratings FORCE ROW LEVEL SECURITY;
+ALTER TABLE notifications FORCE ROW LEVEL SECURITY;
+ALTER TABLE notification_rules FORCE ROW LEVEL SECURITY;
+ALTER TABLE notification_rule_templates FORCE ROW LEVEL SECURITY;
+ALTER TABLE notification_email_deliveries FORCE ROW LEVEL SECURITY;
 
 -- Import staging tables
 ALTER TABLE import_jobs ENABLE ROW LEVEL SECURITY;

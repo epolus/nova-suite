@@ -22,17 +22,22 @@ export async function startIncidentEscalation(params: {
   priority: number;
   slaDueAt: string;
 }): Promise<string> {
+  const workflowId = `incident-escalation-${params.incidentId}`;
   try {
     const cl = await getClient();
     const handle = await cl.workflow.start('incidentEscalation', {
       taskQueue: TASK_QUEUE,
-      workflowId: `incident-escalation-${params.incidentId}`,
+      workflowId,
       args: [params],
       workflowExecutionTimeout: '7 days',
     });
     logger.info({ workflowId: handle.workflowId, incidentId: params.incidentId }, 'Started escalation workflow');
     return handle.workflowId;
   } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, incidentId: params.incidentId }, 'Incident escalation workflow already running');
+      return workflowId;
+    }
     logger.error({ err, incidentId: params.incidentId }, 'Failed to start escalation workflow');
     throw err;
   }
@@ -43,17 +48,22 @@ export async function startCatalogFulfillment(params: {
   tenantId: string;
   serviceItemId: string;
 }): Promise<string> {
+  const workflowId = `catalog-fulfillment-${params.requestId}`;
   try {
     const cl = await getClient();
     const handle = await cl.workflow.start('catalogFulfillment', {
       taskQueue: TASK_QUEUE,
-      workflowId: `catalog-fulfillment-${params.requestId}`,
+      workflowId,
       args: [params],
       workflowExecutionTimeout: '30 days',
     });
     logger.info({ workflowId: handle.workflowId, requestId: params.requestId }, 'Started catalog fulfillment workflow');
     return handle.workflowId;
   } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, requestId: params.requestId }, 'Catalog fulfillment workflow already running');
+      return workflowId;
+    }
     logger.error({ err, requestId: params.requestId }, 'Failed to start catalog fulfillment workflow');
     throw err;
   }
@@ -83,11 +93,11 @@ export async function startDataSourceSync(params: {
   cronSchedule?: string;
   immediate?: boolean;
 }): Promise<string> {
+  const workflowId = params.immediate
+    ? `datasource-run-${params.dataSourceId}-${Date.now()}`
+    : `datasource-schedule-${params.dataSourceId}`;
   try {
     const cl = await getClient();
-    const workflowId = params.immediate
-      ? `datasource-run-${params.dataSourceId}-${Date.now()}`
-      : `datasource-schedule-${params.dataSourceId}`;
 
     // Cancel existing scheduled workflow if re-scheduling
     if (!params.immediate) {
@@ -116,6 +126,10 @@ export async function startDataSourceSync(params: {
     logger.info({ workflowId: handle.workflowId, dataSourceId: params.dataSourceId }, 'Started data source sync workflow');
     return handle.workflowId;
   } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, dataSourceId: params.dataSourceId }, 'Data source sync workflow already running');
+      return workflowId;
+    }
     logger.error({ err, dataSourceId: params.dataSourceId }, 'Failed to start data source sync workflow');
     throw err;
   }
@@ -234,12 +248,15 @@ export async function startNotificationDispatch(params: {
   triggerKey: string;
   entityId: string;
   actorUserId?: string | null;
+  workflowId?: string;
 }): Promise<string> {
+  const workflowId = params.workflowId
+    || `notification-dispatch-${params.entityType}-${params.entityId}-${params.triggerKey}-${Date.now()}`;
   try {
     const cl = await getClient();
     const handle = await cl.workflow.start('notificationDispatch', {
       taskQueue: TASK_QUEUE,
-      workflowId: `notification-dispatch-${params.entityType}-${params.entityId}-${params.triggerKey}-${Date.now()}`,
+      workflowId,
       args: [params],
       workflowExecutionTimeout: '5 minutes',
     });
@@ -249,6 +266,10 @@ export async function startNotificationDispatch(params: {
     );
     return handle.workflowId;
   } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, triggerKey: params.triggerKey, entityId: params.entityId }, 'Notification dispatch workflow already running');
+      return workflowId;
+    }
     logger.warn({ err, triggerKey: params.triggerKey, entityId: params.entityId }, 'Failed to start notification dispatch workflow');
     throw err;
   }

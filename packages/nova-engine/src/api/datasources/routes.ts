@@ -5,6 +5,7 @@ import { config } from '../../config';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { ENTITY_DEFS } from '../import/entity-defs';
 import { startDataSourceSync, cancelDataSourceSchedule } from '../../temporal/workflows';
+import { enqueueDataSourceScheduleStartJob } from '../../temporal/workflow-start-queue';
 import SftpClient from 'ssh2-sftp-client';
 
 const router = Router();
@@ -377,7 +378,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (schedule_enabled && result) {
       try {
-        await startDataSourceSync({
+        await enqueueDataSourceScheduleStartJob({
           dataSourceId: result.id,
           tenantId,
           cronSchedule: schedule_cron || '0 2 * * *',
@@ -436,7 +437,11 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction): Pr
 
     try {
       if (newEnabled) {
-        await startDataSourceSync({ dataSourceId: String(dsId), tenantId: String(tenantId), cronSchedule: newCron });
+        await enqueueDataSourceScheduleStartJob({
+          dataSourceId: String(dsId),
+          tenantId: String(tenantId),
+          cronSchedule: newCron,
+        });
       } else if (existing.schedule_enabled && !newEnabled) {
         await cancelDataSourceSchedule(String(dsId));
       }

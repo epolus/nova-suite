@@ -13,6 +13,10 @@ import { errorHandler } from './middleware/errorHandler';
 import apiRouter from './api/routes';
 import { openApiSpec } from './openapi';
 import { cacheShutdown } from './cache/redis';
+import {
+  startWorkflowStartQueueDispatcher,
+  stopWorkflowStartQueueDispatcher,
+} from './temporal/workflow-start-queue';
 
 const app = express();
 
@@ -78,9 +82,12 @@ const server = app.listen(config.port, () => {
   );
 });
 
+startWorkflowStartQueueDispatcher();
+
 // ─── Graceful Shutdown ───
 async function shutdown(signal: string) {
   logger.info({ signal }, 'Shutting down...');
+  stopWorkflowStartQueueDispatcher();
   server.close(async () => {
     await cacheShutdown();
     await db.shutdown();

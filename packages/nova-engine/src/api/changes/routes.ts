@@ -21,7 +21,7 @@ import {
 } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { hasChangeRole, isAdminRole } from '../roles';
-import { startNotificationDispatch } from '../../temporal/workflows';
+import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-start-queue';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -977,7 +977,7 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
     }
 
     await refreshChangeConflicts(client, change.id);
-    startNotificationDispatch({
+    enqueueNotificationDispatchStartJob({
       tenantId: req.user!.tenant_id,
       entityType: 'change',
       triggerKey: 'change.created',
@@ -1223,7 +1223,7 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
     };
     const transitionTrigger = transitionTriggerByAction[String(action)];
     if (transitionTrigger) {
-      startNotificationDispatch({
+      enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
         entityType: 'change',
         triggerKey: transitionTrigger,
