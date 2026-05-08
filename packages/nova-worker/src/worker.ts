@@ -2,7 +2,7 @@
 import { NativeConnection, Worker } from '@temporalio/worker';
 import * as activities from './activities';
 import { config } from './config';
-import { shutdown as dbShutdown } from './db';
+import { heartbeat, shutdown as dbShutdown } from './db';
 
 async function run() {
   console.log(`[nova-worker] Connecting to Temporal at ${config.temporal.address}...`);
@@ -22,10 +22,21 @@ async function run() {
   console.log(`[nova-worker] Worker started on task queue "${config.temporal.taskQueue}"`);
   console.log('[nova-worker] Registered workflows: incidentEscalation, incidentAutoClose, catalogFulfillment, dataSourceSync, knowledgeApproval, notificationDispatch');
   console.log(`[nova-worker] Registered activities: ${Object.keys(activities).join(', ')}`);
+  const workerName = process.env.NOVA_WORKER_NAME || `worker-${process.pid}`;
+  const pulse = async () => {
+    try {
+      await heartbeat(workerName);
+    } catch (err) {
+      console.warn('[nova-worker] failed to write heartbeat', err);
+    }
+  };
+  await pulse();
+  const heartbeatTimer = setInterval(() => void pulse(), 30_000);
 
   // Graceful shutdown
   const shutdown = async () => {
     console.log('[nova-worker] Shutting down...');
+    clearInterval(heartbeatTimer);
     worker.shutdown();
     await dbShutdown();
     process.exit(0);
