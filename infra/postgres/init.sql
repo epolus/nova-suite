@@ -1,10 +1,10 @@
 -- SPDX-License-Identifier: AGPL-3.0-only
 -- ============================================================
--- Nova Suite – Database Schema
+-- NOVA SUITE DATABASE SCHEMA
 -- PostgreSQL 18 with multi-tenant support
 -- ============================================================
 
--- ─── Extensions ───
+-- EXTENSIONS
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 ALTER USER current_user CREATEDB;
 
 -- ============================================================
--- Session variables for Row-Level Security
+-- SESSION VARIABLES FOR ROW-LEVEL SECURITY
 -- ============================================================
 -- These GUC variables are set per-connection by the app layer.
 CREATE OR REPLACE FUNCTION current_tenant_id() RETURNS uuid AS $$
@@ -56,7 +56,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================
--- 1. TENANTS
+-- TENANTS
 -- ============================================================
 CREATE TABLE tenants (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -69,7 +69,7 @@ CREATE TABLE tenants (
 CREATE INDEX idx_tenants_settings_gin ON tenants USING gin (settings);
 
 -- ============================================================
--- 2. DEPARTMENTS
+-- DEPARTMENTS
 -- ============================================================
 CREATE TABLE departments (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -88,7 +88,7 @@ CREATE INDEX idx_departments_tenant ON departments(tenant_id);
 CREATE INDEX idx_departments_cost_center ON departments(cost_center_id);
 
 -- ============================================================
--- 3. COST CENTERS
+-- COST CENTERS
 -- ============================================================
 CREATE TABLE cost_centers (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -109,7 +109,7 @@ ALTER TABLE departments
   FOREIGN KEY (cost_center_id) REFERENCES cost_centers(id) ON DELETE SET NULL;
 
 -- ============================================================
--- 4. ROLES
+-- ROLES
 -- ============================================================
 CREATE TABLE roles (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -125,7 +125,7 @@ CREATE TABLE roles (
 CREATE INDEX idx_roles_tenant ON roles(tenant_id);
 
 -- ============================================================
--- 5. PROCESSES (ITIL process types)
+-- PROCESSES
 -- ============================================================
 CREATE TABLE processes (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -141,7 +141,7 @@ CREATE TABLE processes (
 CREATE INDEX idx_processes_tenant ON processes(tenant_id);
 
 -- ============================================================
--- 6. USERS
+-- USERS
 -- ============================================================
 CREATE TABLE users (
   id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -187,7 +187,7 @@ CREATE INDEX idx_users_cost_center ON users(cost_center_id);
 CREATE INDEX idx_users_company ON users(company);
 
 -- ============================================================
--- 6A. COMPANIES
+-- COMPANIES
 -- ============================================================
 CREATE TABLE companies (
   id                 uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -222,7 +222,7 @@ ALTER TABLE users
   FOREIGN KEY (company) REFERENCES companies(id) ON DELETE SET NULL;
 
 -- ============================================================
--- 6B. LOCATIONS
+-- LOCATIONS
 -- ============================================================
 CREATE TABLE locations (
   id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -250,7 +250,7 @@ CREATE INDEX idx_locations_parent ON locations(parent_location_id);
 CREATE INDEX idx_locations_name ON locations(tenant_id, name);
 
 -- ============================================================
--- 6C. USER PREFERENCES (cross-device UI prefs)
+-- USER PREFERENCES
 -- ============================================================
 CREATE TABLE user_preferences (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -268,7 +268,7 @@ CREATE INDEX idx_user_preferences_scope ON user_preferences(tenant_id, scope);
 CREATE INDEX idx_user_preferences_value_gin ON user_preferences USING gin (value);
 
 -- ============================================================
--- 7. USER ROLES (many-to-many)
+-- USER ROLES
 -- ============================================================
 CREATE TABLE user_roles (
   id        uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -285,7 +285,7 @@ CREATE INDEX idx_user_roles_role ON user_roles(role_id);
 CREATE INDEX idx_user_roles_tenant ON user_roles(tenant_id);
 
 -- ============================================================
--- 8. ASSIGNMENT GROUPS
+-- ASSIGNMENT GROUPS
 -- ============================================================
 CREATE TABLE assignment_groups (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -306,7 +306,7 @@ CREATE INDEX idx_assignment_groups_manager ON assignment_groups(manager_id);
 CREATE INDEX idx_assignment_groups_parent ON assignment_groups(parent_group_id);
 
 -- ============================================================
--- 9. ASSIGNMENT GROUP MEMBERS (many-to-many)
+-- ASSIGNMENT GROUP MEMBERS
 -- ============================================================
 CREATE TABLE assignment_group_members (
   id        uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -321,7 +321,7 @@ CREATE INDEX idx_agm_group ON assignment_group_members(group_id);
 CREATE INDEX idx_agm_user ON assignment_group_members(user_id);
 
 -- ============================================================
--- 10. ASSIGNMENT GROUP ROLE MAPPINGS (many-to-many)
+-- ASSIGNMENT GROUP ROLE MAPPINGS
 -- ============================================================
 CREATE TABLE assignment_group_roles (
   id        uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -335,7 +335,7 @@ CREATE INDEX idx_agr_group ON assignment_group_roles(group_id);
 CREATE INDEX idx_agr_role ON assignment_group_roles(role_id);
 
 -- ============================================================
--- 11. ASSIGNMENT GROUP PROCESSES (many-to-many)
+-- ASSIGNMENT GROUP PROCESSES
 -- ============================================================
 CREATE TABLE assignment_group_processes (
   id         uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -349,7 +349,7 @@ CREATE INDEX idx_agp_group ON assignment_group_processes(group_id);
 CREATE INDEX idx_agp_process ON assignment_group_processes(process_id);
 
 -- ============================================================
--- 12. SERVICE CATALOG – Categories
+-- SERVICE CATALOG CATEGORIES
 -- ============================================================
 CREATE TABLE service_categories (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -366,7 +366,7 @@ CREATE TABLE service_categories (
 CREATE INDEX idx_service_categories_tenant ON service_categories(tenant_id);
 
 -- ============================================================
--- 8. SERVICE CATALOG – Items
+-- SERVICE CATALOG ITEMS
 -- ============================================================
 CREATE TABLE service_items (
   id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -393,7 +393,7 @@ CREATE INDEX idx_service_items_custom_attributes_gin ON service_items USING gin 
 CREATE INDEX idx_service_items_form_schema_gin ON service_items USING gin (form_schema);
 
 -- ============================================================
--- 9A. CARTS (RLS-isolated per user)
+-- CARTS
 -- ============================================================
 CREATE TABLE carts (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -425,7 +425,7 @@ CREATE INDEX idx_cart_items_cart ON cart_items(cart_id);
 CREATE INDEX idx_cart_items_service_item ON cart_items(service_item_id);
 
 -- ============================================================
--- 9. REQUESTS (User Portal submissions)
+-- REQUESTS
 -- ============================================================
 CREATE TABLE requests (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -464,7 +464,7 @@ CREATE INDEX idx_requests_delivery_info_gin ON requests USING gin (delivery_info
 CREATE SEQUENCE request_number_seq START 1000;
 
 -- ============================================================
--- SERVICES (IT/Business services linked to incidents)
+-- SERVICES
 -- ============================================================
 CREATE TABLE services (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -480,7 +480,7 @@ CREATE TABLE services (
 CREATE INDEX idx_services_tenant ON services(tenant_id);
 
 -- ============================================================
--- 10. INCIDENTS (Fulfiller work items)
+-- INCIDENTS
 -- ============================================================
 CREATE TYPE incident_status_enum AS ENUM (
   'new', 'assigned', 'in_progress', 'pending', 'resolved', 'closed', 'cancelled'
@@ -530,7 +530,7 @@ CREATE INDEX idx_incidents_request ON incidents(request_id);
 CREATE SEQUENCE incident_number_seq START 1000;
 
 -- ============================================================
--- 11. INCIDENT JOURNAL (activity log)
+-- INCIDENT JOURNAL
 -- ============================================================
 CREATE TABLE incident_journal (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -547,7 +547,7 @@ CREATE TABLE incident_journal (
 CREATE INDEX idx_journal_incident ON incident_journal(incident_id);
 
 -- ============================================================
--- 12. CMDB – CI Classes (extensible types)
+-- CMDB CI CLASSES
 -- ============================================================
 CREATE TABLE ci_classes (
   id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -568,7 +568,7 @@ CREATE INDEX idx_ci_classes_tenant ON ci_classes(tenant_id);
 CREATE INDEX idx_ci_classes_attributes_gin ON ci_classes USING gin (attributes);
 
 -- ============================================================
--- 13. CMDB – Configuration Items
+-- CMDB CONFIGURATION ITEMS
 -- ============================================================
 CREATE TYPE ci_status_enum AS ENUM ('active', 'maintenance', 'retired', 'planned');
 
@@ -601,7 +601,7 @@ CREATE INDEX idx_ci_location_id ON configuration_items(tenant_id, location_id);
 CREATE INDEX idx_ci_attributes_gin ON configuration_items USING gin (attributes);
 
 -- ============================================================
--- 14. CMDB – CI Relationships
+-- CMDB CI RELATIONSHIPS
 -- ============================================================
 CREATE TABLE ci_relationships (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -622,7 +622,7 @@ CREATE INDEX idx_ci_rel_source ON ci_relationships(source_ci_id);
 CREATE INDEX idx_ci_rel_target ON ci_relationships(target_ci_id);
 
 -- ============================================================
--- 15. CMDB – CI History (audit trail)
+-- CMDB CI HISTORY
 -- ============================================================
 CREATE TABLE ci_history (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -640,7 +640,7 @@ CREATE INDEX idx_ci_history_ci ON ci_history(ci_id);
 CREATE INDEX idx_ci_history_time ON ci_history(ci_id, created_at DESC);
 
 -- ============================================================
--- 16. PRIORITY MATRIX (Impact x Urgency)
+-- PRIORITY MATRIX
 -- ============================================================
 CREATE TABLE priority_matrix (
   id       uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -663,7 +663,7 @@ INSERT INTO priority_matrix (impact, urgency, priority) VALUES
   ('low',    'low',    5);  -- Planning
 
 -- ============================================================
--- 17. WORKFLOW START JOBS (Durable Temporal start queue)
+-- WORKFLOW START JOBS
 -- ============================================================
 CREATE TABLE workflow_start_jobs (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -697,7 +697,31 @@ CREATE INDEX idx_workflow_start_jobs_tenant
   ON workflow_start_jobs(tenant_id, status, created_at DESC);
 
 -- ============================================================
--- TRIGGERS – auto-update updated_at
+-- AUDIT & OPERATIONAL
+-- ============================================================
+
+CREATE TABLE audit_events (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  actor_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  category      text NOT NULL,
+  action        text NOT NULL,
+  level         text NOT NULL DEFAULT 'info',
+  entity_type   text,
+  entity_id     uuid,
+  metadata      jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_audit_events_tenant_created ON audit_events(tenant_id, created_at DESC);
+CREATE INDEX idx_audit_events_category ON audit_events(tenant_id, category, created_at DESC);
+
+CREATE TABLE worker_heartbeats (
+  worker_name  text PRIMARY KEY,
+  last_seen_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- TRIGGERS AUTO-UPDATE UPDATED_AT
 -- ============================================================
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS trigger AS $$
@@ -730,7 +754,37 @@ END;
 $$;
 
 -- ============================================================
--- FUNCTION – Calculate priority from impact & urgency
+-- ITAM ASSET MANAGEMENT
+-- ============================================================
+
+CREATE TABLE assets (
+  id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id             uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  asset_tag             text NOT NULL,
+  name                  text NOT NULL,
+  category              text NOT NULL DEFAULT 'hardware',
+  status                text NOT NULL DEFAULT 'in_use',
+  owner_user_id         uuid REFERENCES users(id) ON DELETE SET NULL,
+  linked_ci_id          uuid REFERENCES configuration_items(id) ON DELETE SET NULL,
+  vendor_name           text,
+  purchase_cost         numeric(12,2),
+  purchase_currency     text NOT NULL DEFAULT 'USD',
+  purchase_date         date,
+  warranty_expires_at   date,
+  contract_ref          text,
+  depreciation_months   integer,
+  notes                 text,
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, asset_tag)
+);
+CREATE INDEX idx_assets_tenant_status ON assets(tenant_id, status, category);
+CREATE TRIGGER trg_assets_updated_at
+  BEFORE UPDATE ON assets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
+-- FUNCTION CALCULATE PRIORITY
 -- ============================================================
 CREATE OR REPLACE FUNCTION calculate_priority(p_impact text, p_urgency text)
 RETURNS integer AS $$
@@ -739,7 +793,7 @@ RETURNS integer AS $$
 $$ LANGUAGE sql STABLE;
 
 -- ============================================================
--- FUNCTION – CMDB Impact Analysis (recursive blast radius)
+-- FUNCTION CMDB IMPACT ANALYSIS
 -- ============================================================
 CREATE OR REPLACE FUNCTION cmdb_impact_analysis(p_ci_id uuid, p_depth integer DEFAULT 5)
 RETURNS TABLE(
@@ -779,7 +833,7 @@ ORDER BY impact.ci_id, impact.depth;
 $$ LANGUAGE sql STABLE;
 
 -- ============================================================
--- SEED DATA – Demo tenant, users, catalog, CMDB
+-- SEED DATA
 -- ============================================================
 
 -- Demo tenant
@@ -876,7 +930,7 @@ INSERT INTO companies (
   true
 );
 
--- Demo users (passwords: admin123 – bcrypt hash)
+-- Demo users (passwords: admin123 - bcrypt hash)
 INSERT INTO users (
   id, tenant_id, user_id, email, password_hash,
   first_name, last_name, display_name, title,
@@ -1121,7 +1175,7 @@ INSERT INTO service_items (id, tenant_id, category_id, name, short_description, 
    ]}',
    true, 24);
 
--- CMDB – CI Classes
+-- CMDB CI CLASSES (SEED)
 INSERT INTO ci_classes (id, tenant_id, name, display_name, description, attributes, icon) VALUES
   ('e0000000-0000-0000-0000-000000000001',
    'a0000000-0000-0000-0000-000000000001',
@@ -1149,7 +1203,7 @@ INSERT INTO ci_classes (id, tenant_id, name, display_name, description, attribut
    '{"asset_tag": {"type": "string"}, "serial_number": {"type": "string"}, "os": {"type": "string"}, "procurement_order_id": {"type": "string"}}',
    'laptop');
 
--- CMDB – Configuration Items (sample infrastructure)
+-- CMDB CONFIGURATION ITEMS (SEED)
 INSERT INTO configuration_items (id, tenant_id, class_id, name, display_name, status, environment, attributes) VALUES
   ('f0000000-0000-0000-0000-000000000001',
    'a0000000-0000-0000-0000-000000000001',
@@ -1177,7 +1231,7 @@ INSERT INTO configuration_items (id, tenant_id, class_id, name, display_name, st
    'fw-prod-01', 'Production Firewall', 'active', 'production',
    '{"device_type": "firewall", "ip_address": "10.0.0.1", "firmware_version": "7.4.1"}');
 
--- CMDB – Relationships
+-- CMDB RELATIONSHIPS (SEED)
 INSERT INTO ci_relationships (tenant_id, source_ci_id, target_ci_id, relationship_type) VALUES
   -- Nova API runs on web servers
   ('a0000000-0000-0000-0000-000000000001',
@@ -1194,7 +1248,7 @@ INSERT INTO ci_relationships (tenant_id, source_ci_id, target_ci_id, relationshi
    'f0000000-0000-0000-0000-000000000002', 'f0000000-0000-0000-0000-000000000005', 'connected_to');
 
 -- ============================================================
--- DEFERRED FOREIGN KEYS (cross-section references)
+-- DEFERRED FOREIGN KEYS
 -- ============================================================
 ALTER TABLE incidents
   ADD CONSTRAINT fk_incidents_ci
@@ -1455,7 +1509,7 @@ CREATE TABLE attachments (
 CREATE INDEX idx_attachments_entity ON attachments(entity_type, entity_id);
 
 -- ============================================================
--- SLA DEFINITIONS (configurable SLA policies)
+-- SLA DEFINITIONS
 -- ============================================================
 
 CREATE TABLE sla_definitions (
@@ -1464,7 +1518,7 @@ CREATE TABLE sla_definitions (
   name            text NOT NULL,
   description     text,
   process_type    text NOT NULL DEFAULT 'incident'
-                  CHECK (process_type IN ('incident', 'request', 'task')),
+                  CHECK (process_type IN ('incident', 'request', 'task', 'problem', 'change')),
   -- Trigger conditions (when does this SLA apply?)
   condition_priority   integer CHECK (condition_priority BETWEEN 1 AND 5),
   condition_impact     text CHECK (condition_impact IN ('low', 'medium', 'high')),
@@ -1481,10 +1535,10 @@ CREATE TABLE sla_definitions (
   on_warning           jsonb NOT NULL DEFAULT '[]',
   on_breach            jsonb NOT NULL DEFAULT '[]',
   -- Metadata
-  is_active       boolean NOT NULL DEFAULT true,
-  sort_order       integer NOT NULL DEFAULT 100,
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now()
+  is_active            boolean NOT NULL DEFAULT true,
+  sort_order           integer NOT NULL DEFAULT 100,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_at           timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_sla_definitions_tenant ON sla_definitions(tenant_id, process_type, is_active);
@@ -1529,7 +1583,7 @@ INSERT INTO sla_definitions (tenant_id, name, description, process_type, conditi
    50);
 
 -- ============================================================
--- TENANT CREDENTIALS (encrypted mini-vault; secret at rest via pgp_sym_encrypt)
+-- TENANT CREDENTIALS
 -- ============================================================
 
 CREATE TABLE tenant_credentials (
@@ -1555,7 +1609,7 @@ CREATE TRIGGER trg_tenant_credentials_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================
--- DATA SOURCES (scheduled imports via Temporal)
+-- DATA SOURCES
 -- ============================================================
 
 CREATE TABLE data_sources (
@@ -1612,7 +1666,23 @@ CREATE INDEX idx_data_source_runs_error_samples_gin ON data_source_runs USING gi
 CREATE INDEX idx_data_source_runs_run_meta_gin ON data_source_runs USING gin (run_meta);
 
 -- ============================================================
--- TENANT SETTINGS (theming, branding)
+-- REPORTING EXPORTS
+-- ============================================================
+
+CREATE TABLE report_exports (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  created_by    uuid REFERENCES users(id) ON DELETE SET NULL,
+  report_key    text NOT NULL,
+  status        text NOT NULL DEFAULT 'completed',
+  row_count     integer NOT NULL DEFAULT 0,
+  generated_at  timestamptz NOT NULL DEFAULT now(),
+  payload       jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX idx_report_exports_tenant ON report_exports(tenant_id, generated_at DESC);
+
+-- ============================================================
+-- TENANT SETTINGS
 -- ============================================================
 
 CREATE TABLE tenant_settings (
@@ -1775,6 +1845,8 @@ CREATE TABLE problems (
   assignment_group_id uuid REFERENCES assignment_groups(id) ON DELETE SET NULL,
   affected_ci         uuid REFERENCES configuration_items(id) ON DELETE SET NULL,
   resolution_notes    text,
+  sla_due_at          timestamptz,
+  sla_breached        boolean NOT NULL DEFAULT false,
   resolved_at         timestamptz,
   resolved_by         uuid REFERENCES users(id) ON DELETE SET NULL,
   closed_at           timestamptz,
@@ -1791,6 +1863,7 @@ CREATE INDEX idx_problems_affected_ci ON problems(tenant_id, affected_ci);
 CREATE INDEX idx_problems_search_title ON problems USING gin (title gin_trgm_ops);
 CREATE INDEX idx_problems_search_desc ON problems USING gin (description gin_trgm_ops);
 CREATE INDEX idx_problems_search_number ON problems USING gin (number gin_trgm_ops);
+CREATE INDEX idx_problems_sla_due_at ON problems(tenant_id, sla_due_at) WHERE sla_due_at IS NOT NULL;
 
 CREATE TABLE problem_incidents (
   id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1995,6 +2068,8 @@ CREATE TABLE changes (
   business_justification    text,
   estimated_cost            numeric(12,2),
   review_notes              text,
+  sla_due_at                timestamptz,
+  sla_breached              boolean NOT NULL DEFAULT false,
   conflict_summary          jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at                timestamptz NOT NULL DEFAULT now(),
   updated_at                timestamptz NOT NULL DEFAULT now(),
@@ -2078,6 +2153,7 @@ CREATE INDEX idx_changes_related_problem ON changes(tenant_id, related_problem_i
 CREATE INDEX idx_changes_search_number ON changes USING gin (number gin_trgm_ops);
 CREATE INDEX idx_changes_search_title ON changes USING gin (title gin_trgm_ops);
 CREATE INDEX idx_changes_search_desc ON changes USING gin (description gin_trgm_ops);
+CREATE INDEX idx_changes_sla_due_at ON changes(tenant_id, sla_due_at) WHERE sla_due_at IS NOT NULL;
 CREATE INDEX idx_changes_conflict_summary_gin ON changes USING gin (conflict_summary);
 CREATE INDEX idx_change_approvals_change ON change_approvals(tenant_id, change_id, status);
 CREATE INDEX idx_change_approvals_approver_user ON change_approvals(tenant_id, approver_user_id, status);
@@ -2111,6 +2187,35 @@ CREATE TRIGGER trg_change_blackouts_updated_at
 
 CREATE TRIGGER trg_cab_meetings_updated_at
   BEFORE UPDATE ON cab_meetings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
+-- RELEASE MANAGEMENT
+-- ============================================================
+
+CREATE TABLE releases (
+  id                      uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id               uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  number                  text NOT NULL,
+  title                   text NOT NULL,
+  description             text,
+  status                  text NOT NULL DEFAULT 'planned',
+  release_type            text NOT NULL DEFAULT 'minor',
+  risk_level              text NOT NULL DEFAULT 'medium',
+  planned_start           timestamptz,
+  planned_end             timestamptz,
+  deployed_at             timestamptz,
+  owner_user_id           uuid REFERENCES users(id) ON DELETE SET NULL,
+  change_id               uuid REFERENCES changes(id) ON DELETE SET NULL,
+  validation_notes        text,
+  rollback_plan           text,
+  created_at              timestamptz NOT NULL DEFAULT now(),
+  updated_at              timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, number)
+);
+CREATE INDEX idx_releases_tenant_status ON releases(tenant_id, status, planned_start);
+CREATE TRIGGER trg_releases_updated_at
+  BEFORE UPDATE ON releases
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- Seed change types
@@ -2236,7 +2341,7 @@ INSERT INTO knowledge_categories (tenant_id, name, description) VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Incidents', 'Known issues, troubleshooting and workarounds'),
   ('a0000000-0000-0000-0000-000000000001', 'Services', 'Service-specific procedures and FAQs');
 
--- ─── Notifications ───────────────────────────────────────────
+-- NOTIFICATIONS
 CREATE TABLE notifications (
   id          uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id   uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -2350,7 +2455,7 @@ INSERT INTO notification_rule_templates (
 SELECT tenant_id, id, 'en', title_template, body_template
 FROM notification_rules;
 
--- ─── Workflow Builder Definitions ────────────────────────────
+-- WORKFLOW BUILDER DEFINITIONS
 CREATE TABLE workflow_definitions (
   id                   uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id            uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -2376,7 +2481,7 @@ CREATE TRIGGER trg_workflow_definitions_updated_at
   BEFORE UPDATE ON workflow_definitions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- ─── Active-state sync helpers for reporting ────────────────
+-- ACTIVE-STATE SYNC HELPERS FOR REPORTING
 CREATE OR REPLACE FUNCTION sync_is_active_from_status()
 RETURNS trigger AS $$
 BEGIN
@@ -2461,5 +2566,5 @@ UPDATE request_tasks SET is_active = (status::text <> 'completed');
 UPDATE requests SET is_active = (status::text NOT IN ('fulfilled', 'cancelled'));
 
 -- ============================================================
--- DONE – Schema ready
+-- DONE SCHEMA READY
 -- ============================================================

@@ -45,6 +45,10 @@ ALTER TABLE change_blackouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE report_exports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
@@ -280,6 +284,22 @@ CREATE POLICY workflow_start_jobs_tenant_or_system_policy ON workflow_start_jobs
   USING (tenant_id = current_tenant_id() OR current_user_has_role('system'))
   WITH CHECK (tenant_id = current_tenant_id() OR current_user_has_role('system'));
 
+-- ─── Audit Events ───
+CREATE POLICY tenant_isolation_audit_events ON audit_events
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Assets ───
+CREATE POLICY tenant_isolation_assets ON assets
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Releases ───
+CREATE POLICY tenant_isolation_releases ON releases
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Report Exports ───
+CREATE POLICY tenant_isolation_report_exports ON report_exports
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── SLA Definitions ───
 CREATE POLICY tenant_isolation_sla_definitions ON sla_definitions
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -416,6 +436,10 @@ ALTER TABLE change_blackouts FORCE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs FORCE ROW LEVEL SECURITY;
+ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE assets FORCE ROW LEVEL SECURITY;
+ALTER TABLE releases FORCE ROW LEVEL SECURITY;
+ALTER TABLE report_exports FORCE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;
