@@ -16,6 +16,15 @@ async function getClient(): Promise<Client> {
   return client;
 }
 
+export async function checkTemporalHealth(): Promise<boolean> {
+  try {
+    await getClient();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function startIncidentEscalation(params: {
   incidentId: string;
   tenantId: string;

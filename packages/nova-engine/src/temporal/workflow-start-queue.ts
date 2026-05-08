@@ -585,3 +585,13 @@ export function stopWorkflowStartQueueDispatcher(): void {
   dispatcherTimer = null;
 }
 
+export async function getWorkflowStartQueueStats(): Promise<{ pending: number; failed: number }> {
+  const rows = await systemQuery<{ pending: number; failed: number }>(
+    `SELECT
+       count(*) FILTER (WHERE status = 'pending')::int AS pending,
+       count(*) FILTER (WHERE status = 'failed')::int AS failed
+     FROM workflow_start_jobs`,
+  );
+  return rows.rows[0] || { pending: 0, failed: 0 };
+}
+
