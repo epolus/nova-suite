@@ -200,6 +200,12 @@ nova-suite/
 │   │       │   ├── cmdb/         # CMDB list + detail + form
 │   │       │   └── admin/        # All admin pages
 │   │       └── context/          # Auth context
+│   ├── nova-shared/              # Shared contracts and workflow schema
+│   │   └── src/
+│   │       ├── index.ts          # Shared package exports
+│   │       ├── automation-config.ts
+│   │       ├── automation-builder-defaults.ts
+│   │       └── automation-fixtures.ts
 │   └── nova-worker/              # Temporal workflow worker
 ├── infra/
 │   ├── postgres/
