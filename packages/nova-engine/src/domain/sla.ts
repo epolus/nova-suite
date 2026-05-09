@@ -9,6 +9,21 @@ type SlaContext = {
   serviceId?: string | null;
 };
 
+/** `sla_definitions.condition_priority` is numeric (incident P1–P5 only). Never bind text priorities (change/problem). */
+function conditionPriorityParam(
+  processType: SlaProcessType,
+  priority: number | string | null | undefined,
+): number | null {
+  if (processType !== 'incident') return null;
+  if (priority == null) return null;
+  if (typeof priority === 'number' && Number.isFinite(priority)) return priority;
+  if (typeof priority === 'string') {
+    const n = Number.parseInt(priority, 10);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 export async function resolveSlaDueAt(
   client: any,
   processType: SlaProcessType,
@@ -28,7 +43,7 @@ export async function resolveSlaDueAt(
      LIMIT 1`,
     [
       processType,
-      context.priority ?? null,
+      conditionPriorityParam(processType, context.priority ?? null),
       context.impact ?? null,
       context.urgency ?? null,
       context.category ?? null,
