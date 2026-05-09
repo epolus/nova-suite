@@ -22,6 +22,22 @@ import {
 import { checkTemporalHealth } from './temporal/workflows';
 import { metricsHandler, metricsMiddleware } from './observability/metrics';
 
+type SchemaRuntimeStatus = {
+  compatible: boolean;
+  expectedVersion: string;
+  actualVersion: string | null;
+  reason: string;
+};
+
+const schemaRuntimeStatus: SchemaRuntimeStatus = {
+  compatible: false,
+  expectedVersion: config.db.expectedSchemaVersion,
+  actualVersion: null,
+  reason: 'not_checked',
+};
+let workflowDispatcherStarted = false;
+let server: ReturnType<typeof app.listen> | null = null;
+
 const app = express();
 app.set('trust proxy', 1);
 
@@ -79,8 +95,9 @@ app.get('/health', async (_req, res) => {
   ).catch(() => ({ last_seen_at: null }));
   const lastSeenAt = workerHeartbeat?.last_seen_at ? new Date(workerHeartbeat.last_seen_at).getTime() : null;
   const workerRecent = lastSeenAt !== null && Date.now() - lastSeenAt < 120_000;
+  const schemaCompatible = schemaRuntimeStatus.compatible;
 
-  const status = dbOk && temporalOk && workerRecent ? 'healthy' : 'degraded';
+  const status = dbOk && temporalOk && workerRecent && schemaCompatible ? 'healthy' : 'degraded';
   res.status(status === 'healthy' ? 200 : 503).json({
     status,
     version: '1.0.0',
@@ -90,6 +107,10 @@ app.get('/health', async (_req, res) => {
       redis: redis.enabled ? (redis.connected ? 'connected' : 'disconnected') : 'disabled',
       temporal: temporalOk ? 'connected' : 'disconnected',
       worker: workerRecent ? 'alive' : 'stale',
+      schema: schemaCompatible ? 'compatible' : 'mismatch',
+      schema_expected_version: schemaRuntimeStatus.expectedVersion,
+      schema_actual_version: schemaRuntimeStatus.actualVersion,
+      schema_reason: schemaRuntimeStatus.reason,
       workflow_start_queue_pending: queueStats.pending,
       workflow_start_queue_failed: queueStats.failed,
     },
@@ -116,34 +137,69 @@ app.use((_req, res) => {
 // ─── Global Error Handler ───
 app.use(errorHandler);
 
-// ─── Start Server ───
-const server = app.listen(config.port, () => {
-  logger.info(
-    {
-      port: config.port,
-      env: config.nodeEnv,
-      docs: `http://localhost:${config.port}/docs`,
-    },
-    'Nova Suite API started',
-  );
-});
+async function bootstrap(): Promise<void> {
+  const schemaCheck = await db.checkSchemaCompatibility(config.db.expectedSchemaVersion);
+  schemaRuntimeStatus.compatible = schemaCheck.ok;
+  schemaRuntimeStatus.expectedVersion = schemaCheck.expectedVersion;
+  schemaRuntimeStatus.actualVersion = schemaCheck.actualVersion;
+  schemaRuntimeStatus.reason = schemaCheck.reason;
 
-startWorkflowStartQueueDispatcher();
+  if (!schemaCheck.ok) {
+    logger.warn(
+      {
+        expectedVersion: schemaCheck.expectedVersion,
+        actualVersion: schemaCheck.actualVersion,
+        reason: schemaCheck.reason,
+        errorCode: schemaCheck.errorCode,
+      },
+      'Database schema version mismatch detected; API will run in degraded mode',
+    );
+  }
+
+  server = app.listen(config.port, () => {
+    logger.info(
+      {
+        port: config.port,
+        env: config.nodeEnv,
+        docs: `http://localhost:${config.port}/docs`,
+      },
+      'Nova Suite API started',
+    );
+  });
+
+  if (schemaCheck.ok) {
+    startWorkflowStartQueueDispatcher();
+    workflowDispatcherStarted = true;
+  } else {
+    logger.warn('Workflow start queue dispatcher disabled due to schema incompatibility');
+  }
+}
 
 // ─── Graceful Shutdown ───
 async function shutdown(signal: string) {
   logger.info({ signal }, 'Shutting down...');
-  stopWorkflowStartQueueDispatcher();
-  server.close(async () => {
+  if (workflowDispatcherStarted) stopWorkflowStartQueueDispatcher();
+  if (server) {
+    server.close(async () => {
+      await cacheShutdown();
+      await db.shutdown();
+      process.exit(0);
+    });
+  } else {
     await cacheShutdown();
     await db.shutdown();
     process.exit(0);
-  });
+  }
   // Force exit after 10s
   setTimeout(() => process.exit(1), 10_000);
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+void bootstrap().catch((err) => {
+  logger.error({ err }, 'Fatal startup error');
+  process.exit(1);
+});
 
 export default app;

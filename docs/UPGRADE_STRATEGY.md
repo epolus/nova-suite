@@ -21,6 +21,32 @@ migrations/
 └── ...
 ```
 
+### Migration Ledger Contract
+
+Nova Suite tracks applied schema versions in a migration ledger table:
+
+```sql
+CREATE TABLE schema_migrations (
+  version     text PRIMARY KEY,
+  name        text NOT NULL,
+  applied_at  timestamptz NOT NULL DEFAULT now()
+);
+```
+
+- Each schema change must insert exactly one new row into `schema_migrations`.
+- The API and worker compare the latest DB `version` with `DB_SCHEMA_VERSION`.
+- Mismatch behavior is degraded mode: API stays up with degraded health, and workflow background execution is gated.
+- Version format is fixed-width semantic style: `vNN.NN.NN` (example baseline: `v00.01.00`).
+- Database-level validation enforces the same version format with a table `CHECK` constraint.
+
+### Version Bump Workflow
+
+1. Add migration SQL (forward-only, backward-compatible when possible).
+2. Insert a new ledger row (`schema_migrations.version = vNN.NN.NN`).
+3. Set `DB_SCHEMA_VERSION=vNN.NN.NN` for `nova-engine` and `nova-worker`.
+4. Deploy migration first, then deploy code.
+5. Verify `/health` and `/api/admin/runtime-health` report schema as `compatible`.
+
 ### Backward-Compatible Changes
 
 **Safe changes (no coordination needed):**

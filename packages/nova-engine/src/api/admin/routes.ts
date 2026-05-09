@@ -5,6 +5,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import { db } from '../../data/db';
+import { config } from '../../config';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { AppError } from '../../middleware/errorHandler';
@@ -118,6 +119,7 @@ router.get('/audit-events', async (req: Request, res: Response, next: NextFuncti
 
 router.get('/runtime-health', async (_req: Request, res: Response) => {
   const dbOk = await db.healthCheck();
+  const schema = await db.checkSchemaCompatibility(config.db.expectedSchemaVersion);
   const redis = cacheMetrics() as { connected?: boolean; enabled?: boolean };
   const temporalOk = await checkTemporalHealth(2000);
   const queueStats = await getWorkflowStartQueueStats().catch(() => ({ pending: 0, failed: 0 }));
@@ -126,7 +128,7 @@ router.get('/runtime-health', async (_req: Request, res: Response) => {
   ).catch(() => ({ last_seen_at: null }));
   const lastSeenAt = workerHeartbeat?.last_seen_at ? new Date(workerHeartbeat.last_seen_at).getTime() : null;
   const workerRecent = lastSeenAt !== null && Date.now() - lastSeenAt < 120_000;
-  const status = dbOk && temporalOk && workerRecent ? 'healthy' : 'degraded';
+  const status = dbOk && temporalOk && workerRecent && schema.ok ? 'healthy' : 'degraded';
 
   // Always return 200 for admin UI to avoid noisy browser fetch errors;
   // operational probes should continue using /health which returns 503 when degraded.
@@ -136,6 +138,10 @@ router.get('/runtime-health', async (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     checks: {
       database: dbOk ? 'connected' : 'disconnected',
+      schema: schema.ok ? 'compatible' : 'mismatch',
+      schema_expected_version: schema.expectedVersion,
+      schema_actual_version: schema.actualVersion,
+      schema_reason: schema.reason,
       redis: redis.enabled ? (redis.connected ? 'connected' : 'disconnected') : 'disabled',
       temporal: temporalOk ? 'connected' : 'disconnected',
       worker: workerRecent ? 'alive' : 'stale',

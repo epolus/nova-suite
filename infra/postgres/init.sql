@@ -720,6 +720,15 @@ CREATE TABLE worker_heartbeats (
   last_seen_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE schema_migrations (
+  version     text PRIMARY KEY CHECK (version ~ '^v[0-9]{2}[.][0-9]{2}[.][0-9]{2}$'),
+  name        text NOT NULL,
+  applied_at  timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO schema_migrations (version, name) VALUES
+  ('v00.01.00', '001_initial_schema');
+
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
 -- ============================================================

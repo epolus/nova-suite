@@ -37,6 +37,7 @@ export const config = {
     database: env('POSTGRES_DB', 'nova'),
     user: env('POSTGRES_USER', 'nova_app'),
     password: env('POSTGRES_PASSWORD', 'changeme'),
+    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.00'),
   },
 
   jwt: {

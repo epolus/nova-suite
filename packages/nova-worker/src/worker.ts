@@ -2,9 +2,17 @@
 import { NativeConnection, Worker } from '@temporalio/worker';
 import * as activities from './activities';
 import { config } from './config';
-import { heartbeat, shutdown as dbShutdown } from './db';
+import { checkSchemaCompatibility, heartbeat, shutdown as dbShutdown } from './db';
 
 async function run() {
+  const schemaCheck = await checkSchemaCompatibility(config.db.expectedSchemaVersion);
+  if (!schemaCheck.ok) {
+    console.warn(
+      `[nova-worker] Schema mismatch (expected=${schemaCheck.expectedVersion}, actual=${schemaCheck.actualVersion}, reason=${schemaCheck.reason}). Worker execution disabled.`,
+    );
+    return;
+  }
+
   console.log(`[nova-worker] Connecting to Temporal at ${config.temporal.address}...`);
 
   const connection = await NativeConnection.connect({
