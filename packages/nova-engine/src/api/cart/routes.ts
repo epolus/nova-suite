@@ -10,8 +10,6 @@ import { z } from 'zod';
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
 
-type Priority = 'low' | 'medium' | 'high' | 'critical';
-
 const cartItemSchema = z.object({
   service_item_id: z.string().uuid(),
   form_data: z.record(z.unknown()).optional(),
@@ -106,7 +104,7 @@ router.post('/items', validateBody(cartItemSchema), async (req: Request, res: Re
       return;
     }
 
-    const inserted = await client.query(
+    await client.query(
       `
       WITH upsert_cart AS (
         INSERT INTO carts (tenant_id, user_id)

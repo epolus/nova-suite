@@ -28,20 +28,18 @@ const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
 
 const CHANGE_PROCESS_NAME = 'Change Management';
-const CHANGE_TRANSITION_ACTIONS = [
-  'submit_assessment',
-  'request_approval',
-  'approve',
-  'reject',
-  'start_planning',
-  'schedule',
-  'start_implementation',
-  'mark_implemented',
-  'start_review',
-  'close',
-  'cancel',
-] as const;
-type ChangeTransitionAction = (typeof CHANGE_TRANSITION_ACTIONS)[number];
+type ChangeTransitionAction =
+  | 'submit_assessment'
+  | 'request_approval'
+  | 'approve'
+  | 'reject'
+  | 'start_planning'
+  | 'schedule'
+  | 'start_implementation'
+  | 'mark_implemented'
+  | 'start_review'
+  | 'close'
+  | 'cancel';
 
 async function isChangeEnabledGroup(client: any, groupId: string): Promise<boolean> {
   const row = await client.query(

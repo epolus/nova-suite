@@ -5,7 +5,6 @@ import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
 import bcrypt from 'bcrypt';
 import { authenticate, requireRole, setTenantRLS, releaseTenantClient, getRequestClient } from '../../middleware/auth';
-import { db } from '../../data/db';
 import { ENTITY_DEFS, suggestMapping } from './entity-defs';
 import type { FieldDef } from './entity-defs';
 

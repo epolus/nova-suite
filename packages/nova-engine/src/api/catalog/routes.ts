@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { db } from '../../data/db';
 import { authenticate, requireRole, getRequestClient, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
-import { createCategorySchema, createServiceItemSchema, updateServiceItemSchema } from '../../domain/schemas';
+import { createCategorySchema, createServiceItemSchema } from '../../domain/schemas';
 import { NotFound, BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
 import {
