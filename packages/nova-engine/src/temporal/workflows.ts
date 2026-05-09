@@ -8,6 +8,25 @@ const TASK_QUEUE = config.temporal.taskQueue;
 let connection: Connection | null = null;
 let client: Client | null = null;
 
+function resetTemporalClientCache(): void {
+  connection = null;
+  client = null;
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: NodeJS.Timeout | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Temporal health check timed out')), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function getClient(): Promise<Client> {
   if (!client) {
     connection = await Connection.connect({ address: config.temporal.address });
@@ -16,11 +35,16 @@ async function getClient(): Promise<Client> {
   return client;
 }
 
-export async function checkTemporalHealth(): Promise<boolean> {
+export async function checkTemporalHealth(timeoutMs = 2000): Promise<boolean> {
   try {
-    await getClient();
+    const cl = await getClient();
+    await withTimeout(
+      cl.connection.workflowService.describeNamespace({ namespace: config.temporal.namespace }),
+      timeoutMs,
+    );
     return true;
   } catch {
+    resetTemporalClientCache();
     return false;
   }
 }

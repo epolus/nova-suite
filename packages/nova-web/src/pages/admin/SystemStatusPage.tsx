@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useMemo, useState } from 'react';
-import { admin as adminApi, settings as settingsApi, type AuditEvent, type CacheMetrics } from '../../api/client';
+import { admin as adminApi, settings as settingsApi, type AuditEvent, type CacheMetrics, type RuntimeHealth } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import { formatDateTime } from '../../utils/dateTime';
@@ -12,7 +12,7 @@ export default function SystemStatusPage() {
   const [resetting, setResetting] = useState(false);
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
-  const [runtimeHealth, setRuntimeHealth] = useState<Record<string, unknown> | null>(null);
+  const [runtimeHealth, setRuntimeHealth] = useState<RuntimeHealth | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -21,7 +21,7 @@ export default function SystemStatusPage() {
         const [res, audit, healthResp] = await Promise.all([
           settingsApi.cacheMetrics(),
           adminApi.auditEvents(20),
-          fetch('/health').then(async (r) => (r.ok ? r.json() : null)).catch(() => null),
+          adminApi.runtimeHealth().catch(() => null),
         ]);
         if (!alive) return;
         setMetrics(res.cache);

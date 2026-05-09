@@ -2,6 +2,7 @@
 import { db } from '../data/db';
 import { logger } from '../logger';
 import {
+  checkTemporalHealth,
   startCatalogFulfillment,
   startDataSourceSync,
   startIncidentAutoClose,
@@ -189,6 +190,25 @@ async function recoverStaleProcessingJobs(): Promise<void> {
   );
 }
 
+async function fastForwardConnectivityRetriesIfRecovered(): Promise<void> {
+  const temporalHealthy = await checkTemporalHealth(1000).catch(() => false);
+  if (!temporalHealthy) return;
+
+  await systemQuery(
+    `UPDATE workflow_start_jobs
+     SET next_attempt_at = now(),
+         updated_at = now()
+     WHERE status = 'pending'
+       AND next_attempt_at > now()
+       AND (
+         COALESCE(last_error, '') ILIKE '%temporal%'
+         OR COALESCE(last_error, '') ILIKE '%connect%'
+         OR COALESCE(last_error, '') ILIKE '%deadline%'
+         OR COALESCE(last_error, '') ILIKE '%unavailable%'
+       )`,
+  );
+}
+
 async function claimDueJobs(limit: number): Promise<WorkflowStartJobRow[]> {
   const result = await systemQuery<WorkflowStartJobRow>(
     `WITH due AS (
@@ -356,6 +376,7 @@ async function drainWorkflowStartQueue(): Promise<void> {
   dispatcherRunning = true;
   try {
     await recoverStaleProcessingJobs();
+    await fastForwardConnectivityRetriesIfRecovered();
     const jobs = await claimDueJobs(DEFAULT_BATCH_SIZE);
     if (jobs.length === 0) return;
 

@@ -100,6 +100,13 @@ export interface CacheMetrics {
   lastErrorMessage: string | null;
 }
 
+export interface RuntimeHealth {
+  status: string;
+  version: string;
+  timestamp: string;
+  checks: Record<string, unknown>;
+}
+
 export const settings = {
   theme: () => request<{ settings: ThemeSettings }>('/settings/theme'),
   get: () => request<{ settings: ThemeSettings }>('/settings'),
@@ -543,6 +550,8 @@ export const admin = {
     }),
   auditEvents: (limit = 200) =>
     request<{ events: AuditEvent[] }>(`/admin/audit-events?limit=${limit}`),
+  runtimeHealth: () =>
+    request<RuntimeHealth>('/admin/runtime-health'),
 };
 
 // ─── CMDB ───

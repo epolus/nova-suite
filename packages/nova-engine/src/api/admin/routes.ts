@@ -8,9 +8,11 @@ import { db } from '../../data/db';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { AppError } from '../../middleware/errorHandler';
-import { startNotificationDispatch } from '../../temporal/workflows';
+import { checkTemporalHealth, startNotificationDispatch } from '../../temporal/workflows';
+import { getWorkflowStartQueueStats } from '../../temporal/workflow-start-queue';
 import { adminCreateUserSchema, adminUpdateUserSchema } from '../../domain/schemas';
 import { recordAuditEvent } from '../../audit/events';
+import { cacheMetrics } from '../../cache/redis';
 
 const router = Router();
 
@@ -112,6 +114,35 @@ router.get('/audit-events', async (req: Request, res: Response, next: NextFuncti
   } catch (err) {
     next(err);
   }
+});
+
+router.get('/runtime-health', async (_req: Request, res: Response) => {
+  const dbOk = await db.healthCheck();
+  const redis = cacheMetrics() as { connected?: boolean; enabled?: boolean };
+  const temporalOk = await checkTemporalHealth(2000);
+  const queueStats = await getWorkflowStartQueueStats().catch(() => ({ pending: 0, failed: 0 }));
+  const workerHeartbeat = await db.getOne<{ last_seen_at: string | null }>(
+    'SELECT max(last_seen_at) AS last_seen_at FROM worker_heartbeats',
+  ).catch(() => ({ last_seen_at: null }));
+  const lastSeenAt = workerHeartbeat?.last_seen_at ? new Date(workerHeartbeat.last_seen_at).getTime() : null;
+  const workerRecent = lastSeenAt !== null && Date.now() - lastSeenAt < 120_000;
+  const status = dbOk && temporalOk && workerRecent ? 'healthy' : 'degraded';
+
+  // Always return 200 for admin UI to avoid noisy browser fetch errors;
+  // operational probes should continue using /health which returns 503 when degraded.
+  res.json({
+    status,
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    checks: {
+      database: dbOk ? 'connected' : 'disconnected',
+      redis: redis.enabled ? (redis.connected ? 'connected' : 'disconnected') : 'disabled',
+      temporal: temporalOk ? 'connected' : 'disconnected',
+      worker: workerRecent ? 'alive' : 'stale',
+      workflow_start_queue_pending: queueStats.pending,
+      workflow_start_queue_failed: queueStats.failed,
+    },
+  });
 });
 
 // ════════════════════════════════════════════

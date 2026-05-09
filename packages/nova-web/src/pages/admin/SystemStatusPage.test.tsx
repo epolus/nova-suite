@@ -6,6 +6,7 @@ import SystemStatusPage from './SystemStatusPage';
 const mockCacheMetrics = vi.fn();
 const mockResetCacheMetrics = vi.fn();
 const mockAuditEvents = vi.fn();
+const mockRuntimeHealth = vi.fn();
 
 vi.mock('../../api/client', () => ({
   settings: {
@@ -14,6 +15,7 @@ vi.mock('../../api/client', () => ({
   },
   admin: {
     auditEvents: (...args: unknown[]) => mockAuditEvents(...args),
+    runtimeHealth: (...args: unknown[]) => mockRuntimeHealth(...args),
   },
 }));
 
@@ -22,15 +24,9 @@ describe('SystemStatusPage', () => {
     mockCacheMetrics.mockReset();
     mockResetCacheMetrics.mockReset();
     mockAuditEvents.mockReset();
+    mockRuntimeHealth.mockReset();
     mockAuditEvents.mockResolvedValue({ events: [] });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ status: 'healthy', checks: { database: 'connected' } }),
-    }));
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
+    mockRuntimeHealth.mockResolvedValue({ status: 'healthy', checks: { database: 'connected' } });
   });
 
   it('renders cache metrics loaded from API', async () => {
@@ -114,5 +110,41 @@ describe('SystemStatusPage', () => {
     await waitFor(() => expect(mockResetCacheMetrics).toHaveBeenCalledTimes(1));
     expect(await screen.findByText('Cache metrics reset.')).toBeInTheDocument();
     expect(await screen.findByText('0 / 0')).toBeInTheDocument();
+  });
+
+  it('renders runtime health payload even when /health returns 503', async () => {
+    mockCacheMetrics.mockResolvedValue({
+      cache: {
+        enabled: true,
+        connected: true,
+        url: 'redis://redis:6379',
+        defaultTtlSeconds: 300,
+        getHits: 1,
+        getMisses: 0,
+        getErrors: 0,
+        setOps: 0,
+        setErrors: 0,
+        delOps: 0,
+        delErrors: 0,
+        totalGets: 1,
+        hitRatio: 1,
+        lastErrorAt: null,
+        lastErrorMessage: null,
+      },
+    });
+    mockAuditEvents.mockResolvedValue({ events: [] });
+    mockRuntimeHealth.mockResolvedValue({
+      status: 'degraded',
+      checks: {
+        temporal: 'disconnected',
+        database: 'connected',
+      },
+    });
+
+    render(<SystemStatusPage />);
+
+    expect(await screen.findByText('Runtime health')).toBeInTheDocument();
+    expect(await screen.findByText('degraded')).toBeInTheDocument();
+    expect(await screen.findByText(/disconnected/)).toBeInTheDocument();
   });
 });
