@@ -16,6 +16,71 @@ import { recordAuditEvent } from '../../audit/events';
 import { cacheMetrics } from '../../cache/redis';
 
 const router = Router();
+const processStartedAtMs = Date.now();
+
+type StatusLevel = 'healthy' | 'warning' | 'critical' | 'unknown';
+
+type SystemMetricsResponse = {
+  timestamp: string;
+  database: {
+    totalBytes: number | null;
+    growthBytes24h: number | null;
+    growthBytes7d: number | null;
+    topTables: Array<{ table: string; bytes: number }>;
+    p50QueryMs: number | null;
+    p95QueryMs: number | null;
+    slowQueriesPerMin: number | null;
+    activeConnections: number | null;
+    maxConnections: number | null;
+    connectionUsagePct: number | null;
+    status: StatusLevel;
+    lastUpdatedAt: string;
+  };
+  api: {
+    p50Ms: number | null;
+    p95Ms: number | null;
+    p99Ms: number | null;
+    rpm: number | null;
+    errorRate5xxPct: number | null;
+    errorRate4xxPct: number | null;
+    status: StatusLevel;
+    sourceWindowMinutes: number;
+    lastUpdatedAt: string;
+  };
+  queue: {
+    backlog: number;
+    failed24h: number | null;
+    oldestQueuedAgeSec: number | null;
+    status: StatusLevel;
+    lastUpdatedAt: string;
+  };
+  runtime: {
+    uptimeSec: number;
+    version: string;
+    appStatus: 'healthy' | 'degraded';
+    dbStatus: 'connected' | 'disconnected';
+    redisStatus: 'connected' | 'disconnected' | 'disabled';
+    temporalStatus: 'connected' | 'disconnected';
+    workerStatus: 'alive' | 'stale';
+    schemaStatus: 'compatible' | 'mismatch';
+    lastDeployAt: string | null;
+    lastUpdatedAt: string;
+  };
+};
+
+function statusFromThresholds(value: number | null, warningAt: number, criticalAt: number): StatusLevel {
+  if (value == null || !Number.isFinite(value)) return 'unknown';
+  if (value >= criticalAt) return 'critical';
+  if (value >= warningAt) return 'warning';
+  return 'healthy';
+}
+
+function maxStatus(...statuses: StatusLevel[]): StatusLevel {
+  if (statuses.includes('critical')) return 'critical';
+  if (statuses.includes('warning')) return 'warning';
+  if (statuses.includes('healthy')) return 'healthy';
+  return 'unknown';
+}
 
 async function listAssignmentGroupsForTenant(tenantId: string) {
   return db.getMany(
@@ -149,6 +214,202 @@ router.get('/runtime-health', async (_req: Request, res: Response) => {
       workflow_start_queue_failed: queueStats.failed,
     },
   });
+});
+
+router.get('/system-metrics', async (req: Request, res: Response) => {
+  const nowIso = new Date().toISOString();
+  const tenantId = req.user!.tenant_id;
+  const dbOk = await db.healthCheck();
+  const schema = await db.checkSchemaCompatibility(config.db.expectedSchemaVersion);
+  const redis = cacheMetrics() as { connected?: boolean; enabled?: boolean };
+  const temporalOk = await checkTemporalHealth(2000);
+  const queueStats = await getWorkflowStartQueueStats().catch(() => ({ pending: 0, failed: 0 }));
+  const workerHeartbeat = await db.getOne<{ last_seen_at: string | null }>(
+    'SELECT max(last_seen_at) AS last_seen_at FROM worker_heartbeats',
+  ).catch(() => ({ last_seen_at: null }));
+  const lastSeenAt = workerHeartbeat?.last_seen_at ? new Date(workerHeartbeat.last_seen_at).getTime() : null;
+  const workerRecent = lastSeenAt !== null && Date.now() - lastSeenAt < 120_000;
+  const appStatus: 'healthy' | 'degraded' = dbOk && temporalOk && workerRecent && schema.ok ? 'healthy' : 'degraded';
+
+  const dbSize = await db.getOne<{ total_bytes: string }>(
+    'SELECT pg_database_size(current_database())::bigint::text AS total_bytes',
+  ).catch(() => null);
+  const baseline24h = await db.getOne<{ total_bytes: string }>(
+    `SELECT total_bytes::text AS total_bytes
+     FROM system_metrics_db_size_snapshots
+     WHERE tenant_id = $1
+       AND snapshot_at <= now() - interval '24 hours'
+     ORDER BY snapshot_at DESC
+     LIMIT 1`,
+    [tenantId],
+  ).catch(() => null);
+  const baseline7d = await db.getOne<{ total_bytes: string }>(
+    `SELECT total_bytes::text AS total_bytes
+     FROM system_metrics_db_size_snapshots
+     WHERE tenant_id = $1
+       AND snapshot_at <= now() - interval '7 days'
+     ORDER BY snapshot_at DESC
+     LIMIT 1`,
+    [tenantId],
+  ).catch(() => null);
+  const topTables = await db.getMany<{ table_name: string; total_bytes: string }>(
+    `SELECT relname AS table_name, pg_total_relation_size(c.oid)::bigint::text AS total_bytes
+     FROM pg_class c
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE c.relkind = 'r'
+       AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+     ORDER BY pg_total_relation_size(c.oid) DESC
+     LIMIT 5`,
+  ).catch(() => []);
+  const connectionStats = await db.getOne<{ active_connections: string; max_connections: string }>(
+    `SELECT
+       (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database())::text AS active_connections,
+       (SELECT setting FROM pg_settings WHERE name = 'max_connections')::text AS max_connections`,
+  ).catch(() => null);
+  const slowQueryStats = await db.getOne<{ slow_queries_per_min: string | null }>(
+    `SELECT CASE WHEN EXTRACT(EPOCH FROM (now() - stats_reset)) > 0
+            THEN (sum(calls) FILTER (WHERE mean_exec_time >= 500)
+              / (EXTRACT(EPOCH FROM (now() - stats_reset)) / 60.0))
+            ELSE NULL END::text AS slow_queries_per_min
+     FROM pg_stat_statements`,
+  ).catch(() => null);
+  const queryLatencyStats = await db.getOne<{ p50_ms: string | null; p95_ms: string | null }>(
+    `SELECT
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY mean_exec_time)::text AS p50_ms,
+       percentile_cont(0.95) WITHIN GROUP (ORDER BY mean_exec_time)::text AS p95_ms
+     FROM pg_stat_statements
+     WHERE calls > 0`,
+  ).catch(() => null);
+
+  const apiWindowMinutes = 30;
+  const apiStats = await db.getOne<{
+    p50_ms: string | null;
+    p95_ms: string | null;
+    p99_ms: string | null;
+    rpm: string | null;
+    error_rate_5xx_pct: string | null;
+    error_rate_4xx_pct: string | null;
+  }>(
+    `WITH scoped AS (
+       SELECT
+         nullif(ae.metadata->>'duration_ms', '')::double precision AS duration_ms,
+         nullif(ae.metadata->>'status', '')::int AS status_code,
+         ae.created_at
+       FROM audit_events ae
+       WHERE ae.tenant_id = $1::uuid
+         AND ae.created_at >= (now() - interval '${apiWindowMinutes} minutes')
+         AND ae.metadata ? 'duration_ms'
+     )
+     SELECT
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms)::text AS p50_ms,
+       percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)::text AS p95_ms,
+       percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms)::text AS p99_ms,
+       (count(*) / ${apiWindowMinutes}.0)::text AS rpm,
+       (100.0 * count(*) FILTER (WHERE status_code >= 500) / nullif(count(*), 0))::text AS error_rate_5xx_pct,
+       (100.0 * count(*) FILTER (WHERE status_code BETWEEN 400 AND 499) / nullif(count(*), 0))::text AS error_rate_4xx_pct
+     FROM scoped`,
+    [tenantId],
+  ).catch(() => null);
+
+  const failedJobs24h = await db.getOne<{ failed_jobs: string }>(
+    `SELECT count(*)::text AS failed_jobs
+     FROM workflow_start_jobs
+     WHERE status = 'failed'
+       AND updated_at >= now() - interval '24 hours'`,
+  ).catch(() => null);
+  const oldestQueued = await db.getOne<{ oldest_age_sec: string | null }>(
+    `SELECT EXTRACT(EPOCH FROM (now() - min(created_at)))::text AS oldest_age_sec
+     FROM workflow_start_jobs
+     WHERE status = 'pending'`,
+  ).catch(() => null);
+
+  const dbTotalBytes = dbSize?.total_bytes ? Number(dbSize.total_bytes) : null;
+  const growthBytes24h = dbTotalBytes != null && baseline24h?.total_bytes
+    ? dbTotalBytes - Number(baseline24h.total_bytes)
+    : null;
+  const growthBytes7d = dbTotalBytes != null && baseline7d?.total_bytes
+    ? dbTotalBytes - Number(baseline7d.total_bytes)
+    : null;
+  const activeConnections = connectionStats?.active_connections ? Number(connectionStats.active_connections) : null;
+  const maxConnections = connectionStats?.max_connections ? Number(connectionStats.max_connections) : null;
+  const connectionUsagePct = activeConnections != null && maxConnections != null && maxConnections > 0
+    ? (activeConnections / maxConnections) * 100
+    : null;
+  const dbP95 = queryLatencyStats?.p95_ms ? Number(queryLatencyStats.p95_ms) : null;
+  const dbSlowPerMin = slowQueryStats?.slow_queries_per_min ? Number(slowQueryStats.slow_queries_per_min) : null;
+  const dbStatus = maxStatus(
+    statusFromThresholds(connectionUsagePct, 70, 90),
+    statusFromThresholds(dbP95, 300, 800),
+    statusFromThresholds(dbSlowPerMin, 5, 20),
+    dbOk ? 'healthy' : 'critical',
+  );
+
+  const apiP95 = apiStats?.p95_ms ? Number(apiStats.p95_ms) : null;
+  const apiErr5xx = apiStats?.error_rate_5xx_pct ? Number(apiStats.error_rate_5xx_pct) : null;
+  const apiStatus = maxStatus(
+    statusFromThresholds(apiP95, 300, 800),
+    statusFromThresholds(apiErr5xx, 1, 3),
+  );
+
+  const queueBacklog = queueStats.pending;
+  const queueOldestAgeSec = oldestQueued?.oldest_age_sec ? Number(oldestQueued.oldest_age_sec) : null;
+  const queueStatus = maxStatus(
+    statusFromThresholds(queueBacklog, 50, 200),
+    statusFromThresholds(queueOldestAgeSec, 300, 1800),
+  );
+
+  const response: SystemMetricsResponse = {
+    timestamp: nowIso,
+    database: {
+      totalBytes: Number.isFinite(dbTotalBytes) ? dbTotalBytes : null,
+      growthBytes24h: Number.isFinite(growthBytes24h) ? growthBytes24h : null,
+      growthBytes7d: Number.isFinite(growthBytes7d) ? growthBytes7d : null,
+      topTables: topTables.map((row) => ({
+        table: row.table_name,
+        bytes: Number(row.total_bytes) || 0,
+      })),
+      p50QueryMs: queryLatencyStats?.p50_ms ? Number(queryLatencyStats.p50_ms) : null,
+      p95QueryMs: dbP95,
+      slowQueriesPerMin: dbSlowPerMin,
+      activeConnections: Number.isFinite(activeConnections) ? activeConnections : null,
+      maxConnections: Number.isFinite(maxConnections) ? maxConnections : null,
+      connectionUsagePct,
+      status: dbStatus,
+      lastUpdatedAt: nowIso,
+    },
+    api: {
+      p50Ms: apiStats?.p50_ms ? Number(apiStats.p50_ms) : null,
+      p95Ms: apiP95,
+      p99Ms: apiStats?.p99_ms ? Number(apiStats.p99_ms) : null,
+      rpm: apiStats?.rpm ? Number(apiStats.rpm) : null,
+      errorRate5xxPct: apiErr5xx,
+      errorRate4xxPct: apiStats?.error_rate_4xx_pct ? Number(apiStats.error_rate_4xx_pct) : null,
+      status: apiStatus,
+      sourceWindowMinutes: apiWindowMinutes,
+      lastUpdatedAt: nowIso,
+    },
+    queue: {
+      backlog: queueBacklog,
+      failed24h: failedJobs24h?.failed_jobs ? Number(failedJobs24h.failed_jobs) : null,
+      oldestQueuedAgeSec: queueOldestAgeSec,
+      status: queueStatus,
+      lastUpdatedAt: nowIso,
+    },
+    runtime: {
+      uptimeSec: Math.floor((Date.now() - processStartedAtMs) / 1000),
+      version: '1.0.0',
+      appStatus,
+      dbStatus: dbOk ? 'connected' : 'disconnected',
+      redisStatus: redis.enabled ? (redis.connected ? 'connected' : 'disconnected') : 'disabled',
+      temporalStatus: temporalOk ? 'connected' : 'disconnected',
+      workerStatus: workerRecent ? 'alive' : 'stale',
+      schemaStatus: schema.ok ? 'compatible' : 'mismatch',
+      lastDeployAt: null,
+      lastUpdatedAt: nowIso,
+    },
+  };
+
+  res.json(response);
 });
 
 // ════════════════════════════════════════════

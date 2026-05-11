@@ -46,6 +46,7 @@ ALTER TABLE change_conflicts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_metrics_db_size_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_exports ENABLE ROW LEVEL SECURITY;
@@ -288,6 +289,10 @@ CREATE POLICY workflow_start_jobs_tenant_or_system_policy ON workflow_start_jobs
 CREATE POLICY tenant_isolation_audit_events ON audit_events
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── System Metrics DB Size Snapshots ───
+CREATE POLICY tenant_isolation_system_metrics_db_size_snapshots ON system_metrics_db_size_snapshots
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Assets ───
 CREATE POLICY tenant_isolation_assets ON assets
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -437,6 +442,7 @@ ALTER TABLE change_conflicts FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs FORCE ROW LEVEL SECURITY;
 ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE system_metrics_db_size_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE assets FORCE ROW LEVEL SECURITY;
 ALTER TABLE releases FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_exports FORCE ROW LEVEL SECURITY;

@@ -697,6 +697,19 @@ CREATE INDEX idx_workflow_start_jobs_tenant
   ON workflow_start_jobs(tenant_id, status, created_at DESC);
 
 -- ============================================================
+-- SYSTEM METRICS SNAPSHOTS
+-- ============================================================
+CREATE TABLE system_metrics_db_size_snapshots (
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  snapshot_at  timestamptz NOT NULL,
+  total_bytes  bigint NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, snapshot_at)
+);
+CREATE INDEX idx_system_metrics_db_size_snapshots_lookup
+  ON system_metrics_db_size_snapshots(tenant_id, snapshot_at DESC);
+
+-- ============================================================
 -- AUDIT & OPERATIONAL
 -- ============================================================
 

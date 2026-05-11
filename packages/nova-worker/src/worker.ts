@@ -28,7 +28,7 @@ async function run() {
   });
 
   console.log(`[nova-worker] Worker started on task queue "${config.temporal.taskQueue}"`);
-  console.log('[nova-worker] Registered workflows: incidentEscalation, incidentAutoClose, catalogFulfillment, dataSourceSync, knowledgeApproval, notificationDispatch');
+  console.log('[nova-worker] Registered workflows: incidentEscalation, incidentAutoClose, catalogFulfillment, dataSourceSync, knowledgeApproval, notificationDispatch, systemMetricsDbSizeSnapshot');
   console.log(`[nova-worker] Registered activities: ${Object.keys(activities).join(', ')}`);
   const workerName = process.env.NOVA_WORKER_NAME || `worker-${process.pid}`;
   const pulse = async () => {

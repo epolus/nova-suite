@@ -14,3 +14,4 @@ export { knowledgeApproval, kbApprovalDecisionSignal } from './knowledge-approva
 export type { KnowledgeApprovalInput, KnowledgeApprovalDecisionSignal } from './knowledge-approval';
 
 export { notificationDispatch } from './notification-dispatch';
+export { systemMetricsDbSizeSnapshot } from './system-metrics-db-size-snapshot';

@@ -107,6 +107,54 @@ export interface RuntimeHealth {
   checks: Record<string, unknown>;
 }
 
+export interface SystemMetrics {
+  timestamp: string;
+  database: {
+    totalBytes: number | null;
+    growthBytes24h: number | null;
+    growthBytes7d: number | null;
+    topTables: Array<{ table: string; bytes: number }>;
+    p50QueryMs: number | null;
+    p95QueryMs: number | null;
+    slowQueriesPerMin: number | null;
+    activeConnections: number | null;
+    maxConnections: number | null;
+    connectionUsagePct: number | null;
+    status: 'healthy' | 'warning' | 'critical' | 'unknown';
+    lastUpdatedAt: string;
+  };
+  api: {
+    p50Ms: number | null;
+    p95Ms: number | null;
+    p99Ms: number | null;
+    rpm: number | null;
+    errorRate5xxPct: number | null;
+    errorRate4xxPct: number | null;
+    status: 'healthy' | 'warning' | 'critical' | 'unknown';
+    sourceWindowMinutes: number;
+    lastUpdatedAt: string;
+  };
+  queue: {
+    backlog: number;
+    failed24h: number | null;
+    oldestQueuedAgeSec: number | null;
+    status: 'healthy' | 'warning' | 'critical' | 'unknown';
+    lastUpdatedAt: string;
+  };
+  runtime: {
+    uptimeSec: number;
+    version: string;
+    appStatus: 'healthy' | 'degraded';
+    dbStatus: 'connected' | 'disconnected';
+    redisStatus: 'connected' | 'disconnected' | 'disabled';
+    temporalStatus: 'connected' | 'disconnected';
+    workerStatus: 'alive' | 'stale';
+    schemaStatus: 'compatible' | 'mismatch';
+    lastDeployAt: string | null;
+    lastUpdatedAt: string;
+  };
+}
+
 export const settings = {
   theme: () => request<{ settings: ThemeSettings }>('/settings/theme'),
   get: () => request<{ settings: ThemeSettings }>('/settings'),
@@ -552,6 +600,8 @@ export const admin = {
     request<{ events: AuditEvent[] }>(`/admin/audit-events?limit=${limit}`),
   runtimeHealth: () =>
     request<RuntimeHealth>('/admin/runtime-health'),
+  systemMetrics: () =>
+    request<SystemMetrics>('/admin/system-metrics'),
 };
 
 // ─── CMDB ───

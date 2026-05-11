@@ -35,3 +35,7 @@ export {
 export {
   dispatchConfiguredNotifications,
 } from './notification-activities';
+
+export {
+  snapshotDbSizeForAllTenants,
+} from './system-metrics-activities';

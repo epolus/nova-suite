@@ -19,7 +19,7 @@ import {
   startWorkflowStartQueueDispatcher,
   stopWorkflowStartQueueDispatcher,
 } from './temporal/workflow-start-queue';
-import { checkTemporalHealth } from './temporal/workflows';
+import { checkTemporalHealth, startDbSizeSnapshotSchedule } from './temporal/workflows';
 import { metricsHandler, metricsMiddleware } from './observability/metrics';
 
 type SchemaRuntimeStatus = {
@@ -35,6 +35,8 @@ const schemaRuntimeStatus: SchemaRuntimeStatus = {
   actualVersion: null,
   reason: 'not_checked',
 };
+let dbSizeSnapshotScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
+let dbSizeSnapshotScheduleRetryTimer: NodeJS.Timeout | null = null;
 let workflowDispatcherStarted = false;
 let server: ReturnType<typeof app.listen> | null = null;
 
@@ -113,6 +115,7 @@ app.get('/health', async (_req, res) => {
       schema_reason: schemaRuntimeStatus.reason,
       workflow_start_queue_pending: queueStats.pending,
       workflow_start_queue_failed: queueStats.failed,
+      db_size_snapshot_schedule: dbSizeSnapshotScheduleStatus,
     },
   });
 });
@@ -136,6 +139,20 @@ app.use((_req, res) => {
 
 // ─── Global Error Handler ───
 app.use(errorHandler);
+
+async function ensureDbSizeSnapshotScheduleStarted(): Promise<void> {
+  try {
+    await startDbSizeSnapshotSchedule();
+    dbSizeSnapshotScheduleStatus = 'running';
+    if (dbSizeSnapshotScheduleRetryTimer) {
+      clearInterval(dbSizeSnapshotScheduleRetryTimer);
+      dbSizeSnapshotScheduleRetryTimer = null;
+    }
+  } catch (err) {
+    dbSizeSnapshotScheduleStatus = 'failed';
+    logger.warn({ err }, 'DB size snapshot schedule startup failed; will retry in background');
+  }
+}
 
 async function bootstrap(): Promise<void> {
   const schemaCheck = await db.checkSchemaCompatibility(config.db.expectedSchemaVersion);
@@ -170,7 +187,14 @@ async function bootstrap(): Promise<void> {
   if (schemaCheck.ok) {
     startWorkflowStartQueueDispatcher();
     workflowDispatcherStarted = true;
+    await ensureDbSizeSnapshotScheduleStarted();
+    if (dbSizeSnapshotScheduleStatus !== 'running') {
+      dbSizeSnapshotScheduleRetryTimer = setInterval(() => {
+        void ensureDbSizeSnapshotScheduleStarted();
+      }, 30_000);
+    }
   } else {
+    dbSizeSnapshotScheduleStatus = 'not_started';
     logger.warn('Workflow start queue dispatcher disabled due to schema incompatibility');
   }
 }
@@ -178,6 +202,10 @@ async function bootstrap(): Promise<void> {
 // ─── Graceful Shutdown ───
 async function shutdown(signal: string) {
   logger.info({ signal }, 'Shutting down...');
+  if (dbSizeSnapshotScheduleRetryTimer) {
+    clearInterval(dbSizeSnapshotScheduleRetryTimer);
+    dbSizeSnapshotScheduleRetryTimer = null;
+  }
   if (workflowDispatcherStarted) stopWorkflowStartQueueDispatcher();
   if (server) {
     server.close(async () => {
