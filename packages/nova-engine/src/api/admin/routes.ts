@@ -234,24 +234,89 @@ router.get('/system-metrics', async (req: Request, res: Response) => {
   const dbSize = await db.getOne<{ total_bytes: string }>(
     'SELECT pg_database_size(current_database())::bigint::text AS total_bytes',
   ).catch(() => null);
-  const baseline24h = await db.getOne<{ total_bytes: string }>(
-    `SELECT total_bytes::text AS total_bytes
-     FROM system_metrics_db_size_snapshots
-     WHERE tenant_id = $1
-       AND snapshot_at <= now() - interval '24 hours'
-     ORDER BY snapshot_at DESC
-     LIMIT 1`,
-    [tenantId],
+  const apiWindowMinutes = 30;
+
+  const tenantScoped = await db.withTenantTransaction(
+    tenantId,
+    req.user!.id,
+    req.user!.roles.join(','),
+    async (client) => {
+      const baseline24hRes = await client.query<{ total_bytes: string }>(
+        `SELECT total_bytes::text AS total_bytes
+         FROM system_metrics_db_size_snapshots
+         WHERE tenant_id = $1
+           AND snapshot_at <= now() - interval '24 hours'
+         ORDER BY snapshot_at DESC
+         LIMIT 1`,
+        [tenantId],
+      );
+      const baseline7dRes = await client.query<{ total_bytes: string }>(
+        `SELECT total_bytes::text AS total_bytes
+         FROM system_metrics_db_size_snapshots
+         WHERE tenant_id = $1
+           AND snapshot_at <= now() - interval '7 days'
+         ORDER BY snapshot_at DESC
+         LIMIT 1`,
+        [tenantId],
+      );
+      const auditApiRes = await client.query<{
+        p50_ms: string | null;
+        p95_ms: string | null;
+        p99_ms: string | null;
+        rpm: string | null;
+        error_rate_5xx_pct: string | null;
+        error_rate_4xx_pct: string | null;
+      }>(
+        `WITH scoped AS (
+           SELECT
+             nullif(ae.metadata->>'duration_ms', '')::double precision AS duration_ms,
+             nullif(ae.metadata->>'status', '')::int AS status_code,
+             ae.created_at
+           FROM audit_events ae
+           WHERE ae.tenant_id = $1::uuid
+             AND ae.created_at >= (now() - interval '${apiWindowMinutes} minutes')
+             AND ae.metadata ? 'duration_ms'
+         )
+         SELECT
+           percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms)::text AS p50_ms,
+           percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)::text AS p95_ms,
+           percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms)::text AS p99_ms,
+           (count(*) / ${apiWindowMinutes}.0)::text AS rpm,
+           (100.0 * count(*) FILTER (WHERE status_code >= 500) / nullif(count(*), 0))::text AS error_rate_5xx_pct,
+           (100.0 * count(*) FILTER (WHERE status_code BETWEEN 400 AND 499) / nullif(count(*), 0))::text AS error_rate_4xx_pct
+         FROM scoped`,
+        [tenantId],
+      );
+      const failedJobsRes = await client.query<{ failed_jobs: string }>(
+        `SELECT count(*)::text AS failed_jobs
+         FROM workflow_start_jobs
+         WHERE tenant_id = $1
+           AND status = 'failed'
+           AND updated_at >= now() - interval '24 hours'`,
+        [tenantId],
+      );
+      const oldestQueuedRes = await client.query<{ oldest_age_sec: string | null }>(
+        `SELECT EXTRACT(EPOCH FROM (now() - min(created_at)))::text AS oldest_age_sec
+         FROM workflow_start_jobs
+         WHERE tenant_id = $1 AND status = 'pending'`,
+        [tenantId],
+      );
+      return {
+        baseline24h: baseline24hRes.rows[0] || null,
+        baseline7d: baseline7dRes.rows[0] || null,
+        auditApi: auditApiRes.rows[0] || null,
+        failed24h: failedJobsRes.rows[0] || null,
+        oldestQueued: oldestQueuedRes.rows[0] || null,
+      };
+    },
   ).catch(() => null);
-  const baseline7d = await db.getOne<{ total_bytes: string }>(
-    `SELECT total_bytes::text AS total_bytes
-     FROM system_metrics_db_size_snapshots
-     WHERE tenant_id = $1
-       AND snapshot_at <= now() - interval '7 days'
-     ORDER BY snapshot_at DESC
-     LIMIT 1`,
-    [tenantId],
-  ).catch(() => null);
+
+  const baseline24h = tenantScoped?.baseline24h ?? null;
+  const baseline7d = tenantScoped?.baseline7d ?? null;
+  const auditApiRow = tenantScoped?.auditApi ?? null;
+  const apiStats = auditApiRow?.p50_ms != null || auditApiRow?.p95_ms != null ? auditApiRow : null;
+  const failedJobs24h = tenantScoped?.failed24h ?? null;
+  const oldestQueued = tenantScoped?.oldestQueued ?? null;
   const topTables = await db.getMany<{ table_name: string; total_bytes: string }>(
     `SELECT relname AS table_name, pg_total_relation_size(c.oid)::bigint::text AS total_bytes
      FROM pg_class c
@@ -279,48 +344,6 @@ router.get('/system-metrics', async (req: Request, res: Response) => {
        percentile_cont(0.95) WITHIN GROUP (ORDER BY mean_exec_time)::text AS p95_ms
      FROM pg_stat_statements
      WHERE calls > 0`,
-  ).catch(() => null);
-
-  const apiWindowMinutes = 30;
-  const apiStats = await db.getOne<{
-    p50_ms: string | null;
-    p95_ms: string | null;
-    p99_ms: string | null;
-    rpm: string | null;
-    error_rate_5xx_pct: string | null;
-    error_rate_4xx_pct: string | null;
-  }>(
-    `WITH scoped AS (
-       SELECT
-         nullif(ae.metadata->>'duration_ms', '')::double precision AS duration_ms,
-         nullif(ae.metadata->>'status', '')::int AS status_code,
-         ae.created_at
-       FROM audit_events ae
-       WHERE ae.tenant_id = $1::uuid
-         AND ae.created_at >= (now() - interval '${apiWindowMinutes} minutes')
-         AND ae.metadata ? 'duration_ms'
-     )
-     SELECT
-       percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms)::text AS p50_ms,
-       percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)::text AS p95_ms,
-       percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms)::text AS p99_ms,
-       (count(*) / ${apiWindowMinutes}.0)::text AS rpm,
-       (100.0 * count(*) FILTER (WHERE status_code >= 500) / nullif(count(*), 0))::text AS error_rate_5xx_pct,
-       (100.0 * count(*) FILTER (WHERE status_code BETWEEN 400 AND 499) / nullif(count(*), 0))::text AS error_rate_4xx_pct
-     FROM scoped`,
-    [tenantId],
-  ).catch(() => null);
-
-  const failedJobs24h = await db.getOne<{ failed_jobs: string }>(
-    `SELECT count(*)::text AS failed_jobs
-     FROM workflow_start_jobs
-     WHERE status = 'failed'
-       AND updated_at >= now() - interval '24 hours'`,
-  ).catch(() => null);
-  const oldestQueued = await db.getOne<{ oldest_age_sec: string | null }>(
-    `SELECT EXTRACT(EPOCH FROM (now() - min(created_at)))::text AS oldest_age_sec
-     FROM workflow_start_jobs
-     WHERE status = 'pending'`,
   ).catch(() => null);
 
   const dbTotalBytes = dbSize?.total_bytes ? Number(dbSize.total_bytes) : null;

@@ -8,6 +8,8 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+-- Query statistics for admin /system-metrics (requires shared_preload_libraries; see docker-compose postgres service).
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
 -- Grant CREATEDB so Temporal auto-setup can create its databases
 ALTER USER current_user CREATEDB;

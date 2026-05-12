@@ -3,6 +3,10 @@ services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-nova}
       POSTGRES_USER: ${POSTGRES_USER:-nova_app}
