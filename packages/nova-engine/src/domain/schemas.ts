@@ -2,7 +2,10 @@
 // ─── Nova Suite – Zod Validation Schemas ───
 // Central definition of all request/response shapes.
 
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+
+extendZodWithOpenApi(z);
 
 // ─── Common ───
 export const uuidSchema = z.string().uuid();
