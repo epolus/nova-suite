@@ -21,13 +21,14 @@ import {
   updateCIClassSchema,
   updateCISchema,
   updateIncidentSchema,
+  uuidSchema,
 } from '../domain/schemas';
 
-const uuidParam = z.object({ id: z.string().uuid() });
+const uuidParam = z.object({ id: uuidSchema });
 
 const catalogItemsQuerySchema = z
   .object({
-    category_id: z.string().uuid().optional(),
+    category_id: uuidSchema.optional(),
     include_inactive: z.enum(['true']).optional(),
   })
   .passthrough();
@@ -36,7 +37,7 @@ const incidentListQuerySchema = paginationSchema.merge(
   z
     .object({
       status: z.string().optional(),
-      assigned_to: z.string().uuid().optional(),
+      assigned_to: uuidSchema.optional(),
       priority: z.coerce.number().int().optional(),
       sla_breached: z.enum(['true', 'false']).optional(),
       assigned_to_me: z.enum(['true', 'false']).optional(),
@@ -48,7 +49,7 @@ const incidentListQuerySchema = paginationSchema.merge(
 const cmdbItemsQuerySchema = paginationSchema.merge(
   z
     .object({
-      class_id: z.string().uuid().optional(),
+      class_id: uuidSchema.optional(),
       class: z.string().optional(),
       managed_by: z.string().optional(),
       status: z.string().optional(),
@@ -61,8 +62,8 @@ const cmdbItemsQuerySchema = paginationSchema.merge(
 
 const cmdbItemsNavQuerySchema = z
   .object({
-    current: z.string().uuid().optional(),
-    class_id: z.string().uuid().optional(),
+    current: uuidSchema.optional(),
+    class_id: uuidSchema.optional(),
     status: z.string().optional(),
     environment: z.string().optional(),
     search: z.string().optional(),
@@ -448,8 +449,8 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
     responses: { 200: { description: 'Relationship deleted' } },
   });
 
-  const exportItemParams = z.object({ id: z.string().uuid() });
-  const exportRuleParams = z.object({ id: z.string().uuid() });
+  const exportItemParams = z.object({ id: uuidSchema });
+  const exportRuleParams = z.object({ id: uuidSchema });
 
   registry.registerPath({
     method: 'get',

@@ -5,14 +5,15 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, getRequestClient, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
+import { uuidSchema } from '../../domain/schemas';
 import { z } from 'zod';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
 
 const cartItemSchema = z.object({
-  service_item_id: z.string().uuid(),
-  form_data: z.record(z.unknown()).optional(),
+  service_item_id: uuidSchema,
+  form_data: z.record(z.string(), z.unknown()).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   notes: z.string().optional(),
 });
@@ -185,7 +186,7 @@ router.post('/items', validateBody(cartItemSchema), async (req: Request, res: Re
 });
 
 router.patch('/items/:id', validateBody(z.object({
-  form_data: z.record(z.unknown()).optional(),
+  form_data: z.record(z.string(), z.unknown()).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   notes: z.string().optional(),
 })), async (req: Request, res: Response, next: NextFunction) => {
