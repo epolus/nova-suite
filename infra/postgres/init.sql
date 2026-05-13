@@ -356,6 +356,7 @@ CREATE INDEX idx_agp_process ON assignment_group_processes(process_id);
 CREATE TABLE service_categories (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  external_key text,
   name        text NOT NULL,
   description text,
   icon        text DEFAULT 'folder',
@@ -366,6 +367,7 @@ CREATE TABLE service_categories (
 );
 
 CREATE INDEX idx_service_categories_tenant ON service_categories(tenant_id);
+CREATE UNIQUE INDEX uq_service_categories_tenant_external_key ON service_categories(tenant_id, external_key);
 
 -- ============================================================
 -- SERVICE CATALOG ITEMS
@@ -373,6 +375,7 @@ CREATE INDEX idx_service_categories_tenant ON service_categories(tenant_id);
 CREATE TABLE service_items (
   id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id           uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  external_key         text,
   category_id         uuid NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
   name                text NOT NULL,
   short_description   text,
@@ -391,6 +394,7 @@ CREATE TABLE service_items (
 
 CREATE INDEX idx_service_items_tenant ON service_items(tenant_id);
 CREATE INDEX idx_service_items_category ON service_items(category_id);
+CREATE UNIQUE INDEX uq_service_items_tenant_external_key ON service_items(tenant_id, external_key);
 CREATE INDEX idx_service_items_custom_attributes_gin ON service_items USING gin (custom_attributes);
 CREATE INDEX idx_service_items_form_schema_gin ON service_items USING gin (form_schema);
 
@@ -729,6 +733,22 @@ CREATE TABLE audit_events (
 );
 CREATE INDEX idx_audit_events_tenant_created ON audit_events(tenant_id, created_at DESC);
 CREATE INDEX idx_audit_events_category ON audit_events(tenant_id, category, created_at DESC);
+
+CREATE TABLE config_deployment_runs (
+  id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id        uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  actor_user_id    uuid REFERENCES users(id) ON DELETE SET NULL,
+  package_name     text NOT NULL,
+  package_checksum text NOT NULL,
+  source_metadata  jsonb NOT NULL DEFAULT '{}'::jsonb,
+  dry_run          boolean NOT NULL DEFAULT false,
+  status           text NOT NULL CHECK (status IN ('validated', 'applied', 'failed')),
+  summary          jsonb NOT NULL DEFAULT '{}'::jsonb,
+  result           jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  applied_at       timestamptz
+);
+CREATE INDEX idx_config_deployment_runs_tenant_created ON config_deployment_runs(tenant_id, created_at DESC);
 
 CREATE TABLE worker_heartbeats (
   worker_name  text PRIMARY KEY,
@@ -1336,6 +1356,7 @@ CREATE INDEX idx_import_rows_warnings_gin ON import_rows USING gin (warnings);
 CREATE TABLE catalog_tasks (
   id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id         uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  external_key       text,
   service_item_id   uuid NOT NULL REFERENCES service_items(id) ON DELETE CASCADE,
   name              text NOT NULL,
   description       text,
@@ -1351,6 +1372,7 @@ CREATE TABLE catalog_tasks (
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_catalog_tasks_item ON catalog_tasks(service_item_id, task_order);
+CREATE UNIQUE INDEX uq_catalog_tasks_tenant_external_key ON catalog_tasks(tenant_id, external_key);
 
 CREATE SEQUENCE task_number_seq START 1000;
 
@@ -2432,6 +2454,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_tenant ON notifications(tenant_id, 
 CREATE TABLE notification_rules (
   id                 uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id          uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  external_key        text,
   name               text        NOT NULL,
   description        text,
   entity_type        text        NOT NULL DEFAULT 'incident',
@@ -2448,6 +2471,7 @@ CREATE TABLE notification_rules (
   updated_at         timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_notification_rules_tenant ON notification_rules(tenant_id, entity_type, trigger_key, is_active, sort_order);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_rules_tenant_external_key ON notification_rules(tenant_id, external_key);
 CREATE TRIGGER trg_notification_rules_updated_at
   BEFORE UPDATE ON notification_rules
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();

@@ -46,6 +46,7 @@ ALTER TABLE change_conflicts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE config_deployment_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_metrics_db_size_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
@@ -452,6 +453,7 @@ ALTER TABLE change_conflicts FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs FORCE ROW LEVEL SECURITY;
 ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE config_deployment_runs FORCE ROW LEVEL SECURITY;
 ALTER TABLE system_metrics_db_size_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE assets FORCE ROW LEVEL SECURITY;
 ALTER TABLE releases FORCE ROW LEVEL SECURITY;
@@ -481,6 +483,12 @@ ALTER TABLE import_rows ENABLE ROW LEVEL SECURITY;
 CREATE POLICY job_access ON import_rows
   USING (job_id IN (SELECT id FROM import_jobs WHERE tenant_id = current_tenant_id()));
 ALTER TABLE import_rows FORCE ROW LEVEL SECURITY;
+
+-- Configuration deployment runs
+CREATE POLICY tenant_isolation_config_deployment_runs ON config_deployment_runs
+  FOR ALL
+  USING (tenant_id = current_tenant_id())
+  WITH CHECK (tenant_id = current_tenant_id());
 
 -- Catalog tasks
 ALTER TABLE catalog_tasks ENABLE ROW LEVEL SECURITY;

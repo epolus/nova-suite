@@ -26,12 +26,14 @@ import credentialsRoutes from './credentials/routes';
 import assetRoutes from './assets/routes';
 import releaseRoutes from './releases/routes';
 import reportRoutes from './reports/routes';
+import configPackageRoutes from './config-packages/routes';
 
 const router = Router();
 
 router.use('/settings', settingsRoutes);
 router.use('/auth', authRoutes);
 router.use('/auth/sso', ssoRoutes);
+router.use('/admin/config-packages', configPackageRoutes);
 router.use('/admin', adminRoutes);
 router.use('/catalog', catalogRoutes);
 router.use('/requests', requestRoutes);

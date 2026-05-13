@@ -597,6 +597,26 @@ export const admin = {
       `/admin/notification-email-deliveries${qs.size > 0 ? `?${qs}` : ''}`,
     );
   },
+  // Configuration packages
+  exportCatalogItemPackage: (id: string) =>
+    request<ConfigPackageExportResponse>(`/admin/config-packages/export/catalog/items/${id}`),
+  exportCatalogPackage: () =>
+    request<ConfigPackageExportResponse>('/admin/config-packages/export/catalog'),
+  exportNotificationRulePackage: (id: string) =>
+    request<ConfigPackageExportResponse>(`/admin/config-packages/export/notifications/rules/${id}`),
+  exportNotificationPackage: () =>
+    request<ConfigPackageExportResponse>('/admin/config-packages/export/notifications'),
+  validateConfigPackage: (bundle: ConfigPackageBundle) =>
+    request<ConfigPackageValidateResponse>('/admin/config-packages/validate', {
+      method: 'POST',
+      body: JSON.stringify({ package: bundle }),
+    }),
+  applyConfigPackage: (bundle: ConfigPackageBundle) =>
+    request<ConfigPackageApplyResponse>('/admin/config-packages/apply', {
+      method: 'POST',
+      body: JSON.stringify({ package: bundle }),
+    }),
+  configPackageRuns: () => request<{ runs: ConfigDeploymentRun[] }>('/admin/config-packages/runs'),
   // Workflow builder definitions
   workflowDefinitions: () =>
     request<{ workflow_definitions: WorkflowDefinition[] }>('/admin/workflow-definitions'),
@@ -909,6 +929,7 @@ export interface UserListItem {
 
 export interface Category {
   id: string;
+  external_key?: string | null;
   name: string;
   description: string | null;
   icon: string;
@@ -917,6 +938,7 @@ export interface Category {
 
 export interface ServiceItem {
   id: string;
+  external_key?: string | null;
   category_id: string;
   name: string;
   short_description: string | null;
@@ -1959,6 +1981,7 @@ export interface Attachment {
 // ─── Catalog Task Types ───
 export interface CatalogTask {
   id: string;
+  external_key?: string | null;
   service_item_id: string;
   name: string;
   description: string | null;
@@ -2006,6 +2029,7 @@ export interface SlaDefinition {
 
 export interface NotificationRule {
   id: string;
+  external_key?: string | null;
   name: string;
   description: string | null;
   entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge';
@@ -2070,6 +2094,86 @@ export interface NotificationEmailDelivery {
 export interface NotificationEmailDeliverySummary {
   status: 'queued' | 'sent' | 'failed';
   count: number;
+}
+
+export interface ConfigPackageBundle {
+  format: 'nova.config-package';
+  version: 1;
+  name: string;
+  schema_version: string;
+  exported_at: string;
+  source: Record<string, unknown>;
+  contents: {
+    catalog: {
+      categories: Array<Record<string, unknown>>;
+      service_items: Array<Record<string, unknown>>;
+    };
+    notifications: {
+      rules: Array<Record<string, unknown>>;
+    };
+  };
+}
+
+export interface ConfigPackageValidationIssue {
+  severity: 'error' | 'warning';
+  path: string;
+  message: string;
+}
+
+export interface ConfigPackageChange {
+  type: 'category' | 'service_item' | 'catalog_task' | 'notification_rule';
+  external_key: string;
+  name: string;
+  action: 'create' | 'update' | 'skip';
+}
+
+export interface ConfigPackageValidationReport {
+  valid: boolean;
+  issues: ConfigPackageValidationIssue[];
+  changes: ConfigPackageChange[];
+  summary: {
+    create: number;
+    update: number;
+    skip: number;
+    errors: number;
+    warnings: number;
+  };
+}
+
+export interface ConfigPackageExportResponse {
+  package: ConfigPackageBundle;
+  checksum: string;
+}
+
+export interface ConfigPackageValidateResponse {
+  validation: ConfigPackageValidationReport;
+  run_id: string;
+  checksum: string;
+}
+
+export interface ConfigPackageApplyResponse {
+  success: boolean;
+  run_id: string;
+  dry_run: ConfigPackageValidationReport;
+  applied: {
+    categories: number;
+    service_items: number;
+    catalog_tasks: number;
+    notification_rules: number;
+  };
+}
+
+export interface ConfigDeploymentRun {
+  id: string;
+  package_name: string;
+  package_checksum: string;
+  dry_run: boolean;
+  status: 'validated' | 'applied' | 'failed';
+  summary: Record<string, unknown>;
+  result: Record<string, unknown>;
+  actor_name?: string | null;
+  created_at: string;
+  applied_at: string | null;
 }
 
 export interface KnowledgeCategory {

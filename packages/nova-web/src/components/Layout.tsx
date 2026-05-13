@@ -288,6 +288,7 @@ const adminSections: RawAdminSection[] = [
     items: [
       { to: '/admin/data-sources', labelKey: 'admin.dataSources', icon: '🔗' },
       { to: '/admin/credentials', labelKey: 'admin.credentials', icon: '🔐' },
+      { to: '/admin/config-packages', labelKey: 'admin.configPackages', icon: '📦' },
       { to: '/admin/import', labelKey: 'admin.importData', icon: '📥' },
     ],
   },

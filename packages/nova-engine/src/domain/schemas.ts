@@ -80,6 +80,113 @@ export const createServiceItemSchema = z.object({
 
 export const updateServiceItemSchema = createServiceItemSchema.partial();
 
+// ─── Configuration Packages ───
+export const configExternalKeySchema = z
+  .string()
+  .min(1)
+  .max(160)
+  .regex(/^[a-z0-9][a-z0-9._/-]*$/, 'Must start with a lowercase letter or number and contain only lowercase letters, numbers, dot, underscore, slash, or dash');
+
+const nullableStringSchema = z.string().nullable().optional();
+
+export const configPackageCategorySchema = z.object({
+  external_key: configExternalKeySchema,
+  name: z.string().min(1).max(255),
+  description: nullableStringSchema,
+  icon: z.string().max(50).default('folder'),
+  sort_order: z.number().int().min(0).default(0),
+  is_active: z.boolean().default(true),
+});
+
+export const configPackagePictureSchema = z.object({
+  file_name: z.string().min(1).max(255),
+  content_type: z.string().min(1).max(100),
+  base64: z.string().min(1),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
+export const configPackageCatalogTaskSchema = z.object({
+  external_key: configExternalKeySchema,
+  name: z.string().min(1).max(255),
+  description: nullableStringSchema,
+  instructions: nullableStringSchema,
+  task_type: z.enum(['approval', 'manual', 'automated']).default('manual'),
+  task_order: z.number().int().min(1).default(1),
+  assigned_group_name: nullableStringSchema,
+  sla_hours: z.number().int().min(1).nullable().optional(),
+  automation_config: z.record(z.unknown()).default({}),
+  is_active: z.boolean().default(true),
+});
+
+export const configPackageServiceItemSchema = z.object({
+  external_key: configExternalKeySchema,
+  category_external_key: configExternalKeySchema,
+  name: z.string().min(1).max(255),
+  short_description: nullableStringSchema,
+  description: nullableStringSchema,
+  icon: z.string().max(50).default('box'),
+  picture: configPackagePictureSchema.nullable().optional(),
+  price: z.number().min(0).nullable().optional(),
+  custom_attributes: z.record(z.unknown()).default({}),
+  form_schema: z.object({ fields: z.array(z.record(z.unknown())) }).default({ fields: [] }),
+  approval_required: z.boolean().default(false),
+  sla_hours: z.number().int().min(1).default(72),
+  is_active: z.boolean().default(true),
+  tasks: z.array(configPackageCatalogTaskSchema).default([]),
+});
+
+export const configPackageNotificationRuleTemplateSchema = z.object({
+  locale: z.string().regex(/^[a-z]{2}(?:-[a-z]{2})?$/),
+  title_template: z.string().min(1),
+  body_template: z.string().nullable().optional(),
+  body_html_template: z.string().nullable().optional(),
+});
+
+export const configPackageNotificationRuleSchema = z.object({
+  external_key: configExternalKeySchema,
+  name: z.string().min(1).max(255),
+  description: nullableStringSchema,
+  entity_type: z.enum(['incident', 'request', 'change', 'problem', 'knowledge']).default('incident'),
+  trigger_key: z.string().min(1).max(100),
+  recipient_type: z.string().min(1).max(100),
+  recipient_user_email: z.string().email().nullable().optional(),
+  recipient_group_name: z.string().min(1).max(255).nullable().optional(),
+  channels: z.array(z.enum(['in_app', 'email'])).min(1).default(['in_app']),
+  templates: z.array(configPackageNotificationRuleTemplateSchema).min(1),
+  title_template: z.string().min(1).optional(),
+  body_template: z.string().nullable().optional(),
+  is_active: z.boolean().default(true),
+  sort_order: z.number().int().default(100),
+});
+
+export const configPackageBundleSchema = z.object({
+  format: z.literal('nova.config-package'),
+  version: z.literal(1),
+  name: z.string().min(1).max(255).default('Nova configuration package'),
+  schema_version: z.string().regex(/^v\d{2}\.\d{2}\.\d{2}$/),
+  exported_at: z.string(),
+  source: z.object({
+    tenant_id: z.string().uuid().optional(),
+    instance: z.string().max(255).optional(),
+  }).default({}),
+  contents: z.object({
+    catalog: z.object({
+      categories: z.array(configPackageCategorySchema).default([]),
+      service_items: z.array(configPackageServiceItemSchema).default([]),
+    }).default({ categories: [], service_items: [] }),
+    notifications: z.object({
+      rules: z.array(configPackageNotificationRuleSchema).default([]),
+    }).default({ rules: [] }),
+  }).default({
+    catalog: { categories: [], service_items: [] },
+    notifications: { rules: [] },
+  }),
+});
+
+export const configPackageApplySchema = z.object({
+  package: configPackageBundleSchema,
+});
+
 // ─── Requests (User Portal) ───
 export const createRequestSchema = z.object({
   service_item_id: z.string().uuid(),

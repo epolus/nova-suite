@@ -179,6 +179,7 @@
       "ciClasses": "Classi CI",
       "dataSources": "Fonti dei dati",
       "credentials": "Credenziali",
+      "configPackages": "Pacchetti di configurazione",
       "importData": "Importa dati",
       "theming": "Tematizzazione",
       "status": "Stato"

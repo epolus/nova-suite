@@ -68,6 +68,7 @@ import ChangeCalendarPage from './pages/changes/ChangeCalendarPage';
 import ChangeAdminPage from './pages/admin/ChangeAdminPage';
 import NotificationConfigPage from './pages/admin/NotificationConfigPage';
 import NotificationEmailDeliveriesPage from './pages/admin/NotificationEmailDeliveriesPage';
+import ConfigPackagesPage from './pages/admin/ConfigPackagesPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import SystemStatusPage from './pages/admin/SystemStatusPage';
 import AdminAccessGuard from './components/AdminAccessGuard';
@@ -184,6 +185,7 @@ function AppRoutes() {
           <Route path="theming" element={<ThemingPage />} />
           <Route path="data-sources" element={<DataSourcesPage />} />
           <Route path="credentials" element={<CredentialsPage />} />
+          <Route path="config-packages" element={<ConfigPackagesPage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="import/history" element={<ImportHistoryPage />} />
         </Route>
