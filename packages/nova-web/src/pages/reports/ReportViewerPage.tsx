@@ -7,6 +7,7 @@ import Spinner from '../../components/Spinner';
 import { reports, type ReportComponentConfig, type ReportComponentResult, type ReportDatasetKey } from '../../api/client';
 import { hasReportingViewRole } from '../../utils/roles';
 import { useAuth } from '../../context/AuthContext';
+import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { DATASET_LABELS } from './reportBuilderConfig';
 
 function datasetBasePath(dataset: ReportDatasetKey): string {
@@ -200,10 +201,21 @@ export default function ReportViewerPage() {
   const [title, setTitle] = useState('Report');
   const [description, setDescription] = useState<string | null>(null);
   const [results, setResults] = useState<Array<{ component: ReportComponentConfig; result: ReportComponentResult }>>([]);
-  const [autoRefreshSeconds, setAutoRefreshSeconds] = useState<number>(0);
+  const [autoRefreshSeconds, setAutoRefreshSeconds] = useUserPreferenceState<number>(
+    'reports:viewer:auto_refresh_seconds',
+    0,
+    'nova_report_viewer_auto_refresh_seconds',
+  );
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState<number>(0);
 
   const canView = useMemo(() => hasReportingViewRole(user?.roles), [user?.roles]);
+
+  useEffect(() => {
+    const allowed = new Set([0, 30, 60, 300]);
+    if (!allowed.has(autoRefreshSeconds)) {
+      setAutoRefreshSeconds(0);
+    }
+  }, [autoRefreshSeconds, setAutoRefreshSeconds]);
 
   const runNow = async () => {
     setRunning(true);
