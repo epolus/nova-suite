@@ -7,7 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import { notifications as notificationsApi, type AppNotification } from '../api/client';
 import GlobalSearch from './GlobalSearch';
 import DarkModeToggle from './DarkModeToggle';
-import { isAdminRole } from '../utils/roles';
+import { hasReportingViewRole, isAdminRole } from '../utils/roles';
 import { canAccessAdminRoute } from '../utils/adminRouteAccess';
 import { useUserPreferenceState } from '../hooks/useUserPreferenceState';
 import { formatDateTime } from '../utils/dateTime';
@@ -196,6 +196,7 @@ const nav = [
   { to: '/incidents', labelKey: 'agent.incidents', icon: '🔥' },
   { to: '/problems', labelKey: 'agent.problems', icon: '🧩' },
   { to: '/changes', labelKey: 'agent.changes', icon: '🛠️' },
+  { to: '/reports', labelKey: 'agent.reports', icon: '📈' },
   { to: '/cmdb', labelKey: 'agent.cmdb', icon: '🖥️' },
 ];
 
@@ -448,11 +449,16 @@ export default function Layout() {
   const restName = appNameParts.slice(1).join(' ');
 
   const isAdmin = isAdminRole(user?.roles);
-  const localizedNav: NavItemDef[] = nav.map((item) => ({
-    to: item.to,
-    icon: item.icon,
-    label: tNavigation(item.labelKey),
-  }));
+  const localizedNav: NavItemDef[] = nav
+    .filter((item) => {
+      if (item.to === '/reports') return hasReportingViewRole(user?.roles);
+      return true;
+    })
+    .map((item) => ({
+      to: item.to,
+      icon: item.icon,
+      label: tNavigation(item.labelKey),
+    }));
   const localizedCatalogDesignerNav: NavItemDef[] = catalogDesignerNav.map((item) => ({
     to: item.to,
     icon: item.icon,

@@ -934,7 +934,16 @@ INSERT INTO roles (id, tenant_id, name, description) VALUES
    'credential_manager', 'Can create and rotate encrypted integration credentials'),
   ('a3000000-0000-0000-0000-000000000011',
    'a0000000-0000-0000-0000-000000000001',
-   'knowledge', 'Can create, review, and publish knowledge articles');
+   'knowledge', 'Can create, review, and publish knowledge articles'),
+  ('a3000000-0000-0000-0000-000000000012',
+   'a0000000-0000-0000-0000-000000000001',
+   'report_viewer', 'Can view and run shared reports'),
+  ('a3000000-0000-0000-0000-000000000013',
+   'a0000000-0000-0000-0000-000000000001',
+   'report_creator', 'Can create and edit reports'),
+  ('a3000000-0000-0000-0000-000000000014',
+   'a0000000-0000-0000-0000-000000000001',
+   'report_admin', 'Can manage all tenant reports and sharing');
 
 -- Demo company
 INSERT INTO companies (
@@ -1704,6 +1713,44 @@ CREATE TABLE report_exports (
   payload       jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 CREATE INDEX idx_report_exports_tenant ON report_exports(tenant_id, generated_at DESC);
+
+CREATE TABLE report_definitions (
+  id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id        uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name             text NOT NULL,
+  description      text,
+  is_shared        boolean NOT NULL DEFAULT false,
+  allowed_roles    text[] NOT NULL DEFAULT ARRAY[]::text[],
+  layout           jsonb NOT NULL DEFAULT '{}'::jsonb,
+  components       jsonb NOT NULL DEFAULT '[]'::jsonb,
+  default_filters  jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_by       uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_by       uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  last_run_at      timestamptz,
+  version          integer NOT NULL DEFAULT 1,
+  CONSTRAINT report_definitions_name_len CHECK (length(trim(name)) > 0)
+);
+CREATE INDEX idx_report_definitions_tenant ON report_definitions(tenant_id, updated_at DESC);
+CREATE INDEX idx_report_definitions_components_gin ON report_definitions USING gin (components);
+CREATE INDEX idx_report_definitions_allowed_roles_gin ON report_definitions USING gin (allowed_roles);
+
+CREATE TRIGGER trg_report_definitions_updated_at
+  BEFORE UPDATE ON report_definitions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE report_activity_events (
+  id                   uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id            uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  report_definition_id uuid REFERENCES report_definitions(id) ON DELETE CASCADE,
+  actor_user_id        uuid REFERENCES users(id) ON DELETE SET NULL,
+  action               text NOT NULL,
+  metadata             jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at           timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_report_activity_events_tenant ON report_activity_events(tenant_id, created_at DESC);
+CREATE INDEX idx_report_activity_events_report ON report_activity_events(report_definition_id, created_at DESC);
 
 -- ============================================================
 -- TENANT SETTINGS

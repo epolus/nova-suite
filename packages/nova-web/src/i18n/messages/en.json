@@ -136,6 +136,7 @@
       "incidents": "Incidents",
       "problems": "Problems",
       "changes": "Changes",
+      "reports": "Reports",
       "cmdb": "CMDB",
       "catalogDesigner": "Catalog Designer"
     },

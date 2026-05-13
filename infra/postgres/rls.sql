@@ -50,6 +50,8 @@ ALTER TABLE system_metrics_db_size_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_exports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE report_definitions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE report_activity_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
@@ -305,6 +307,14 @@ CREATE POLICY tenant_isolation_releases ON releases
 CREATE POLICY tenant_isolation_report_exports ON report_exports
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Report Definitions ───
+CREATE POLICY tenant_isolation_report_definitions ON report_definitions
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Report Activity Events ───
+CREATE POLICY tenant_isolation_report_activity_events ON report_activity_events
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── SLA Definitions ───
 CREATE POLICY tenant_isolation_sla_definitions ON sla_definitions
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -446,6 +456,8 @@ ALTER TABLE system_metrics_db_size_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE assets FORCE ROW LEVEL SECURITY;
 ALTER TABLE releases FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_exports FORCE ROW LEVEL SECURITY;
+ALTER TABLE report_definitions FORCE ROW LEVEL SECURITY;
+ALTER TABLE report_activity_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;

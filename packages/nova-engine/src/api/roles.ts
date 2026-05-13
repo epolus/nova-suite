@@ -39,3 +39,15 @@ export function hasProblemRole(req: Request): boolean {
 export function hasKnowledgeRole(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'knowledge']);
 }
+
+export function hasReportingViewRole(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'report_viewer', 'report_creator', 'report_admin']);
+}
+
+export function hasReportingCreateRole(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'report_creator', 'report_admin']);
+}
+
+export function hasReportingAdminRole(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'report_admin']);
+}

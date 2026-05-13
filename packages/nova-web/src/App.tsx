@@ -72,6 +72,9 @@ import SearchResultsPage from './pages/SearchResultsPage';
 import SystemStatusPage from './pages/admin/SystemStatusPage';
 import AdminAccessGuard from './components/AdminAccessGuard';
 import { isAgentRole } from './utils/roles';
+import ReportsLibraryPage from './pages/reports/ReportsLibraryPage';
+import ReportBuilderPage from './pages/reports/ReportBuilderPage';
+import ReportViewerPage from './pages/reports/ReportViewerPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -131,6 +134,10 @@ function AppRoutes() {
         <Route path="/changes/new" element={<ChangeDetailPage />} />
         <Route path="/changes/:id" element={<ChangeDetailPage />} />
         <Route path="/changes/calendar" element={<ChangeCalendarPage />} />
+        <Route path="/reports" element={<ReportsLibraryPage />} />
+        <Route path="/reports/new" element={<ReportBuilderPage />} />
+        <Route path="/reports/:reportId" element={<ReportViewerPage />} />
+        <Route path="/reports/:reportId/builder" element={<ReportBuilderPage />} />
         <Route path="/cmdb" element={<CMDBPage />} />
         <Route path="/cmdb/new" element={<CIForm />} />
         <Route path="/cmdb/:id" element={<CIDetail />} />

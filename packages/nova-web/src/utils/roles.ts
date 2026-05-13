@@ -7,6 +7,9 @@ const AGENT_ROLES = new Set([
   'credential_manager',
   'change_manager',
   'problem_manager',
+  'report_viewer',
+  'report_creator',
+  'report_admin',
 ]);
 
 type RoleList = string[] | undefined;
@@ -49,6 +52,18 @@ export function hasChangeRole(roles: RoleList): boolean {
 
 export function hasKnowledgeRole(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'knowledge']);
+}
+
+export function hasReportingViewRole(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'report_viewer', 'report_creator', 'report_admin']);
+}
+
+export function hasReportingCreateRole(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'report_creator', 'report_admin']);
+}
+
+export function hasReportingAdminRole(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'report_admin']);
 }
 
 export function hasAnyRole(roles: RoleList, required: string[]): boolean {
