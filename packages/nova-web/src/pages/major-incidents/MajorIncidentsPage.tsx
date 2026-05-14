@@ -13,6 +13,7 @@ import { MAJOR_INCIDENT_STATUS_OPTIONS } from './majorIncidentListConfig';
 
 export interface MajorIncidentListItem {
   id: string;
+  number: string;
   title: string;
   status: string;
   priority: number;
@@ -20,7 +21,7 @@ export interface MajorIncidentListItem {
   participant_count?: number;
 }
 
-const DEFAULT_COLS = ['title', 'status', 'priority', 'declared_major_at', 'participant_count'];
+const DEFAULT_COLS = ['number', 'title', 'status', 'priority', 'declared_major_at', 'participant_count'];
 
 function createMajorIncidentListParams(args: {
   statusFilter: string;
@@ -44,6 +45,23 @@ function createMajorIncidentListParams(args: {
 
 function buildColumns(listParams: Record<string, string>): DataColumnDef<MajorIncidentListItem>[] {
   return [
+    {
+      key: 'number',
+      label: 'Number',
+      sortable: true,
+      defaultVisible: true,
+      className: 'whitespace-nowrap font-mono text-xs',
+      render: (row) => (
+        <Link
+          to={`/major-incidents/${row.id}`}
+          state={{ listParams }}
+          className="text-indigo-600 font-medium hover:text-indigo-800"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {row.number}
+        </Link>
+      ),
+    },
     {
       key: 'title',
       label: 'Title',
@@ -165,7 +183,7 @@ export default function MajorIncidentsPage() {
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
-          <SearchBar value={params.search} onChange={setSearch} placeholder="Search by title…" />
+          <SearchBar value={params.search} onChange={setSearch} placeholder="Search by number or title…" />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           {MAJOR_INCIDENT_STATUS_OPTIONS.map((s) => (

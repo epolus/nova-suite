@@ -572,11 +572,15 @@ CREATE TYPE postmortem_status_enum AS ENUM (
   'draft', 'in_review', 'published'
 );
 
+CREATE SEQUENCE major_incident_number_seq START 1000;
+
 CREATE TABLE major_incidents (
   id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id             uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   title                 text NOT NULL,
+  number                text NOT NULL,
   description           text,
+  resolution_summary    text,
   status                major_incident_status_enum NOT NULL DEFAULT 'declared',
   priority              integer NOT NULL DEFAULT 1
                         CHECK (priority BETWEEN 1 AND 2),
@@ -598,7 +602,8 @@ CREATE TABLE major_incidents (
   temporal_workflow_id  text,
   postmortem_workflow_id text,
   created_at            timestamptz NOT NULL DEFAULT now(),
-  updated_at            timestamptz NOT NULL DEFAULT now()
+  updated_at            timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, number)
 );
 
 CREATE INDEX idx_major_incidents_tenant ON major_incidents(tenant_id);
@@ -2697,11 +2702,11 @@ INSERT INTO notification_rules (
   ('a0000000-0000-0000-0000-000000000001', 'Knowledge submitted for review to group', 'Notify assignment group members when article is submitted', 'knowledge', 'knowledge.submitted_for_review', 'assignment_group_members', 'Article {knowledge_number} submitted for review', '{knowledge_title} is awaiting review.', 10),
   ('a0000000-0000-0000-0000-000000000001', 'Knowledge published to author', 'Notify author when article is published', 'knowledge', 'knowledge.published', 'author', 'Article {knowledge_number} published', 'Your article "{knowledge_title}" has been published.', 20),
   ('a0000000-0000-0000-0000-000000000001', 'Knowledge rejected to author', 'Notify author when article is rejected', 'knowledge', 'knowledge.rejected', 'author', 'Article {knowledge_number} rejected', 'Your article "{knowledge_title}" was rejected.', 30),
-  ('a0000000-0000-0000-0000-000000000001', 'Major incident promotion pending', 'Notify MI managers when an incident is promoted and awaits acceptance', 'major_incident', 'major_incident.promotion_requested', 'role_major_incident_manager', 'Major incident pending acceptance', 'A promotion is waiting: "{major_incident_title}". Accept it in Major incidents.', 10),
-  ('a0000000-0000-0000-0000-000000000001', 'Major incident accepted', 'Notify fulfillers when a major incident is accepted', 'major_incident', 'major_incident.accepted', 'role_fulfiller', 'Major incident accepted', '"{major_incident_title}" is now an active major incident.', 20),
-  ('a0000000-0000-0000-0000-000000000001', 'Major incident resolve requested', 'Notify MI managers when resolve is requested', 'major_incident', 'major_incident.resolve_requested', 'role_major_incident_manager', 'Resolve requested', '"{major_incident_title}": resolve was requested (monitoring / closure).', 30),
-  ('a0000000-0000-0000-0000-000000000001', 'Major incident stakeholder update', 'Notify MI managers on stakeholder update', 'major_incident', 'major_incident.stakeholder_update', 'role_major_incident_manager', 'Stakeholder update', '"{major_incident_title}": a new stakeholder update was posted.', 40),
-  ('a0000000-0000-0000-0000-000000000001', 'Major incident opened', 'Notify MI managers when a major incident is opened directly', 'major_incident', 'major_incident.declared', 'role_major_incident_manager', 'Major incident opened', '"{major_incident_title}" was declared as a major incident.', 50);
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident promotion pending', 'Notify MI managers when an incident is promoted and awaits acceptance', 'major_incident', 'major_incident.promotion_requested', 'role_major_incident_manager', 'Major incident {major_incident_number} pending acceptance', 'A promotion is waiting: {major_incident_number} — "{major_incident_title}". Accept it in Major incidents.', 10),
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident accepted', 'Notify fulfillers when a major incident is accepted', 'major_incident', 'major_incident.accepted', 'role_fulfiller', 'Major incident {major_incident_number} accepted', '{major_incident_number} — "{major_incident_title}" is now an active major incident.', 20),
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident resolve requested', 'Notify MI managers when resolve is requested', 'major_incident', 'major_incident.resolve_requested', 'role_major_incident_manager', '{major_incident_number}: resolve requested', '{major_incident_number} — "{major_incident_title}": resolve was requested (monitoring / closure).', 30),
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident stakeholder update', 'Notify MI managers on stakeholder update', 'major_incident', 'major_incident.stakeholder_update', 'role_major_incident_manager', '{major_incident_number}: stakeholder update', '{major_incident_number} — "{major_incident_title}": a new stakeholder update was posted.', 40),
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident opened', 'Notify MI managers when a major incident is opened directly', 'major_incident', 'major_incident.declared', 'role_major_incident_manager', 'Major incident {major_incident_number} opened', '{major_incident_number} — "{major_incident_title}" was declared as a major incident.', 50);
 
 INSERT INTO notification_rule_templates (
   tenant_id, notification_rule_id, locale, title_template, body_template

@@ -337,6 +337,11 @@ export const incidents = {
       body: JSON.stringify({ ids, action, value }),
     }),
   stats: () => request<IncidentStats>('/incidents/stats'),
+  linkMajorIncident: (incidentId: string, body: { major_incident_id: string }) =>
+    request<{ success: boolean; major_incident_id: string }>(`/incidents/${incidentId}/link-major-incident`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };
 
 // ─── Major incidents ───
@@ -380,12 +385,18 @@ export const majorIncidents = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  resolve: (id: string) =>
+  resolve: (id: string, body: { solution: string }) =>
     request<{ ok: boolean; major_incident?: Record<string, unknown> }>(`/major-incidents/${id}/resolve`, {
       method: 'POST',
+      body: JSON.stringify(body),
     }),
   acceptMajor: (id: string) =>
     request<{ major_incident: Record<string, unknown> }>(`/major-incidents/${id}/accept-major`, { method: 'POST' }),
+  rejectPromotion: (id: string, body?: { reason?: string }) =>
+    request<{ major_incident: Record<string, unknown> }>(`/major-incidents/${id}/reject-promotion`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
   linkRelated: (id: string, data: { incident_id: string; link_reason?: string }) =>
     request<{ link: Record<string, unknown> }>(`/major-incidents/${id}/related-incidents`, {
       method: 'POST',
@@ -1103,6 +1114,13 @@ export interface Incident {
   service_name?: string;
   ci_name?: string;
   ci_display_name?: string;
+  linked_major_incidents?: Array<{
+    id: string;
+    number?: string;
+    title: string;
+    status: string;
+    link_kind: 'primary' | 'related';
+  }>;
 }
 
 export interface IncidentProblemLink {

@@ -69,6 +69,18 @@ export function majorIncidentEventToFeedItem(
         title: 'Accepted as major incident',
         meta: metaLine(actor, 'Response workflow can run'),
       };
+    case 'promotion_rejected':
+      return {
+        accent: 'rose',
+        title: 'Promotion rejected',
+        meta: metaLine(actor, 'Proposed major incident was not accepted'),
+        body:
+          typeof payload.reason === 'string' && payload.reason.trim() ? (
+            <p className="text-sm text-gray-700 dark:text-gray-200 mt-1 whitespace-pre-wrap leading-relaxed">{payload.reason.trim()}</p>
+          ) : (
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">The source incident remains a normal incident; you can promote again later if needed.</p>
+          ),
+      };
     case 'created':
       return {
         accent: 'indigo',
@@ -90,6 +102,13 @@ export function majorIncidentEventToFeedItem(
         accent: 'rose',
         title: 'Resolve requested',
         meta: metaLine(actor, 'Monitoring window before closure'),
+        body:
+          typeof payload.solution === 'string' && payload.solution.trim() ? (
+            <div className="mt-1 space-y-1">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Resolution summary</p>
+              <p className="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">{payload.solution.trim()}</p>
+            </div>
+          ) : undefined,
       };
     case 'monitoring_window':
       return {
@@ -103,17 +122,26 @@ export function majorIncidentEventToFeedItem(
         accent: 'emerald',
         title: 'Marked resolved',
         meta: metaLine(actor, 'Automated'),
-        body:
-          typeof payload.postmortemId === 'string' ? (
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-              <Link
-                to={`/major-incidents/${opts.majorIncidentId}/postmortem`}
-                className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
-              >
-                Open postmortem
-              </Link>
-            </p>
-          ) : undefined,
+        body: (
+          <div className="mt-1 space-y-2">
+            {typeof payload.solution === 'string' && payload.solution.trim() ? (
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Resolution summary</p>
+                <p className="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">{payload.solution.trim()}</p>
+              </div>
+            ) : null}
+            {typeof payload.postmortemId === 'string' ? (
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                <Link
+                  to={`/major-incidents/${opts.majorIncidentId}/postmortem`}
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                >
+                  Open postmortem
+                </Link>
+              </p>
+            ) : null}
+          </div>
+        ),
       };
     case 'postmortem_published':
       return {

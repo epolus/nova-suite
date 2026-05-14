@@ -134,6 +134,13 @@ export async function majorIncidentFinalizeResolved(
   majorIncidentId: string,
 ): Promise<{ postmortemId: string }> {
   return await withTenantContext(tenantId, async (client) => {
+    const summaryRow = await client.query(
+      `SELECT resolution_summary FROM major_incidents WHERE id = $1 AND tenant_id = current_tenant_id()`,
+      [majorIncidentId],
+    );
+    const resolutionSummary =
+      (summaryRow.rows[0] as { resolution_summary: string | null } | undefined)?.resolution_summary?.trim() ?? '';
+
     await client.query(
       `UPDATE major_incidents
        SET status = 'resolved',
@@ -162,10 +169,68 @@ export async function majorIncidentFinalizeResolved(
       [
         tenantId,
         majorIncidentId,
-        JSON.stringify({ postmortemId }),
+        JSON.stringify({
+          postmortemId,
+          ...(resolutionSummary ? { solution: resolutionSummary } : {}),
+        }),
         null,
       ],
     );
+
+    const miMeta = await client.query(
+      `SELECT created_by, primary_incident_id FROM major_incidents WHERE id = $1 AND tenant_id = current_tenant_id()`,
+      [majorIncidentId],
+    );
+    const metaRow = miMeta.rows[0] as { created_by: string; primary_incident_id: string | null } | undefined;
+    const journalAuthorId = metaRow?.created_by;
+    const primaryIncidentId = metaRow?.primary_incident_id ?? null;
+
+    const rel = await client.query(
+      `SELECT incident_id FROM major_incident_related_incidents
+       WHERE major_incident_id = $1 AND tenant_id = current_tenant_id()`,
+      [majorIncidentId],
+    );
+
+    const incidentIds = new Set<string>();
+    if (primaryIncidentId) incidentIds.add(primaryIncidentId);
+    for (const r of rel.rows as { incident_id: string }[]) {
+      incidentIds.add(r.incident_id);
+    }
+
+    const autoResolutionNotes = 'Automatically resolved: linked major incident was closed.';
+    const journalContent = 'Incident resolved automatically when the linked major incident was closed.';
+
+    for (const incidentId of incidentIds) {
+      try {
+        const upd = await client.query(
+          `UPDATE incidents
+           SET status = 'resolved'::incident_status_enum,
+               resolved_at = COALESCE(resolved_at, now()),
+               resolution_notes = CASE
+                 WHEN resolution_notes IS NULL OR trim(resolution_notes) = '' THEN $2::text
+                 ELSE resolution_notes
+               END,
+               resolution_code = COALESCE(resolution_code, 'major_incident'),
+               updated_at = now()
+           WHERE id = $1::uuid AND tenant_id = current_tenant_id()
+             AND status::text NOT IN ('resolved', 'closed', 'cancelled')`,
+          [incidentId, autoResolutionNotes],
+        );
+        if (journalAuthorId && (upd.rowCount ?? 0) > 0) {
+          await client.query(
+            `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content, is_customer_visible)
+             VALUES (current_tenant_id(), $1::uuid, $2::uuid, 'state_change', $3, true)`,
+            [incidentId, journalAuthorId, journalContent],
+          );
+        }
+      } catch (err) {
+        log.error('Failed to auto-resolve incident linked to major incident', {
+          err: err instanceof Error ? err.message : String(err),
+          incidentId,
+          majorIncidentId,
+        });
+      }
+    }
 
     return { postmortemId };
   });

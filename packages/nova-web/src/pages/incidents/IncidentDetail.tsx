@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { type FormEvent, useEffect, useState } from 'react';
-import { attachments as attachmentsApi, knowledge as knowledgeApi, majorIncidents as majorIncidentsApi } from '../../api/client';
+import { Link } from 'react-router-dom';
+import { attachments as attachmentsApi, knowledge as knowledgeApi, majorIncidents as majorIncidentsApi, incidents as incidentsApi } from '../../api/client';
 import type { JournalEntry, KnowledgeSuggestion, KnowledgeArticleDetail } from '../../api/client';
 import { AttachmentCard } from '../../components/AttachmentCard';
 import PageHeader from '../../components/PageHeader';
@@ -39,7 +40,28 @@ export default function IncidentDetail() {
     kbResolveOpen, setKbResolveOpen,
     handleUpdate, handleReopen, handleCancel, handleAddJournal, handleResolveWithKb,
     handleFileUpload, handleDrop, handleDeleteAttachment, handlePreview, formatSize,
+    refresh,
   } = useIncidentDetail();
+
+  const [linkMajorSelect, setLinkMajorSelect] = useState('');
+  const [linkableMajors, setLinkableMajors] = useState<Array<{ id: string; number: string; title: string; status: string }>>([]);
+  const [linkMajorBusy, setLinkMajorBusy] = useState(false);
+  const [linkMajorErr, setLinkMajorErr] = useState('');
+
+  useEffect(() => {
+    if (!inc || !isFulfiller || readonly || isClosed || isResolved) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await majorIncidentsApi.list({ status_not_in: 'resolved,cancelled,pending_acceptance' }, 1, 50);
+        const rows = (res.major_incidents as Array<{ id: string; number: string; title: string; status: string }>) ?? [];
+        if (!cancelled) setLinkableMajors(rows);
+      } catch {
+        if (!cancelled) setLinkableMajors([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [inc?.id, isFulfiller, readonly, isClosed, isResolved]);
 
   const openKnowledgePreview = async (articleId: string) => {
     setPreviewError('');
@@ -75,6 +97,21 @@ export default function IncidentDetail() {
       setDeclareMajorErr(err instanceof Error ? err.message : 'Failed to promote to major incident');
     } finally {
       setDeclareMajorBusy(false);
+    }
+  };
+
+  const handleLinkMajor = async () => {
+    if (!inc || !linkMajorSelect) return;
+    setLinkMajorErr('');
+    setLinkMajorBusy(true);
+    try {
+      await incidentsApi.linkMajorIncident(inc.id, { major_incident_id: linkMajorSelect });
+      setLinkMajorSelect('');
+      await refresh();
+    } catch (err: unknown) {
+      setLinkMajorErr(err instanceof Error ? err.message : 'Failed to link major incident');
+    } finally {
+      setLinkMajorBusy(false);
     }
   };
 
@@ -119,14 +156,26 @@ export default function IncidentDetail() {
 
   const inputCls = `w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none${readonly ? ' bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`;
   const selectCls = inputCls;
+  const linkMajorSelectCls =
+    'min-w-0 flex-1 text-sm py-1.5 px-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none sm:max-w-xs md:max-w-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100';
+
+  const linkedMajor = inc.linked_major_incidents ?? [];
+  const linkedMajorIds = new Set(linkedMajor.map((m) => m.id));
+  const linkChoices = linkableMajors.filter((m) => !linkedMajorIds.has(m.id));
+  const promEligible = inc.priority <= 2 || (inc.impact === 'high' && inc.urgency === 'high');
+  const showPromoteButton = canCreateMajorIncidentRecord(user?.roles)
+    && !isClosed
+    && !isResolved
+    && linkedMajor.length === 0
+    && promEligible;
 
   return (
     <>
       <PageHeader
         title={`${inc.number} — ${inc.title}`}
         action={
-          <div className="flex items-center gap-2">
-            {canCreateMajorIncidentRecord(user?.roles) && !isClosed && (inc.priority <= 2 || (inc.impact === 'high' && inc.urgency === 'high')) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {showPromoteButton && (
               <Button
                 type="button"
                 className="bg-orange-600 hover:bg-orange-500 text-white border-0"
@@ -151,7 +200,7 @@ export default function IncidentDetail() {
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
             )}
-            {!readonly && !isClosed && (
+            {!readonly && !isClosed && !isResolved && (
               <Button
                 variant="outline"
                 onClick={() => setField('status', fields.status === 'pending' ? inc.status : 'pending')}
@@ -159,15 +208,12 @@ export default function IncidentDetail() {
                 {fields.status === 'pending' ? 'Undo Pending' : 'Set Pending'}
               </Button>
             )}
-            {!readonly && !isClosed && (
-              <Button
-                variant="outline"
-                onClick={() => setField('status', fields.status === 'resolved' ? inc.status : 'resolved')}
-              >
-                {fields.status === 'resolved' ? 'Undo Resolve' : 'Resolve'}
+            {!readonly && !isClosed && !isResolved && (
+              <Button variant="outline" onClick={() => setField('status', 'resolved')}>
+                Resolve
               </Button>
             )}
-            {!readonly && !isClosed && (
+            {!readonly && !isClosed && !isResolved && (
               <Button variant="outline" onClick={() => setKbResolveOpen(true)}>
                 Resolve with KB
               </Button>
@@ -186,6 +232,93 @@ export default function IncidentDetail() {
         <div className="mb-4 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 font-medium">
           {declareMajorErr}
         </div>
+      )}
+
+      {(linkedMajor.length > 0 || (isFulfiller && !readonly && !isClosed && !isResolved)) && (
+        <Card
+          padding={false}
+          className="mb-3 border-l-[3px] border-l-indigo-500 border-y border-r border-gray-200 rounded-lg bg-indigo-50/25 px-3 py-2 dark:border-gray-600 dark:border-l-indigo-400 dark:bg-indigo-950/55"
+        >
+          {linkedMajor.length === 0 &&
+          isFulfiller &&
+          !readonly &&
+          !isClosed &&
+          !isResolved &&
+          linkChoices.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-900/90 dark:text-indigo-100 shrink-0">
+                Major incident
+              </span>
+              <label htmlFor="link-major-select" className="sr-only">
+                Link to major incident
+              </label>
+              <select
+                id="link-major-select"
+                className={linkMajorSelectCls}
+                value={linkMajorSelect}
+                onChange={(e) => setLinkMajorSelect(e.target.value)}
+              >
+                <option value="">Select major incident…</option>
+                {linkChoices.map((m) => (
+                  <option key={m.id} value={m.id}>{m.number} — {m.title} ({m.status})</option>
+                ))}
+              </select>
+              <Button type="button" variant="outline" size="sm" onClick={() => void handleLinkMajor()} disabled={!linkMajorSelect || linkMajorBusy}>
+                {linkMajorBusy ? 'Linking…' : 'Link'}
+              </Button>
+              {linkMajorErr && <p className="text-xs text-red-600 dark:text-red-400 basis-full">{linkMajorErr}</p>}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 min-h-[1.25rem]">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-900/90 dark:text-indigo-100 shrink-0">
+                  Major incident
+                </span>
+                {linkedMajor.length === 0 ? (
+                  <span className="text-xs text-gray-600 dark:text-gray-300 truncate">None linked.</span>
+                ) : null}
+              </div>
+              {linkedMajor.length > 0 ? (
+                <ul className="text-sm space-y-0.5">
+                  {linkedMajor.map((m) => (
+                    <li key={m.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 leading-snug">
+                      <Link to={`/major-incidents/${m.id}`} className="text-indigo-700 dark:text-indigo-300 font-medium hover:underline truncate min-w-0">
+                        <span className="font-mono text-xs text-gray-600 dark:text-gray-400 mr-1.5 tabular-nums">{m.number ?? '—'}</span>
+                        {m.title}
+                      </Link>
+                      <Badge value={m.status} />
+                      {m.link_kind === 'primary' && (
+                        <span className="text-[10px] font-semibold uppercase text-amber-900 bg-amber-100/90 dark:text-amber-100 dark:bg-amber-900/55 px-1 py-0.5 rounded">Primary</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {isFulfiller && !readonly && !isClosed && !isResolved && linkChoices.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-indigo-100/60 dark:border-indigo-700/50">
+                  <label htmlFor="link-major-select-linked" className="sr-only">
+                    Link to major incident
+                  </label>
+                  <select
+                    id="link-major-select-linked"
+                    className={linkMajorSelectCls}
+                    value={linkMajorSelect}
+                    onChange={(e) => setLinkMajorSelect(e.target.value)}
+                  >
+                    <option value="">Select major incident…</option>
+                    {linkChoices.map((m) => (
+                      <option key={m.id} value={m.id}>{m.number ?? '—'} — {m.title} ({m.status})</option>
+                    ))}
+                  </select>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void handleLinkMajor()} disabled={!linkMajorSelect || linkMajorBusy}>
+                    {linkMajorBusy ? 'Linking…' : 'Link'}
+                  </Button>
+                </div>
+              )}
+              {linkMajorErr && <p className="text-xs text-red-600 dark:text-red-400">{linkMajorErr}</p>}
+            </div>
+          )}
+        </Card>
       )}
 
       {formError && (

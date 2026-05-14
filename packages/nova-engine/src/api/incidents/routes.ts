@@ -20,6 +20,7 @@ import {
   createIncidentSchema,
   updateIncidentSchema,
   addJournalEntrySchema,
+  incidentLinkMajorIncidentSchema,
   paginationSchema,
   rankedSuggestionsQuerySchema,
 } from '../../domain/schemas';
@@ -952,11 +953,98 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       }
     }
 
-    res.json(incident);
+    const links = await client.query(
+      `SELECT DISTINCT ON (u.id) u.id, u.number, u.title, u.status::text AS status, u.link_kind
+       FROM (
+         SELECT mi.id, mi.number, mi.title, mi.status, 'primary'::text AS link_kind
+         FROM major_incidents mi
+         WHERE mi.primary_incident_id = $1::uuid
+           AND mi.tenant_id = current_tenant_id()
+           AND mi.status::text <> 'cancelled'
+         UNION ALL
+         SELECT mi.id, mi.number, mi.title, mi.status, 'related'::text
+         FROM major_incidents mi
+         INNER JOIN major_incident_related_incidents r
+           ON r.major_incident_id = mi.id
+          AND r.incident_id = $1::uuid
+          AND r.tenant_id = current_tenant_id()
+         WHERE mi.tenant_id = current_tenant_id()
+           AND mi.status::text <> 'cancelled'
+       ) u
+       ORDER BY u.id, CASE WHEN u.link_kind = 'primary' THEN 0 ELSE 1 END`,
+      [req.params.id],
+    );
+
+    res.json({ ...incident, linked_major_incidents: links.rows });
   } catch (err) {
     next(err);
   }
 });
+
+router.post(
+  '/:id/link-major-incident',
+  requireRole('admin', 'fulfiller', 'major_incident_manager'),
+  validateBody(incidentLinkMajorIncidentSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const incidentId = String(req.params.id);
+      const tenantId = req.user!.tenant_id;
+      const userId = req.user!.id;
+      const { major_incident_id: majorIncidentId } = req.body as { major_incident_id: string };
+
+      const inc = await client.query(
+        `SELECT id, caller_id FROM incidents WHERE id = $1 AND tenant_id = current_tenant_id()`,
+        [incidentId],
+      );
+      if (inc.rows.length === 0) throw NotFound('Incident not found');
+      const isFulfiller = isFulfillerRole(req);
+      if (!isFulfiller && (inc.rows[0] as { caller_id: string | null }).caller_id !== userId) {
+        res.status(403).json({ error: 'Insufficient permissions' });
+        return;
+      }
+
+      const mi = await client.query(
+        `SELECT id, number, status::text AS status, title FROM major_incidents WHERE id = $1 AND tenant_id = $2`,
+        [majorIncidentId, tenantId],
+      );
+      if (mi.rows.length === 0) throw NotFound('Major incident not found');
+      const mst = (mi.rows[0] as { status: string }).status;
+      if (['pending_acceptance', 'resolved', 'cancelled'].includes(mst)) {
+        return res.status(400).json({
+          error: 'This major incident cannot accept new links (pending acceptance, resolved, or cancelled).',
+        });
+      }
+
+      await client.query(
+        `INSERT INTO major_incident_related_incidents (tenant_id, major_incident_id, incident_id, link_reason)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (major_incident_id, incident_id) DO UPDATE SET link_reason = EXCLUDED.link_reason
+         RETURNING *`,
+        [tenantId, majorIncidentId, incidentId, 'Linked from incident record'],
+      );
+
+      await client.query(
+        `INSERT INTO major_incident_events (tenant_id, major_incident_id, event_type, payload, actor_user_id)
+         VALUES ($1, $2, 'related_incident_linked', $3::jsonb, $4)`,
+        [tenantId, majorIncidentId, JSON.stringify({ incident_id: incidentId }), userId],
+      );
+
+      const miTitle = (mi.rows[0] as { title: string }).title;
+      await client.query(
+        `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content, is_customer_visible)
+         VALUES (current_tenant_id(), $1::uuid, $2::uuid, 'work_note', $3, false)`,
+        [incidentId, userId, `Linked to major incident: ${miTitle}`],
+      );
+
+      res.status(201).json({ success: true, major_incident_id: majorIncidentId });
+      return;
+    } catch (err) {
+      next(err);
+      return;
+    }
+  },
+);
 
 // ─── GET /api/incidents/:id/problems ───
 router.get('/:id/problems', async (req: Request, res: Response, next: NextFunction) => {

@@ -171,20 +171,20 @@ CREATE POLICY tenant_isolation_requests ON requests
   );
 
 -- ─── Incidents ───
--- Only fulfillers and admins can see incidents
+-- Only fulfillers and admins can see incidents; system (worker) for automation
 CREATE POLICY tenant_isolation_incidents ON incidents
   FOR ALL USING (
     tenant_id = current_tenant_id()
-    AND current_user_has_role('admin', 'fulfiller')
+    AND current_user_has_role('admin', 'fulfiller', 'system')
   );
 
 -- ─── Incident Journal ───
--- Customer-visible entries for users; all entries for fulfillers/admins
+-- Customer-visible entries for users; all entries for fulfillers/admins; system for automation
 CREATE POLICY tenant_isolation_journal ON incident_journal
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller')
+      current_user_has_role('admin', 'fulfiller', 'system')
       OR is_customer_visible = true
     )
   );
@@ -231,7 +231,7 @@ CREATE POLICY mi_events_select ON major_incident_events
 CREATE POLICY mi_events_insert ON major_incident_events
   FOR INSERT WITH CHECK (
     tenant_id = current_tenant_id()
-    AND current_user_has_role('admin', 'major_incident_manager', 'system')
+    AND current_user_has_role('admin', 'fulfiller', 'major_incident_manager', 'system')
   );
 
 DROP POLICY IF EXISTS tenant_isolation_mi_related ON major_incident_related_incidents;
@@ -243,7 +243,7 @@ CREATE POLICY mi_related_select ON major_incident_related_incidents
 CREATE POLICY mi_related_insert ON major_incident_related_incidents
   FOR INSERT WITH CHECK (
     tenant_id = current_tenant_id()
-    AND current_user_has_role('admin', 'major_incident_manager', 'system')
+    AND current_user_has_role('admin', 'major_incident_manager', 'fulfiller', 'system')
   );
 
 DROP POLICY IF EXISTS tenant_isolation_mi_participants ON major_incident_participants;

@@ -611,5 +611,6 @@ export function useIncidentDetail() {
     handleDeleteAttachment,
     handlePreview,
     formatSize,
+    refresh,
   };
 }

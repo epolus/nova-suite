@@ -390,6 +390,10 @@ export const createCabMeetingSchema = z.object({
   minutes: z.string().max(20000).optional(),
 });
 
+export const majorIncidentResolveSchema = z.object({
+  solution: z.string().min(1).max(20000),
+});
+
 export const createBlackoutSchema = z.object({
   name: z.string().min(1).max(255),
   start_date: z.string(),
@@ -398,6 +402,10 @@ export const createBlackoutSchema = z.object({
 });
 
 export const updateBlackoutSchema = createBlackoutSchema.partial();
+
+export const incidentLinkMajorIncidentSchema = z.object({
+  major_incident_id: uuidSchema,
+});
 
 export const addJournalEntrySchema = z.object({
   entry_type: z.enum(['comment', 'work_note', 'state_change', 'assignment']).default('comment'),
@@ -508,7 +516,7 @@ export const majorIncidentListQuerySchema = paginationSchema.extend({
   status: z.string().max(200).optional(),
   status_not_in: z.string().max(200).optional(),
   search: z.string().max(200).optional(),
-  sort_by: z.enum(['declared_major_at', 'title', 'status', 'priority']).optional(),
+  sort_by: z.enum(['declared_major_at', 'title', 'status', 'priority', 'number']).optional(),
   sort_dir: z.enum(['asc', 'desc']).optional(),
   priority_lte: z.coerce.number().int().min(1).max(2).optional(),
 });
@@ -521,6 +529,7 @@ export type ApproveRequestInput = z.infer<typeof approveRequestSchema>;
 export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
 export type UpdateIncidentInput = z.infer<typeof updateIncidentSchema>;
 export type AddJournalEntryInput = z.infer<typeof addJournalEntrySchema>;
+export type IncidentLinkMajorIncidentInput = z.infer<typeof incidentLinkMajorIncidentSchema>;
 export type CreateProblemInput = z.infer<typeof createProblemSchema>;
 export type UpdateProblemInput = z.infer<typeof updateProblemSchema>;
 export type CreateChangeInput = z.infer<typeof createChangeSchema>;
@@ -533,3 +542,4 @@ export type UpdateCIInput = z.infer<typeof updateCISchema>;
 export type CreateCIRelationshipInput = z.infer<typeof createCIRelationshipSchema>;
 export type CreateMajorIncidentInput = z.infer<typeof createMajorIncidentSchema>;
 export type UpdateMajorIncidentInput = z.infer<typeof updateMajorIncidentSchema>;
+export type MajorIncidentResolveInput = z.infer<typeof majorIncidentResolveSchema>;

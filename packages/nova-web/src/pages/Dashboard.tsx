@@ -88,7 +88,7 @@ export default function Dashboard() {
   const [pendingChanges, setPendingChanges] = useState<Change[]>([]);
   const [recentRequests, setRecentRequests] = useState<ServiceRequest[]>([]);
   const [requestTotal, setRequestTotal] = useState(0);
-  const [majorRows, setMajorRows] = useState<Array<{ id: string; title: string; status: string; priority: number }>>([]);
+  const [majorRows, setMajorRows] = useState<Array<{ id: string; number: string; title: string; status: string; priority: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   const isFulfiller = isFulfillerRole(user?.roles);
@@ -127,7 +127,7 @@ export default function Dashboard() {
           setAssignedToMeTotal(queueRes.pagination.total);
           const majorRes = results[idx++] as { major_incidents: Record<string, unknown>[] };
           setMajorRows(
-            (majorRes.major_incidents as Array<{ id: string; title: string; status: string; priority: number }>) ?? [],
+            (majorRes.major_incidents as Array<{ id: string; number: string; title: string; status: string; priority: number }>) ?? [],
           );
         }
         if (canManageChanges) {
@@ -218,7 +218,7 @@ export default function Dashboard() {
             {majorRows.map((m) => (
               <li key={m.id}>
                 <Link to={`/major-incidents/${m.id}`} className="text-indigo-700 hover:underline font-medium">
-                  P{m.priority} · {m.title}
+                  {m.number} · P{m.priority} · {m.title}
                 </Link>
                 <span className="text-gray-500 ml-2 capitalize">({m.status})</span>
               </li>

@@ -17,6 +17,7 @@ import {
   postmortemUpsertSchema,
   publishPostmortemSchema,
   majorIncidentListQuerySchema,
+  majorIncidentResolveSchema,
 } from '../../domain/schemas';
 import type { CreateMajorIncidentInput } from '../../domain/schemas';
 import { NotFound } from '../../middleware/errorHandler';
@@ -95,7 +96,7 @@ router.get('/active-banner', async (req: Request, res: Response, next: NextFunct
     const client = getRequestClient(req);
     const tenantId = req.user!.tenant_id;
     const r = await client.query(
-      `SELECT id, title, status, priority, declared_major_at
+      `SELECT id, number, title, status, priority, declared_major_at
        FROM major_incidents
        WHERE tenant_id = $1
          AND status IN ('declared', 'investigating', 'monitoring')
@@ -157,7 +158,7 @@ router.get(
       }
       if (search && search.trim()) {
         p += 1;
-        conds.push(`mi.title ILIKE '%' || $${p} || '%'`);
+        conds.push(`(mi.title ILIKE '%' || $${p} || '%' OR mi.number ILIKE '%' || $${p} || '%')`);
         params.push(search.trim());
       }
       if (priority_lte !== undefined) {
@@ -166,7 +167,7 @@ router.get(
         params.push(priority_lte);
       }
       const sortKey =
-        sort_by === 'title' || sort_by === 'status' || sort_by === 'priority' || sort_by === 'declared_major_at'
+        sort_by === 'title' || sort_by === 'status' || sort_by === 'priority' || sort_by === 'declared_major_at' || sort_by === 'number'
           ? sort_by
           : 'declared_major_at';
       const dir = sort_dir === 'asc' ? 'ASC' : 'DESC';
@@ -228,14 +229,18 @@ router.post(
       }
       const initialStatus = awaitingAcceptance ? 'pending_acceptance' : 'declared';
 
+      const seqResult = await client.query(`SELECT nextval('major_incident_number_seq') AS nextval`);
+      const number = `MI${String((seqResult.rows[0] as { nextval: string | number }).nextval).padStart(7, '0')}`;
+
       const ins = await client.query(
         `INSERT INTO major_incidents (
-           tenant_id, title, description, priority, impact, urgency,
+           tenant_id, number, title, description, priority, impact, urgency,
            affected_service_ids, created_by, assigned_team_id, primary_incident_id, war_room_channel, status
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::major_incident_status_enum)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::major_incident_status_enum)
          RETURNING *`,
         [
           tenantId,
+          number,
           body.title,
           body.description ?? null,
           body.priority,
@@ -250,6 +255,14 @@ router.post(
         ],
       );
       const row = ins.rows[0] as { id: string; title: string };
+      if (primaryId) {
+        await client.query(
+          `INSERT INTO major_incident_related_incidents (tenant_id, major_incident_id, incident_id, link_reason)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (major_incident_id, incident_id) DO NOTHING`,
+          [tenantId, row.id, primaryId, 'Primary incident'],
+        );
+      }
       await insertMiEvent(
         client,
         tenantId,
@@ -290,11 +303,12 @@ router.post('/:id/accept-major', requireMajorIncidentManage, async (req: Request
     const id = routeId(req);
     const tenantId = req.user!.tenant_id;
     const cur = await client.query(
-      `SELECT id, status::text AS status, title FROM major_incidents WHERE id = $1 AND tenant_id = $2`,
+      `SELECT id, status::text AS status, title, primary_incident_id
+       FROM major_incidents WHERE id = $1 AND tenant_id = $2`,
       [id, tenantId],
     );
     if (cur.rows.length === 0) throw NotFound('Major incident not found');
-    const row = cur.rows[0] as { status: string; title: string };
+    const row = cur.rows[0] as { status: string; title: string; primary_incident_id: string | null };
     if (row.status !== 'pending_acceptance') {
       return res.status(400).json({ error: 'This major incident is not awaiting acceptance' });
     }
@@ -309,6 +323,14 @@ router.post('/:id/accept-major', requireMajorIncidentManage, async (req: Request
       return res.status(409).json({ error: 'Major incident state changed; refresh and try again' });
     }
     await insertMiEvent(client, tenantId, id, 'accepted_as_major', {}, req.user!.id);
+    if (row.primary_incident_id) {
+      await client.query(
+        `INSERT INTO major_incident_related_incidents (tenant_id, major_incident_id, incident_id, link_reason)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (major_incident_id, incident_id) DO NOTHING`,
+        [tenantId, id, row.primary_incident_id, 'Primary incident'],
+      );
+    }
     await enqueueMajorIncidentWorkflowStartJob({
       tenantId,
       majorIncidentId: id,
@@ -316,6 +338,45 @@ router.post('/:id/accept-major', requireMajorIncidentManage, async (req: Request
       queryable: client,
     });
     queueMajorIncidentNotification(tenantId, id, 'major_incident.accepted', req.user!.id);
+    res.json({ major_incident: upd.rows[0] });
+    return;
+  } catch (err) {
+    next(err);
+    return;
+  }
+});
+
+// ─── POST /api/major-incidents/:id/reject-promotion ───
+router.post('/:id/reject-promotion', requireMajorIncidentManage, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const id = routeId(req);
+    const tenantId = req.user!.tenant_id;
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 2000) : '';
+
+    const cur = await client.query(
+      `SELECT id, status::text AS status FROM major_incidents WHERE id = $1 AND tenant_id = $2`,
+      [id, tenantId],
+    );
+    if (cur.rows.length === 0) throw NotFound('Major incident not found');
+    if ((cur.rows[0] as { status: string }).status !== 'pending_acceptance') {
+      return res.status(400).json({ error: 'Only a proposed major incident awaiting acceptance can be rejected' });
+    }
+
+    const upd = await client.query(
+      `UPDATE major_incidents
+       SET status = 'cancelled'::major_incident_status_enum,
+           primary_incident_id = NULL,
+           updated_at = now()
+       WHERE id = $1 AND tenant_id = $2 AND status = 'pending_acceptance'::major_incident_status_enum
+       RETURNING *`,
+      [id, tenantId],
+    );
+    if (upd.rows.length === 0) {
+      return res.status(409).json({ error: 'Major incident state changed; refresh and try again' });
+    }
+
+    await insertMiEvent(client, tenantId, id, 'promotion_rejected', { reason: reason || undefined }, req.user!.id);
     res.json({ major_incident: upd.rows[0] });
     return;
   } catch (err) {
@@ -533,11 +594,16 @@ router.post(
 );
 
 // ─── POST /api/major-incidents/:id/resolve ───
-router.post('/:id/resolve', requireMajorIncidentManage, async (req: Request, res: Response, next: NextFunction) => {
+router.post(
+  '/:id/resolve',
+  requireMajorIncidentManage,
+  validateBody(majorIncidentResolveSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
     const id = routeId(req);
     const tenantId = req.user!.tenant_id;
+    const { solution } = req.body as { solution: string };
     const cur = await client.query(
       `SELECT id, status::text AS status FROM major_incidents WHERE id = $1 AND tenant_id = $2`,
       [id, tenantId],
@@ -551,16 +617,17 @@ router.post('/:id/resolve', requireMajorIncidentManage, async (req: Request, res
       `UPDATE major_incidents
        SET status = 'monitoring'::major_incident_status_enum,
            monitoring_until_at = now() + interval '5 minutes',
+           resolution_summary = $3,
            updated_at = now()
        WHERE id = $1 AND tenant_id = $2
          AND status::text NOT IN ('resolved', 'cancelled', 'pending_acceptance')
        RETURNING *`,
-      [id, tenantId],
+      [id, tenantId, solution],
     );
     if (upd.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid state for resolve' });
     }
-    await insertMiEvent(client, tenantId, id, 'resolve_requested', {}, req.user!.id);
+    await insertMiEvent(client, tenantId, id, 'resolve_requested', { solution }, req.user!.id);
     await signalMajorIncidentDeclareResolved(id);
     queueMajorIncidentNotification(tenantId, id, 'major_incident.resolve_requested', req.user!.id);
     res.json({ ok: true, major_incident: upd.rows[0] });
@@ -569,7 +636,8 @@ router.post('/:id/resolve', requireMajorIncidentManage, async (req: Request, res
     next(err);
     return;
   }
-});
+  },
+);
 router.post(
   '/:id/related-incidents',
   requireMajorIncidentManage,

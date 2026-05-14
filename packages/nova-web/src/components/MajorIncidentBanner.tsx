@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { majorIncidents as majorIncidentsApi } from '../api/client';
 
 export default function MajorIncidentBanner() {
-  const [items, setItems] = useState<Array<{ id: string; title: string; status: string; priority: number }>>([]);
+  const [items, setItems] = useState<Array<{ id: string; number: string; title: string; status: string; priority: number }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -13,7 +13,7 @@ export default function MajorIncidentBanner() {
         const { items: rows } = await majorIncidentsApi.activeBanner();
         if (!cancelled) {
           setItems(
-            (rows as Array<{ id: string; title: string; status: string; priority: number }>).filter(Boolean),
+            (rows as Array<{ id: string; number: string; title: string; status: string; priority: number }>).filter(Boolean),
           );
         }
       } catch {
@@ -40,7 +40,7 @@ export default function MajorIncidentBanner() {
             to={`/major-incidents/${it.id}`}
             className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700"
           >
-            P{it.priority} · {it.title}
+            P{it.priority} · {it.number} · {it.title}
           </Link>
         ))}
       </div>

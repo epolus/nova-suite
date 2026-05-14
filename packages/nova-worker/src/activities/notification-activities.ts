@@ -150,7 +150,7 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       entity = (r.rows[0] as Record<string, string | null>) || null;
     } else if (input.entityType === 'major_incident') {
       const r = await client.query(
-        `SELECT id::text AS id, title, created_by
+        `SELECT id::text AS id, number, title, created_by
          FROM major_incidents
          WHERE id = $1::uuid`,
         [input.entityId],
@@ -234,6 +234,7 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       problem_title: String(entity.title || ''),
       knowledge_number: String(entity.number || ''),
       knowledge_title: String(entity.title || ''),
+      major_incident_number: String(entity.number || ''),
       major_incident_title: String(entity.title || ''),
     };
 
