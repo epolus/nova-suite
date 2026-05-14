@@ -158,7 +158,7 @@ In Entra app registration, add a Web redirect URI that exactly matches `OIDC_RED
 | Nova Engine    | 4000  | Backend REST API                     |
 | PostgreSQL     | 5432  | Database                             |
 | Temporal       | 7233  | Workflow engine (gRPC)               |
-| Temporal UI    | 8080  | Workflow monitoring dashboard         |
+| Temporal UI    | 8080  | Workflow monitoring dashboard        |
 
 ## Project Structure
 
@@ -167,57 +167,103 @@ nova-suite/
 ├── packages/
 │   ├── nova-engine/              # Backend API
 │   │   └── src/
-│   │       ├── index.ts          # Entry point + Swagger UI
+│   │       ├── index.ts          # Express app, Swagger UI, health, metrics
 │   │       ├── config.ts         # Environment config
-│   │       ├── openapi.ts        # OpenAPI 3.0 spec
+│   │       ├── logger.ts
 │   │       ├── api/
 │   │       │   ├── routes.ts     # Main router
-│   │       │   ├── auth/         # Login, SSO, register, user info
-│   │       │   ├── admin/        # User/role/org management
-│   │       │   ├── catalog/      # Service categories & items
-│   │       │   ├── requests/     # Service request lifecycle
-│   │       │   ├── incidents/    # Incident management
-│   │       │   ├── cmdb/         # CI classes, items, relationships
-│   │       │   └── temporal/     # Workflow orchestration
+│   │       │   ├── roles.ts      # Route → role metadata
+│   │       │   ├── admin/        # Users, roles, org, catalog admin, imports, ...
+│   │       │   ├── approvals/    # Approval tasks
+│   │       │   ├── assets/
+│   │       │   ├── attachments/
+│   │       │   ├── auth/         # Login, SSO, session
+│   │       │   ├── cart/
+│   │       │   ├── catalog/      # Categories, items, task automation config
+│   │       │   ├── changes/
+│   │       │   ├── cmdb/
+│   │       │   ├── config-packages/
+│   │       │   ├── credentials/
+│   │       │   ├── datasources/
+│   │       │   ├── import/
+│   │       │   ├── incidents/
+│   │       │   ├── knowledge/
+│   │       │   ├── major-incidents/
+│   │       │   ├── notifications/
+│   │       │   ├── problems/
+│   │       │   ├── releases/
+│   │       │   ├── reports/
+│   │       │   ├── requests/
+│   │       │   ├── search/
+│   │       │   ├── settings/     # Theme and app settings
+│   │       │   └── temporal/     # Enqueue / inspect workflows
+│   │       ├── audit/
+│   │       ├── cache/            # Redis + cache metrics
 │   │       ├── data/
-│   │       │   └── db.ts         # Database wrapper + RLS helpers
+│   │       │   └── db.ts         # Database pool + RLS helpers
 │   │       ├── domain/
-│   │       │   └── schemas.ts    # Zod validation schemas
-│   │       └── middleware/
-│   │           ├── auth.ts       # JWT + RLS context
-│   │           ├── errorHandler.ts
-│   │           └── validate.ts   # Request validation
-│   ├── nova-web/                 # Frontend SPA
+│   │       │   ├── schemas.ts    # Zod models + OpenAPI extensions
+│   │       │   └── sla.ts
+│   │       ├── middleware/       # auth, validation, errors
+│   │       ├── notifications/    # DB-side notification triggers
+│   │       ├── observability/    # Prometheus metrics middleware
+│   │       ├── openapi/          # OpenAPI 3 spec (registerPaths + generator)
+│   │       └── temporal/         # Workflow definitions + start-queue dispatcher
+│   ├── nova-web/                 # Frontend SPA (Vite + React)
 │   │   └── src/
-│   │       ├── api/client.ts     # API client + TypeScript interfaces
-│   │       ├── components/       # DataTable, Layout, SearchBar, etc.
-│   │       ├── hooks/            # useListParams, useAuth
+│   │       ├── main.tsx
+│   │       ├── App.tsx
+│   │       ├── api/client.ts     # API client + shared types
+│   │       ├── components/       # Layout, DataTable, workflow designer, ...
+│   │       ├── hooks/
+│   │       ├── context/          # Auth, cart, locale, theme
+│   │       ├── i18n/             # Locales and JSON message catalogs
 │   │       ├── pages/
-│   │       │   ├── Dashboard.tsx
-│   │       │   ├── catalog/      # Service catalog + cart
-│   │       │   ├── requests/     # Request list + detail
-│   │       │   ├── incidents/    # Incident list + detail + create
-│   │       │   ├── cmdb/         # CMDB list + detail + form
-│   │       │   └── admin/        # All admin pages
-│   │       └── context/          # Auth context
-│   ├── nova-shared/              # Shared contracts and workflow schema
+│   │       │   ├── Dashboard.tsx, Login.tsx, profile, search, My Todo / My Groups
+│   │       │   ├── admin/        # Admin console + workflow editor
+│   │       │   ├── catalog/      # Catalog + cart
+│   │       │   ├── changes/
+│   │       │   ├── cmdb/
+│   │       │   ├── ess/          # Employee self-service home + approvals
+│   │       │   ├── incidents/
+│   │       │   ├── knowledge/
+│   │       │   ├── major-incidents/
+│   │       │   ├── problems/
+│   │       │   ├── reports/
+│   │       │   ├── requests/
+│   │       │   └── todo/
+│   │       └── utils/
+│   ├── nova-shared/              # Shared automation contracts for engine + worker
 │   │   └── src/
-│   │       ├── index.ts          # Shared package exports
+│   │       ├── index.ts
 │   │       ├── automation-config.ts
 │   │       ├── automation-builder-defaults.ts
 │   │       └── automation-fixtures.ts
-│   └── nova-worker/              # Temporal workflow worker
+│   └── nova-worker/              # Temporal worker (activities + workflows)
+│       └── src/
+│           ├── worker.ts
+│           ├── config.ts
+│           ├── db.ts
+│           ├── credentials/      # Secret provider helpers
+│           ├── activities/       # Catalog, datasource, email, incidents, ...
+│           └── workflows/        # Fulfillment, sync, notifications, major incidents, ...
 ├── infra/
 │   ├── postgres/
-│   │   ├── init.sql              # Full schema + seed data
+│   │   ├── init.sql              # Schema + seed data
 │   │   ├── rls.sql               # Row-Level Security policies
-│   │   └── 03-demo-data.sql      # Demo data
+│   │   └── 03-demo-data.sql      # Demo tenants / records
 │   └── caddy/
 │       └── Caddyfile             # Reverse proxy config
 ├── docs/
 │   ├── ARCHITECTURE.md
+│   ├── CATALOG_TASK_AUTOMATION.md
+│   ├── ENVIRONMENT.md
 │   ├── HIGH_AVAILABILITY.md
+│   ├── OBSERVABILITY.md
+│   ├── OPERATIONS_RUNBOOK.md
 │   └── UPGRADE_STRATEGY.md
+├── scripts/                      # Backup / maintenance helpers
+├── .github/                      # CI workflows
 ├── docker-compose.yml
 ├── .env.example
 └── package.json
@@ -227,38 +273,44 @@ nova-suite/
 
 All endpoints are prefixed with `/api`. Full interactive documentation is available at `/docs` (Swagger UI).
 
-| Endpoint                            | Method | Auth           | Description                         |
-|-------------------------------------|--------|----------------|-------------------------------------|
-| `/api/auth/login`                   | POST   | None           | Get JWT token                       |
-| `/api/auth/sso/authorize`          | GET    | None           | Initiate SSO login via OIDC         |
-| `/api/auth/me`                      | GET    | Any            | Current user info                   |
-| `/api/auth/users`                   | GET    | Fulfiller+     | List users (for pickers)            |
-| `/api/catalog/categories`           | GET    | Any            | List service categories             |
-| `/api/catalog/items`                | GET    | Any            | List service items                  |
-| `/api/requests`                     | GET/POST | Any          | List / submit service requests      |
-| `/api/requests/:id/approve`         | POST   | Manager/Admin  | Approve or reject a request         |
-| `/api/incidents`                    | GET/POST | Fulfiller+   | List / create incidents             |
-| `/api/incidents/:id`                | PATCH  | Fulfiller+     | Update an incident                  |
-| `/api/incidents/:id/journal`        | GET/POST | Varies       | Activity log entries                |
-| `/api/cmdb/classes`                 | GET/POST | Admin/CM     | List / create CI classes            |
-| `/api/cmdb/classes/:id`            | PUT/DELETE | Admin/CM   | Update / delete CI classes          |
-| `/api/cmdb/items`                   | GET/POST | Varies       | List / create configuration items   |
-| `/api/cmdb/items/:id`              | GET/PATCH | Varies      | CI details / update                 |
-| `/api/cmdb/items/:id/history`      | GET    | Fulfiller+     | CI audit trail                      |
-| `/api/cmdb/items/:id/impact`       | GET    | Fulfiller+     | Impact analysis (blast radius)      |
-| `/api/cmdb/relationships`           | GET/POST | Fulfiller+  | List / create CI relationships      |
-| `/api/cmdb/relationships/:id`      | DELETE | Fulfiller+     | Remove a relationship               |
-| `/api/admin/users`                  | GET/POST | Admin        | User management                     |
-| `/api/admin/users/:id`             | PATCH/DELETE | Admin     | Update / delete user                |
-| `/api/admin/roles`                  | GET/POST | Admin        | Role management                     |
-| `/api/admin/departments`            | GET/POST | Admin        | Department management               |
-| `/api/admin/cost-centers`           | GET/POST | Admin        | Cost center management              |
-| `/api/admin/assignment-groups`      | GET/POST | Admin        | Assignment group management         |
-| `/api/admin/services`               | GET/POST | Admin        | Service management                  |
-| `/api/admin/processes`              | GET/POST | Admin        | Process management                  |
-| `/api/settings/theme`              | GET/PUT | Admin         | Theming (colors, logo, name)        |
+| Endpoint                            | Method       | Auth              | Description                         |
+|-------------------------------------|--------------|-------------------|-------------------------------------|
+| `/api/auth/login`                   | POST         | None              | Get JWT token                       |
+| `/api/auth/sso/authorize`           | GET          | None              | Initiate SSO login via OIDC         |
+| `/api/auth/me`                      | GET          | Any               | Current user info                   |
+| `/api/auth/users`                   | GET          | Admin / FF / User | List users (for pickers)            |
+| `/api/catalog/categories`           | GET          | Any               | List service categories             |
+| `/api/catalog/items`                | GET          | Any               | List service items                  |
+| `/api/requests`                     | GET/POST     | Any               | List / submit service requests      |
+| `/api/requests/:id/approve`         | POST         | Admin / FF        | Approve or reject a request         |
+| `/api/incidents`                    | GET          | Any               | List incidents (scoped for non-FF)  |
+| `/api/incidents`                    | POST         | Admin / FF        | Create incident (agent)             |
+| `/api/incidents/ess`                | POST         | User              | use `POST /api/incidents`           |
+| `/api/incidents/:id`                | PATCH        | Varies            | Update (FF: full; caller: limited)  |
+| `/api/incidents/:id/journal`        | GET/POST     | Varies            | Activity log entries                |
+| `/api/cmdb/classes`                 | GET          | Any               | List CI classes                     |
+| `/api/cmdb/classes`                 | POST         | Admin / CM        | Create CI class                     |
+| `/api/cmdb/classes/:id`             | PUT          | Admin / CM        | Update CI class                     |
+| `/api/cmdb/classes/:id`             | DELETE       | Admin             | Delete CI class (no CIs on class)   |
+| `/api/cmdb/items`                   | GET/POST     | Varies            | List / create configuration items   |
+| `/api/cmdb/items/:id`               | GET/PATCH    | Varies            | CI details / update                 |
+| `/api/cmdb/items/:id/history`       | GET          | Any               | CI audit trail                      |
+| `/api/cmdb/items/:id/impact`        | GET          | Any               | Impact analysis (blast radius)      |
+| `/api/cmdb/relationships`           | GET          | Any               | List CI relationships               |
+| `/api/cmdb/relationships`           | POST         | Admin / FF / CM   | Create CI relationship              |
+| `/api/cmdb/relationships/:id`       | DELETE       | Admin / FF / CM   | Remove a relationship               |
+| `/api/admin/users`                  | GET/POST     | Admin             | User management                     |
+| `/api/admin/users/:id`              | PATCH/DELETE | Admin             | Update / delete user                |
+| `/api/admin/roles`                  | GET/POST     | Admin             | Role management                     |
+| `/api/admin/departments`            | GET/POST     | Admin             | Department management               |
+| `/api/admin/cost-centers`           | GET/POST     | Admin             | Cost center management              |
+| `/api/admin/assignment-groups`      | GET/POST     | Admin             | Assignment group management         |
+| `/api/admin/services`               | GET/POST     | Admin             | Service management                  |
+| `/api/admin/processes`              | GET/POST     | Admin             | Process management                  |
+| `/api/settings/theme`               | GET          | None              | Public theming (e.g. login page)    |
+| `/api/settings`                     | GET/PUT      | Admin             | List / bulk-update tenant settings  |
 
-**Roles:** Admin = full access, Fulfiller (FF) = incident/request management, Configuration Manager (CM) = CMDB editing, User = self-service only.
+**Roles:** Admin = full access, Fulfiller (FF) = incident/request management, Configuration Manager (CM) = CMDB editing, User = self-service only. The table is a **sample**; use `/docs` for every route (changes, problems, knowledge, major incidents, cart, search, …).
 
 ## Documentation
 
