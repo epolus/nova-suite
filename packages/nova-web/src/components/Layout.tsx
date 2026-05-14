@@ -7,7 +7,6 @@ import { useTheme } from '../context/ThemeContext';
 import { notifications as notificationsApi, type AppNotification } from '../api/client';
 import GlobalSearch from './GlobalSearch';
 import DarkModeToggle from './DarkModeToggle';
-import MajorIncidentBanner from './MajorIncidentBanner';
 import { hasReportingViewRole, isAdminRole } from '../utils/roles';
 import { canAccessAdminRoute } from '../utils/adminRouteAccess';
 import { useUserPreferenceState } from '../hooks/useUserPreferenceState';
@@ -655,7 +654,6 @@ export default function Layout() {
       {/* Main content */}
       <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-content-bg)' }}>
         <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-          <MajorIncidentBanner />
           <Outlet />
         </div>
       </main>

@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { incidents as incidentsApi } from '../../api/client';
 import type { AssignmentGroupItem, Incident, Pagination } from '../../api/client';
+import MajorIncidentBanner from '../../components/MajorIncidentBanner';
 import PageHeader from '../../components/PageHeader';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
@@ -434,6 +435,7 @@ export default function IncidentsPage() {
 
   return (
     <>
+      <MajorIncidentBanner />
       <PageHeader
         title={tIncidents('title')}
         description={tIncidents('description')}

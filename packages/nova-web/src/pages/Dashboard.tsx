@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { incidents as incidentsApi, changes as changesApi, requests as requestsApi, majorIncidents as majorIncidentsApi } from '../api/client';
 import type { Incident, Change, ServiceRequest, IncidentStats, ChangeStats } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import MajorIncidentBanner from '../components/MajorIncidentBanner';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -147,6 +148,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <MajorIncidentBanner />
       <PageHeader
         title={tDashboard('welcomeBack', { name: user?.display_name || '' })}
         description={tDashboard('description')}
