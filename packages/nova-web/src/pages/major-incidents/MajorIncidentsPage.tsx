@@ -1,0 +1,213 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader';
+import SearchBar from '../../components/SearchBar';
+import DataTable, { type DataColumnDef } from '../../components/DataTable';
+import Spinner from '../../components/Spinner';
+import Badge from '../../components/Badge';
+import { majorIncidents as majorIncidentsApi } from '../../api/client';
+import { useListParams } from '../../hooks/useListParams';
+import { formatDate } from '../../utils/dateTime';
+import { MAJOR_INCIDENT_STATUS_OPTIONS } from './majorIncidentListConfig';
+
+export interface MajorIncidentListItem {
+  id: string;
+  title: string;
+  status: string;
+  priority: number;
+  declared_major_at: string | null;
+  participant_count?: number;
+}
+
+const DEFAULT_COLS = ['title', 'status', 'priority', 'declared_major_at', 'participant_count'];
+
+function createMajorIncidentListParams(args: {
+  statusFilter: string;
+  search: string;
+  sort: string;
+  dir: string;
+}): Record<string, string> {
+  const apiParams: Record<string, string> = {};
+  if (args.statusFilter === 'active') {
+    apiParams.status_not_in = 'resolved,cancelled';
+  } else if (args.statusFilter !== 'all') {
+    apiParams.status = args.statusFilter;
+  }
+  if (args.search) apiParams.search = args.search;
+  if (args.sort) {
+    apiParams.sort_by = args.sort;
+    apiParams.sort_dir = args.dir;
+  }
+  return apiParams;
+}
+
+function buildColumns(listParams: Record<string, string>): DataColumnDef<MajorIncidentListItem>[] {
+  return [
+    {
+      key: 'title',
+      label: 'Title',
+      sortable: true,
+      defaultVisible: true,
+      className: 'max-w-xs truncate',
+      render: (row) => (
+        <Link
+          to={`/major-incidents/${row.id}`}
+          state={{ listParams }}
+          className="text-indigo-600 font-medium hover:text-indigo-800"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {row.title}
+        </Link>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      defaultVisible: true,
+      render: (row) => <Badge value={row.status} />,
+    },
+    {
+      key: 'priority',
+      label: 'Priority',
+      sortable: true,
+      defaultVisible: true,
+      render: (row) => (
+        <span className={`text-xs font-bold ${row.priority <= 1 ? 'text-red-600' : 'text-orange-600'}`}>
+          P{row.priority}
+        </span>
+      ),
+    },
+    {
+      key: 'declared_major_at',
+      label: 'Declared',
+      sortable: true,
+      defaultVisible: true,
+      render: (row) => (
+        <span className="text-gray-500 text-xs">{row.declared_major_at ? formatDate(row.declared_major_at) : '—'}</span>
+      ),
+    },
+    {
+      key: 'participant_count',
+      label: 'Participants',
+      sortable: false,
+      defaultVisible: true,
+      render: (row) => <span className="text-gray-600 text-sm">{row.participant_count ?? '—'}</span>,
+    },
+  ];
+}
+
+export default function MajorIncidentsPage() {
+  const { params, setSearch, setSort, setCols, setPage, setFilter } = useListParams({
+    defaultCols: DEFAULT_COLS,
+    filterKeys: ['status'],
+    storageKey: 'major_incidents',
+  });
+
+  const [data, setData] = useState<MajorIncidentListItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const navigate = useNavigate();
+
+  const rawStatusFilter = params.filters.status || '';
+  const statusFilter = rawStatusFilter || 'active';
+
+  const getListParams = useCallback((): Record<string, string> => {
+    return createMajorIncidentListParams({
+      statusFilter,
+      search: params.search,
+      sort: params.sort,
+      dir: params.dir,
+    });
+  }, [statusFilter, params.search, params.sort, params.dir]);
+
+  const columns = useMemo(() => buildColumns(getListParams()), [getListParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const apiParams = createMajorIncidentListParams({
+      statusFilter,
+      search: params.search,
+      sort: params.sort,
+      dir: params.dir,
+    });
+    majorIncidentsApi
+      .list(apiParams, params.page, 20)
+      .then((res) => {
+        if (cancelled) return;
+        setData(res.major_incidents as unknown as MajorIncidentListItem[]);
+        setTotal(res.total);
+        setErr('');
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setErr(e instanceof Error ? e.message : 'Failed to load');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [params.page, statusFilter, params.search, params.sort, params.dir]);
+
+  const pages = Math.max(1, Math.ceil(total / 20));
+
+  return (
+    <>
+      <PageHeader
+        title="Major incidents"
+        description="Active and recent major incident command records."
+      />
+      {err && <p className="text-sm text-red-600 mb-4">{err}</p>}
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="w-full sm:w-80">
+          <SearchBar value={params.search} onChange={setSearch} placeholder="Search by title…" />
+        </div>
+        <div className="flex gap-2 flex-wrap items-center">
+          {MAJOR_INCIDENT_STATUS_OPTIONS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setFilter('status', s === 'active' ? '' : s)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors capitalize ${
+                statusFilter === s ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {s.replace(/_/g, ' ')}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <Spinner />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={data}
+          visibleColumns={params.cols}
+          onColumnsChange={setCols}
+          sortKey={params.sort}
+          sortDir={params.dir}
+          onSort={setSort}
+          emptyMessage={params.search ? `No major incidents matching "${params.search}"` : 'No major incidents found.'}
+          onRowClick={(row) => navigate(`/major-incidents/${row.id}`, { state: { listParams: getListParams() } })}
+          pagination={
+            pages > 1
+              ? {
+                  page: params.page,
+                  pages,
+                  total,
+                  onPageChange: setPage,
+                }
+              : undefined
+          }
+        />
+      )}
+    </>
+  );
+}

@@ -149,7 +149,7 @@ export const configPackageNotificationRuleSchema = z.object({
   external_key: configExternalKeySchema,
   name: z.string().min(1).max(255),
   description: nullableStringSchema,
-  entity_type: z.enum(['incident', 'request', 'change', 'problem', 'knowledge']).default('incident'),
+  entity_type: z.enum(['incident', 'request', 'change', 'problem', 'knowledge', 'major_incident']).default('incident'),
   trigger_key: z.string().min(1).max(100),
   recipient_type: z.string().min(1).max(100),
   recipient_user_email: z.string().email().nullable().optional(),
@@ -450,6 +450,69 @@ export const createCIRelationshipSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+// ─── Major incidents ───
+export const postmortemActionItemSchema = z.object({
+  title: z.string().min(1).max(500),
+  owner_user_id: uuidSchema.optional().nullable(),
+  due_at: z.string().optional().nullable(),
+});
+
+export const createMajorIncidentSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(10000).optional(),
+  priority: z.union([z.literal(1), z.literal(2)]).default(1),
+  impact: z.enum(['low', 'medium', 'high']).default('high'),
+  urgency: z.enum(['low', 'medium', 'high']).default('high'),
+  affected_service_ids: z.array(uuidSchema).default([]),
+  assigned_team_id: uuidSchema.optional().nullable(),
+  primary_incident_id: uuidSchema.optional().nullable(),
+  war_room_channel: z.string().max(1000).optional().nullable(),
+});
+
+export const updateMajorIncidentSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  description: z.string().max(10000).optional().nullable(),
+  war_room_channel: z.string().max(1000).optional().nullable(),
+});
+
+export const majorIncidentStakeholderUpdateSchema = z.object({
+  audience: z.enum(['internal', 'external']).default('external'),
+  subject: z.string().max(500).optional().default(''),
+  body: z.string().min(1).max(20000),
+});
+
+export const majorIncidentRoleSchema = z.object({
+  role: z.enum(['commander', 'comms_lead', 'scribe', 'resolver']),
+  user_id: uuidSchema,
+});
+
+export const majorIncidentRelatedSchema = z.object({
+  incident_id: uuidSchema,
+  link_reason: z.string().max(500).optional(),
+});
+
+export const postmortemUpsertSchema = z.object({
+  timeline: z.array(z.record(z.string(), z.unknown())).optional(),
+  root_causes: z.array(z.string()).optional(),
+  contributing_factors: z.array(z.string()).optional(),
+  action_items: z.array(postmortemActionItemSchema).optional(),
+  status: z.enum(['draft', 'in_review', 'published']).optional(),
+});
+
+export const publishPostmortemSchema = z.object({
+  root_causes: z.array(z.string().min(3)).min(1),
+  contributing_factors: z.array(z.string().min(3)).min(1),
+});
+
+export const majorIncidentListQuerySchema = paginationSchema.extend({
+  status: z.string().max(200).optional(),
+  status_not_in: z.string().max(200).optional(),
+  search: z.string().max(200).optional(),
+  sort_by: z.enum(['declared_major_at', 'title', 'status', 'priority']).optional(),
+  sort_dir: z.enum(['asc', 'desc']).optional(),
+  priority_lte: z.coerce.number().int().min(1).max(2).optional(),
+});
+
 // ─── Type Exports ───
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
@@ -468,3 +531,5 @@ export type CreateCIClassInput = z.infer<typeof createCIClassSchema>;
 export type CreateCIInput = z.infer<typeof createCISchema>;
 export type UpdateCIInput = z.infer<typeof updateCISchema>;
 export type CreateCIRelationshipInput = z.infer<typeof createCIRelationshipSchema>;
+export type CreateMajorIncidentInput = z.infer<typeof createMajorIncidentSchema>;
+export type UpdateMajorIncidentInput = z.infer<typeof updateMajorIncidentSchema>;

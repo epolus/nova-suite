@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { incidents as incidentsApi, changes as changesApi, requests as requestsApi } from '../api/client';
+import { incidents as incidentsApi, changes as changesApi, requests as requestsApi, majorIncidents as majorIncidentsApi } from '../api/client';
 import type { Incident, Change, ServiceRequest, IncidentStats, ChangeStats } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
@@ -87,6 +87,7 @@ export default function Dashboard() {
   const [pendingChanges, setPendingChanges] = useState<Change[]>([]);
   const [recentRequests, setRecentRequests] = useState<ServiceRequest[]>([]);
   const [requestTotal, setRequestTotal] = useState(0);
+  const [majorRows, setMajorRows] = useState<Array<{ id: string; title: string; status: string; priority: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   const isFulfiller = isFulfillerRole(user?.roles);
@@ -101,6 +102,7 @@ export default function Dashboard() {
           promises.push(
             incidentsApi.stats(),
             incidentsApi.list({ assigned_to_me: 'true' }, 1, 5),
+            majorIncidentsApi.list({ status_not_in: 'resolved,cancelled' }, 1, 8),
           );
         }
         if (canManageChanges) {
@@ -122,6 +124,10 @@ export default function Dashboard() {
           const queueRes = results[idx++] as { incidents: Incident[]; pagination: { total: number } };
           setMyQueue(queueRes.incidents);
           setAssignedToMeTotal(queueRes.pagination.total);
+          const majorRes = results[idx++] as { major_incidents: Record<string, unknown>[] };
+          setMajorRows(
+            (majorRes.major_incidents as Array<{ id: string; title: string; status: string; priority: number }>) ?? [],
+          );
         }
         if (canManageChanges) {
           setChStats(results[idx++] as ChangeStats);
@@ -199,6 +205,25 @@ export default function Dashboard() {
           />
         )}
       </div>
+
+      {isFulfiller && majorRows.length > 0 && (
+        <Card className="mb-6 border-orange-200 bg-orange-50/60">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold text-gray-900">Active major incidents</h2>
+            <Link to="/major-incidents" className="text-sm text-indigo-600 hover:text-indigo-800">View all</Link>
+          </div>
+          <ul className="space-y-2 text-sm">
+            {majorRows.map((m) => (
+              <li key={m.id}>
+                <Link to={`/major-incidents/${m.id}`} className="text-indigo-700 hover:underline font-medium">
+                  P{m.priority} · {m.title}
+                </Link>
+                <span className="text-gray-500 ml-2 capitalize">({m.status})</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* Priority breakdown */}
       {isFulfiller && incStats && incStats.by_priority.some((p) => p.count > 0) && (

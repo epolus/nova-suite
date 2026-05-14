@@ -5,7 +5,7 @@ import { getEmailProvider } from './email-provider';
 
 export interface NotificationDispatchInput {
   tenantId: string;
-  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge';
+  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
   triggerKey: string;
   entityId: string;
   actorUserId?: string | null;
@@ -148,8 +148,23 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
         [input.entityId],
       );
       entity = (r.rows[0] as Record<string, string | null>) || null;
+    } else if (input.entityType === 'major_incident') {
+      const r = await client.query(
+        `SELECT id::text AS id, title, created_by
+         FROM major_incidents
+         WHERE id = $1::uuid`,
+        [input.entityId],
+      );
+      entity = (r.rows[0] as Record<string, string | null>) || null;
     }
-    if (!entity) return 0;
+    if (!entity) {
+      log.warn('Notification dispatch skipped: entity not found', {
+        entityType: input.entityType,
+        entityId: input.entityId,
+        triggerKey: input.triggerKey,
+      });
+      return 0;
+    }
 
     const tenantLocaleRes = await client.query<{ value: string }>(
       `SELECT value
@@ -171,7 +186,14 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       [input.entityType, input.triggerKey],
     );
     const rules = rulesRes.rows as NotificationRuleRow[];
-    if (rules.length === 0) return 0;
+    if (rules.length === 0) {
+      log.warn('Notification dispatch: no active rules for trigger', {
+        entityType: input.entityType,
+        entityId: input.entityId,
+        triggerKey: input.triggerKey,
+      });
+      return 0;
+    }
 
     const ruleIds = rules.map((rule) => rule.id);
     const templateRes = await client.query<{
@@ -212,6 +234,7 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       problem_title: String(entity.title || ''),
       knowledge_number: String(entity.number || ''),
       knowledge_title: String(entity.title || ''),
+      major_incident_title: String(entity.title || ''),
     };
 
     let inserted = 0;
@@ -245,6 +268,25 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
           );
           for (const m of membersRes.rows as Array<{ user_id: string }>) recipients.add(m.user_id);
         }
+      }
+      if (recipientType === 'role_major_incident_manager' || recipientType === 'role_fulfiller') {
+        const roleName = recipientType === 'role_major_incident_manager' ? 'major_incident_manager' : 'fulfiller';
+        const uidRes = await client.query<{ user_id: string }>(
+          `SELECT DISTINCT uid AS user_id FROM (
+             SELECT ur.user_id AS uid
+             FROM user_roles ur
+             JOIN roles r ON r.id = ur.role_id AND r.tenant_id = ur.tenant_id
+             WHERE ur.tenant_id = current_tenant_id() AND r.name = $1
+             UNION
+             SELECT agm.user_id AS uid
+             FROM assignment_group_members agm
+             JOIN assignment_group_roles agr ON agr.group_id = agm.group_id AND agr.tenant_id = agm.tenant_id
+             JOIN roles r ON r.id = agr.role_id AND r.tenant_id = agr.tenant_id
+             WHERE agm.tenant_id = current_tenant_id() AND r.name = $1
+           ) u`,
+          [roleName],
+        );
+        for (const row of uidRes.rows) recipients.add(row.user_id);
       }
 
       if (input.actorUserId) recipients.delete(input.actorUserId);
@@ -367,9 +409,19 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       }
     }
 
+    if (inserted === 0 && emailQueued === 0 && rules.length > 0) {
+      log.warn('Notification dispatch: rules matched but no deliveries (recipients empty or actor-only)', {
+        entityType: input.entityType,
+        entityId: input.entityId,
+        triggerKey: input.triggerKey,
+        ruleCount: rules.length,
+      });
+    }
+
     log.info('Dispatched configured notifications', {
       triggerKey: input.triggerKey,
-      incidentId: input.entityId,
+      entityType: input.entityType,
+      entityId: input.entityId,
       inserted,
       emailQueued,
       emailSent,

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { type FormEvent, useEffect, useState } from 'react';
-import { attachments as attachmentsApi, knowledge as knowledgeApi } from '../../api/client';
+import { attachments as attachmentsApi, knowledge as knowledgeApi, majorIncidents as majorIncidentsApi } from '../../api/client';
 import type { JournalEntry, KnowledgeSuggestion, KnowledgeArticleDetail } from '../../api/client';
 import { AttachmentCard } from '../../components/AttachmentCard';
 import PageHeader from '../../components/PageHeader';
@@ -14,12 +14,15 @@ import { Card as UiCard, CardContent, CardHeader, CardTitle } from '../../compon
 import { useIncidentDetail } from './useIncidentDetail';
 import { SimilarIncidentsSection, KbSuggestionsSection } from '../../components/IncidentSidebarSections';
 import type { UserListItem, ServiceListItem, CI, Problem } from '../../api/client';
+import { canCreateMajorIncidentRecord } from '../../utils/roles';
 
 export default function IncidentDetail() {
   const [previewArticle, setPreviewArticle] = useState<KnowledgeArticleDetail | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
   const [previewAttachmentUrls, setPreviewAttachmentUrls] = useState<Record<string, string>>({});
+  const [declareMajorBusy, setDeclareMajorBusy] = useState(false);
+  const [declareMajorErr, setDeclareMajorErr] = useState('');
 
   const {
     user, navigate, prevId, nextId, goTo,
@@ -49,6 +52,29 @@ export default function IncidentDetail() {
       setPreviewError(err instanceof Error ? err.message : 'Failed to load article preview');
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const handleDeclareMajor = async () => {
+    if (!inc) return;
+    setDeclareMajorErr('');
+    setDeclareMajorBusy(true);
+    try {
+      const res = await majorIncidentsApi.create({
+        title: inc.title,
+        description: inc.description ?? undefined,
+        priority: inc.priority <= 2 ? inc.priority : 2,
+        impact: inc.impact as 'low' | 'medium' | 'high',
+        urgency: inc.urgency as 'low' | 'medium' | 'high',
+        primary_incident_id: inc.id,
+        affected_service_ids: inc.service_id ? [inc.service_id] : [],
+      });
+      const mid = (res.major_incident as { id: string }).id;
+      navigate(`/major-incidents/${mid}`);
+    } catch (err: unknown) {
+      setDeclareMajorErr(err instanceof Error ? err.message : 'Failed to promote to major incident');
+    } finally {
+      setDeclareMajorBusy(false);
     }
   };
 
@@ -100,6 +126,16 @@ export default function IncidentDetail() {
         title={`${inc.number} — ${inc.title}`}
         action={
           <div className="flex items-center gap-2">
+            {canCreateMajorIncidentRecord(user?.roles) && !isClosed && (inc.priority <= 2 || (inc.impact === 'high' && inc.urgency === 'high')) && (
+              <Button
+                type="button"
+                className="bg-orange-600 hover:bg-orange-500 text-white border-0"
+                onClick={handleDeclareMajor}
+                disabled={declareMajorBusy}
+              >
+                {declareMajorBusy ? 'Promoting…' : 'Promote to major incident'}
+              </Button>
+            )}
             {isResolved && (isFulfiller || isCaller) && (
               <Button onClick={handleReopen} disabled={saving} variant="warning">
                 Reopen Incident
@@ -145,6 +181,12 @@ export default function IncidentDetail() {
           </div>
         }
       />
+
+      {declareMajorErr && (
+        <div className="mb-4 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 font-medium">
+          {declareMajorErr}
+        </div>
+      )}
 
       {formError && (
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">

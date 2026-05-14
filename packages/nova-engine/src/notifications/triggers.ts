@@ -30,6 +30,13 @@ export const NOTIFICATION_TRIGGER_KEYS = {
     'knowledge.published',
     'knowledge.rejected',
   ],
+  major_incident: [
+    'major_incident.promotion_requested',
+    'major_incident.accepted',
+    'major_incident.resolve_requested',
+    'major_incident.stakeholder_update',
+    'major_incident.declared',
+  ],
 } as const;
 
 export function getRequestApprovalTrigger(

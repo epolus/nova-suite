@@ -134,6 +134,7 @@
       "requests": "Requests",
       "requestTasks": "Request Tasks",
       "incidents": "Incidents",
+      "majorIncidents": "Major incidents",
       "problems": "Problems",
       "changes": "Changes",
       "reports": "Reports",

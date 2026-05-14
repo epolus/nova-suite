@@ -26,6 +26,12 @@ ALTER TABLE cart_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incidents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incident_journal ENABLE ROW LEVEL SECURITY;
+ALTER TABLE major_incidents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE major_incident_stakeholder_updates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE major_incident_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE major_incident_related_incidents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE major_incident_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE postmortems ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ci_classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE configuration_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ci_relationships ENABLE ROW LEVEL SECURITY;
@@ -58,6 +64,7 @@ ALTER TABLE tenant_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_runbook_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kb_approval_workflows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kb_article_approvals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kb_article_ratings ENABLE ROW LEVEL SECURITY;
@@ -180,6 +187,97 @@ CREATE POLICY tenant_isolation_journal ON incident_journal
       current_user_has_role('admin', 'fulfiller')
       OR is_customer_visible = true
     )
+  );
+
+-- ─── Major incidents: fulfillers read; managers + admin write; system (worker) writes events ───
+DROP POLICY IF EXISTS tenant_isolation_major_incidents ON major_incidents;
+CREATE POLICY major_incidents_select ON major_incidents
+  FOR SELECT USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'major_incident_manager', 'system')
+  );
+CREATE POLICY major_incidents_insert ON major_incidents
+  FOR INSERT WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND (
+      current_user_has_role('admin', 'major_incident_manager', 'system')
+      OR (current_user_has_role('fulfiller') AND primary_incident_id IS NOT NULL)
+    )
+  );
+CREATE POLICY major_incidents_update ON major_incidents
+  FOR UPDATE USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'major_incident_manager', 'system')
+  );
+
+DROP POLICY IF EXISTS tenant_isolation_mi_stakeholder_updates ON major_incident_stakeholder_updates;
+CREATE POLICY mi_stakeholder_updates_select ON major_incident_stakeholder_updates
+  FOR SELECT USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'major_incident_manager', 'system')
+  );
+CREATE POLICY mi_stakeholder_updates_insert ON major_incident_stakeholder_updates
+  FOR INSERT WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'major_incident_manager', 'system')
+  );
+
+DROP POLICY IF EXISTS tenant_isolation_mi_events ON major_incident_events;
+CREATE POLICY mi_events_select ON major_incident_events
+  FOR SELECT USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'major_incident_manager', 'system')
+  );
+CREATE POLICY mi_events_insert ON major_incident_events
+  FOR INSERT WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'major_incident_manager', 'system')
+  );
+
+DROP POLICY IF EXISTS tenant_isolation_mi_related ON major_incident_related_incidents;
+CREATE POLICY mi_related_select ON major_incident_related_incidents
+  FOR SELECT USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'major_incident_manager', 'system')
+  );
+CREATE POLICY mi_related_insert ON major_incident_related_incidents
+  FOR INSERT WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'major_incident_manager', 'system')
+  );
+
+DROP POLICY IF EXISTS tenant_isolation_mi_participants ON major_incident_participants;
+CREATE POLICY mi_participants_select ON major_incident_participants
+  FOR SELECT USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'major_incident_manager', 'system')
+  );
+CREATE POLICY mi_participants_insert ON major_incident_participants
+  FOR INSERT WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'major_incident_manager', 'system')
+  );
+CREATE POLICY mi_participants_delete ON major_incident_participants
+  FOR DELETE USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'major_incident_manager', 'system')
+  );
+
+DROP POLICY IF EXISTS tenant_isolation_postmortems ON postmortems;
+CREATE POLICY postmortems_select ON postmortems
+  FOR SELECT USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'major_incident_manager', 'system')
+  );
+CREATE POLICY postmortems_insert ON postmortems
+  FOR INSERT WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'major_incident_manager', 'system')
+  );
+CREATE POLICY postmortems_update ON postmortems
+  FOR UPDATE USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'major_incident_manager', 'system')
   );
 
 -- ─── CI Classes ───
@@ -346,6 +444,10 @@ CREATE POLICY tenant_isolation_incident_kb_resolutions ON incident_kb_resolution
     )
   );
 
+-- ─── Service runbook links (catalog ↔ KB) ───
+CREATE POLICY tenant_isolation_service_runbook_links ON service_runbook_links
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Knowledge Approval Workflows ───
 CREATE POLICY tenant_isolation_kb_approval_workflows ON kb_approval_workflows
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -433,6 +535,12 @@ ALTER TABLE cart_items FORCE ROW LEVEL SECURITY;
 ALTER TABLE requests FORCE ROW LEVEL SECURITY;
 ALTER TABLE incidents FORCE ROW LEVEL SECURITY;
 ALTER TABLE incident_journal FORCE ROW LEVEL SECURITY;
+ALTER TABLE major_incidents FORCE ROW LEVEL SECURITY;
+ALTER TABLE major_incident_stakeholder_updates FORCE ROW LEVEL SECURITY;
+ALTER TABLE major_incident_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE major_incident_related_incidents FORCE ROW LEVEL SECURITY;
+ALTER TABLE major_incident_participants FORCE ROW LEVEL SECURITY;
+ALTER TABLE postmortems FORCE ROW LEVEL SECURITY;
 ALTER TABLE ci_classes FORCE ROW LEVEL SECURITY;
 ALTER TABLE configuration_items FORCE ROW LEVEL SECURITY;
 ALTER TABLE ci_relationships FORCE ROW LEVEL SECURITY;
@@ -465,6 +573,7 @@ ALTER TABLE tenant_settings FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles FORCE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions FORCE ROW LEVEL SECURITY;
+ALTER TABLE service_runbook_links FORCE ROW LEVEL SECURITY;
 ALTER TABLE kb_approval_workflows FORCE ROW LEVEL SECURITY;
 ALTER TABLE kb_article_approvals FORCE ROW LEVEL SECURITY;
 ALTER TABLE kb_article_ratings FORCE ROW LEVEL SECURITY;

@@ -9,6 +9,18 @@ export {
 } from './incident-activities';
 
 export {
+  majorIncidentOnDeclared,
+  majorIncidentGetSnapshot,
+  majorIncidentNudgeNoCommander,
+  majorIncidentMaybeNudgeStakeholderComms,
+  majorIncidentSetMonitoring,
+  majorIncidentFinalizeResolved,
+  postmortemGetStatus,
+  postmortemLogReminder,
+  postmortemRecordWorkflowId,
+} from './major-incident-activities';
+
+export {
   getTaskDefinitions,
   createRequestTasks,
   activateTaskGroup,

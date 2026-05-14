@@ -21,6 +21,9 @@ import RequestDetail from './pages/requests/RequestDetail';
 import IncidentsPage from './pages/incidents/IncidentsPage';
 import IncidentDetail from './pages/incidents/IncidentDetail';
 import NewIncident from './pages/incidents/NewIncident';
+import MajorIncidentsPage from './pages/major-incidents/MajorIncidentsPage';
+import MajorIncidentWarRoom from './pages/major-incidents/MajorIncidentWarRoom';
+import MajorIncidentPostmortemPage from './pages/major-incidents/MajorIncidentPostmortemPage';
 import CMDBPage from './pages/cmdb/CMDBPage';
 import CIDetail from './pages/cmdb/CIDetail';
 import CIForm from './pages/cmdb/CIForm';
@@ -128,6 +131,9 @@ function AppRoutes() {
         <Route path="/incidents" element={<IncidentsPage />} />
         <Route path="/incidents/new" element={<NewIncident />} />
         <Route path="/incidents/:id" element={<IncidentDetail />} />
+        <Route path="/major-incidents" element={<MajorIncidentsPage />} />
+        <Route path="/major-incidents/:id" element={<MajorIncidentWarRoom />} />
+        <Route path="/major-incidents/:id/postmortem" element={<MajorIncidentPostmortemPage />} />
         <Route path="/problems" element={<ProblemsPage />} />
         <Route path="/problems/new" element={<ProblemDetail />} />
         <Route path="/problems/:id" element={<ProblemDetail />} />

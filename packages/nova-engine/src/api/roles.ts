@@ -51,3 +51,18 @@ export function hasReportingCreateRole(req: Request): boolean {
 export function hasReportingAdminRole(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'report_admin']);
 }
+
+/** List/detail/banner for major incidents (read-only for fulfillers). */
+export function canViewMajorIncidents(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'fulfiller', 'major_incident_manager']);
+}
+
+/** Accept, war room actions, postmortem edits, standalone major incident create. */
+export function canManageMajorIncidents(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'major_incident_manager']);
+}
+
+/** Promote from incident (fulfiller path) or full create. */
+export function canCreateMajorIncidentRecord(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'fulfiller', 'major_incident_manager']);
+}

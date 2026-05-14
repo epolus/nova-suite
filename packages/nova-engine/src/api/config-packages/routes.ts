@@ -382,7 +382,7 @@ async function exportNotificationRule(
     external_key: string;
     name: string;
     description: string | null;
-    entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge';
+    entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
     trigger_key: string;
     recipient_type: string;
     recipient_user_email: string | null;

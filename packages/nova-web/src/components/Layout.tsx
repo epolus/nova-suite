@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import { notifications as notificationsApi, type AppNotification } from '../api/client';
 import GlobalSearch from './GlobalSearch';
 import DarkModeToggle from './DarkModeToggle';
+import MajorIncidentBanner from './MajorIncidentBanner';
 import { hasReportingViewRole, isAdminRole } from '../utils/roles';
 import { canAccessAdminRoute } from '../utils/adminRouteAccess';
 import { useUserPreferenceState } from '../hooks/useUserPreferenceState';
@@ -194,6 +195,7 @@ const nav = [
   { to: '/requests', labelKey: 'agent.requests', icon: '📋' },
   { to: '/request-tasks', labelKey: 'agent.requestTasks', icon: '🗂️' },
   { to: '/incidents', labelKey: 'agent.incidents', icon: '🔥' },
+  { to: '/major-incidents', labelKey: 'agent.majorIncidents', icon: '🚨' },
   { to: '/problems', labelKey: 'agent.problems', icon: '🧩' },
   { to: '/changes', labelKey: 'agent.changes', icon: '🛠️' },
   { to: '/reports', labelKey: 'agent.reports', icon: '📈' },
@@ -653,6 +655,7 @@ export default function Layout() {
       {/* Main content */}
       <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-content-bg)' }}>
         <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+          <MajorIncidentBanner />
           <Outlet />
         </div>
       </main>

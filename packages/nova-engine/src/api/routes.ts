@@ -27,6 +27,7 @@ import assetRoutes from './assets/routes';
 import releaseRoutes from './releases/routes';
 import reportRoutes from './reports/routes';
 import configPackageRoutes from './config-packages/routes';
+import majorIncidentRoutes from './major-incidents/routes';
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.use('/admin', adminRoutes);
 router.use('/catalog', catalogRoutes);
 router.use('/requests', requestRoutes);
 router.use('/incidents', incidentRoutes);
+router.use('/major-incidents', majorIncidentRoutes);
 router.use('/cmdb', cmdbRoutes);
 router.use('/temporal', temporalRoutes);
 router.use('/import', importRoutes);

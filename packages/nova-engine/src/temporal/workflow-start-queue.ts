@@ -8,6 +8,7 @@ import {
   startIncidentAutoClose,
   startIncidentEscalation,
   startKnowledgeApproval,
+  startMajorIncidentWorkflow,
   startNotificationDispatch,
 } from './workflows';
 
@@ -17,7 +18,8 @@ type WorkflowStartJobType =
   | 'incident_escalation_start'
   | 'incident_autoclose_start'
   | 'datasource_schedule_start'
-  | 'knowledge_approval_start';
+  | 'knowledge_approval_start'
+  | 'major_incident_workflow_start';
 
 type WorkflowStartJobRow = {
   id: string;
@@ -35,7 +37,7 @@ type CatalogFulfillmentPayload = {
 };
 
 type NotificationDispatchPayload = {
-  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge';
+  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
   triggerKey: string;
   entityId: string;
   actorUserId?: string | null;
@@ -60,6 +62,11 @@ type DataSourceSchedulePayload = {
 type KnowledgeApprovalPayload = {
   articleId: string;
   steps: { step_order: number; assignment_group_id: string }[];
+};
+
+type MajorIncidentWorkflowPayload = {
+  majorIncidentId: string;
+  title: string;
 };
 
 type Queryable = {
@@ -136,7 +143,8 @@ function isNotificationDispatchPayload(value: unknown): value is NotificationDis
       || entityType === 'request'
       || entityType === 'change'
       || entityType === 'problem'
-      || entityType === 'knowledge')
+      || entityType === 'knowledge'
+      || entityType === 'major_incident')
   );
 }
 
@@ -176,6 +184,12 @@ function isKnowledgeApprovalPayload(value: unknown): value is KnowledgeApprovalP
     const s = step as Record<string, unknown>;
     return typeof s.step_order === 'number' && Number.isFinite(s.step_order) && typeof s.assignment_group_id === 'string';
   });
+}
+
+function isMajorIncidentWorkflowPayload(value: unknown): value is MajorIncidentWorkflowPayload {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.majorIncidentId === 'string' && typeof v.title === 'string';
 }
 
 async function recoverStaleProcessingJobs(): Promise<void> {
@@ -360,6 +374,19 @@ async function processJob(job: WorkflowStartJobRow): Promise<void> {
       return;
     }
 
+    if (job.job_type === 'major_incident_workflow_start') {
+      if (!isMajorIncidentWorkflowPayload(job.payload)) {
+        throw new Error('Invalid payload for major incident workflow start job');
+      }
+      await startMajorIncidentWorkflow({
+        majorIncidentId: job.payload.majorIncidentId,
+        tenantId: job.tenant_id,
+        title: job.payload.title,
+      });
+      await markJobCompleted(job.id);
+      return;
+    }
+
     throw new Error(`Unsupported workflow start job type: ${job.job_type}`);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'unknown workflow start queue error';
@@ -425,7 +452,7 @@ export async function enqueueCatalogFulfillmentStartJob(params: {
 
 export async function enqueueNotificationDispatchStartJob(params: {
   tenantId: string;
-  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge';
+  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
   triggerKey: string;
   entityId: string;
   actorUserId?: string | null;
@@ -582,6 +609,39 @@ export async function enqueueKnowledgeApprovalStartJob(params: {
       JSON.stringify({
         articleId: params.articleId,
         steps: params.steps,
+      }),
+    ],
+  );
+}
+
+export async function enqueueMajorIncidentWorkflowStartJob(params: {
+  tenantId: string;
+  majorIncidentId: string;
+  title: string;
+  queryable?: Queryable;
+}): Promise<void> {
+  const workflowId = `major-incident-${params.majorIncidentId}`;
+  await runWithQueryable(
+    params.queryable,
+    `INSERT INTO workflow_start_jobs (
+       tenant_id, job_type, workflow_id, payload, status, attempt_count, max_attempts, next_attempt_at
+     ) VALUES (
+       $1, 'major_incident_workflow_start', $2, $3::jsonb, 'pending', 0, 0, now()
+     )
+     ON CONFLICT (tenant_id, job_type, workflow_id)
+     DO UPDATE SET
+       payload = EXCLUDED.payload,
+       status = CASE WHEN workflow_start_jobs.status = 'completed' THEN workflow_start_jobs.status ELSE 'pending' END,
+       next_attempt_at = CASE WHEN workflow_start_jobs.status = 'completed' THEN workflow_start_jobs.next_attempt_at ELSE now() END,
+       locked_at = CASE WHEN workflow_start_jobs.status = 'completed' THEN workflow_start_jobs.locked_at ELSE NULL END,
+       last_error = CASE WHEN workflow_start_jobs.status = 'completed' THEN workflow_start_jobs.last_error ELSE NULL END,
+       updated_at = now()`,
+    [
+      params.tenantId,
+      workflowId,
+      JSON.stringify({
+        majorIncidentId: params.majorIncidentId,
+        title: params.title,
       }),
     ],
   );

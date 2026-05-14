@@ -277,7 +277,7 @@ export async function signalKnowledgeApprovalDecision(
 
 export async function startNotificationDispatch(params: {
   tenantId: string;
-  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge';
+  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
   triggerKey: string;
   entityId: string;
   actorUserId?: string | null;
@@ -329,5 +329,78 @@ export async function startDbSizeSnapshotSchedule(cronSchedule = '0 2 * * *'): P
     }
     logger.warn({ err, workflowId }, 'Failed to start DB size snapshot schedule workflow');
     throw err;
+  }
+}
+
+export async function startMajorIncidentWorkflow(params: {
+  majorIncidentId: string;
+  tenantId: string;
+  title: string;
+}): Promise<string> {
+  const workflowId = `major-incident-${params.majorIncidentId}`;
+  try {
+    const cl = await getClient();
+    const handle = await cl.workflow.start('majorIncidentWorkflow', {
+      taskQueue: TASK_QUEUE,
+      workflowId,
+      args: [params],
+      workflowExecutionTimeout: '30 days',
+    });
+    logger.info({ workflowId: handle.workflowId, majorIncidentId: params.majorIncidentId }, 'Started major incident workflow');
+    return handle.workflowId;
+  } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, majorIncidentId: params.majorIncidentId }, 'Major incident workflow already running');
+      return workflowId;
+    }
+    logger.error({ err, majorIncidentId: params.majorIncidentId }, 'Failed to start major incident workflow');
+    throw err;
+  }
+}
+
+export async function signalMajorIncidentDeclareResolved(majorIncidentId: string): Promise<void> {
+  try {
+    const cl = await getClient();
+    const handle = cl.workflow.getHandle(`major-incident-${majorIncidentId}`);
+    await handle.signal('declareResolved');
+    logger.info({ majorIncidentId }, 'Sent declareResolved to major incident workflow');
+  } catch (err) {
+    logger.warn({ err, majorIncidentId }, 'Could not signal major incident workflow declareResolved');
+  }
+}
+
+export async function signalMajorIncidentStakeholderUpdate(majorIncidentId: string): Promise<void> {
+  try {
+    const cl = await getClient();
+    const handle = cl.workflow.getHandle(`major-incident-${majorIncidentId}`);
+    await handle.signal('stakeholderUpdatePosted');
+    logger.info({ majorIncidentId }, 'Sent stakeholderUpdatePosted to major incident workflow');
+  } catch (err) {
+    logger.warn({ err, majorIncidentId }, 'Could not signal major incident stakeholder update');
+  }
+}
+
+export async function queryMajorIncidentWorkflowStatus(majorIncidentId: string): Promise<{
+  phase: string;
+  majorIncidentId: string;
+} | null> {
+  try {
+    const cl = await getClient();
+    const handle = cl.workflow.getHandle(`major-incident-${majorIncidentId}`);
+    return await handle.query('getMajorIncidentStatus');
+  } catch (err) {
+    logger.warn({ err, majorIncidentId }, 'Could not query major incident workflow');
+    return null;
+  }
+}
+
+export async function signalPostmortemPublished(postmortemId: string): Promise<void> {
+  try {
+    const cl = await getClient();
+    const handle = cl.workflow.getHandle(`postmortem-${postmortemId}`);
+    await handle.signal('postmortemPublished');
+    logger.info({ postmortemId }, 'Sent postmortemPublished signal');
+  } catch (err) {
+    logger.warn({ err, postmortemId }, 'Could not signal postmortem workflow');
   }
 }

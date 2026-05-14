@@ -13,6 +13,12 @@ const colorMap: Record<string, string> = {
   fulfilled: 'bg-emerald-100 text-emerald-800',
   closed: 'bg-gray-100 text-gray-800',
   cancelled: 'bg-gray-100 text-gray-500',
+  major_incident_manager: 'bg-orange-100 text-orange-900 dark:bg-orange-950/50 dark:text-orange-100',
+  // Major incident statuses
+  pending_acceptance: 'bg-yellow-100 text-yellow-900',
+  declared: 'bg-orange-100 text-orange-900',
+  investigating: 'bg-indigo-100 text-indigo-800',
+  monitoring: 'bg-amber-100 text-amber-900',
   // Priorities
   critical: 'bg-red-100 text-red-800',
   high: 'bg-orange-100 text-orange-800',

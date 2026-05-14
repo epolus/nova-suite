@@ -2,6 +2,7 @@
 const AGENT_ROLES = new Set([
   'admin',
   'fulfiller',
+  'major_incident_manager',
   'configuration_manager',
   'catalog_designer',
   'credential_manager',
@@ -64,6 +65,16 @@ export function hasReportingCreateRole(roles: RoleList): boolean {
 
 export function hasReportingAdminRole(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'report_admin']);
+}
+
+/** War room / postmortem edits (not read-only fulfiller). */
+export function canManageMajorIncidents(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'major_incident_manager']);
+}
+
+/** Promote from incident or create MI record (includes fulfiller). */
+export function canCreateMajorIncidentRecord(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'fulfiller', 'major_incident_manager']);
 }
 
 export function hasAnyRole(roles: RoleList, required: string[]): boolean {

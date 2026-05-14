@@ -27,6 +27,11 @@ const TRIGGERS = [
   { entity: 'knowledge', id: 'knowledge.submitted_for_review', label: 'Knowledge submitted for review' },
   { entity: 'knowledge', id: 'knowledge.published', label: 'Knowledge published' },
   { entity: 'knowledge', id: 'knowledge.rejected', label: 'Knowledge rejected' },
+  { entity: 'major_incident', id: 'major_incident.promotion_requested', label: 'Major incident promotion requested' },
+  { entity: 'major_incident', id: 'major_incident.accepted', label: 'Major incident accepted' },
+  { entity: 'major_incident', id: 'major_incident.resolve_requested', label: 'Major incident resolve requested' },
+  { entity: 'major_incident', id: 'major_incident.stakeholder_update', label: 'Major incident stakeholder update' },
+  { entity: 'major_incident', id: 'major_incident.declared', label: 'Major incident declared' },
 ];
 
 const RECIPIENTS = [
@@ -40,9 +45,18 @@ const RECIPIENTS = [
   { id: 'assignment_group_manager', label: 'Assignment Group Manager' },
   { id: 'specific_user', label: 'Specific User' },
   { id: 'assignment_group_members', label: 'Assignment Group Members' },
+  { id: 'role_major_incident_manager', label: 'Users with Major Incident Manager role' },
+  { id: 'role_fulfiller', label: 'Users with Fulfiller role' },
 ];
 
-const ENTITY_OPTIONS: NotificationRule['entity_type'][] = ['incident', 'request', 'change', 'problem', 'knowledge'];
+const ENTITY_OPTIONS: NotificationRule['entity_type'][] = [
+  'incident',
+  'request',
+  'change',
+  'problem',
+  'knowledge',
+  'major_incident',
+];
 const TEMPLATE_LOCALES = ['en', 'de', 'de-ch', 'fr', 'it'] as const;
 type TemplateLocale = typeof TEMPLATE_LOCALES[number];
 

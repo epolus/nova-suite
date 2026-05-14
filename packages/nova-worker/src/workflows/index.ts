@@ -15,3 +15,13 @@ export type { KnowledgeApprovalInput, KnowledgeApprovalDecisionSignal } from './
 
 export { notificationDispatch } from './notification-dispatch';
 export { systemMetricsDbSizeSnapshot } from './system-metrics-db-size-snapshot';
+export {
+  majorIncidentWorkflow,
+  declareResolvedSignal,
+  stakeholderUpdateSignal,
+  assignRoleSignal,
+  getMajorIncidentStatusQuery,
+} from './major-incident';
+export type { MajorIncidentWorkflowInput, MajorIncidentPhase } from './major-incident';
+export { postmortemWorkflow, postmortemPublishedSignal } from './postmortem';
+export type { PostmortemWorkflowInput } from './postmortem';

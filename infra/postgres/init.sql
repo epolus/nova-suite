@@ -553,6 +553,141 @@ CREATE TABLE incident_journal (
 CREATE INDEX idx_journal_incident ON incident_journal(incident_id);
 
 -- ============================================================
+-- MAJOR INCIDENTS
+-- ============================================================
+CREATE TYPE major_incident_status_enum AS ENUM (
+  'pending_acceptance',
+  'declared',
+  'investigating',
+  'monitoring',
+  'resolved',
+  'cancelled'
+);
+
+CREATE TYPE major_incident_participant_role_enum AS ENUM (
+  'commander', 'comms_lead', 'scribe', 'resolver'
+);
+
+CREATE TYPE postmortem_status_enum AS ENUM (
+  'draft', 'in_review', 'published'
+);
+
+CREATE TABLE major_incidents (
+  id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id             uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  title                 text NOT NULL,
+  description           text,
+  status                major_incident_status_enum NOT NULL DEFAULT 'declared',
+  priority              integer NOT NULL DEFAULT 1
+                        CHECK (priority BETWEEN 1 AND 2),
+  impact                text NOT NULL DEFAULT 'high'
+                        CHECK (impact IN ('low', 'medium', 'high')),
+  urgency               text NOT NULL DEFAULT 'high'
+                        CHECK (urgency IN ('low', 'medium', 'high')),
+  declared_major_at     timestamptz NOT NULL DEFAULT now(),
+  resolved_at           timestamptz,
+  monitoring_until_at   timestamptz,
+  postmortem_due_at     timestamptz,
+  affected_service_ids  uuid[] NOT NULL DEFAULT ARRAY[]::uuid[],
+  created_by            uuid NOT NULL REFERENCES users(id),
+  assigned_team_id      uuid REFERENCES assignment_groups(id) ON DELETE SET NULL,
+  primary_incident_id   uuid REFERENCES incidents(id) ON DELETE SET NULL,
+  war_room_channel      text,
+  timeline              jsonb NOT NULL DEFAULT '[]'::jsonb,
+  metadata              jsonb NOT NULL DEFAULT '{}'::jsonb,
+  temporal_workflow_id  text,
+  postmortem_workflow_id text,
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_major_incidents_tenant ON major_incidents(tenant_id);
+CREATE INDEX idx_major_incidents_tenant_status ON major_incidents(tenant_id, status);
+CREATE INDEX idx_major_incidents_primary_incident ON major_incidents(tenant_id, primary_incident_id)
+  WHERE primary_incident_id IS NOT NULL;
+
+CREATE TABLE major_incident_stakeholder_updates (
+  id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id         uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  major_incident_id uuid NOT NULL REFERENCES major_incidents(id) ON DELETE CASCADE,
+  author_id         uuid NOT NULL REFERENCES users(id),
+  audience          text NOT NULL DEFAULT 'external'
+                    CHECK (audience IN ('internal', 'external')),
+  subject           text NOT NULL DEFAULT '',
+  body              text NOT NULL,
+  channels          jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_mi_stakeholder_updates_mi ON major_incident_stakeholder_updates(major_incident_id, created_at DESC);
+
+CREATE TABLE major_incident_events (
+  id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id         uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  major_incident_id uuid NOT NULL REFERENCES major_incidents(id) ON DELETE CASCADE,
+  event_type        text NOT NULL,
+  payload           jsonb NOT NULL DEFAULT '{}'::jsonb,
+  actor_user_id     uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_mi_events_mi ON major_incident_events(major_incident_id, created_at DESC);
+
+CREATE TABLE major_incident_related_incidents (
+  id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id         uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  major_incident_id uuid NOT NULL REFERENCES major_incidents(id) ON DELETE CASCADE,
+  incident_id       uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  link_reason       text,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (major_incident_id, incident_id)
+);
+
+CREATE INDEX idx_mi_related_tenant ON major_incident_related_incidents(tenant_id);
+
+CREATE TABLE major_incident_participants (
+  id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id         uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  major_incident_id uuid NOT NULL REFERENCES major_incidents(id) ON DELETE CASCADE,
+  role              major_incident_participant_role_enum NOT NULL,
+  user_id           uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  assigned_at       timestamptz NOT NULL DEFAULT now(),
+  assigned_by       uuid REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_mi_participants_mi ON major_incident_participants(major_incident_id);
+
+CREATE UNIQUE INDEX uq_mi_participant_commander
+  ON major_incident_participants(major_incident_id)
+  WHERE role = 'commander';
+
+CREATE UNIQUE INDEX uq_mi_participant_comms_lead
+  ON major_incident_participants(major_incident_id)
+  WHERE role = 'comms_lead';
+
+CREATE UNIQUE INDEX uq_mi_participant_scribe
+  ON major_incident_participants(major_incident_id)
+  WHERE role = 'scribe';
+
+CREATE TABLE postmortems (
+  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id           uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  major_incident_id   uuid NOT NULL UNIQUE REFERENCES major_incidents(id) ON DELETE CASCADE,
+  status              postmortem_status_enum NOT NULL DEFAULT 'draft',
+  timeline            jsonb NOT NULL DEFAULT '[]'::jsonb,
+  root_causes         text[] NOT NULL DEFAULT ARRAY[]::text[],
+  contributing_factors text[] NOT NULL DEFAULT ARRAY[]::text[],
+  action_items        jsonb NOT NULL DEFAULT '[]'::jsonb,
+  authored_by         uuid REFERENCES users(id) ON DELETE SET NULL,
+  published_at        timestamptz,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_postmortems_tenant ON postmortems(tenant_id);
+CREATE INDEX idx_postmortems_status ON postmortems(tenant_id, status);
+
+-- ============================================================
 -- CMDB CI CLASSES
 -- ============================================================
 CREATE TABLE ci_classes (
@@ -680,7 +815,8 @@ CREATE TABLE workflow_start_jobs (
                     'incident_escalation_start',
                     'incident_autoclose_start',
                     'datasource_schedule_start',
-                    'knowledge_approval_start'
+                    'knowledge_approval_start',
+                    'major_incident_workflow_start'
                   )),
   workflow_id     text NOT NULL,
   payload         jsonb NOT NULL,
@@ -784,7 +920,7 @@ BEGIN
       'tenants', 'departments', 'cost_centers', 'roles', 'processes',
       'users', 'companies', 'locations', 'user_preferences', 'assignment_groups', 'services',
       'service_categories', 'service_items',
-      'requests', 'workflow_start_jobs', 'incidents', 'ci_classes', 'configuration_items'
+      'requests', 'workflow_start_jobs', 'incidents', 'major_incidents', 'postmortems', 'ci_classes', 'configuration_items'
     ])
   LOOP
     EXECUTE format(
@@ -963,7 +1099,10 @@ INSERT INTO roles (id, tenant_id, name, description) VALUES
    'report_creator', 'Can create and edit reports'),
   ('a3000000-0000-0000-0000-000000000014',
    'a0000000-0000-0000-0000-000000000001',
-   'report_admin', 'Can manage all tenant reports and sharing');
+   'report_admin', 'Can manage all tenant reports and sharing'),
+  ('a3000000-0000-0000-0000-000000000015',
+   'a0000000-0000-0000-0000-000000000001',
+   'major_incident_manager', 'Owns major incident response: accept, war room actions, postmortem');
 
 -- Demo company
 INSERT INTO companies (
@@ -1057,6 +1196,9 @@ INSERT INTO user_roles (tenant_id, user_id, role_id, granted_by) VALUES
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000001',
    'a3000000-0000-0000-0000-000000000011', NULL),
+  ('a0000000-0000-0000-0000-000000000001',
+   'b0000000-0000-0000-0000-000000000001',
+   'a3000000-0000-0000-0000-000000000015', NULL),
   -- Fulfiller gets fulfiller + user
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000002',
@@ -1916,6 +2058,18 @@ CREATE TABLE kb_article_ratings (
 );
 CREATE INDEX idx_kb_article_ratings_article ON kb_article_ratings(article_id);
 
+CREATE TABLE service_runbook_links (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  service_id    uuid NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+  kb_article_id uuid NOT NULL REFERENCES knowledge_articles(id) ON DELETE CASCADE,
+  sort_order    integer NOT NULL DEFAULT 100,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, service_id, kb_article_id)
+);
+
+CREATE INDEX idx_service_runbook_links_service ON service_runbook_links(tenant_id, service_id, sort_order);
+
 CREATE SEQUENCE IF NOT EXISTS problem_number_seq START 1;
 
 CREATE TABLE problems (
@@ -2542,7 +2696,12 @@ INSERT INTO notification_rules (
   ('a0000000-0000-0000-0000-000000000001', 'Problem resolved to reporter', 'Notify reporter when a problem is resolved', 'problem', 'problem.resolved', 'reported_by', 'Problem {problem_number} resolved', '"{problem_title}" has been marked as resolved.', 20),
   ('a0000000-0000-0000-0000-000000000001', 'Knowledge submitted for review to group', 'Notify assignment group members when article is submitted', 'knowledge', 'knowledge.submitted_for_review', 'assignment_group_members', 'Article {knowledge_number} submitted for review', '{knowledge_title} is awaiting review.', 10),
   ('a0000000-0000-0000-0000-000000000001', 'Knowledge published to author', 'Notify author when article is published', 'knowledge', 'knowledge.published', 'author', 'Article {knowledge_number} published', 'Your article "{knowledge_title}" has been published.', 20),
-  ('a0000000-0000-0000-0000-000000000001', 'Knowledge rejected to author', 'Notify author when article is rejected', 'knowledge', 'knowledge.rejected', 'author', 'Article {knowledge_number} rejected', 'Your article "{knowledge_title}" was rejected.', 30);
+  ('a0000000-0000-0000-0000-000000000001', 'Knowledge rejected to author', 'Notify author when article is rejected', 'knowledge', 'knowledge.rejected', 'author', 'Article {knowledge_number} rejected', 'Your article "{knowledge_title}" was rejected.', 30),
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident promotion pending', 'Notify MI managers when an incident is promoted and awaits acceptance', 'major_incident', 'major_incident.promotion_requested', 'role_major_incident_manager', 'Major incident pending acceptance', 'A promotion is waiting: "{major_incident_title}". Accept it in Major incidents.', 10),
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident accepted', 'Notify fulfillers when a major incident is accepted', 'major_incident', 'major_incident.accepted', 'role_fulfiller', 'Major incident accepted', '"{major_incident_title}" is now an active major incident.', 20),
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident resolve requested', 'Notify MI managers when resolve is requested', 'major_incident', 'major_incident.resolve_requested', 'role_major_incident_manager', 'Resolve requested', '"{major_incident_title}": resolve was requested (monitoring / closure).', 30),
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident stakeholder update', 'Notify MI managers on stakeholder update', 'major_incident', 'major_incident.stakeholder_update', 'role_major_incident_manager', 'Stakeholder update', '"{major_incident_title}": a new stakeholder update was posted.', 40),
+  ('a0000000-0000-0000-0000-000000000001', 'Major incident opened', 'Notify MI managers when a major incident is opened directly', 'major_incident', 'major_incident.declared', 'role_major_incident_manager', 'Major incident opened', '"{major_incident_title}" was declared as a major incident.', 50);
 
 INSERT INTO notification_rule_templates (
   tenant_id, notification_rule_id, locale, title_template, body_template
