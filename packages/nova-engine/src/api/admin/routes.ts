@@ -332,11 +332,21 @@ router.get('/system-metrics', async (req: Request, res: Response) => {
        (SELECT setting FROM pg_settings WHERE name = 'max_connections')::text AS max_connections`,
   ).catch(() => null);
   const slowQueryStats = await db.getOne<{ slow_queries_per_min: string | null }>(
-    `SELECT CASE WHEN EXTRACT(EPOCH FROM (now() - stats_reset)) > 0
-            THEN (sum(calls) FILTER (WHERE mean_exec_time >= 500)
-              / (EXTRACT(EPOCH FROM (now() - stats_reset)) / 60.0))
-            ELSE NULL END::text AS slow_queries_per_min
-     FROM pg_stat_statements`,
+    `SELECT CASE
+            WHEN reset.stats_reset IS NOT NULL AND reset.elapsed_sec > 0
+            THEN (agg.slow_calls / (reset.elapsed_sec / 60.0))
+            ELSE NULL
+          END::text AS slow_queries_per_min
+     FROM (
+       SELECT coalesce(sum(calls) FILTER (WHERE mean_exec_time >= 500), 0) AS slow_calls
+       FROM pg_stat_statements
+     ) agg
+     CROSS JOIN (
+       SELECT
+         stats_reset,
+         EXTRACT(EPOCH FROM (now() - stats_reset)) AS elapsed_sec
+       FROM pg_stat_statements_info
+     ) reset`,
   ).catch(() => null);
   const queryLatencyStats = await db.getOne<{ p50_ms: string | null; p95_ms: string | null }>(
     `SELECT
