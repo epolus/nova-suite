@@ -561,6 +561,29 @@ export default function Layout() {
 
         {/* User profile */}
         <div className="flex items-center gap-2">
+          <NavLink
+            to="/cart"
+            title={tCommon('cart.label')}
+            className={({ isActive }) =>
+              `relative p-1.5 rounded-md transition-colors ${
+                isActive
+                  ? 'text-white bg-white/10'
+                  : 'text-slate-400 hover:text-white hover:bg-white/10'
+              }`
+            }
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            {cartCount > 0 && (
+              <span
+                className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 flex items-center justify-center text-[10px] font-bold text-white rounded-full"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                {cartCount > 99 ? '99+' : cartCount}
+              </span>
+            )}
+          </NavLink>
           <DarkModeToggle variant="on-dark-header" />
           <NotificationBell />
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ backgroundColor: 'var(--color-primary)' }}>
@@ -607,29 +630,6 @@ export default function Layout() {
 
         <nav className={`flex-1 py-2 space-y-1 overflow-y-auto ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
           {localizedNav.map((item) => <CollapsibleNavItem key={item.to} item={item} collapsed={sidebarCollapsed} currentPath={location.pathname} />)}
-
-          <NavLink
-            to="/cart"
-            title={tCommon('cart.label')}
-            className={({ isActive }) =>
-              `flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                sidebarCollapsed ? 'justify-center' : 'gap-3'
-              } ${
-                isActive
-                  ? 'text-white'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
-              }`
-            }
-            style={({ isActive }) => isActive ? { backgroundColor: 'var(--color-sidebar-active)' } : {}}
-          >
-            <span className="text-lg">🛒</span>
-            {!sidebarCollapsed && tCommon('cart.label')}
-            {cartCount > 0 && (
-              <span className={`${sidebarCollapsed ? 'ml-0' : 'ml-auto'} text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center`} style={{ backgroundColor: 'var(--color-primary)' }}>
-                {cartCount}
-              </span>
-            )}
-          </NavLink>
 
           {/* Catalog Designer section (only when NOT admin, since admin already shows these) */}
           {filteredCatalogDesignerNav.length > 0 && !isAdmin && (
