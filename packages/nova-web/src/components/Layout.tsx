@@ -234,6 +234,21 @@ function isNavItemActive(itemTo: string, pathname: string | undefined, fallbackI
   return fallbackIsActive;
 }
 
+function useFullWidthContent(pathname: string): boolean {
+  const fullWidthPaths = new Set([
+    '/incidents',
+    '/requests',
+    '/changes',
+    '/problems',
+    '/cmdb',
+    '/admin/workflows',
+    '/admin/catalog-tasks',
+    '/admin/service-items',
+    '/admin/data-sources',
+  ]);
+  return fullWidthPaths.has(pathname);
+}
+
 const adminSections: RawAdminSection[] = [
   {
     key: 'org',
@@ -489,6 +504,8 @@ export default function Layout() {
   );
 
   const hasAdministrationNav = filteredAdminSections.length > 0;
+  const isFullWidthPage = useFullWidthContent(location.pathname);
+  const contentContainerClass = isFullWidthPage ? 'w-full max-w-none' : 'max-w-7xl mx-auto';
 
   // Auto-expand the section that contains the current route
   const activeSection = filteredAdminSections.find((s) =>
@@ -652,8 +669,11 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-content-bg)' }}>
-        <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <main
+        className={`flex-1 overflow-auto ${isFullWidthPage ? 'border-x border-gray-200' : ''}`}
+        style={{ backgroundColor: 'var(--color-content-bg)' }}
+      >
+        <div className={`p-6 lg:p-8 ${contentContainerClass}`}>
           <Outlet />
         </div>
       </main>

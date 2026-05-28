@@ -11,6 +11,19 @@ import { useTranslations } from 'use-intl';
 
 const DEFAULT_LOGO_SRC = '/default-logo.svg';
 
+function useFullWidthContent(pathname: string): boolean {
+  const fullWidthPaths = new Set([
+    '/incidents',
+    '/requests',
+    '/changes',
+    '/problems',
+    '/cmdb',
+    '/catalog',
+    '/knowledge',
+  ]);
+  return fullWidthPaths.has(pathname);
+}
+
 function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -197,6 +210,8 @@ export default function ESSLayout() {
   const location = useLocation();
   // ESS-specific pages manage their own layout; reused agent pages need a container
   const needsContainer = !location.pathname.startsWith('/ess');
+  const isFullWidthPage = useFullWidthContent(location.pathname);
+  const contentContainerClass = isFullWidthPage ? 'w-full max-w-none' : 'max-w-6xl mx-auto';
 
   const [logoSrc, setLogoSrc] = useState(DEFAULT_LOGO_SRC);
   useEffect(() => {
@@ -245,10 +260,10 @@ export default function ESSLayout() {
   ] as { to: string; label: string; end?: boolean; badge?: number }[];
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
+    <div className="flex flex-col min-h-screen bg-slate-50 border-x border-gray-200">
       {/* ── Header ── */}
       <header className="bg-white border-b border-gray-200 flex-shrink-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-6">
+        <div className="w-full px-4 sm:px-6 h-16 flex items-center gap-6">
 
           {/* Logo */}
           <button
@@ -363,7 +378,7 @@ export default function ESSLayout() {
       {/* ── Main ── */}
       <main className="flex-1">
         {needsContainer ? (
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+          <div className={`${contentContainerClass} px-4 sm:px-6 py-8`}>
             <Outlet />
           </div>
         ) : (
