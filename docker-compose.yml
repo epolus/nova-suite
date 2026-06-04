@@ -143,6 +143,12 @@ services:
     build:
       context: .
       dockerfile: packages/nova-web/Dockerfile
+      args:
+        VITE_DEFAULT_LOCALE: ${VITE_DEFAULT_LOCALE:-en}
+        VITE_SUPPORTED_LOCALES: ${VITE_SUPPORTED_LOCALES:-en,de,de-ch,fr,it}
+        VITE_LOCALE_STORAGE_KEY: ${VITE_LOCALE_STORAGE_KEY:-nova_locale}
+        VITE_LOCALE_PREFERENCE_SCOPE: ${VITE_LOCALE_PREFERENCE_SCOPE:-ui:locale}
+        VITE_HIDE_DEMO_LOGIN_CREDENTIALS: ${VITE_HIDE_DEMO_LOGIN_CREDENTIALS:-false}
     restart: unless-stopped
     depends_on:
       - nova-engine

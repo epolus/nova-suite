@@ -26,11 +26,12 @@ REDIS_ENABLED=false
 REDIS_URL=redis://redis:6379
 REDIS_DEFAULT_TTL_SECONDS=300
 
-# Web i18n (build-time Vite vars)
+# Web (build-time Vite vars)
 VITE_DEFAULT_LOCALE=en
 VITE_SUPPORTED_LOCALES=en,de,de-ch,fr,it
 VITE_LOCALE_STORAGE_KEY=nova_locale
 VITE_LOCALE_PREFERENCE_SCOPE=ui:locale
+VITE_HIDE_DEMO_LOGIN_CREDENTIALS=false
 
 # Notification mail delivery (nova-worker)
 MAIL_NOTIFICATIONS_ENABLED=false
@@ -60,3 +61,4 @@ SMTP_PASS=
 - Redis caching is optional; when enabled, `GET /api/settings/theme` and `GET /api/settings` are cached and invalidated on settings update/logo change.
 - Cache telemetry endpoint: `GET /api/settings/cache/metrics` (admin only) reports hits/misses/errors and connection status.
 - `VITE_*` values are injected at frontend build time; rebuild `nova-web` after changing them.
+- **`VITE_HIDE_DEMO_LOGIN_CREDENTIALS`** — when `true`, hides the demo quick-login buttons (Admin / Fulfiller / User) on the login page. Default is `false` (shown). Set to `true` in production deployments.

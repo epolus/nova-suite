@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import DarkModeToggle from '../components/DarkModeToggle';
 import { auth as authApi } from '../api/client';
 import { useTranslations } from 'use-intl';
+import { hideDemoLoginCredentials } from '../config/env';
 
 const DEFAULT_LOGO_SRC = '/default-logo.svg';
 
@@ -180,26 +181,27 @@ export default function Login() {
                 </button>
               </form>
 
-              {/* Quick credentials hint */}
-              <div className="mt-6 pt-5 border-t border-gray-100">
-                <p className="text-xs text-gray-400 text-center mb-2">{tAuth('demoCredentials')}</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: tCommon('roles.admin'), email: 'admin@acme.local' },
-                    { label: tCommon('roles.fulfiller'), email: 'fulfiller@acme.local' },
-                    { label: tCommon('roles.user'), email: 'user@acme.local' },
-                  ].map((cred) => (
-                    <button
-                      key={cred.email}
-                      type="button"
-                      onClick={() => { setEmail(cred.email); setPassword('admin123'); }}
-                      className="text-xs py-1.5 px-2 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-600 transition-colors"
-                    >
-                      {cred.label}
-                    </button>
-                  ))}
+              {!hideDemoLoginCredentials && (
+                <div className="mt-6 pt-5 border-t border-gray-100">
+                  <p className="text-xs text-gray-400 text-center mb-2">{tAuth('demoCredentials')}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: tCommon('roles.admin'), email: 'admin@acme.local' },
+                      { label: tCommon('roles.fulfiller'), email: 'fulfiller@acme.local' },
+                      { label: tCommon('roles.user'), email: 'user@acme.local' },
+                    ].map((cred) => (
+                      <button
+                        key={cred.email}
+                        type="button"
+                        onClick={() => { setEmail(cred.email); setPassword('admin123'); }}
+                        className="text-xs py-1.5 px-2 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-600 transition-colors"
+                      >
+                        {cred.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
 

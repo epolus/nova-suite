@@ -92,7 +92,7 @@ curl http://localhost:4000/health
 # Temporal UI:   http://localhost:8080
 ```
 
-**Default credentials:**
+**Default credentials** (quick-fill buttons on the login page; hide in production with `VITE_HIDE_DEMO_LOGIN_CREDENTIALS=true` in `.env`, then rebuild `nova-web`):
 
 | Role                   | Email                    | Password   |
 |------------------------|--------------------------|------------|
