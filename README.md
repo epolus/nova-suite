@@ -6,7 +6,7 @@
 
 **Open-source IT Service Management (ITSM) platform.**
 
-Nova Suite provides a complete service management solution — service catalog, incident management, CMDB, workflow automation, SSO, and a modern admin dashboard — all with built-in multi-tenancy and row-level security.
+Nova Suite provides a complete service management solution — service catalog, incident management, CMDB, workflow automation, SSO, AI assistant, and a modern admin dashboard — all with built-in multi-tenancy and row-level security.
 
 ## Features
 
@@ -16,6 +16,7 @@ Nova Suite provides a complete service management solution — service catalog, 
 - Approval workflows with manager-based routing
 - Real-time request status tracking
 - Personal task views (My Todo, My Groups)
+- **AI assistant (ESS)** — catalog search, knowledge base lookup, and draft incidents (with confirmation before create)
 
 ### Incident Management
 - Full incident lifecycle (new → in progress → resolved → closed)
@@ -24,6 +25,7 @@ Nova Suite provides a complete service management solution — service catalog, 
 - Assignment to users and groups
 - Journal / activity log with comments and work notes
 - Default "active" filter (excludes closed) for efficient triage
+- **AI assistant (Agent)** — incident context, KB suggestions, draft work notes, and catalog automation proposals (with confirmation before write)
 
 ### CMDB (Configuration Management Database)
 - Extensible CI classes with parent/child inheritance (child classes inherit parent attributes)
@@ -105,6 +107,27 @@ curl http://localhost:4000/health
 Core env configuration is documented in `docs/ENVIRONMENT.md`.
 Use `.env.example` as the baseline and keep deployment manifests aligned with that file.
 
+### Optional AI assistant
+
+The AI assistant is **disabled by default**. Enable it in `.env` and restart `nova-engine`:
+
+```bash
+AI_ENABLED=true
+AI_DEFAULT_PROVIDER=openai   # openai | azure_openai | ollama
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+```
+
+For local models via Ollama:
+
+```bash
+AI_DEFAULT_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+```
+
+See [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md) for Azure OpenAI, Docker Compose, personas, API, and security notes.
+
 ### Optional Google OIDC setup
 
 Set these values in `.env` and restart `nova-engine`:
@@ -174,6 +197,7 @@ nova-suite/
 │   │       │   ├── routes.ts     # Main router
 │   │       │   ├── roles.ts      # Route → role metadata
 │   │       │   ├── admin/        # Users, roles, org, catalog admin, imports, ...
+│   │       │   ├── ai/           # AI conversations, SSE chat, confirm actions
 │   │       │   ├── approvals/    # Approval tasks
 │   │       │   ├── assets/
 │   │       │   ├── attachments/
@@ -205,6 +229,7 @@ nova-suite/
 │   │       │   ├── schemas.ts    # Zod models + OpenAPI extensions
 │   │       │   └── sla.ts
 │   │       ├── middleware/       # auth, validation, errors
+│   │       ├── ai/               # LLM providers, orchestrator, tools, prompts
 │   │       ├── notifications/    # DB-side notification triggers
 │   │       ├── observability/    # Prometheus metrics middleware
 │   │       ├── openapi/          # OpenAPI 3 spec (registerPaths + generator)
@@ -214,7 +239,7 @@ nova-suite/
 │   │       ├── main.tsx
 │   │       ├── App.tsx
 │   │       ├── api/client.ts     # API client + shared types
-│   │       ├── components/       # Layout, DataTable, workflow designer, ...
+│   │       ├── components/       # Layout, DataTable, workflow designer, ai/, ...
 │   │       ├── hooks/
 │   │       ├── context/          # Auth, cart, locale, theme
 │   │       ├── i18n/             # Locales and JSON message catalogs
@@ -237,6 +262,7 @@ nova-suite/
 │   │   └── src/
 │   │       ├── index.ts
 │   │       ├── automation-config.ts
+│   │       ├── catalog-links.ts  # Shared catalog link normalization
 │   │       ├── automation-builder-defaults.ts
 │   │       └── automation-fixtures.ts
 │   └── nova-worker/              # Temporal worker (activities + workflows)
@@ -256,6 +282,7 @@ nova-suite/
 │       └── Caddyfile             # Reverse proxy config
 ├── docs/
 │   ├── ARCHITECTURE.md
+│   ├── AI_ASSISTANT.md
 │   ├── CATALOG_TASK_AUTOMATION.md
 │   ├── ENVIRONMENT.md
 │   ├── HIGH_AVAILABILITY.md
@@ -273,42 +300,46 @@ nova-suite/
 
 All endpoints are prefixed with `/api`. Full interactive documentation is available at `/docs` (Swagger UI).
 
-| Endpoint                            | Method       | Auth              | Description                         |
-|-------------------------------------|--------------|-------------------|-------------------------------------|
-| `/api/auth/login`                   | POST         | None              | Get JWT token                       |
-| `/api/auth/sso/authorize`           | GET          | None              | Initiate SSO login via OIDC         |
-| `/api/auth/me`                      | GET          | Any               | Current user info                   |
-| `/api/auth/users`                   | GET          | Admin / FF / User | List users (for pickers)            |
-| `/api/catalog/categories`           | GET          | Any               | List service categories             |
-| `/api/catalog/items`                | GET          | Any               | List service items                  |
-| `/api/requests`                     | GET/POST     | Any               | List / submit service requests      |
-| `/api/requests/:id/approve`         | POST         | Admin / FF        | Approve or reject a request         |
-| `/api/incidents`                    | GET          | Any               | List incidents (scoped for non-FF)  |
-| `/api/incidents`                    | POST         | Admin / FF        | Create incident (agent)             |
-| `/api/incidents/ess`                | POST         | User              | use `POST /api/incidents`           |
-| `/api/incidents/:id`                | PATCH        | Varies            | Update (FF: full; caller: limited)  |
-| `/api/incidents/:id/journal`        | GET/POST     | Varies            | Activity log entries                |
-| `/api/cmdb/classes`                 | GET          | Any               | List CI classes                     |
-| `/api/cmdb/classes`                 | POST         | Admin / CM        | Create CI class                     |
-| `/api/cmdb/classes/:id`             | PUT          | Admin / CM        | Update CI class                     |
-| `/api/cmdb/classes/:id`             | DELETE       | Admin             | Delete CI class (no CIs on class)   |
-| `/api/cmdb/items`                   | GET/POST     | Varies            | List / create configuration items   |
-| `/api/cmdb/items/:id`               | GET/PATCH    | Varies            | CI details / update                 |
-| `/api/cmdb/items/:id/history`       | GET          | Any               | CI audit trail                      |
-| `/api/cmdb/items/:id/impact`        | GET          | Any               | Impact analysis (blast radius)      |
-| `/api/cmdb/relationships`           | GET          | Any               | List CI relationships               |
-| `/api/cmdb/relationships`           | POST         | Admin / FF / CM   | Create CI relationship              |
-| `/api/cmdb/relationships/:id`       | DELETE       | Admin / FF / CM   | Remove a relationship               |
-| `/api/admin/users`                  | GET/POST     | Admin             | User management                     |
-| `/api/admin/users/:id`              | PATCH/DELETE | Admin             | Update / delete user                |
-| `/api/admin/roles`                  | GET/POST     | Admin             | Role management                     |
-| `/api/admin/departments`            | GET/POST     | Admin             | Department management               |
-| `/api/admin/cost-centers`           | GET/POST     | Admin             | Cost center management              |
-| `/api/admin/assignment-groups`      | GET/POST     | Admin             | Assignment group management         |
-| `/api/admin/services`               | GET/POST     | Admin             | Service management                  |
-| `/api/admin/processes`              | GET/POST     | Admin             | Process management                  |
-| `/api/settings/theme`               | GET          | None              | Public theming (e.g. login page)    |
-| `/api/settings`                     | GET/PUT      | Admin             | List / bulk-update tenant settings  |
+| Endpoint                            | Method          | Auth              | Description                            |
+|-------------------------------------|-----------------|-------------------|----------------------------------------|
+| `/api/auth/login`                   | POST            | None              | Get JWT token                          |
+| `/api/auth/sso/authorize`           | GET             | None              | Initiate SSO login via OIDC            |
+| `/api/auth/me`                      | GET             | Any               | Current user info                      |
+| `/api/auth/users`                   | GET             | Admin / FF / User | List users (for pickers)               |
+| `/api/catalog/categories`           | GET             | Any               | List service categories                |
+| `/api/catalog/items`                | GET             | Any               | List service items                     |
+| `/api/requests`                     | GET/POST        | Any               | List / submit service requests         |
+| `/api/requests/:id/approve`         | POST            | Admin / FF        | Approve or reject a request            |
+| `/api/incidents`                    | GET             | Any               | List incidents (scoped for non-FF)     |
+| `/api/incidents`                    | POST            | Admin / FF        | Create incident (agent)                |
+| `/api/incidents/ess`                | POST            | User              | use `POST /api/incidents`              |
+| `/api/incidents/:id`                | PATCH           | Varies            | Update (FF: full; caller: limited)     |
+| `/api/incidents/:id/journal`        | GET/POST        | Varies            | Activity log entries                   |
+| `/api/ai/status`                    | GET             | Any               | AI feature flags (no LLM call)         |
+| `/api/ai/conversations`             | POST            | Any               | Start AI chat thread                   |
+| `/api/ai/conversations/:id/messages`| POST            | Any               | Send message (SSE when `stream: true`) |
+| `/api/ai/conversations/:id/actions/:actionId/confirm` | POST | Any        | Confirm pending AI action (write)      |
+| `/api/cmdb/classes`                 | GET             | Any               | List CI classes                        |
+| `/api/cmdb/classes`                 | POST            | Admin / CM        | Create CI class                        |
+| `/api/cmdb/classes/:id`             | PUT             | Admin / CM        | Update CI class                        |
+| `/api/cmdb/classes/:id`             | DELETE          | Admin             | Delete CI class (no CIs on class)      |
+| `/api/cmdb/items`                   | GET/POST        | Varies            | List / create configuration items      |
+| `/api/cmdb/items/:id`               | GET/PATCH       | Varies            | CI details / update                    |
+| `/api/cmdb/items/:id/history`       | GET             | Any               | CI audit trail                         |
+| `/api/cmdb/items/:id/impact`        | GET             | Any               | Impact analysis (blast radius)         |
+| `/api/cmdb/relationships`           | GET             | Any               | List CI relationships                  |
+| `/api/cmdb/relationships`           | POST            | Admin / FF / CM   | Create CI relationship                 |
+| `/api/cmdb/relationships/:id`       | DELETE          | Admin / FF / CM   | Remove a relationship                  |
+| `/api/admin/users`                  | GET/POST        | Admin             | User management                        |
+| `/api/admin/users/:id`              | PATCH/DELETE    | Admin             | Update / delete user                   |
+| `/api/admin/roles`                  | GET/POST        | Admin             | Role management                        |
+| `/api/admin/departments`            | GET/POST        | Admin             | Department management                  |
+| `/api/admin/cost-centers`           | GET/POST        | Admin             | Cost center management                 |
+| `/api/admin/assignment-groups`      | GET/POST        | Admin             | Assignment group management            |
+| `/api/admin/services`               | GET/POST        | Admin             | Service management                     |
+| `/api/admin/processes`              | GET/POST        | Admin             | Process management                     |
+| `/api/settings/theme`               | GET             | None              | Public theming (e.g. login page)       |
+| `/api/settings`                     | GET/PUT         | Admin             | List / bulk-update tenant settings     |
 
 **Roles:** Admin = full access, Fulfiller (FF) = incident/request management, Configuration Manager (CM) = CMDB editing, User = self-service only. The table is a **sample**; use `/docs` for every route (changes, problems, knowledge, major incidents, cart, search, …).
 
@@ -317,6 +348,7 @@ All endpoints are prefixed with `/api`. Full interactive documentation is availa
 - [QUICKSTART.md](QUICKSTART.md) — 5-minute setup guide
 - [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) — Feature summary
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System design & decisions
+- [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md) — AI assistant (ESS + Agent personas, providers, API)
 - [docs/HIGH_AVAILABILITY.md](docs/HIGH_AVAILABILITY.md) — HA deployment
 - [docs/UPGRADE_STRATEGY.md](docs/UPGRADE_STRATEGY.md) — Zero-downtime upgrades
 - [docs/CATALOG_TASK_AUTOMATION.md](docs/CATALOG_TASK_AUTOMATION.md) — Catalog task HTTP automation (`automation_config`)
