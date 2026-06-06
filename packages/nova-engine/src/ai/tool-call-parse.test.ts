@@ -86,4 +86,25 @@ describe('enrichChatResultWithEmbeddedToolCalls', () => {
       ),
     ).toBe(true);
   });
+
+  it('detects tool JSON embedded in explanatory prose', () => {
+    const text = `Here is a possible JSON function call:\n\n{"name": "get_incident_context", "parameters": {"incident_id": "<INCIDENT_ID>"}}`;
+    expect(
+      isLikelyRawToolOutput(text, new Set(['get_incident_context'])),
+    ).toBe(true);
+  });
+
+  it('resolves incident placeholders from context when enriching', () => {
+    const incidentId = 'a1111111-1111-1111-1111-111111111111';
+    const enriched = enrichChatResultWithEmbeddedToolCalls(
+      {
+        content: `Use this call: {"name": "get_incident_context", "parameters": {"incident_id": "<INCIDENT_ID>"}}`,
+        toolCalls: [],
+      },
+      [{ name: 'get_incident_context', description: 'x', parameters: {} }],
+      { incidentId },
+    );
+    expect(enriched.toolCalls).toHaveLength(1);
+    expect(enriched.toolCalls[0].arguments).toEqual({ incident_id: incidentId });
+  });
 });

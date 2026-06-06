@@ -97,6 +97,54 @@ function finalizeAssistantReply(content: string, messages: AiChatMessage[]): str
 const CATALOG_REPLY_INSTRUCTION =
   'Answer in plain language. For each catalog item, include its path exactly as returned (starts with /catalog/). Never use raw UUIDs alone, external URLs (https://), or manual browse/search steps.';
 
+const AGENT_REPLY_INSTRUCTION =
+  'Answer in plain language using the incident data already loaded. Never output JSON or tool syntax, and never ask the user for an incident id.';
+
+async function prefetchIncidentContext(
+  messages: AiChatMessage[],
+  ctx: {
+    client: PoolClient;
+    userId: string;
+    tenantId: string;
+    persona: AiPersona;
+    context?: AiConversationContext;
+  },
+): Promise<void> {
+  const incidentId = ctx.context?.incidentId;
+  if (ctx.persona !== 'agent' || !incidentId) return;
+
+  const tcId = `prefetch_incident_${Date.now()}`;
+  const toolResult = await executeTool(
+    {
+      client: ctx.client,
+      userId: ctx.userId,
+      tenantId: ctx.tenantId,
+      persona: ctx.persona,
+      conversationContext: ctx.context,
+    },
+    'get_incident_context',
+    { incident_id: incidentId },
+  );
+
+  messages.push({
+    role: 'assistant',
+    content: '',
+    tool_calls: [{ id: tcId, name: 'get_incident_context', arguments: { incident_id: incidentId } }],
+  });
+  messages.push({
+    role: 'tool',
+    content: toolResult.content,
+    tool_call_id: tcId,
+    name: 'get_incident_context',
+  });
+}
+
+function replyRecoveryInstruction(persona: AiPersona): string {
+  return persona === 'ess'
+    ? `Do not output JSON or tool syntax. ${CATALOG_REPLY_INSTRUCTION}`
+    : `Do not output JSON or tool syntax. ${AGENT_REPLY_INSTRUCTION}`;
+}
+
 export async function runChatTurn(params: RunChatTurnParams): Promise<RunChatTurnResult> {
   const { client, conversationId, userId, tenantId, persona, context, userMessage, onToken } = params;
   const provider = getLlmProvider();
@@ -109,19 +157,25 @@ export async function runChatTurn(params: RunChatTurnParams): Promise<RunChatTur
     ...(await loadHistory(client, conversationId)),
   ];
 
+  await prefetchIncidentContext(messages, { client, userId, tenantId, persona, context });
+
   const pendingActions: AiPendingActionSummary[] = [];
   let totalUsage = { promptTokens: 0, completionTokens: 0 };
   let assistantContent = '';
   const allowedToolNames = new Set(tools.map((t) => t.name));
 
   for (let round = 0; round < config.ai.maxToolRounds; round++) {
-    let result = enrichChatResultWithEmbeddedToolCalls(await provider.chat(messages, tools), tools);
+    let result = enrichChatResultWithEmbeddedToolCalls(
+      await provider.chat(messages, tools),
+      tools,
+      context,
+    );
     if (result.usage?.promptTokens) totalUsage.promptTokens += result.usage.promptTokens;
     if (result.usage?.completionTokens) totalUsage.completionTokens += result.usage.completionTokens;
 
     if (!result.toolCalls.length) {
       if (isLikelyRawToolOutput(result.content, allowedToolNames)) {
-        result = enrichChatResultWithEmbeddedToolCalls(result, tools);
+        result = enrichChatResultWithEmbeddedToolCalls(result, tools, context);
       }
     }
 
@@ -130,8 +184,7 @@ export async function runChatTurn(params: RunChatTurnParams): Promise<RunChatTur
         messages.push({ role: 'assistant', content: result.content });
         messages.push({
           role: 'user',
-          content:
-            `Do not output JSON or tool syntax. ${CATALOG_REPLY_INSTRUCTION}`,
+          content: replyRecoveryInstruction(persona),
         });
         const recovered = await provider.chat(messages, []);
         assistantContent = finalizeAssistantReply(recovered.content, messages);
@@ -200,7 +253,9 @@ export async function runChatTurn(params: RunChatTurnParams): Promise<RunChatTur
         messages.push({
           role: 'user',
           content:
-            `Summarize the tool results above for the user. ${CATALOG_REPLY_INSTRUCTION} Do not output JSON or tool call syntax.`,
+            persona === 'ess'
+              ? `Summarize the tool results above for the user. ${CATALOG_REPLY_INSTRUCTION} Do not output JSON or tool call syntax.`
+              : `Summarize the tool results above for the user. ${AGENT_REPLY_INSTRUCTION} Do not output JSON or tool call syntax.`,
         });
         final = await provider.chat(messages, []);
       }
@@ -218,7 +273,9 @@ export async function runChatTurn(params: RunChatTurnParams): Promise<RunChatTur
     messages.push({
       role: 'user',
       content:
-        `Reply to the user in plain language based on the information you already looked up. ${CATALOG_REPLY_INSTRUCTION} Do not output JSON.`,
+        persona === 'ess'
+          ? `Reply to the user in plain language based on the information you already looked up. ${CATALOG_REPLY_INSTRUCTION} Do not output JSON.`
+          : `Reply to the user in plain language based on the information you already looked up. ${AGENT_REPLY_INSTRUCTION} Do not output JSON.`,
     });
     const final = await provider.chat(messages, []);
     assistantContent = finalizeAssistantReply(final.content || assistantContent, messages);
