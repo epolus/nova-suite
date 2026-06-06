@@ -122,6 +122,19 @@
       "loadFailed": "Failed to load notifications.",
       "markReadFailed": "Failed to mark notification as read.",
       "markAllFailed": "Failed to mark all notifications as read."
+    },
+    "ai": {
+      "title": "Nova Assistant",
+      "openAriaLabel": "Open Nova Assistant",
+      "closeAriaLabel": "Close",
+      "greetingEss": "Hi! I can help you find catalog services (like a new laptop), search knowledge articles, or open an incident if needed.",
+      "greetingAgent": "Hi! I can summarize incidents, suggest knowledge articles, draft work notes, and propose catalog automation.",
+      "placeholder": "Ask a question…",
+      "send": "Send",
+      "initFailed": "Failed to start the assistant.",
+      "workNoteAdded": "Work note added to the incident.",
+      "actionFailed": "Action failed.",
+      "catalogOpenLink": "Open in catalog"
     }
   },
   "navigation": {

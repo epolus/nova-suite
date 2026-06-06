@@ -33,6 +33,15 @@ VITE_LOCALE_STORAGE_KEY=nova_locale
 VITE_LOCALE_PREFERENCE_SCOPE=ui:locale
 VITE_HIDE_DEMO_LOGIN_CREDENTIALS=false
 
+# AI assistant (nova-engine)
+AI_ENABLED=false
+AI_DEFAULT_PROVIDER=openai
+AI_ESS_ENABLED=true
+AI_AGENT_ENABLED=true
+OPENAI_API_KEY=
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1
+
 # Notification mail delivery (nova-worker)
 MAIL_NOTIFICATIONS_ENABLED=false
 MAIL_FROM=no-reply@nova.local
@@ -62,3 +71,4 @@ SMTP_PASS=
 - Cache telemetry endpoint: `GET /api/settings/cache/metrics` (admin only) reports hits/misses/errors and connection status.
 - `VITE_*` values are injected at frontend build time; rebuild `nova-web` after changing them.
 - **`VITE_HIDE_DEMO_LOGIN_CREDENTIALS`** — when `true`, hides the demo quick-login buttons (Admin / Fulfiller / User) on the login page. Default is `false` (shown). Set to `true` in production deployments.
+- **AI assistant** — see [AI_ASSISTANT.md](./AI_ASSISTANT.md). Set `AI_ENABLED=true` and configure `OPENAI_*`, Azure OpenAI, or `OLLAMA_*`. ESS/agent toggles: `AI_ESS_ENABLED`, `AI_AGENT_ENABLED`.

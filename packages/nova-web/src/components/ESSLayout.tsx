@@ -8,6 +8,7 @@ import { approvals as approvalsApi } from '../api/client';
 import { notifications as notificationsApi, type AppNotification } from '../api/client';
 import DarkModeToggle from './DarkModeToggle';
 import { useTranslations } from 'use-intl';
+import { AiAssistantProvider } from './ai/AiAssistantProvider';
 
 const DEFAULT_LOGO_SRC = '/default-logo.svg';
 
@@ -260,6 +261,7 @@ export default function ESSLayout() {
   ] as { to: string; label: string; end?: boolean; badge?: number }[];
 
   return (
+    <AiAssistantProvider persona="ess">
     <div className="flex flex-col min-h-screen bg-slate-50 border-x border-gray-200">
       {/* ── Header ── */}
       <header className="bg-white border-b border-gray-200 flex-shrink-0 z-20">
@@ -386,5 +388,6 @@ export default function ESSLayout() {
         )}
       </main>
     </div>
+    </AiAssistantProvider>
   );
 }

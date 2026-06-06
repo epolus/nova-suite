@@ -122,6 +122,19 @@
       "loadFailed": "Impossibile caricare le notifiche.",
       "markReadFailed": "Impossibile contrassegnare la notifica come letta.",
       "markAllFailed": "Impossibile contrassegnare tutte le notifiche come lette."
+    },
+    "ai": {
+      "title": "Assistente Nova",
+      "openAriaLabel": "Apri l'assistente Nova",
+      "closeAriaLabel": "Chiudi",
+      "greetingEss": "Ciao! Posso aiutarti a trovare servizi nel catalogo (ad es. un nuovo laptop), cercare articoli nella knowledge base o aprire un incident se necessario.",
+      "greetingAgent": "Ciao! Posso riassumere gli incident, suggerire articoli KB, redigere note di lavoro e proporre automazioni del catalogo.",
+      "placeholder": "Fai una domanda…",
+      "send": "Invia",
+      "initFailed": "Impossibile avviare l'assistente.",
+      "workNoteAdded": "Nota di lavoro aggiunta all'incident.",
+      "actionFailed": "Azione non riuscita.",
+      "catalogOpenLink": "Apri nel catalogo"
     }
   },
   "navigation": {

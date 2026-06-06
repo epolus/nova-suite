@@ -51,6 +51,10 @@ ALTER TABLE change_blackouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_pending_actions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE config_deployment_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_metrics_db_size_snapshots ENABLE ROW LEVEL SECURITY;
@@ -379,6 +383,55 @@ CREATE POLICY tenant_isolation_change_conflicts ON change_conflicts
 CREATE POLICY tenant_isolation_workflow_definitions ON workflow_definitions
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── AI Assistant ───
+CREATE POLICY tenant_isolation_ai_conversations ON ai_conversations
+  FOR ALL
+  USING (tenant_id = current_tenant_id() AND user_id = current_user_id())
+  WITH CHECK (tenant_id = current_tenant_id() AND user_id = current_user_id());
+
+CREATE POLICY tenant_isolation_ai_messages ON ai_messages
+  FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM ai_conversations c
+      WHERE c.id = ai_messages.conversation_id
+        AND c.tenant_id = current_tenant_id()
+        AND c.user_id = current_user_id()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM ai_conversations c
+      WHERE c.id = ai_messages.conversation_id
+        AND c.tenant_id = current_tenant_id()
+        AND c.user_id = current_user_id()
+    )
+  );
+
+CREATE POLICY tenant_isolation_ai_pending_actions ON ai_pending_actions
+  FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM ai_conversations c
+      WHERE c.id = ai_pending_actions.conversation_id
+        AND c.tenant_id = current_tenant_id()
+        AND c.user_id = current_user_id()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM ai_conversations c
+      WHERE c.id = ai_pending_actions.conversation_id
+        AND c.tenant_id = current_tenant_id()
+        AND c.user_id = current_user_id()
+    )
+  );
+
+CREATE POLICY tenant_isolation_ai_audit_log ON ai_audit_log
+  FOR ALL
+  USING (tenant_id = current_tenant_id() AND user_id = current_user_id())
+  WITH CHECK (tenant_id = current_tenant_id() AND user_id = current_user_id());
+
 -- ─── Workflow Start Jobs ───
 -- Tenant-scoped access in normal request context, plus system role for dispatcher.
 CREATE POLICY workflow_start_jobs_tenant_or_system_policy ON workflow_start_jobs
@@ -560,6 +613,10 @@ ALTER TABLE change_blackouts FORCE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs FORCE ROW LEVEL SECURITY;
+ALTER TABLE ai_conversations FORCE ROW LEVEL SECURITY;
+ALTER TABLE ai_messages FORCE ROW LEVEL SECURITY;
+ALTER TABLE ai_pending_actions FORCE ROW LEVEL SECURITY;
+ALTER TABLE ai_audit_log FORCE ROW LEVEL SECURITY;
 ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE config_deployment_runs FORCE ROW LEVEL SECURITY;
 ALTER TABLE system_metrics_db_size_snapshots FORCE ROW LEVEL SECURITY;

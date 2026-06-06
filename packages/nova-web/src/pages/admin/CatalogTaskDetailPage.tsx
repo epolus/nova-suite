@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  useRegisterAiAutomationApply,
+  useSetAiContext,
+} from '../../components/ai/AiAssistantProvider';
 import type { CatalogTasksListLocationState } from './CatalogTasksPage';
 import { admin as adminApi, catalog, credentials as credentialsApi } from '../../api/client';
 import type { AllCatalogTask, AssignmentGroupItem, CatalogTask, ServiceItem, TenantCredentialListItem } from '../../api/client';
@@ -125,6 +129,25 @@ export default function CatalogTaskDetailPage() {
     sla_hours: '',
     automation_config_json: '{\n  \n}',
   });
+
+  const aiPageContext = useMemo(
+    () =>
+      !isNew && taskId
+        ? { catalogTaskId: taskId, serviceItemId: serviceItemId || form.service_item_id }
+        : undefined,
+    [isNew, taskId, serviceItemId, form.service_item_id],
+  );
+  useSetAiContext(aiPageContext);
+
+  const applyAutomationFromAi = useCallback((cfg: Record<string, unknown>) => {
+    setForm((prev) => ({
+      ...prev,
+      automation_config_json: JSON.stringify(cfg, null, 2),
+    }));
+    setShowVisualBuilder(true);
+  }, []);
+
+  useRegisterAiAutomationApply(applyAutomationFromAi);
 
   useEffect(() => {
     let active = true;

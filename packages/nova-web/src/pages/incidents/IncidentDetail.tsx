@@ -16,6 +16,7 @@ import { useIncidentDetail } from './useIncidentDetail';
 import { SimilarIncidentsSection, KbSuggestionsSection } from '../../components/IncidentSidebarSections';
 import type { UserListItem, ServiceListItem, CI, Problem } from '../../api/client';
 import { canCreateMajorIncidentRecord } from '../../utils/roles';
+import { useSetAiContext } from '../../components/ai/AiAssistantProvider';
 
 export default function IncidentDetail() {
   const [previewArticle, setPreviewArticle] = useState<KnowledgeArticleDetail | null>(null);
@@ -42,6 +43,8 @@ export default function IncidentDetail() {
     handleFileUpload, handleDrop, handleDeleteAttachment, handlePreview, formatSize,
     refresh,
   } = useIncidentDetail();
+
+  useSetAiContext(inc ? { incidentId: inc.id } : undefined);
 
   const [linkMajorSelect, setLinkMajorSelect] = useState('');
   const [linkableMajors, setLinkableMajors] = useState<Array<{ id: string; number: string; title: string; status: string }>>([]);

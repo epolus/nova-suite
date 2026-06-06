@@ -809,6 +809,57 @@ INSERT INTO priority_matrix (impact, urgency, priority) VALUES
   ('low',    'low',    5);  -- Planning
 
 -- ============================================================
+-- AI ASSISTANT
+-- ============================================================
+CREATE TABLE ai_conversations (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  persona     text NOT NULL CHECK (persona IN ('ess', 'agent')),
+  context     jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_ai_conversations_user ON ai_conversations(tenant_id, user_id, created_at DESC);
+
+CREATE TABLE ai_messages (
+  id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id  uuid NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+  role             text NOT NULL CHECK (role IN ('system', 'user', 'assistant', 'tool')),
+  content          text NOT NULL DEFAULT '',
+  tool_calls       jsonb,
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_ai_messages_conversation ON ai_messages(conversation_id, created_at ASC);
+
+CREATE TABLE ai_pending_actions (
+  id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id  uuid NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+  action_type      text NOT NULL,
+  payload          jsonb NOT NULL,
+  validation_errors jsonb,
+  status           text NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending', 'confirmed', 'cancelled', 'expired')),
+  expires_at       timestamptz NOT NULL,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  confirmed_at     timestamptz
+);
+CREATE INDEX idx_ai_pending_actions_conversation ON ai_pending_actions(conversation_id, status);
+
+CREATE TABLE ai_audit_log (
+  id               uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id        uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id          uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  conversation_id  uuid REFERENCES ai_conversations(id) ON DELETE SET NULL,
+  action_type      text NOT NULL,
+  entity_type      text,
+  entity_id        uuid,
+  metadata         jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_ai_audit_log_tenant ON ai_audit_log(tenant_id, created_at DESC);
+
+-- ============================================================
 -- WORKFLOW START JOBS
 -- ============================================================
 CREATE TABLE workflow_start_jobs (
@@ -925,7 +976,7 @@ BEGIN
       'tenants', 'departments', 'cost_centers', 'roles', 'processes',
       'users', 'companies', 'locations', 'user_preferences', 'assignment_groups', 'services',
       'service_categories', 'service_items',
-      'requests', 'workflow_start_jobs', 'incidents', 'major_incidents', 'postmortems', 'ci_classes', 'configuration_items'
+      'requests', 'workflow_start_jobs', 'ai_conversations', 'incidents', 'major_incidents', 'postmortems', 'ci_classes', 'configuration_items'
     ])
   LOOP
     EXECUTE format(

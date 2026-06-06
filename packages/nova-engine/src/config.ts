@@ -89,4 +89,30 @@ export const config = {
   catalogAutomation: {
     sharedKey: env('CATALOG_AUTOMATION_SHARED_KEY', ''),
   },
+
+  ai: {
+    enabled: process.env.AI_ENABLED === 'true',
+    defaultProvider: env('AI_DEFAULT_PROVIDER', 'openai') as 'openai' | 'azure_openai' | 'ollama',
+    essEnabled: process.env.AI_ESS_ENABLED !== 'false',
+    agentEnabled: process.env.AI_AGENT_ENABLED !== 'false',
+    maxContextArticles: envInt('AI_MAX_CONTEXT_ARTICLES', 6),
+    rateLimitPerUserPerMin: envInt('AI_RATE_LIMIT_PER_USER_PER_MIN', 20),
+    pendingActionTtlMinutes: envInt('AI_PENDING_ACTION_TTL_MINUTES', 60),
+    maxToolRounds: envInt('AI_MAX_TOOL_ROUNDS', 8),
+    openai: {
+      apiKey: env('OPENAI_API_KEY', ''),
+      baseUrl: env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+      model: env('OPENAI_MODEL', 'gpt-4o-mini'),
+    },
+    azureOpenai: {
+      endpoint: env('AZURE_OPENAI_ENDPOINT', ''),
+      apiKey: env('AZURE_OPENAI_API_KEY', ''),
+      deployment: env('AZURE_OPENAI_DEPLOYMENT', ''),
+      apiVersion: env('AZURE_OPENAI_API_VERSION', '2024-08-01-preview'),
+    },
+    ollama: {
+      baseUrl: env('OLLAMA_BASE_URL', 'http://localhost:11434'),
+      model: env('OLLAMA_MODEL', 'llama3.1'),
+    },
+  },
 } as const;

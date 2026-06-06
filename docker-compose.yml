@@ -61,6 +61,20 @@ services:
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-http://localhost/api/auth/sso/callback}
       OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-Google}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_DEFAULT_PROVIDER: ${AI_DEFAULT_PROVIDER:-openai}
+      AI_ESS_ENABLED: ${AI_ESS_ENABLED:-true}
+      AI_AGENT_ENABLED: ${AI_AGENT_ENABLED:-true}
+      AI_RATE_LIMIT_PER_USER_PER_MIN: ${AI_RATE_LIMIT_PER_USER_PER_MIN:-20}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-08-01-preview}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1}
       OIDC_SCOPE: ${OIDC_SCOPE:-openid email profile}
     extra_hosts:
       - "localhost:host-gateway"

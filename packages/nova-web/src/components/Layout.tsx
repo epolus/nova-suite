@@ -12,6 +12,7 @@ import { canAccessAdminRoute } from '../utils/adminRouteAccess';
 import { useUserPreferenceState } from '../hooks/useUserPreferenceState';
 import { formatDateTime } from '../utils/dateTime';
 import { useTranslations } from 'use-intl';
+import { AiAssistantProvider } from './ai/AiAssistantProvider';
 
 const DEFAULT_LOGO_SRC = '/default-logo.svg';
 
@@ -541,6 +542,7 @@ export default function Layout() {
   };
 
   return (
+    <AiAssistantProvider persona="agent">
     <div className="flex flex-col h-full">
       {/* ── Top header ── */}
       <header className="flex-shrink-0 h-14 flex items-center justify-between px-4 border-b border-white/10 z-10" style={{ backgroundColor: 'var(--color-sidebar-bg)' }}>
@@ -679,5 +681,6 @@ export default function Layout() {
       </main>
       </div>
     </div>
+    </AiAssistantProvider>
   );
 }

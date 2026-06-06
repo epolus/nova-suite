@@ -28,6 +28,7 @@ import releaseRoutes from './releases/routes';
 import reportRoutes from './reports/routes';
 import configPackageRoutes from './config-packages/routes';
 import majorIncidentRoutes from './major-incidents/routes';
+import aiRoutes from './ai/routes';
 
 const router = Router();
 
@@ -56,5 +57,6 @@ router.use('/credentials', credentialsRoutes);
 router.use('/assets', assetRoutes);
 router.use('/releases', releaseRoutes);
 router.use('/reports', reportRoutes);
+router.use('/ai', aiRoutes);
 
 export default router;

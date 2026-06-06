@@ -25,6 +25,7 @@ import {
   rankedSuggestionsQuerySchema,
 } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
+import { createEssIncident } from '../../domain/incidents/create-ess-incident';
 import {
   signalIncidentResolved,
   cancelIncidentAutoClose,
@@ -360,85 +361,13 @@ router.post(
       }
 
       const client = getRequestClient(req);
-      const {
-        title, description, impact, urgency,
-        caller_id, contact_info, request_id,
-      } = req.body;
-
-      const groups = await client.query(
-        `SELECT id, name
-         FROM assignment_groups
-         WHERE is_active = true
-         ORDER BY name`,
+      const incident = await createEssIncident(
+        client,
+        req.user!.id,
+        req.user!.tenant_id,
+        req.body,
       );
-      const serviceDesk = groups.rows.find(
-        (g: { id: string; name: string }) => normalizeGroupName(g.name) === 'servicedesk',
-      );
-      if (!serviceDesk) {
-        throw new AppError(400, 'Service Desk assignment group not found');
-      }
-
-      // Calculate priority from matrix
-      const priorityResult = await client.query(
-        'SELECT calculate_priority($1, $2) AS priority',
-        [impact, urgency],
-      );
-      const priority = priorityResult.rows[0]?.priority || 3;
-
-      // Generate number
-      const seqResult = await client.query("SELECT nextval('incident_number_seq')");
-      const number = `INC${seqResult.rows[0].nextval.toString().padStart(7, '0')}`;
-
-      // Default SLA: priority-based hours
-      const slaHoursMap: Record<number, number> = { 1: 4, 2: 8, 3: 24, 4: 48, 5: 72 };
-      const slaDueAt = new Date();
-      slaDueAt.setHours(slaDueAt.getHours() + (slaHoursMap[priority] || 24));
-
-      const result = await client.query(
-        `INSERT INTO incidents (
-          tenant_id, number, request_id, title, description,
-          status, impact, urgency, priority,
-          assigned_to, assignment_group_id, caller_id,
-          contact_info, service_id, configuration_item_id,
-          category, subcategory, sla_due_at
-        ) VALUES (
-          current_tenant_id(), $1, $2, $3, $4,
-          $5, $6, $7, $8,
-          $9, $10, $11,
-          $12, $13, $14,
-          $15, $16, $17
-        ) RETURNING *`,
-        [
-          number, request_id || null, title, description || null,
-          'new', impact, urgency, priority,
-          null, serviceDesk.id, caller_id || req.user!.id,
-          contact_info || null, null, null,
-          null, null, slaDueAt.toISOString(),
-        ],
-      );
-
-      await client.query(
-        `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-         VALUES (current_tenant_id(), $1, $2, 'state_change', $3)`,
-        [result.rows[0].id, req.user!.id, `Incident created with priority ${priority}`],
-      );
-
-      enqueueIncidentEscalationStartJob({
-        incidentId: result.rows[0].id,
-        tenantId: req.user!.tenant_id,
-        priority,
-        slaDueAt: slaDueAt.toISOString(),
-      }).catch(() => {});
-
-      enqueueNotificationDispatchStartJob({
-        tenantId: req.user!.tenant_id,
-        entityType: 'incident',
-        triggerKey: 'incident.created',
-        entityId: result.rows[0].id,
-        actorUserId: req.user!.id,
-      }).catch(() => {});
-
-      res.status(201).json(result.rows[0]);
+      res.status(201).json(incident);
     } catch (err) {
       next(err);
     }

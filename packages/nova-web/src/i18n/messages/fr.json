@@ -122,6 +122,19 @@
       "loadFailed": "Échec du chargement des notifications.",
       "markReadFailed": "Échec du marquage de la notification comme lue.",
       "markAllFailed": "Échec du marquage de toutes les notifications comme lues."
+    },
+    "ai": {
+      "title": "Assistant Nova",
+      "openAriaLabel": "Ouvrir l'assistant Nova",
+      "closeAriaLabel": "Fermer",
+      "greetingEss": "Bonjour ! Je peux vous aider à parcourir le catalogue de services (par ex. un nouvel ordinateur portable), rechercher des articles de la base de connaissances ou ouvrir un incident si nécessaire.",
+      "greetingAgent": "Bonjour ! Je peux résumer les incidents, suggérer des articles de la base de connaissances, rédiger des notes de travail et proposer l'automatisation du catalogue.",
+      "placeholder": "Posez une question…",
+      "send": "Envoyer",
+      "initFailed": "Impossible de démarrer l'assistant.",
+      "workNoteAdded": "Note de travail ajoutée à l'incident.",
+      "actionFailed": "Échec de l'action.",
+      "catalogOpenLink": "Ouvrir dans le catalogue"
     }
   },
   "navigation": {

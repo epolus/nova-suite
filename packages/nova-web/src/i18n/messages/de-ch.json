@@ -122,6 +122,19 @@
       "loadFailed": "Benachrichtigungen konnten nicht geladen werden.",
       "markReadFailed": "Die Benachrichtigung konnte nicht als gelesen markiert werden.",
       "markAllFailed": "Es konnten nicht alle Benachrichtigungen als gelesen markiert werden."
+    },
+    "ai": {
+      "title": "Nova Assistent",
+      "openAriaLabel": "Nova Assistent öffnen",
+      "closeAriaLabel": "Schliessen",
+      "greetingEss": "Hallo! Ich kann Ihnen beim Servicekatalog helfen (z. B. neuer Laptop), Wissensartikel suchen oder bei Bedarf ein Incident eröffnen.",
+      "greetingAgent": "Hallo! Ich kann Incidents zusammenfassen, Wissensartikel vorschlagen, Notizen entwerfen und Katalog-Automatisierung vorschlagen.",
+      "placeholder": "Frage stellen…",
+      "send": "Senden",
+      "initFailed": "Der Assistent konnte nicht gestartet werden.",
+      "workNoteAdded": "Arbeitsnotiz zum Incident hinzugefügt.",
+      "actionFailed": "Aktion fehlgeschlagen.",
+      "catalogOpenLink": "Im Katalog öffnen"
     }
   },
   "navigation": {
@@ -142,7 +155,7 @@
       "catalogDesigner": "Katalogdesigner"
     },
     "ess": {
-      "home": "Heim",
+      "home": "Startseite",
       "catalog": "Katalog",
       "myRequests": "Meine Wünsche",
       "myIncidents": "Meine Vorfälle",
