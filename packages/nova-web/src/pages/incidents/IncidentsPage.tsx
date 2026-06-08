@@ -228,7 +228,7 @@ export default function IncidentsPage() {
 
   return (
     <>
-      <MajorIncidentBanner />
+      {!isEss && <MajorIncidentBanner />}
       <PageHeader
         title={tIncidents('title')}
         description={tIncidents('description')}
