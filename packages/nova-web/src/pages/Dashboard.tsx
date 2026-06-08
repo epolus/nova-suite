@@ -192,7 +192,7 @@ export default function Dashboard() {
           />
         )}
         <StatCard
-          label={tDashboard('stats.myRequests')}
+          label={tDashboard('stats.openRequests')}
           value={requestTotal}
           color="text-blue-600"
           bg="bg-blue-50"

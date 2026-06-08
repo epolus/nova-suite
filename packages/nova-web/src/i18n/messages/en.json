@@ -391,7 +391,7 @@
         "openIncidents": "Open Incidents",
         "slaBreached": "SLA Breached",
         "openChanges": "Open Changes",
-        "myRequests": "My Requests",
+        "openRequests": "Open Requests",
         "assignedToMe": "Assigned to Me",
         "assignedHint": "Excludes resolved, closed, cancelled"
       },
