@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { log } from '@temporalio/activity';
 import { withTenantContext } from '../db';
+import { getIncidentJournalAuthorHint, insertWorkflowJournalEntry } from './workflow-journal';
 
 export interface IncidentInfo {
   id: string;
@@ -51,11 +52,14 @@ export async function markSlaBreached(incidentId: string, tenantId: string): Pro
       'UPDATE incidents SET sla_breached = true WHERE id = $1',
       [incidentId],
     );
-    await client.query(
-      `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'state_change', $3)`,
-      [tenantId, incidentId, 'SLA breached — automated escalation triggered'],
-    );
+    const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
+    await insertWorkflowJournalEntry(client, {
+      tenantId,
+      incidentId,
+      entryType: 'state_change',
+      content: 'SLA breached — automated escalation triggered',
+      preferredAuthorId,
+    });
   });
 }
 
@@ -70,11 +74,14 @@ export async function escalateIncident(
       'UPDATE incidents SET priority = $1 WHERE id = $2 AND priority > $1',
       [newPriority, incidentId],
     );
-    await client.query(
-      `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'state_change', $3)`,
-      [tenantId, incidentId, `Priority escalated to P${newPriority} by automated SLA workflow`],
-    );
+    const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
+    await insertWorkflowJournalEntry(client, {
+      tenantId,
+      incidentId,
+      entryType: 'state_change',
+      content: `Priority escalated to P${newPriority} by automated SLA workflow`,
+      preferredAuthorId,
+    });
   });
 }
 
@@ -108,11 +115,13 @@ export async function autoAssignIncident(
     );
 
     const assigneeName = managerId ? 'group manager' : 'assignment group';
-    await client.query(
-      `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'assignment', $3)`,
-      [tenantId, incidentId, `Auto-assigned to ${assigneeName} via SLA escalation workflow`],
-    );
+    await insertWorkflowJournalEntry(client, {
+      tenantId,
+      incidentId,
+      entryType: 'assignment',
+      content: `Auto-assigned to ${assigneeName} via SLA escalation workflow`,
+      preferredAuthorId: managerId,
+    });
     return true;
   });
 }
@@ -125,11 +134,14 @@ export async function sendNotification(
   // In production this would send email/Slack/webhook — for now, log a journal entry
   log.info('Sending notification', { incidentId, message });
   await withTenantContext(tenantId, async (client) => {
-    await client.query(
-      `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'work_note', $3)`,
-      [tenantId, incidentId, `[Notification] ${message}`],
-    );
+    const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
+    await insertWorkflowJournalEntry(client, {
+      tenantId,
+      incidentId,
+      entryType: 'work_note',
+      content: `[Notification] ${message}`,
+      preferredAuthorId,
+    });
   });
 }
 
@@ -151,11 +163,14 @@ export async function autoCloseIncident(
     if (updated.rows.length === 0) return false;
 
     const incidentNumber = String((updated.rows[0] as Record<string, unknown>).number ?? incidentId);
-    await client.query(
-      `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
-       VALUES ($1, $2, '00000000-0000-0000-0000-000000000000', 'state_change', $3)`,
-      [tenantId, incidentId, `Status changed from resolved to closed (auto-close after 7 days): ${incidentNumber}`],
-    );
+    const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
+    await insertWorkflowJournalEntry(client, {
+      tenantId,
+      incidentId,
+      entryType: 'state_change',
+      content: `Status changed from resolved to closed (auto-close after 7 days): ${incidentNumber}`,
+      preferredAuthorId,
+    });
     return true;
   });
 }
