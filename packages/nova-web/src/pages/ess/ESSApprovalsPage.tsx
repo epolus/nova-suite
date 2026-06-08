@@ -1,25 +1,19 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslations, useMessages } from 'use-intl';
 import { approvals as approvalsApi, type PendingApproval } from '../../api/client';
 
-const TYPE_LABEL: Record<string, string> = {
-  change: 'Change',
-  knowledge: 'Knowledge Article',
-  request: 'Request',
-};
+function hasNestedKey(messages: unknown, path: string): boolean {
+  const parts = path.split('.');
+  let current: unknown = messages;
+  for (const part of parts) {
+    if (!current || typeof current !== 'object' || !(part in (current as object))) return false;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return typeof current === 'string';
+}
 
-const APPROVAL_TYPE_LABEL: Record<string, string> = {
-  manager: 'Manager Approval',
-  group: 'Group Approval',
-  cab: 'CAB Approval',
-  technical: 'Technical Approval',
-  security: 'Security Approval',
-  business: 'Business Approval',
-  knowledge_review: 'Knowledge Review',
-};
-
-// ─── Confirm modal ────────────────────────────────────────────
 function ConfirmModal({
   item,
   action,
@@ -31,27 +25,34 @@ function ConfirmModal({
   onConfirm: (notes: string) => void;
   onCancel: () => void;
 }) {
+  const t = useTranslations('pages.ess.approvals');
+  const tActions = useTranslations('common.actions');
+  const messages = useMessages();
   const [notes, setNotes] = useState('');
   const isReject = action === 'rejected';
+  const typePath = `pages.ess.approvals.types.${item.type}`;
+  const typeLabel = hasNestedKey(messages, typePath)
+    ? t(`types.${item.type}` as 'types.change')
+    : item.type;
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
         <h3 className="text-base font-semibold text-gray-900 mb-1">
-          {isReject ? 'Reject' : 'Approve'} {TYPE_LABEL[item.type] ?? item.type}
+          {isReject ? t('rejectTitle', { type: typeLabel }) : t('approveTitle', { type: typeLabel })}
         </h3>
         <p className="text-sm text-gray-500 mb-4">
           <span className="font-mono text-xs text-gray-400">{item.entity_number}</span>{' '}
           {item.entity_title}
         </p>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Notes {isReject && <span className="text-red-500">*</span>}
+          {t('notes')} {isReject && <span className="text-red-500">*</span>}
         </label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
-          placeholder={isReject ? 'Reason for rejection...' : 'Optional notes...'}
+          placeholder={isReject ? t('rejectReasonPlaceholder') : t('optionalNotesPlaceholder')}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
         />
         <div className="flex justify-end gap-2 mt-4">
@@ -59,7 +60,7 @@ function ConfirmModal({
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            Cancel
+            {tActions('cancel')}
           </button>
           <button
             onClick={() => onConfirm(notes)}
@@ -70,7 +71,7 @@ function ConfirmModal({
                 : 'bg-emerald-600 hover:bg-emerald-700'
             }`}
           >
-            {isReject ? 'Reject' : 'Approve'}
+            {isReject ? tActions('reject') : tActions('approve')}
           </button>
         </div>
       </div>
@@ -78,14 +79,36 @@ function ConfirmModal({
   );
 }
 
-// ─── Page ────────────────────────────────────────────────────
 export default function ESSApprovalsPage() {
+  const t = useTranslations('pages.ess.approvals');
+  const tActions = useTranslations('common.actions');
+  const messages = useMessages();
   const navigate = useNavigate();
   const [items, setItems] = useState<PendingApproval[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<{ item: PendingApproval; action: 'approved' | 'rejected' } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const approvalTypeLabel = useCallback(
+    (approvalType: string) => {
+      const path = `pages.ess.approvals.approvalTypes.${approvalType}`;
+      return hasNestedKey(messages, path)
+        ? t(`approvalTypes.${approvalType}` as 'approvalTypes.manager')
+        : approvalType;
+    },
+    [messages, t],
+  );
+
+  const typeLabel = useCallback(
+    (type: string) => {
+      const path = `pages.ess.approvals.types.${type}`;
+      return hasNestedKey(messages, path)
+        ? t(`types.${type}` as 'types.change')
+        : type;
+    },
+    [messages, t],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,7 +143,7 @@ export default function ESSApprovalsPage() {
           body: JSON.stringify({ decision: action === 'approved' ? 'approved' : 'rejected', notes }),
         });
         if (!response.ok) {
-          throw new Error('Failed to save change approval decision');
+          throw new Error(t('changeDecisionFailed'));
         }
       } else if (item.type === 'knowledge') {
         const response = await fetch(`/api/knowledge/articles/${item.entity_id}/approvals/${item.approval_id}/decision`, {
@@ -129,7 +152,7 @@ export default function ESSApprovalsPage() {
           body: JSON.stringify({ decision: action, notes }),
         });
         if (!response.ok) {
-          throw new Error('Failed to save knowledge approval decision');
+          throw new Error(t('knowledgeDecisionFailed'));
         }
       } else if (item.type === 'request') {
         const response = await fetch(`/api/requests/${item.entity_id}/tasks/${item.approval_id}/complete`, {
@@ -138,14 +161,14 @@ export default function ESSApprovalsPage() {
           body: JSON.stringify({ outcome: action, notes }),
         });
         if (!response.ok) {
-          throw new Error('Failed to save request approval decision');
+          throw new Error(t('requestDecisionFailed'));
         }
       }
 
       setModal(null);
       await load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save approval decision');
+      setError(err instanceof Error ? err.message : t('decisionFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -172,16 +195,14 @@ export default function ESSApprovalsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
-      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Pending Approvals</h1>
-        <p className="text-sm text-gray-500 mt-1">Items waiting for your review and decision.</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('pageTitle')}</h1>
+        <p className="text-sm text-gray-500 mt-1">{t('listDescription')}</p>
         {error && (
           <p className="text-sm text-red-600 mt-2">{error}</p>
         )}
       </div>
 
-      {/* List */}
       {loading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
@@ -196,8 +217,8 @@ export default function ESSApprovalsPage() {
           <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p className="text-base font-medium text-gray-900">All caught up</p>
-          <p className="text-sm text-gray-400 mt-1">No pending approvals at this time.</p>
+          <p className="text-base font-medium text-gray-900">{t('allCaughtUp')}</p>
+          <p className="text-sm text-gray-400 mt-1">{t('empty')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -206,30 +227,27 @@ export default function ESSApprovalsPage() {
               key={item.approval_id}
               className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4"
             >
-              {/* Icon */}
               <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0 mt-0.5">
                 {typeIcon(item.type)}
               </div>
 
-              {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                    {TYPE_LABEL[item.type] ?? item.type}
+                    {typeLabel(item.type)}
                   </span>
                   <span className="text-[10px] font-mono text-gray-400">{item.entity_number}</span>
                   <span className="text-[10px] text-gray-300">·</span>
                   <span className="text-[10px] text-gray-400">
-                    {APPROVAL_TYPE_LABEL[item.approval_type] ?? item.approval_type}
+                    {approvalTypeLabel(item.approval_type)}
                   </span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900 truncate">{item.entity_title}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Requested {new Date(item.created_at).toLocaleDateString()}
+                  {t('requestedOn', { date: new Date(item.created_at).toLocaleDateString() })}
                 </p>
               </div>
 
-              {/* Actions */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={() => {
@@ -242,20 +260,20 @@ export default function ESSApprovalsPage() {
                   }}
                   className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
                 >
-                  View
+                  {tActions('view')}
                 </button>
                 <button
                   onClick={() => setModal({ item, action: 'rejected' })}
                   className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
                 >
-                  Reject
+                  {tActions('reject')}
                 </button>
                 <button
                   onClick={() => setModal({ item, action: 'approved' })}
                   className="px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-colors"
                   style={{ backgroundColor: 'var(--color-primary)' }}
                 >
-                  Approve
+                  {tActions('approve')}
                 </button>
               </div>
             </div>
@@ -263,7 +281,6 @@ export default function ESSApprovalsPage() {
         </div>
       )}
 
-      {/* Modal */}
       {modal && !submitting && (
         <ConfirmModal
           item={modal.item}
@@ -274,7 +291,7 @@ export default function ESSApprovalsPage() {
       )}
       {submitting && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-xl px-8 py-6 shadow-xl text-sm text-gray-600">Saving...</div>
+          <div className="bg-white rounded-xl px-8 py-6 shadow-xl text-sm text-gray-600">{t('saving')}</div>
         </div>
       )}
     </div>

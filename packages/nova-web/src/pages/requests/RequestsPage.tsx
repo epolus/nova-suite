@@ -1,127 +1,45 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { requests as requestsApi } from '../../api/client';
-import type { ServiceRequest, Pagination } from '../../api/client';
+import type { ServiceRequest } from '../../api/client';
+import { useRequestsList, useInvalidateRequests } from '@/hooks/queries';
 import PageHeader from '../../components/PageHeader';
-import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import SearchBar from '../../components/SearchBar';
-import DataTable, { type DataColumnDef } from '../../components/DataTable';
+import DataTable from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
-import { formatDate, formatDateTime } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
+import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import { REQUEST_BULK_ACTIONS, REQUEST_STATUS_OPTIONS } from './requestListConfig';
-
-const DEFAULT_COLS = ['number', 'service_item_name', 'requester_name', 'priority', 'status', 'created_at'];
-const PRESETS_KEY = 'nova_filter_presets_requests';
-
-interface FilterPreset {
-  id: string;
-  name: string;
-  search: string;
-  status: string;
-  active: string;
-  columnFilters: Record<string, string>;
-}
-
-function buildColumns(listParams: Record<string, string>): DataColumnDef<ServiceRequest>[] {
-  return [
-    {
-      key: 'number',
-      label: 'Number',
-      sortable: true,
-      defaultVisible: true,
-      render: (req) => (
-        <Link
-          to={`/requests/${req.id}`}
-          state={{ listParams }}
-          className="text-indigo-600 font-medium hover:text-indigo-800"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {req.number}
-        </Link>
-      ),
-    },
-    {
-      key: 'service_item_name',
-      label: 'Service Item',
-      sortable: true,
-      defaultVisible: true,
-      render: (req) => <span className="text-gray-900">{req.service_item_name || '—'}</span>,
-    },
-    {
-      key: 'requester_name',
-      label: 'Requester',
-      sortable: true,
-      defaultVisible: true,
-      render: (req) => <span className="text-gray-500">{req.requester_name || '—'}</span>,
-    },
-    {
-      key: 'priority',
-      label: 'Priority',
-      sortable: true,
-      defaultVisible: true,
-      render: (req) => <Badge value={req.priority} />,
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      sortable: true,
-      defaultVisible: true,
-      render: (req) => <Badge value={req.status} />,
-    },
-    {
-      key: 'approved_by_name',
-      label: 'Approved By',
-      sortable: false,
-      defaultVisible: false,
-      render: (req) => <span className="text-gray-500">{req.approved_by_name || '—'}</span>,
-    },
-    {
-      key: 'approved_at',
-      label: 'Approved At',
-      sortable: true,
-      defaultVisible: false,
-      render: (req) => (
-        <span className="text-gray-500 text-xs">
-          {formatDateTime(req.approved_at)}
-        </span>
-      ),
-    },
-    {
-      key: 'notes',
-      label: 'Notes',
-      sortable: false,
-      defaultVisible: false,
-      className: 'max-w-xs truncate',
-      render: (req) => <span className="text-gray-500">{req.notes || '—'}</span>,
-    },
-    {
-      key: 'created_at',
-      label: 'Created',
-      sortable: true,
-      defaultVisible: true,
-      render: (req) => (
-        <span className="text-gray-500 text-xs">{formatDate(req.created_at)}</span>
-      ),
-    },
-    {
-      key: 'updated_at',
-      label: 'Updated',
-      sortable: true,
-      defaultVisible: false,
-      render: (req) => (
-        <span className="text-gray-500 text-xs">{formatDate(req.updated_at)}</span>
-      ),
-    },
-  ];
-}
+import {
+  DEFAULT_COLS,
+  PRESETS_KEY,
+  type FilterPreset,
+  type RequestListLabels,
+  buildColumns,
+  REQUEST_CSV_HEADERS,
+  getRequestCsvField,
+} from './requestsPageConfig';
 
 export default function RequestsPage() {
+  const tRequests = useTranslations('pages.requests');
+  const tList = useTranslations('common.list');
+  const tFilters = useTranslations('common.filters');
+  const tActions = useTranslations('common.actions');
+  const tMaster = useTranslations('common.masterData');
+  const tTable = useTranslations('common.table');
+  const fieldLabel = useFieldLabel();
+  const statusLabel = useStatusLabel();
+  const listLabels = useMemo<RequestListLabels>(
+    () => ({ field: fieldLabel, emDash: tTable('emDash') }),
+    [fieldLabel, tTable],
+  );
+
   const { user } = useAuth();
   const isAgent = isAgentRole(user?.roles);
   const { params, setSearch, setSort, setCols, setPage, setFilter, setColumnFilter, update } = useListParams({
@@ -130,13 +48,10 @@ export default function RequestsPage() {
     storageKey: 'requests',
   });
 
-  const [data, setData] = useState<ServiceRequest[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [pendingBulkAction, setPendingBulkAction] = useState<'approve' | 'reject' | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const invalidateRequests = useInvalidateRequests();
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
@@ -151,28 +66,29 @@ export default function RequestsPage() {
   const statusFilter = rawStatusFilter;
   const activeFilter = params.filters.active || '';
   const activeOnly = activeFilter !== 'all';
-  const cfKey = JSON.stringify(params.columnFilters);
 
-  useEffect(() => {
-    setLoading(true);
-    setSelectedIds([]);
-    const apiParams: Record<string, string> = {};
-    if (statusFilter) apiParams.status = statusFilter;
-    else if (activeOnly) apiParams.active = 'true';
-    if (params.search) apiParams.search = params.search;
+  const apiParams = useMemo(() => {
+    const p: Record<string, string> = {};
+    if (statusFilter) p.status = statusFilter;
+    else if (activeOnly) p.active = 'true';
+    if (params.search) p.search = params.search;
     if (params.sort) {
-      apiParams.sort_by = params.sort;
-      apiParams.sort_dir = params.dir;
+      p.sort_by = params.sort;
+      p.sort_dir = params.dir;
     }
     for (const [col, val] of Object.entries(params.columnFilters)) {
-      if (val) apiParams[`cf.${col}`] = val;
+      if (val) p[`cf.${col}`] = val;
     }
-    requestsApi.list(apiParams, params.page, 20).then((res) => {
-      setData(res.requests);
-      setPagination(res.pagination);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [params.page, statusFilter, activeOnly, params.search, params.sort, params.dir, cfKey, refreshKey]);
+    return p;
+  }, [statusFilter, activeOnly, params.search, params.sort, params.dir, params.columnFilters]);
+
+  const { data: listResult, isLoading: loading, isFetching } = useRequestsList(apiParams, params.page);
+  const data: ServiceRequest[] = listResult?.requests ?? [];
+  const pagination = listResult?.pagination ?? null;
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [params.page, apiParams, isFetching]);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};
@@ -190,7 +106,7 @@ export default function RequestsPage() {
     return lp;
   }, [statusFilter, activeFilter, params.search, params.sort, params.dir, params.columnFilters]);
 
-  const columns = useMemo(() => buildColumns(getListParams()), [getListParams]);
+  const columns = useMemo(() => buildColumns(getListParams(), listLabels), [getListParams, listLabels]);
   const hasActiveFilter = !!params.search || statusFilter !== '' || activeFilter === 'all' || Object.values(params.columnFilters).some(Boolean);
   const applyPreset = (preset: FilterPreset) => {
     update({
@@ -244,26 +160,12 @@ export default function RequestsPage() {
             return rows;
           })();
 
-      const headers = ['number', 'service_item_name', 'requester_name', 'priority', 'status', 'approved_by_name', 'approved_at', 'created_at', 'updated_at'];
-      const getField = (row: ServiceRequest, header: string): unknown => {
-        switch (header) {
-          case 'number': return row.number;
-          case 'service_item_name': return row.service_item_name;
-          case 'requester_name': return row.requester_name;
-          case 'priority': return row.priority;
-          case 'status': return row.status;
-          case 'approved_by_name': return row.approved_by_name;
-          case 'approved_at': return row.approved_at;
-          case 'created_at': return row.created_at;
-          case 'updated_at': return row.updated_at;
-          default: return '';
-        }
-      };
+      const headers = REQUEST_CSV_HEADERS;
       const csvEscape = (value: unknown) => {
         const str = String(value ?? '');
         return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
       };
-      const lines = [headers.join(','), ...allRows.map((row) => headers.map((h) => csvEscape(getField(row, h))).join(','))];
+      const lines = [headers.join(','), ...allRows.map((row) => headers.map((h) => csvEscape(getRequestCsvField(row, h))).join(','))];
       const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
@@ -293,13 +195,13 @@ export default function RequestsPage() {
 
       setPendingBulkAction(null);
       setSelectedIds([]);
-      setRefreshKey((k) => k + 1);
+      invalidateRequests();
 
-      // eslint-disable-next-line no-alert
+      const resultKey = action === 'approve' ? 'bulk.resultApproved' : 'bulk.resultRejected';
       alert(
-        `${action === 'approve' ? 'Approved' : 'Rejected'} ${successCount} request(s).`
-        + (skippedCount ? ` Skipped ${skippedCount} non-pending request(s).` : '')
-        + (failedCount ? ` ${failedCount} failed.` : ''),
+        tRequests(resultKey, { count: successCount })
+        + (skippedCount ? tRequests('bulk.resultSkipped', { count: skippedCount }) : '')
+        + (failedCount ? tRequests('bulk.resultFailed', { count: failedCount }) : ''),
       );
     } finally {
       setBulkLoading(false);
@@ -309,21 +211,21 @@ export default function RequestsPage() {
   return (
     <>
       <PageHeader
-        title="Service Requests"
-        description="Track and manage service requests."
+        title={tRequests('title')}
+        description={tRequests('description')}
         action={
           <Link
             to="/catalog"
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
           >
-            + New Request
+            + {tRequests('newRequest')}
           </Link>
         }
       />
 
       {isAgent && (presets.length > 0 || hasActiveFilter) && (
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-xs font-medium text-gray-400">Saved:</span>
+          <span className="text-xs font-medium text-gray-400">{tFilters('saved')}</span>
           {presets.map((preset) => (
             <div key={preset.id} className="flex items-center gap-0.5 pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700">
               <button onClick={() => applyPreset(preset)} className="hover:text-indigo-600 transition-colors">{preset.name}</button>
@@ -337,30 +239,29 @@ export default function RequestsPage() {
                 value={savePresetName}
                 onChange={(e) => setSavePresetName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') { setShowSaveInput(false); setSavePresetName(''); } }}
-                placeholder="Filter name..."
+                placeholder={tFilters('filterNamePlaceholder')}
                 className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-none focus:ring-1 focus:ring-indigo-400 w-36"
               />
-              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">Save</button>
-              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">{tActions('save')}</button>
+              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">{tActions('cancel')}</button>
             </div>
           ) : hasActiveFilter && (
             <button
               onClick={() => setShowSaveInput(true)}
               className="px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
             >
-              + Save current filter
+              + {tFilters('saveCurrent')}
             </button>
           )}
         </div>
       )}
 
-      {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
           <SearchBar
             value={params.search}
             onChange={setSearch}
-            placeholder="Search by number, service, requester..."
+            placeholder={tRequests('searchPlaceholder')}
           />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -372,7 +273,7 @@ export default function RequestsPage() {
                 : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
-            Active
+            {tRequests('filters.active')}
           </button>
           <button
             onClick={() => update({ filters: { ...params.filters, active: 'all' }, page: 1 })}
@@ -382,7 +283,7 @@ export default function RequestsPage() {
                 : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
-            All
+            {tRequests('filters.all')}
           </button>
           {REQUEST_STATUS_OPTIONS.map((s) => (
             <button
@@ -394,12 +295,12 @@ export default function RequestsPage() {
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {s === '' ? 'Any status' : s.replace(/_/g, ' ')}
+              {s === '' ? tRequests('filters.anyStatus') : statusLabel(s)}
             </button>
           ))}
           {isAgent && (
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
-              {exporting ? 'Exporting...' : 'Export CSV'}
+              {exporting ? tList('exporting') : tList('exportCsv')}
             </Button>
           )}
         </div>
@@ -407,28 +308,28 @@ export default function RequestsPage() {
 
       {isAgent && REQUEST_BULK_ACTIONS.length > 0 && selectedIds.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl mb-4 flex-wrap">
-          <span className="text-sm font-semibold text-indigo-900">{selectedIds.length} selected</span>
+          <span className="text-sm font-semibold text-indigo-900">{tList('selected', { count: selectedIds.length })}</span>
           <div className="flex items-center gap-2 flex-wrap">
             {REQUEST_BULK_ACTIONS.map((action) => (
               pendingBulkAction === action.id ? (
                 <span key={action.id} className="inline-flex items-center gap-2">
                   <span className="text-xs text-gray-600">
-                    {action.id === 'approve' ? 'Approve' : 'Reject'} selected requests?
+                    {action.id === 'approve' ? tRequests('bulk.confirmApprove') : tRequests('bulk.confirmReject')}
                   </span>
                   <Button size="sm" variant={action.id === 'approve' ? 'default' : 'warning'} disabled={bulkLoading} onClick={() => handleBulkApproval(action.id)}>
-                    Confirm
+                    {tMaster('confirm')}
                   </Button>
-                  <button onClick={() => setPendingBulkAction(null)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                  <button onClick={() => setPendingBulkAction(null)} className="text-xs text-gray-500 hover:text-gray-700">{tActions('cancel')}</button>
                 </span>
               ) : (
                 <Button key={action.id} size="sm" variant={action.variant} disabled={bulkLoading} onClick={() => setPendingBulkAction(action.id)}>
-                  {action.label}
+                  {action.id === 'approve' ? tRequests('bulk.approveSelected') : tRequests('bulk.rejectSelected')}
                 </Button>
               )
             ))}
           </div>
           <button onClick={() => setSelectedIds([])} className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-            Clear selection
+            {tMaster('clearSelection')}
           </button>
         </div>
       )}
@@ -446,7 +347,11 @@ export default function RequestsPage() {
           onSort={setSort}
           columnFilters={params.columnFilters}
           onColumnFilter={setColumnFilter}
-          emptyMessage={params.search ? `No requests matching "${params.search}"` : 'No requests found.'}
+          emptyMessage={
+            params.search
+              ? tRequests('emptySearch', { query: params.search })
+              : tRequests('empty')
+          }
           onRowClick={(req) => navigate(`/requests/${req.id}`, { state: { listParams: getListParams() } })}
           selectable={isAgent}
           selectedIds={selectedIds}

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'use-intl';
 import {
   credentials as credentialsApi,
   type TenantCredentialListItem,
@@ -11,10 +12,13 @@ import Spinner from '../../components/Spinner';
 import { useAuth } from '../../context/AuthContext';
 import { hasRole } from '../../utils/roles';
 import { formatDateTime } from '../../utils/dateTime';
-
-type SecretMode = 'plain' | 'oauth2_client_credentials';
+import CredentialForm, { type SecretMode } from './CredentialForm';
 
 export default function CredentialsPage() {
+  const t = useTranslations('pages.admin.credentials');
+  const tFields = useTranslations('common.fields');
+  const tActions = useTranslations('common.actions');
+  const tTable = useTranslations('common.table');
   const { user } = useAuth();
   const canManage = hasRole(user?.roles, 'admin') || hasRole(user?.roles, 'credential_manager');
 
@@ -45,11 +49,11 @@ export default function CredentialsPage() {
       const res = await credentialsApi.list();
       setItems(res.credentials);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load credentials');
+      setError(e instanceof Error ? e.message : t('loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -103,7 +107,7 @@ export default function CredentialsPage() {
       setTokenTestResult('');
       setMode('edit');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load credential');
+      setError(e instanceof Error ? e.message : t('loadCredentialFailed'));
     } finally {
       setSaving(false);
     }
@@ -194,7 +198,7 @@ export default function CredentialsPage() {
       await load();
       setTokenTestResult('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setError(e instanceof Error ? e.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -208,7 +212,7 @@ export default function CredentialsPage() {
     try {
       const result = await credentialsApi.testToken(editId);
       if (!result.ok) {
-        setError(result.error || 'Token test failed');
+        setError(result.error || t('tokenTestFailed'));
         return;
       }
       const expiresInfo = result.expires_in ? `${result.expires_in}s` : 'unknown';
@@ -216,14 +220,14 @@ export default function CredentialsPage() {
         `OK - token_type=${result.token_type}, expires_in=${expiresInfo}, preview=${result.access_token_preview}`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Token test failed');
+      setError(e instanceof Error ? e.message : t('tokenTestFailed'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!canManage || !window.confirm('Delete this credential? References in catalog automation or data sources will break.')) return;
+    if (!canManage || !window.confirm(t('confirmDelete'))) return;
     setSaving(true);
     setError('');
     try {
@@ -233,7 +237,7 @@ export default function CredentialsPage() {
         setMode('list');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setError(e instanceof Error ? e.message : t('deleteFailed'));
     } finally {
       setSaving(false);
     }
@@ -246,8 +250,8 @@ export default function CredentialsPage() {
   return (
     <>
       <PageHeader
-        title="Credentials"
-        description="Encrypted integration secrets (PostgreSQL pgcrypto). Use {{cred.slug}} for plain secrets or {{cred.slug.access_token}} for OAuth2 client-credentials. Set CREDENTIALS_MASTER_KEY on API and worker."
+        title={t('title')}
+        description={t('description')}
       />
 
       {error && (
@@ -258,8 +262,8 @@ export default function CredentialsPage() {
         <Card>
           <div className="flex justify-between items-center mb-4">
             <p className="text-sm text-gray-600">
-              Slugs must match <code className="text-xs bg-gray-100 px-1 rounded">^[a-z][a-z0-9_]*$</code>.
-              Catalog designers can see names only; admins and credential managers can create and rotate secrets.
+              {t('slugHint')} <code className="text-xs bg-gray-100 px-1 rounded">^[a-z][a-z0-9_]*$</code>.{' '}
+              {t('permissionsHint')}
             </p>
             {canManage && (
               <button
@@ -267,7 +271,7 @@ export default function CredentialsPage() {
                 onClick={openCreate}
                 className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700"
               >
-                New credential
+                {t('new')}
               </button>
             )}
           </div>
@@ -276,10 +280,10 @@ export default function CredentialsPage() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-gray-500">
-                  <th className="py-2 pr-4 font-medium">Slug</th>
-                  <th className="py-2 pr-4 font-medium">Label</th>
-                  <th className="py-2 pr-4 font-medium">Updated</th>
-                  {canManage && <th className="py-2 font-medium">Actions</th>}
+                  <th className="py-2 pr-4 font-medium">{tFields('slug')}</th>
+                  <th className="py-2 pr-4 font-medium">{tFields('label')}</th>
+                  <th className="py-2 pr-4 font-medium">{tFields('updated')}</th>
+                  {canManage && <th className="py-2 font-medium">{tTable('actions')}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -291,10 +295,10 @@ export default function CredentialsPage() {
                     {canManage && (
                       <td className="py-2 space-x-2">
                         <button type="button" className="text-indigo-600 hover:underline text-xs" onClick={() => openEdit(row.id)}>
-                          Edit
+                          {tActions('edit')}
                         </button>
                         <button type="button" className="text-red-600 hover:underline text-xs" onClick={() => handleDelete(row.id)}>
-                          Delete
+                          {tActions('delete')}
                         </button>
                       </td>
                     )}
@@ -302,189 +306,53 @@ export default function CredentialsPage() {
                 ))}
               </tbody>
             </table>
-            {items.length === 0 && <p className="text-sm text-gray-500 py-6">No credentials yet.</p>}
+            {items.length === 0 && <p className="text-sm text-gray-500 py-6">{t('empty')}</p>}
           </div>
         </Card>
       )}
 
       {(mode === 'create' || mode === 'edit') && canManage && (
         <Card>
-          <h3 className="font-semibold text-gray-900 mb-4">{mode === 'create' ? 'New credential' : 'Edit credential'}</h3>
-          <div className="space-y-4 max-w-lg">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Slug</label>
-              <input
-                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm font-mono"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                disabled={mode === 'edit'}
-                placeholder="my_api_token"
-              />
-              {mode === 'edit' && <p className="text-xs text-gray-400 mt-1">Slug cannot be changed after creation.</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Label</label>
-              <input
-                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="Production API"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Description (optional)</label>
-              <textarea
-                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Secret Type</label>
-              <select
-                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                value={secretMode}
-                onChange={(e) => setSecretMode(e.target.value as SecretMode)}
-              >
-                <option value="plain">Plain secret (token/password/API key)</option>
-                <option value="oauth2_client_credentials">OAuth2 client credentials</option>
-              </select>
-            </div>
-            {secretMode === 'oauth2_client_credentials' ? (
-              <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <p className="text-xs text-gray-600">
-                  Stored as encrypted JSON once in this credential. Automation tasks only reference the slug using
-                  {' '}
-                  <code className="rounded bg-gray-100 px-1 py-0.5">{"{{cred.slug.access_token}}"}</code>.
-                </p>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Token URL</label>
-                  <input
-                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                    value={oauthTokenUrl}
-                    onChange={(e) => setOauthTokenUrl(e.target.value)}
-                    placeholder="https://idp.example.com/oauth/token"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Client ID</label>
-                  <input
-                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                    value={oauthClientId}
-                    onChange={(e) => setOauthClientId(e.target.value)}
-                    placeholder="svc_catalog"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Client Secret {mode === 'edit' ? '(fill to rotate, blank keeps existing)' : ''}
-                  </label>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                    value={oauthClientSecret}
-                    onChange={(e) => setOauthClientSecret(e.target.value)}
-                    placeholder={mode === 'edit' ? '••••••••' : ''}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Scope (optional)</label>
-                  <input
-                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                    value={oauthScope}
-                    onChange={(e) => setOauthScope(e.target.value)}
-                    placeholder="group.write users.read"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Audience (optional)</label>
-                  <input
-                    className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                    value={oauthAudience}
-                    onChange={(e) => setOauthAudience(e.target.value)}
-                    placeholder="https://api.example.com"
-                  />
-                </div>
-                {mode === 'edit' && (
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={handleTestToken}
-                      disabled={saving || !editId}
-                      className="px-3 py-1.5 text-xs font-medium text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-50 disabled:opacity-50"
-                    >
-                      Get token (test)
-                    </button>
-                  </div>
-                )}
-                {tokenTestResult && (
-                  <p className="text-xs text-emerald-700 rounded bg-emerald-50 border border-emerald-200 px-2 py-1">
-                    {tokenTestResult}
-                  </p>
-                )}
-              </div>
-            ) : (
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Secret {mode === 'edit' ? '(leave blank to keep existing)' : ''}
-              </label>
-              <input
-                type="password"
-                autoComplete="new-password"
-                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
-                placeholder={mode === 'edit' ? '••••••••' : ''}
-              />
-              {mode === 'edit' && detail && (
-                <p className="text-xs text-gray-500 mt-1">Stored encrypted. has_secret: {detail.has_secret ? 'yes' : 'no'}</p>
-              )}
-            </div>
-            )}
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                disabled={
-                  saving
-                  || (mode === 'create' && !slug.trim())
-                  || (mode === 'create' && !label.trim())
-                  || (
-                    mode === 'create'
-                    && secretMode === 'plain'
-                    && !secret.trim()
-                  )
-                  || (
-                    mode === 'create'
-                    && secretMode === 'oauth2_client_credentials'
-                    && (!oauthTokenUrl.trim() || !oauthClientId.trim() || !oauthClientSecret.trim())
-                  )
-                }
-                onClick={handleSave}
-                className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('list');
-                  setSecret('');
-                  setDetail(null);
-                  setSecretMode('plain');
-                  setOauthTokenUrl('');
-                  setOauthClientId('');
-                  setOauthClientSecret('');
-                  setOauthScope('');
-                  setOauthAudience('');
-                }}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+          <CredentialForm
+            mode={mode}
+            slug={slug}
+            setSlug={setSlug}
+            label={label}
+            setLabel={setLabel}
+            description={description}
+            setDescription={setDescription}
+            secret={secret}
+            setSecret={setSecret}
+            secretMode={secretMode}
+            setSecretMode={setSecretMode}
+            oauthTokenUrl={oauthTokenUrl}
+            setOauthTokenUrl={setOauthTokenUrl}
+            oauthClientId={oauthClientId}
+            setOauthClientId={setOauthClientId}
+            oauthClientSecret={oauthClientSecret}
+            setOauthClientSecret={setOauthClientSecret}
+            oauthScope={oauthScope}
+            setOauthScope={setOauthScope}
+            oauthAudience={oauthAudience}
+            setOauthAudience={setOauthAudience}
+            saving={saving}
+            editId={editId}
+            detail={detail}
+            tokenTestResult={tokenTestResult}
+            onSave={handleSave}
+            onTestToken={handleTestToken}
+            onCancel={() => {
+              setMode('list');
+              setSecret('');
+              setDetail(null);
+              setSecretMode('plain');
+              setOauthTokenUrl('');
+              setOauthClientId('');
+              setOauthClientSecret('');
+              setOauthScope('');
+              setOauthAudience('');
+            }}
+          />
         </Card>
       )}
     </>

@@ -2,195 +2,54 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { incidents as incidentsApi } from '../../api/client';
-import type { AssignmentGroupItem, Incident, Pagination } from '../../api/client';
+import type { Incident } from '../../api/client';
+import {
+  useIncidentsList,
+  useIncidentAssignmentGroups,
+  useInvalidateIncidents,
+} from '@/hooks/queries';
 import MajorIncidentBanner from '../../components/MajorIncidentBanner';
 import PageHeader from '../../components/PageHeader';
-import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import SearchBar from '../../components/SearchBar';
-import DataTable, { type DataColumnDef } from '../../components/DataTable';
+import DataTable from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
-import { formatDate } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
 import { INCIDENT_BULK_ACTIONS, INCIDENT_STATUS_OPTIONS } from './incidentListConfig';
+import { buildColumns, type IncidentListLabels } from './incidentColumns';
+import {
+  createIncidentListParams,
+  type FilterPreset,
+  PRESETS_KEY,
+  DEFAULT_COLS,
+} from './incidentListParams';
+import { exportIncidentsCsv } from './incidentExport';
+import { useFieldLabel, usePriorityLabel, useStatusLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
-
-interface FilterPreset {
-  id: string;
-  name: string;
-  search: string;
-  status: string;
-  columnFilters: Record<string, string>;
-}
-
-const PRESETS_KEY = 'nova_filter_presets_incidents';
-
-const priorityLabels: Record<number, string> = {
-  1: 'P1 Critical',
-  2: 'P2 High',
-  3: 'P3 Moderate',
-  4: 'P4 Low',
-  5: 'P5 Planning',
-};
-
-const DEFAULT_COLS = ['number', 'title', 'priority', 'status', 'assigned_to_name', 'sla', 'created_at'];
-
-function createIncidentListParams(args: {
-  statusFilter: string;
-  assignedToMe: boolean;
-  slaBreached: boolean;
-  search: string;
-  sort: string;
-  dir: string;
-  columnFilters: Record<string, string>;
-}): Record<string, string> {
-  const apiParams: Record<string, string> = {};
-  if (args.assignedToMe) {
-    apiParams.assigned_to_me = 'true';
-  }
-  if (args.statusFilter === 'active') {
-    apiParams.status_not_in = 'closed,cancelled';
-  } else if (args.statusFilter !== 'all') {
-    apiParams.status = args.statusFilter;
-  }
-  if (args.slaBreached) {
-    apiParams.sla_breached = 'true';
-  }
-  if (args.search) apiParams.search = args.search;
-  if (args.sort) {
-    const sortKey = args.sort === 'sla' ? 'sla_due_at' : args.sort;
-    apiParams.sort_by = sortKey;
-    apiParams.sort_dir = args.dir;
-  }
-  for (const [col, val] of Object.entries(args.columnFilters)) {
-    if (val) apiParams[`cf.${col}`] = val;
-  }
-  return apiParams;
-}
-
-function buildColumns(listParams: Record<string, string>): DataColumnDef<Incident>[] {
-  return [
-  {
-    key: 'number',
-    label: 'Number',
-    sortable: true,
-    defaultVisible: true,
-    render: (inc) => (
-      <Link
-        to={`/incidents/${inc.id}`}
-        state={{ listParams }}
-        className="text-indigo-600 font-medium hover:text-indigo-800"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {inc.number}
-      </Link>
-    ),
-  },
-  {
-    key: 'title',
-    label: 'Title',
-    sortable: true,
-    defaultVisible: true,
-    className: 'max-w-xs truncate',
-    render: (inc) => <span className="text-gray-900">{inc.title}</span>,
-  },
-  {
-    key: 'priority',
-    label: 'Priority',
-    sortable: true,
-    defaultVisible: true,
-    render: (inc) => (
-      <span
-        className={`text-xs font-bold ${
-          inc.priority <= 2 ? 'text-red-600' : inc.priority === 3 ? 'text-yellow-600' : 'text-gray-500'
-        }`}
-      >
-        {priorityLabels[inc.priority] || `P${inc.priority}`}
-      </span>
-    ),
-  },
-  {
-    key: 'status',
-    label: 'Status',
-    sortable: true,
-    defaultVisible: true,
-    render: (inc) => <Badge value={inc.status} />,
-  },
-  {
-    key: 'assigned_to_name',
-    label: 'Assigned To',
-    sortable: true,
-    defaultVisible: true,
-    render: (inc) => <span className="text-gray-500">{inc.assigned_to_name || '—'}</span>,
-  },
-  {
-    key: 'impact',
-    label: 'Impact',
-    sortable: true,
-    defaultVisible: false,
-    render: (inc) => <span className="capitalize text-gray-600">{inc.impact}</span>,
-  },
-  {
-    key: 'urgency',
-    label: 'Urgency',
-    sortable: true,
-    defaultVisible: false,
-    render: (inc) => <span className="capitalize text-gray-600">{inc.urgency}</span>,
-  },
-  {
-    key: 'category',
-    label: 'Category',
-    sortable: true,
-    defaultVisible: false,
-    render: (inc) => <span className="text-gray-500">{inc.category || '—'}</span>,
-  },
-  {
-    key: 'assignment_group_name',
-    label: 'Assignment Group',
-    sortable: true,
-    defaultVisible: false,
-    render: (inc) => <span className="text-gray-500">{inc.assignment_group_name || '—'}</span>,
-  },
-  {
-    key: 'sla',
-    label: 'SLA',
-    sortable: true,
-    defaultVisible: true,
-    render: (inc) =>
-      inc.sla_breached ? (
-        <span className="text-xs font-bold text-red-600">BREACHED</span>
-      ) : inc.sla_due_at ? (
-        <span className="text-xs text-gray-500">{formatDate(inc.sla_due_at)}</span>
-      ) : (
-        <span className="text-gray-400">—</span>
-      ),
-  },
-  {
-    key: 'created_at',
-    label: 'Created',
-    sortable: true,
-    defaultVisible: true,
-    render: (inc) => (
-      <span className="text-gray-500 text-xs">{formatDate(inc.created_at)}</span>
-    ),
-  },
-  {
-    key: 'updated_at',
-    label: 'Updated',
-    sortable: true,
-    defaultVisible: false,
-    render: (inc) => (
-      <span className="text-gray-500 text-xs">{formatDate(inc.updated_at)}</span>
-    ),
-  },
-  ];
-}
 
 export default function IncidentsPage() {
   const tIncidents = useTranslations('pages.incidents');
+  const tList = useTranslations('common.list');
+  const tFilters = useTranslations('common.filters');
+  const tActions = useTranslations('common.actions');
+  const tMaster = useTranslations('common.masterData');
+  const fieldLabel = useFieldLabel();
+  const priorityLabel = usePriorityLabel();
+  const statusLabel = useStatusLabel();
+  const tTable = useTranslations('common.table');
+  const listLabels = useMemo<IncidentListLabels>(
+    () => ({
+      field: fieldLabel,
+      priority: priorityLabel,
+      status: statusLabel,
+      emDash: tTable('emDash'),
+      slaBreached: tList('breached'),
+    }),
+    [fieldLabel, priorityLabel, statusLabel, tTable, tList],
+  );
   const { user } = useAuth();
   const isEss = !isAgentRole(user?.roles);
 
@@ -200,20 +59,16 @@ export default function IncidentsPage() {
     storageKey: 'incidents',
   });
 
-  const [data, setData] = useState<Incident[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const invalidateIncidents = useInvalidateIncidents();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
   const [bulkGroupId, setBulkGroupId] = useState('');
   const [confirmClose, setConfirmClose] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   // Saved filter presets
   const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
@@ -228,7 +83,36 @@ export default function IncidentsPage() {
   const statusFilter = rawStatusFilter || 'active';
   const assignedToMeFilter = params.filters.assigned_to_me === 'true';
   const slaBreachedFilter = params.filters.sla_breached === 'true';
-  const cfKey = JSON.stringify(params.columnFilters);
+  const apiParams = useMemo(
+    () =>
+      createIncidentListParams({
+        statusFilter,
+        assignedToMe: assignedToMeFilter,
+        slaBreached: slaBreachedFilter,
+        search: params.search,
+        sort: params.sort,
+        dir: params.dir,
+        columnFilters: params.columnFilters,
+      }),
+    [
+      statusFilter,
+      assignedToMeFilter,
+      slaBreachedFilter,
+      params.search,
+      params.sort,
+      params.dir,
+      params.columnFilters,
+    ],
+  );
+
+  const { data: listResult, isLoading: loading, isFetching } = useIncidentsList(apiParams, params.page);
+  const data: Incident[] = listResult?.incidents ?? [];
+  const pagination = listResult?.pagination ?? null;
+  const { data: groups = [] } = useIncidentAssignmentGroups();
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [params.page, apiParams, isFetching]);
 
   useEffect(() => {
     // Dashboard SLA card should not inherit stale priority column filter state.
@@ -249,29 +133,6 @@ export default function IncidentsPage() {
       setSearchParams(next, { replace: true });
     }
   }, [slaBreachedFilter, params.columnFilters, searchParams, setSearchParams, update]);
-
-  useEffect(() => {
-    incidentsApi.assignmentGroups().then((r) => setGroups(r.assignment_groups)).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    setSelectedIds([]);
-    const apiParams = createIncidentListParams({
-      statusFilter,
-      assignedToMe: assignedToMeFilter,
-      slaBreached: slaBreachedFilter,
-      search: params.search,
-      sort: params.sort,
-      dir: params.dir,
-      columnFilters: params.columnFilters,
-    });
-    incidentsApi.list(apiParams, params.page, 20).then((res) => {
-      setData(res.incidents);
-      setPagination(res.pagination);
-      setLoading(false);
-    });
-  }, [params.page, statusFilter, assignedToMeFilter, slaBreachedFilter, params.search, params.sort, params.dir, cfKey, refreshKey]);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};
@@ -298,7 +159,7 @@ export default function IncidentsPage() {
       await incidentsApi.bulkUpdate(selectedIds, 'assign_group', bulkGroupId);
       setSelectedIds([]);
       setBulkGroupId('');
-      setRefreshKey((k) => k + 1);
+      invalidateIncidents();
     } finally {
       setBulkLoading(false);
     }
@@ -311,7 +172,7 @@ export default function IncidentsPage() {
       await incidentsApi.bulkUpdate(selectedIds, 'close');
       setSelectedIds([]);
       setConfirmClose(false);
-      setRefreshKey((k) => k + 1);
+      invalidateIncidents();
     } finally {
       setBulkLoading(false);
     }
@@ -320,86 +181,18 @@ export default function IncidentsPage() {
   const exportCsv = async () => {
     setExporting(true);
     try {
-      const allIncidents = selectedIds.length > 0
-        ? data.filter((incident) => selectedIds.includes(incident.id))
-        : await (async () => {
-            const paramsForExport = createIncidentListParams({
-              statusFilter,
-              assignedToMe: assignedToMeFilter,
-              slaBreached: slaBreachedFilter,
-              search: params.search,
-              sort: params.sort,
-              dir: params.dir,
-              columnFilters: params.columnFilters,
-            });
-            const limit = 100;
-            const firstPage = await incidentsApi.list(paramsForExport, 1, limit);
-            const rows = [...firstPage.incidents];
-            const totalPages = firstPage.pagination.pages;
-            for (let page = 2; page <= totalPages; page += 1) {
-              const nextPage = await incidentsApi.list(paramsForExport, page, limit);
-              rows.push(...nextPage.incidents);
-            }
-            return rows;
-          })();
-
-      const headers = [
-        'number',
-        'title',
-        'status',
-        'priority',
-        'impact',
-        'urgency',
-        'assigned_to_name',
-        'assignment_group_name',
-        'caller_name',
-        'service_name',
-        'sla_due_at',
-        'sla_breached',
-        'created_at',
-        'updated_at',
-      ];
-      const getExportField = (incident: Incident, header: string): unknown => {
-        switch (header) {
-          case 'number': return incident.number;
-          case 'title': return incident.title;
-          case 'status': return incident.status;
-          case 'priority': return incident.priority;
-          case 'impact': return incident.impact;
-          case 'urgency': return incident.urgency;
-          case 'assigned_to_name': return incident.assigned_to_name;
-          case 'assignment_group_name': return incident.assignment_group_name;
-          case 'caller_name': return incident.caller_name;
-          case 'service_name': return incident.service_name;
-          case 'sla_due_at': return incident.sla_due_at;
-          case 'sla_breached': return incident.sla_breached;
-          case 'created_at': return incident.created_at;
-          case 'updated_at': return incident.updated_at;
-          default: return '';
-        }
-      };
-      const csvEscape = (value: unknown) => {
-        const str = String(value ?? '');
-        return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-      };
-      const lines = [
-        headers.join(','),
-        ...allIncidents.map((incident) => headers.map((header) => csvEscape(getExportField(incident, header))).join(',')),
-      ];
-      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = selectedIds.length > 0 ? `incidents-selected-${ts}.csv` : `incidents-${ts}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      // Keep UX simple and avoid uncaught promise errors on export failures.
-      // eslint-disable-next-line no-alert
-      alert(err instanceof Error ? err.message : 'Failed to export incidents');
+      await exportIncidentsCsv({
+        selectedIds,
+        data,
+        statusFilter,
+        assignedToMe: assignedToMeFilter,
+        slaBreached: slaBreachedFilter,
+        search: params.search,
+        sort: params.sort,
+        dir: params.dir,
+        columnFilters: params.columnFilters,
+        exportFailedMessage: tIncidents('exportFailed'),
+      });
     } finally {
       setExporting(false);
     }
@@ -431,7 +224,7 @@ export default function IncidentsPage() {
     setPresets(next);
   };
 
-  const columns = useMemo(() => buildColumns(getListParams()), [getListParams]);
+  const columns = useMemo(() => buildColumns(getListParams(), listLabels), [getListParams, listLabels]);
 
   return (
     <>
@@ -452,7 +245,7 @@ export default function IncidentsPage() {
       {/* Saved filter presets */}
       {!isEss && (presets.length > 0 || hasActiveFilter) && (
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-xs font-medium text-gray-400">Saved:</span>
+          <span className="text-xs font-medium text-gray-400">{tFilters('saved')}</span>
           {presets.map((preset) => (
             <div key={preset.id} className="flex items-center gap-0.5 pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700">
               <button onClick={() => applyPreset(preset)} className="hover:text-indigo-600 transition-colors">{preset.name}</button>
@@ -466,18 +259,18 @@ export default function IncidentsPage() {
                 value={savePresetName}
                 onChange={(e) => setSavePresetName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') { setShowSaveInput(false); setSavePresetName(''); } }}
-                placeholder="Filter name..."
+                placeholder={tFilters('filterNamePlaceholder')}
                 className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-none focus:ring-1 focus:ring-indigo-400 w-36"
               />
-              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">Save</button>
-              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">{tActions('save')}</button>
+              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">{tActions('cancel')}</button>
             </div>
           ) : hasActiveFilter && (
             <button
               onClick={() => setShowSaveInput(true)}
               className="px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
             >
-              + Save current filter
+              + {tFilters('saveCurrent')}
             </button>
           )}
         </div>
@@ -489,7 +282,7 @@ export default function IncidentsPage() {
           <SearchBar
             value={params.search}
             onChange={setSearch}
-            placeholder="Search by number, title, description, category..."
+            placeholder={tIncidents('searchPlaceholder')}
           />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -503,18 +296,18 @@ export default function IncidentsPage() {
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {s.replace(/_/g, ' ')}
+              {statusLabel(s)}
             </button>
           ))}
           <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
-            {exporting ? 'Exporting...' : 'Export CSV'}
+            {exporting ? tList('exporting') : tList('exportCsv')}
           </Button>
           {assignedToMeFilter && (
             <button
               onClick={() => setFilter('assigned_to_me', '')}
               className="px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
             >
-              Assigned to me active ×
+              {tIncidents('filters.assignedToMeActive')}
             </button>
           )}
           {slaBreachedFilter && (
@@ -522,7 +315,7 @@ export default function IncidentsPage() {
               onClick={() => setFilter('sla_breached', '')}
               className="px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
             >
-              SLA breached ×
+              {tIncidents('filters.slaBreachedActive')}
             </button>
           )}
         </div>
@@ -531,14 +324,14 @@ export default function IncidentsPage() {
       {/* Bulk action bar */}
       {!isEss && selectedIds.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl mb-4 flex-wrap">
-          <span className="text-sm font-semibold text-indigo-900">{selectedIds.length} selected</span>
+          <span className="text-sm font-semibold text-indigo-900">{tList('selected', { count: selectedIds.length })}</span>
           <div className="flex items-center gap-2 flex-wrap">
             <select
               value={bulkGroupId}
               onChange={(e) => setBulkGroupId(e.target.value)}
               className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
             >
-              <option value="">Assign to group...</option>
+              <option value="">{tMaster('assignToGroup')}</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
             {INCIDENT_BULK_ACTIONS.map((action) => {
@@ -551,20 +344,20 @@ export default function IncidentsPage() {
                     disabled={(action.requiresGroup && !bulkGroupId) || bulkLoading}
                     onClick={handleBulkAssign}
                   >
-                    {action.label}
+                    {tIncidents('bulk.assignGroup')}
                   </Button>
                 );
               }
               if (action.id === 'close') {
                 return confirmClose ? (
                   <span key={action.id} className="inline-flex items-center gap-2">
-                    <span className="text-xs text-gray-600">Close {selectedIds.length} incidents?</span>
-                    <Button size="sm" variant="warning" disabled={bulkLoading} onClick={handleBulkClose}>Confirm</Button>
-                    <button onClick={() => setConfirmClose(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                    <span className="text-xs text-gray-600">{tIncidents('bulk.confirmClose', { count: selectedIds.length })}</span>
+                    <Button size="sm" variant="warning" disabled={bulkLoading} onClick={handleBulkClose}>{tMaster('confirm')}</Button>
+                    <button onClick={() => setConfirmClose(false)} className="text-xs text-gray-500 hover:text-gray-700">{tActions('cancel')}</button>
                   </span>
                 ) : (
                   <Button key={action.id} size="sm" variant={action.variant} onClick={() => setConfirmClose(true)}>
-                    {action.label}
+                    {tIncidents('bulk.closeIncidents')}
                   </Button>
                 );
               }
@@ -572,7 +365,7 @@ export default function IncidentsPage() {
             })}
           </div>
           <button onClick={() => { setSelectedIds([]); setConfirmClose(false); setBulkGroupId(''); }} className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-            Clear selection
+            {tMaster('clearSelection')}
           </button>
         </div>
       )}
@@ -590,7 +383,11 @@ export default function IncidentsPage() {
           onSort={setSort}
           columnFilters={params.columnFilters}
           onColumnFilter={setColumnFilter}
-          emptyMessage={params.search ? `No incidents matching "${params.search}"` : 'No incidents found.'}
+          emptyMessage={
+            params.search
+              ? tIncidents('emptySearch', { query: params.search })
+              : tIncidents('empty')
+          }
           onRowClick={(inc) => navigate(`/incidents/${inc.id}`, { state: { listParams: getListParams() } })}
           selectable={!isEss}
           selectedIds={selectedIds}

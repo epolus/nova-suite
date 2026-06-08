@@ -1,14 +1,17 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import { Button } from '../../components/ui/button';
 import { majorIncidents as majorIncidentsApi } from '../../api/client';
-import { buildMajorIncidentFeedItems, MajorIncidentTimelineList } from './majorIncidentTimeline';
+import { MajorIncidentTimelineList } from './majorIncidentTimeline';
+import { useMajorIncidentTimeline } from './majorIncidentFeed';
 import { useAuth } from '../../context/AuthContext';
 import { canManageMajorIncidents } from '../../utils/roles';
+import { RejectPromotionModal, ResolveModal, StakeholderUpdateModal } from './warRoomModals';
 
 type Detail = Awaited<ReturnType<typeof majorIncidentsApi.get>>;
 
@@ -16,6 +19,9 @@ export default function MajorIncidentWarRoom() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const t = useTranslations('pages.majorIncidents.warRoom');
+  const tPostmortem = useTranslations('pages.majorIncidents.postmortem');
+  const { buildFeedItems } = useMajorIncidentTimeline();
   const canManage = canManageMajorIncidents(user?.roles);
   const [data, setData] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,17 +47,17 @@ export default function MajorIncidentWarRoom() {
       setData(d);
       setErr('');
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Failed to load');
+      setErr(e instanceof Error ? e.message : t('loadFailed'));
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void load();
-    const t = setInterval(() => void load(), 15_000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => void load(), 15_000);
+    return () => clearInterval(timer);
   }, [load]);
 
   const sendUpdate = async () => {
@@ -63,7 +69,7 @@ export default function MajorIncidentWarRoom() {
       setUpdateOpen(false);
       await load();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Failed to send update');
+      setErr(e instanceof Error ? e.message : t('sendUpdateFailed'));
     } finally {
       setSaving(false);
     }
@@ -80,7 +86,7 @@ export default function MajorIncidentWarRoom() {
       setResolveSolution('');
       await load();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Failed to resolve');
+      setErr(e instanceof Error ? e.message : t('resolveFailed'));
     } finally {
       setSaving(false);
     }
@@ -93,7 +99,7 @@ export default function MajorIncidentWarRoom() {
       await majorIncidentsApi.acceptMajor(id);
       await load();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Failed to accept');
+      setErr(e instanceof Error ? e.message : t('acceptFailed'));
     } finally {
       setAcceptBusy(false);
     }
@@ -109,7 +115,7 @@ export default function MajorIncidentWarRoom() {
       setRejectReason('');
       await load();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Failed to reject promotion');
+      setErr(e instanceof Error ? e.message : t('rejectFailed'));
     } finally {
       setRejectBusy(false);
     }
@@ -145,11 +151,11 @@ export default function MajorIncidentWarRoom() {
     if (!id) return;
     setLinkBusy(incidentId);
     try {
-      await majorIncidentsApi.linkRelated(id, { incident_id: incidentId, link_reason: 'Linked from war room' });
+      await majorIncidentsApi.linkRelated(id, { incident_id: incidentId, link_reason: t('linkReason') });
       await load();
       await loadSuggested();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Failed to link incident');
+      setErr(e instanceof Error ? e.message : t('linkFailed'));
     } finally {
       setLinkBusy(null);
     }
@@ -159,8 +165,8 @@ export default function MajorIncidentWarRoom() {
   if (!data?.major_incident) {
     return (
       <>
-        <PageHeader title="Major incident" />
-        <Card><p className="text-sm text-gray-600">{err || 'Not found'}</p></Card>
+        <PageHeader title={t('notFoundTitle')} />
+        <Card><p className="text-sm text-gray-600">{err || t('notFound')}</p></Card>
       </>
     );
   }
@@ -175,7 +181,7 @@ export default function MajorIncidentWarRoom() {
     ? String(mi.primary_incident_id)
     : '';
   const suggestedToShow = suggested.filter((s) => !linkedIdSet.has(String(s.id)));
-  const feedItems = buildMajorIncidentFeedItems(
+  const feedItems = buildFeedItems(
     (data.events || []) as Record<string, unknown>[],
     (data.stakeholder_updates || []) as Record<string, unknown>[],
     String(mi.id ?? id ?? ''),
@@ -187,22 +193,25 @@ export default function MajorIncidentWarRoom() {
         title={pageTitle}
         description={
           isPendingAcceptance
-            ? `Status: ${mi.status} · Workflow: not started (pending acceptance)`
-            : `Status: ${mi.status} · Workflow: ${data.workflow_status?.phase ?? 'n/a'}`
+            ? t('statusPendingDescription', { status: String(mi.status) })
+            : t('statusDescription', {
+                status: String(mi.status),
+                phase: data.workflow_status?.phase ?? t('workflowNotAvailable'),
+              })
         }
         action={(
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => navigate('/major-incidents')}>All major incidents</Button>
+            <Button variant="outline" onClick={() => navigate('/major-incidents')}>{t('allMajorIncidents')}</Button>
             {!isPendingAcceptance && canManage && (
               <Link
                 to={`/major-incidents/${id}/postmortem`}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
               >
-                Postmortem
+                {tPostmortem('title')}
               </Link>
             )}
             {!isPendingAcceptance && canManage && (
-              <Button type="button" onClick={() => setUpdateOpen(true)}>Send update</Button>
+              <Button type="button" onClick={() => setUpdateOpen(true)}>{t('sendUpdate')}</Button>
             )}
             {!isPendingAcceptance && canManage && mi.status !== 'resolved' && mi.status !== 'cancelled' && (
               <Button
@@ -211,7 +220,7 @@ export default function MajorIncidentWarRoom() {
                 onClick={() => { setResolveSolution(''); setResolveModalOpen(true); }}
                 disabled={saving}
               >
-                Declare resolved
+                {t('declareResolved')}
               </Button>
             )}
           </div>
@@ -223,12 +232,13 @@ export default function MajorIncidentWarRoom() {
       {isPendingAcceptance && canManage && (
         <Card className="mb-4 border-amber-200 bg-amber-50/80 dark:border-amber-700 dark:bg-amber-950/45">
           <p className="text-sm text-amber-950 dark:text-amber-50 mb-3 leading-relaxed">
-            This record was promoted from an incident and is <strong className="dark:text-amber-100">pending acceptance</strong> as a major incident.
-            Until it is accepted, no workflow runs and war-room actions stay disabled.
+            {t('pendingAcceptanceManagerPrefix')}{' '}
+            <strong className="dark:text-amber-100">{t('pendingAcceptance')}</strong>{' '}
+            {t('pendingAcceptanceManagerSuffix')}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={acceptAsMajor} disabled={acceptBusy || rejectBusy}>
-              {acceptBusy ? 'Accepting…' : 'Accept as major incident'}
+              {acceptBusy ? t('accepting') : t('acceptAsMajor')}
             </Button>
             <Button
               type="button"
@@ -236,7 +246,7 @@ export default function MajorIncidentWarRoom() {
               onClick={() => { setRejectReason(''); setRejectModalOpen(true); }}
               disabled={acceptBusy || rejectBusy}
             >
-              Reject promotion
+              {t('rejectPromotion')}
             </Button>
           </div>
         </Card>
@@ -244,7 +254,11 @@ export default function MajorIncidentWarRoom() {
       {isPendingAcceptance && !canManage && (
         <Card className="mb-4 border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-900/40">
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            This major incident is <strong>pending acceptance</strong> by a user with the <strong>major incident manager</strong> role.
+            {t('pendingAcceptanceReadOnlyPrefix')}{' '}
+            <strong>{t('pendingAcceptance')}</strong>{' '}
+            {t('pendingAcceptanceReadOnlyMiddle')}{' '}
+            <strong>{t('majorIncidentManagerRole')}</strong>{' '}
+            {t('roleSuffix')}
           </p>
         </Card>
       )}
@@ -254,8 +268,8 @@ export default function MajorIncidentWarRoom() {
           <Card>
             <div className="flex items-baseline justify-between gap-3 mb-4">
               <div>
-                <h3 className="font-semibold text-gray-900">Live feed</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Stakeholder updates and major-incident events, newest first.</p>
+                <h3 className="font-semibold text-gray-900">{t('liveFeed')}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{t('liveFeedDescription')}</p>
               </div>
             </div>
             <MajorIncidentTimelineList items={feedItems} />
@@ -263,7 +277,7 @@ export default function MajorIncidentWarRoom() {
         </div>
         <div className="space-y-4">
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-3">Roles</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">{t('roles')}</h3>
             <ul className="text-sm space-y-2">
               {(data.participants || []).map((p) => (
                 <li key={String((p as Record<string, unknown>).id)} className="flex justify-between gap-2">
@@ -274,7 +288,7 @@ export default function MajorIncidentWarRoom() {
             </ul>
           </Card>
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-2">Runbooks</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">{t('runbooks')}</h3>
             <ul className="text-sm space-y-1 text-gray-800">
               {(data.suggested_runbooks || []).map((rb) => (
                 <li key={String((rb as Record<string, unknown>).id)}>
@@ -283,20 +297,20 @@ export default function MajorIncidentWarRoom() {
               ))}
             </ul>
             {(data.suggested_runbooks || []).length === 0 && (
-              <p className="text-xs text-gray-500">No runbook links for affected services.</p>
+              <p className="text-xs text-gray-500">{t('noRunbooks')}</p>
             )}
           </Card>
           <Card>
             <div className="flex items-center justify-between gap-2 mb-2">
-              <h3 className="font-semibold text-gray-900">Linked incidents</h3>
+              <h3 className="font-semibold text-gray-900">{t('linkedIncidents')}</h3>
               {!isPendingAcceptance && canManage && (
                 <Button type="button" variant="outline" className="text-xs h-8" onClick={() => void loadSuggested()} disabled={suggLoading}>
-                  {suggLoading ? 'Refreshing…' : 'Refresh suggestions'}
+                  {suggLoading ? t('refreshing') : t('refreshSuggestions')}
                 </Button>
               )}
             </div>
             {related.length === 0 ? (
-              <p className="text-xs text-gray-500">No incidents linked yet.</p>
+              <p className="text-xs text-gray-500">{t('noLinkedIncidents')}</p>
             ) : (
               <ul className="text-sm space-y-2">
                 {related.map((r) => {
@@ -309,7 +323,7 @@ export default function MajorIncidentWarRoom() {
                       </Link>
                       {isPrimary && (
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
-                          Primary
+                          {t('primary')}
                         </span>
                       )}
                     </li>
@@ -319,7 +333,7 @@ export default function MajorIncidentWarRoom() {
             )}
             {!isPendingAcceptance && canManage && suggestedToShow.length > 0 && (
               <div className="mt-4 pt-3 border-t border-gray-100">
-                <p className="text-xs font-medium text-gray-600 mb-2">Suggested (same window / services)</p>
+                <p className="text-xs font-medium text-gray-600 mb-2">{t('suggestedSameWindow')}</p>
                 <ul className="text-sm space-y-2">
                   {suggestedToShow.map((s) => {
                     const sid = String(s.id);
@@ -335,7 +349,7 @@ export default function MajorIncidentWarRoom() {
                           disabled={linkBusy !== null}
                           onClick={() => void linkIncident(sid)}
                         >
-                          {linkBusy === sid ? 'Linking…' : 'Add'}
+                          {linkBusy === sid ? t('linking') : t('add')}
                         </Button>
                       </li>
                     );
@@ -348,91 +362,33 @@ export default function MajorIncidentWarRoom() {
       </div>
 
       {updateOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h4 className="font-semibold text-lg mb-2">Stakeholder update</h4>
-            <textarea
-              className="w-full border rounded-md p-2 text-sm min-h-[140px]"
-              value={updateBody}
-              onChange={(e) => setUpdateBody(e.target.value)}
-              placeholder="Customer-safe status update..."
-            />
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" type="button" onClick={() => setUpdateOpen(false)}>Cancel</Button>
-              <Button type="button" onClick={sendUpdate} disabled={saving || !updateBody.trim()}>
-                {saving ? 'Sending…' : 'Send'}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <StakeholderUpdateModal
+          body={updateBody}
+          onChange={setUpdateBody}
+          onClose={() => setUpdateOpen(false)}
+          onSend={sendUpdate}
+          saving={saving}
+        />
       )}
 
       {rejectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h4 className="font-semibold text-lg mb-2">Reject promotion</h4>
-            <p className="text-sm text-gray-600 mb-3">
-              The proposed major incident will be discarded and the source incident stays open. This cannot be undone.
-            </p>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Reason (optional, shown in the timeline)</label>
-            <textarea
-              className="w-full border rounded-md p-2 text-sm min-h-[100px]"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Why this should not be a major incident…"
-              maxLength={2000}
-            />
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" type="button" onClick={() => setRejectModalOpen(false)} disabled={rejectBusy}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="bg-rose-600 hover:bg-rose-500 text-white border-0"
-                onClick={() => void confirmRejectPromotion()}
-                disabled={rejectBusy}
-              >
-                {rejectBusy ? 'Rejecting…' : 'Reject promotion'}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <RejectPromotionModal
+          reason={rejectReason}
+          onChange={setRejectReason}
+          onClose={() => setRejectModalOpen(false)}
+          onConfirm={() => void confirmRejectPromotion()}
+          rejecting={rejectBusy}
+        />
       )}
 
       {resolveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h4 className="font-semibold text-lg mb-2">Declare resolved</h4>
-            <p className="text-sm text-gray-600 mb-3">
-              Describe how the incident was mitigated or fixed. This is stored on the major incident and appears in the live feed.
-            </p>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Resolution summary</label>
-            <textarea
-              className="w-full border rounded-md p-2 text-sm min-h-[120px]"
-              value={resolveSolution}
-              onChange={(e) => setResolveSolution(e.target.value)}
-              placeholder="Root cause, fix, verification…"
-            />
-            <div className="flex justify-end gap-2 mt-4">
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => { setResolveModalOpen(false); setResolveSolution(''); }}
-                disabled={saving}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="bg-red-600 hover:bg-red-500 text-white border-0"
-                onClick={() => void requestResolve()}
-                disabled={saving || !resolveSolution.trim()}
-              >
-                {saving ? 'Submitting…' : 'Declare resolved'}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ResolveModal
+          solution={resolveSolution}
+          onChange={setResolveSolution}
+          onClose={() => { setResolveModalOpen(false); setResolveSolution(''); }}
+          onConfirm={() => void requestResolve()}
+          saving={saving}
+        />
       )}
     </>
   );

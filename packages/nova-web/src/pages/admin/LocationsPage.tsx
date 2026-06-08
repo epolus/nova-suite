@@ -1,91 +1,97 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { admin, type LocationItem } from '../../api/client';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
 
-const columns: ColumnDef<LocationItem>[] = [
-  {
-    key: 'code',
-    label: 'Code',
-    sortable: true,
-    render: (l) => <span className="font-mono text-xs font-medium text-gray-900">{l.code}</span>,
-  },
-  {
-    key: 'name',
-    label: 'Name',
-    sortable: true,
-    render: (l) => <span className="font-medium text-gray-900">{l.name}</span>,
-  },
-  {
-    key: 'source',
-    label: 'Source',
-    sortable: true,
-    render: (l) => <span className="text-gray-600">{l.source}</span>,
-  },
-  {
-    key: 'company_name',
-    label: 'Company',
-    sortable: true,
-    render: (l) =>
-      l.company_id && l.company_name ? (
-        <Link
-          to={`/admin/companies/${l.company_id}`}
-          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {l.company_name}
-        </Link>
-      ) : (
-        <span className="text-gray-400">—</span>
-      ),
-  },
-  {
-    key: 'parent_location_name',
-    label: 'Parent',
-    sortable: true,
-    render: (l) =>
-      l.parent_location_id && l.parent_location_name ? (
-        <Link
-          to={`/admin/locations/${l.parent_location_id}`}
-          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {l.parent_location_name}
-        </Link>
-      ) : (
-        <span className="text-gray-400">—</span>
-      ),
-  },
-  {
-    key: 'city',
-    label: 'City',
-    sortable: true,
-    render: (l) => <span className="text-gray-600">{l.city || '—'}</span>,
-  },
-  {
-    key: 'country',
-    label: 'Country',
-    sortable: true,
-    render: (l) => <span className="text-gray-600">{l.country || '—'}</span>,
-  },
-];
-
-const fields: FieldDef[] = [
-  { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. Zurich HQ' },
-  { key: 'code', label: 'Code', type: 'text', required: true, placeholder: 'e.g. CH-ZRH-HQ' },
-  { key: 'source', label: 'Source', type: 'text', placeholder: 'e.g. manual' },
-  { key: 'country', label: 'Country', type: 'text', placeholder: 'e.g. Switzerland' },
-  { key: 'state', label: 'State', type: 'text', placeholder: 'e.g. ZH' },
-  { key: 'city', label: 'City', type: 'text', placeholder: 'e.g. Zurich' },
-  { key: 'zip', label: 'ZIP', type: 'text', placeholder: 'e.g. 8001' },
-  { key: 'street', label: 'Street', type: 'text', placeholder: 'e.g. Bahnhofstrasse 1' },
-  { key: 'company_id', label: 'Company ID', type: 'text', placeholder: 'Optional UUID' },
-  { key: 'parent_location_id', label: 'Parent Location ID', type: 'text', placeholder: 'Optional UUID' },
-  { key: 'description', label: 'Description', type: 'textarea', placeholder: 'Optional notes' },
-];
-
 export default function LocationsPage() {
+  const t = useTranslations('pages.admin.locations');
+  const tFields = useTranslations('common.fields');
+  const tTable = useTranslations('common.table');
+  const tMaster = useTranslations('common.masterData');
+
+  const columns = useMemo((): ColumnDef<LocationItem>[] => [
+    {
+      key: 'code',
+      label: tFields('code'),
+      sortable: true,
+      render: (l) => <span className="font-mono text-xs font-medium text-gray-900">{l.code}</span>,
+    },
+    {
+      key: 'name',
+      label: tFields('name'),
+      sortable: true,
+      render: (l) => <span className="font-medium text-gray-900">{l.name}</span>,
+    },
+    {
+      key: 'source',
+      label: tFields('source'),
+      sortable: true,
+      render: (l) => <span className="text-gray-600">{l.source}</span>,
+    },
+    {
+      key: 'company_name',
+      label: tFields('company'),
+      sortable: true,
+      render: (l) =>
+        l.company_id && l.company_name ? (
+          <Link
+            to={`/admin/companies/${l.company_id}`}
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {l.company_name}
+          </Link>
+        ) : (
+          <span className="text-gray-400">{tTable('emDash')}</span>
+        ),
+    },
+    {
+      key: 'parent_location_name',
+      label: tFields('parent'),
+      sortable: true,
+      render: (l) =>
+        l.parent_location_id && l.parent_location_name ? (
+          <Link
+            to={`/admin/locations/${l.parent_location_id}`}
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {l.parent_location_name}
+          </Link>
+        ) : (
+          <span className="text-gray-400">{tTable('emDash')}</span>
+        ),
+    },
+    {
+      key: 'city',
+      label: tFields('city'),
+      sortable: true,
+      render: (l) => <span className="text-gray-600">{l.city || tTable('emDash')}</span>,
+    },
+    {
+      key: 'country',
+      label: tFields('country'),
+      sortable: true,
+      render: (l) => <span className="text-gray-600">{l.country || tTable('emDash')}</span>,
+    },
+  ], [tFields, tTable]);
+
+  const fields = useMemo((): FieldDef[] => [
+    { key: 'name', label: tFields('name'), type: 'text', required: true, placeholder: t('placeholderName') },
+    { key: 'code', label: tFields('code'), type: 'text', required: true, placeholder: t('placeholderCode') },
+    { key: 'source', label: tFields('source'), type: 'text', placeholder: t('placeholderSource') },
+    { key: 'country', label: tFields('country'), type: 'text', placeholder: t('placeholderCountry') },
+    { key: 'state', label: tFields('state'), type: 'text', placeholder: t('placeholderState') },
+    { key: 'city', label: tFields('city'), type: 'text', placeholder: t('placeholderCity') },
+    { key: 'zip', label: tFields('zip'), type: 'text', placeholder: t('placeholderZip') },
+    { key: 'street', label: tFields('street'), type: 'text', placeholder: t('placeholderStreet') },
+    { key: 'company_id', label: tFields('companyId'), type: 'text', placeholder: t('placeholderOptionalUuid') },
+    { key: 'parent_location_id', label: tFields('parentLocationId'), type: 'text', placeholder: t('placeholderOptionalUuid') },
+    { key: 'description', label: tFields('description'), type: 'textarea', placeholder: tMaster('optionalNotes') },
+  ], [t, tFields, tMaster]);
+
   const fetchItems = useCallback(async () => {
     const res = await admin.locations();
     return res.locations;
@@ -93,8 +99,8 @@ export default function LocationsPage() {
 
   return (
     <MasterDataPage<LocationItem>
-      title="Locations"
-      description="Manage physical and logical locations."
+      title={t('title')}
+      description={t('description')}
       storageKey="admin_locations"
       detailBasePath="/admin/locations"
       columns={columns}

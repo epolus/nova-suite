@@ -12,13 +12,14 @@ import Spinner from '../components/Spinner';
 import { formatDate } from '../utils/dateTime';
 import { hasChangeRole, isFulfillerRole } from '../utils/roles';
 import { useTranslations } from 'use-intl';
+import { usePriorityLabel, useStatusLabel } from '@/i18n/hooks';
 
-const PRIORITY_CONFIG: Record<number, { label: string; color: string; bg: string; dot: string }> = {
-  1: { label: 'P1 Critical', color: 'text-red-700', bg: 'bg-red-50 border-red-200', dot: 'bg-red-500' },
-  2: { label: 'P2 High', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', dot: 'bg-orange-500' },
-  3: { label: 'P3 Moderate', color: 'text-yellow-700', bg: 'bg-yellow-50 border-yellow-200', dot: 'bg-yellow-500' },
-  4: { label: 'P4 Low', color: 'text-gray-600', bg: 'bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
-  5: { label: 'P5 Planning', color: 'text-gray-500', bg: 'bg-gray-50 border-gray-100', dot: 'bg-gray-300' },
+const PRIORITY_CONFIG: Record<number, { color: string; bg: string; dot: string }> = {
+  1: { color: 'text-red-700', bg: 'bg-red-50 border-red-200', dot: 'bg-red-500' },
+  2: { color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', dot: 'bg-orange-500' },
+  3: { color: 'text-yellow-700', bg: 'bg-yellow-50 border-yellow-200', dot: 'bg-yellow-500' },
+  4: { color: 'text-gray-600', bg: 'bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
+  5: { color: 'text-gray-500', bg: 'bg-gray-50 border-gray-100', dot: 'bg-gray-300' },
 };
 
 function StatCard({
@@ -80,6 +81,9 @@ const Icons = {
 
 export default function Dashboard() {
   const tDashboard = useTranslations('pages.dashboard');
+  const tList = useTranslations('common.list');
+  const priorityLabel = usePriorityLabel();
+  const statusLabel = useStatusLabel();
   const { user } = useAuth();
   const [incStats, setIncStats] = useState<IncidentStats | null>(null);
   const [chStats, setChStats] = useState<ChangeStats | null>(null);
@@ -159,7 +163,7 @@ export default function Dashboard() {
         {isFulfiller && incStats && (
           <>
             <StatCard
-              label="Open Incidents"
+              label={tDashboard('stats.openIncidents')}
               value={incStats.open_total}
               color="text-indigo-600"
               bg="bg-indigo-50"
@@ -167,7 +171,7 @@ export default function Dashboard() {
               link="/incidents"
             />
             <StatCard
-              label="SLA Breached"
+              label={tDashboard('stats.slaBreached')}
               value={incStats.sla_breached}
               color={incStats.sla_breached > 0 ? 'text-red-600' : 'text-gray-400'}
               bg="bg-red-50"
@@ -179,7 +183,7 @@ export default function Dashboard() {
         )}
         {canManageChanges && chStats && (
           <StatCard
-            label="Open Changes"
+            label={tDashboard('stats.openChanges')}
             value={chStats.open_total}
             color="text-violet-600"
             bg="bg-violet-50"
@@ -188,7 +192,7 @@ export default function Dashboard() {
           />
         )}
         <StatCard
-          label="My Requests"
+          label={tDashboard('stats.myRequests')}
           value={requestTotal}
           color="text-blue-600"
           bg="bg-blue-50"
@@ -197,13 +201,13 @@ export default function Dashboard() {
         />
         {isFulfiller && incStats && (
           <StatCard
-            label="Assigned to Me"
+            label={tDashboard('stats.assignedToMe')}
               value={assignedToMeTotal || incStats.assigned_to_me}
             color="text-emerald-600"
             bg="bg-emerald-50"
             icon={Icons.queue('w-5 h-5 text-emerald-500')}
               link="/incidents?assigned_to_me=true"
-              hint="Excludes resolved, closed, cancelled"
+              hint={tDashboard('stats.assignedHint')}
           />
         )}
       </div>
@@ -211,8 +215,8 @@ export default function Dashboard() {
       {isFulfiller && majorRows.length > 0 && (
         <Card className="mb-6 border-orange-200 bg-orange-50/60">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold text-gray-900">Active major incidents</h2>
-            <Link to="/major-incidents" className="text-sm text-indigo-600 hover:text-indigo-800">View all</Link>
+            <h2 className="font-semibold text-gray-900">{tDashboard('majorIncidents.activeTitle')}</h2>
+            <Link to="/major-incidents" className="text-sm text-indigo-600 hover:text-indigo-800">{tDashboard('viewAll')}</Link>
           </div>
           <ul className="space-y-2 text-sm">
             {majorRows.map((m) => (
@@ -220,7 +224,7 @@ export default function Dashboard() {
                 <Link to={`/major-incidents/${m.id}`} className="text-indigo-700 hover:underline font-medium">
                   {m.number} · P{m.priority} · {m.title}
                 </Link>
-                <span className="text-gray-500 ml-2 capitalize">({m.status})</span>
+                <span className="text-gray-500 ml-2 capitalize">({statusLabel(m.status)})</span>
               </li>
             ))}
           </ul>
@@ -231,12 +235,12 @@ export default function Dashboard() {
       {isFulfiller && incStats && incStats.by_priority.some((p) => p.count > 0) && (
         <Card className="mb-6">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm font-semibold text-gray-700">Open Incidents by Priority</span>
-            <span className="text-xs text-gray-400">— click to filter</span>
+            <span className="text-sm font-semibold text-gray-700">{tDashboard('priority.title')}</span>
+            <span className="text-xs text-gray-400">{tDashboard('priority.clickToFilter')}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {incStats.by_priority.map((p) => {
-              const cfg = PRIORITY_CONFIG[p.priority] ?? { label: `P${p.priority}`, color: 'text-gray-600', bg: 'bg-gray-50 border-gray-200', dot: 'bg-gray-400' };
+              const cfg = PRIORITY_CONFIG[p.priority] ?? { color: 'text-gray-600', bg: 'bg-gray-50 border-gray-200', dot: 'bg-gray-400' };
               return (
                 <Link
                   key={p.priority}
@@ -244,7 +248,7 @@ export default function Dashboard() {
                   className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-opacity ${cfg.bg} ${cfg.color} ${p.count === 0 ? 'opacity-40 pointer-events-none' : 'hover:opacity-80'}`}
                 >
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
-                  {cfg.label}
+                  {priorityLabel(p.priority)}
                   <span className="font-bold">{p.count}</span>
                 </Link>
               );
@@ -261,14 +265,14 @@ export default function Dashboard() {
           {isFulfiller && (
             <Card padding={false}>
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900">My Queue</h2>
+                <h2 className="font-semibold text-gray-900">{tDashboard('sections.myQueue')}</h2>
                 <Link to="/incidents?assigned_to_me=true" className="text-sm text-indigo-600 hover:text-indigo-800">
-                  View all
+                  {tDashboard('viewAll')}
                 </Link>
               </div>
               <div className="divide-y divide-gray-50">
                 {myQueue.length === 0 ? (
-                  <p className="px-6 py-8 text-sm text-gray-400 text-center">No incidents assigned to you</p>
+                  <p className="px-6 py-8 text-sm text-gray-400 text-center">{tDashboard('queue.empty')}</p>
                 ) : (
                   myQueue.map((inc) => {
                     const cfg = PRIORITY_CONFIG[inc.priority];
@@ -283,7 +287,7 @@ export default function Dashboard() {
                                 {inc.number}
                                 {inc.sla_due_at && (
                                   <span className={`ml-2 ${inc.sla_breached ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
-                                    {inc.sla_breached ? 'SLA BREACHED' : `due ${formatDate(inc.sla_due_at)}`}
+                                    {inc.sla_breached ? tList('breached') : tDashboard('queue.due', { date: formatDate(inc.sla_due_at) })}
                                   </span>
                                 )}
                               </p>
@@ -303,9 +307,9 @@ export default function Dashboard() {
           {canManageChanges && (
             <Card padding={false}>
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900">Changes Pending Approval</h2>
+                <h2 className="font-semibold text-gray-900">{tDashboard('changesPending.title')}</h2>
                 <Link to="/changes?status=pending_approval" className="text-sm text-indigo-600 hover:text-indigo-800">
-                  View all
+                  {tDashboard('viewAll')}
                   {chStats && chStats.pending_approval > 0 && (
                     <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-violet-100 text-violet-700 rounded-full font-semibold">
                       {chStats.pending_approval}
@@ -315,14 +319,14 @@ export default function Dashboard() {
               </div>
               <div className="divide-y divide-gray-50">
                 {pendingChanges.length === 0 ? (
-                  <p className="px-6 py-8 text-sm text-gray-400 text-center">No changes pending approval</p>
+                  <p className="px-6 py-8 text-sm text-gray-400 text-center">{tDashboard('changesPending.empty')}</p>
                 ) : (
                   pendingChanges.map((ch) => (
                     <Link key={ch.id} to={`/changes/${ch.id}`} className="block px-6 py-3 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{ch.title}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{ch.number} &middot; {ch.risk_level} risk</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{ch.number} &middot; {tDashboard('changesPending.risk', { level: ch.risk_level })}</p>
                         </div>
                         <Badge value={ch.status} className="ml-4 flex-shrink-0" />
                       </div>
@@ -340,15 +344,15 @@ export default function Dashboard() {
         {/* Right column: Recent Requests */}
         <Card padding={false}>
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Recent Requests</h2>
-            <Link to="/requests?active=true" className="text-sm text-indigo-600 hover:text-indigo-800">View all</Link>
+            <h2 className="font-semibold text-gray-900">{tDashboard('recentRequests.title')}</h2>
+            <Link to="/requests?active=true" className="text-sm text-indigo-600 hover:text-indigo-800">{tDashboard('viewAll')}</Link>
           </div>
           <div className="divide-y divide-gray-50">
             {recentRequests.length === 0 ? (
               <div className="px-6 py-8 text-center">
-                <p className="text-sm text-gray-400 mb-3">No requests yet</p>
+                <p className="text-sm text-gray-400 mb-3">{tDashboard('recentRequests.empty')}</p>
                 <Link to="/catalog" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
-                  Browse the service catalog →
+                  {tDashboard('recentRequests.browseCatalog')}
                 </Link>
               </div>
             ) : (
@@ -368,7 +372,7 @@ export default function Dashboard() {
           {recentRequests.length > 0 && (
             <div className="px-6 py-3 border-t border-gray-50">
               <Link to="/catalog" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
-                + New request from catalog
+                {tDashboard('recentRequests.newFromCatalog')}
               </Link>
             </div>
           )}

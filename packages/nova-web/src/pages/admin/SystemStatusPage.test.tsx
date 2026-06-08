@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { IntlProvider } from 'use-intl';
+import enMessages from '../../i18n/messages/en.json';
 import SystemStatusPage from './SystemStatusPage';
 
 const mockCacheMetrics = vi.fn();
@@ -20,6 +22,14 @@ vi.mock('../../api/client', () => ({
     systemMetrics: (...args: unknown[]) => mockSystemMetrics(...args),
   },
 }));
+
+function renderPage() {
+  return render(
+    <IntlProvider locale="en" messages={enMessages}>
+      <SystemStatusPage />
+    </IntlProvider>,
+  );
+}
 
 describe('SystemStatusPage', () => {
   beforeEach(() => {
@@ -101,7 +111,7 @@ describe('SystemStatusPage', () => {
     });
     mockAuditEvents.mockResolvedValue({ events: [] });
 
-    render(<SystemStatusPage />);
+    renderPage();
 
     expect(await screen.findByText('System Status')).toBeInTheDocument();
     expect(await screen.findByText('Redis Cache')).toBeInTheDocument();
@@ -154,7 +164,7 @@ describe('SystemStatusPage', () => {
     });
     mockAuditEvents.mockResolvedValue({ events: [] });
 
-    render(<SystemStatusPage />);
+    renderPage();
     const user = userEvent.setup();
 
     await screen.findByText('System Status');
@@ -194,7 +204,7 @@ describe('SystemStatusPage', () => {
       },
     });
 
-    render(<SystemStatusPage />);
+    renderPage();
 
     expect(await screen.findByText('Raw diagnostics')).toBeInTheDocument();
     const user = userEvent.setup();

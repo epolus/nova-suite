@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
@@ -35,19 +36,23 @@ function SummaryPill({ label, value }: { label: string; value: number }) {
 }
 
 function ValidationSummary({ report }: { report: ConfigPackageValidationReport }) {
+  const t = useTranslations('pages.admin.configPackages');
+  const tTable = useTranslations('common.table');
+  const tFields = useTranslations('common.fields');
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <SummaryPill label="Create" value={report.summary.create} />
-        <SummaryPill label="Update" value={report.summary.update} />
-        <SummaryPill label="Skip" value={report.summary.skip} />
-        <SummaryPill label="Errors" value={report.summary.errors} />
-        <SummaryPill label="Warnings" value={report.summary.warnings} />
+        <SummaryPill label={t('summary.create')} value={report.summary.create} />
+        <SummaryPill label={t('summary.update')} value={report.summary.update} />
+        <SummaryPill label={t('summary.skip')} value={report.summary.skip} />
+        <SummaryPill label={t('summary.errors')} value={report.summary.errors} />
+        <SummaryPill label={t('summary.warnings')} value={report.summary.warnings} />
       </div>
 
       {report.issues.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">Issues</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('issues')}</h3>
           <div className="space-y-2">
             {report.issues.map((issue, idx) => (
               <div
@@ -69,15 +74,15 @@ function ValidationSummary({ report }: { report: ConfigPackageValidationReport }
 
       {report.changes.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">Planned Changes</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('plannedChanges')}</h3>
           <div className="overflow-x-auto border border-gray-100 rounded-lg">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-500">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium">Action</th>
-                  <th className="text-left px-3 py-2 font-medium">Type</th>
-                  <th className="text-left px-3 py-2 font-medium">Name</th>
-                  <th className="text-left px-3 py-2 font-medium">External Key</th>
+                  <th className="text-left px-3 py-2 font-medium">{tTable('actions')}</th>
+                  <th className="text-left px-3 py-2 font-medium">{tFields('type')}</th>
+                  <th className="text-left px-3 py-2 font-medium">{tFields('name')}</th>
+                  <th className="text-left px-3 py-2 font-medium">{t('table.externalKey')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -93,7 +98,7 @@ function ValidationSummary({ report }: { report: ConfigPackageValidationReport }
             </table>
           </div>
           {report.changes.length > 100 && (
-            <p className="text-xs text-gray-500 mt-2">Showing first 100 changes.</p>
+            <p className="text-xs text-gray-500 mt-2">{t('showingFirst100')}</p>
           )}
         </div>
       )}
@@ -102,6 +107,10 @@ function ValidationSummary({ report }: { report: ConfigPackageValidationReport }
 }
 
 export default function ConfigPackagesPage() {
+  const t = useTranslations('pages.admin.configPackages');
+  const tActions = useTranslations('common.actions');
+  const tFields = useTranslations('common.fields');
+
   const [exportMode, setExportMode] = useState<ExportMode>('catalog');
   const [objectId, setObjectId] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -138,9 +147,9 @@ export default function ConfigPackagesPage() {
       else if (exportMode === 'catalog_item') result = await admin.exportCatalogItemPackage(objectId.trim());
       else result = await admin.exportNotificationRulePackage(objectId.trim());
       downloadBundle(result.package, result.checksum);
-      setMessage(`Exported ${result.package.name}.`);
+      setMessage(t('exported', { name: result.package.name }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Export failed');
+      setError(err instanceof Error ? err.message : t('exportFailed'));
     } finally {
       setExporting(false);
     }
@@ -155,9 +164,9 @@ export default function ConfigPackagesPage() {
       const text = await file.text();
       const parsed = JSON.parse(text) as ConfigPackageBundle;
       setBundle(parsed);
-      setMessage(`Loaded ${parsed.name || file.name}. Run validation before applying.`);
+      setMessage(t('loaded', { name: parsed.name || file.name }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not parse JSON package');
+      setError(err instanceof Error ? err.message : t('parseFailed'));
     }
   };
 
@@ -168,10 +177,10 @@ export default function ConfigPackagesPage() {
     try {
       const result = await admin.validateConfigPackage(bundle);
       setValidation(result.validation);
-      setMessage(result.validation.valid ? 'Package is valid for this instance.' : 'Package has blocking validation errors.');
+      setMessage(result.validation.valid ? t('valid') : t('hasErrors'));
       await loadRuns();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Validation failed');
+      setError(err instanceof Error ? err.message : t('validationFailed'));
     }
   };
 
@@ -183,12 +192,15 @@ export default function ConfigPackagesPage() {
     try {
       const result = await admin.applyConfigPackage(bundle);
       setValidation(result.dry_run);
-      setMessage(
-        `Applied package: ${result.applied.categories} categories, ${result.applied.service_items} service items, ${result.applied.catalog_tasks} tasks, ${result.applied.notification_rules} notification rules.`,
-      );
+      setMessage(t('applied', {
+        categories: result.applied.categories,
+        serviceItems: result.applied.service_items,
+        catalogTasks: result.applied.catalog_tasks,
+        notificationRules: result.applied.notification_rules,
+      }));
       await loadRuns();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Apply failed');
+      setError(err instanceof Error ? err.message : t('applyFailed'));
     } finally {
       setApplying(false);
     }
@@ -199,8 +211,8 @@ export default function ConfigPackagesPage() {
   return (
     <>
       <PageHeader
-        title="Configuration Packages"
-        description="Export, validate, and apply portable catalog and notification configuration between Nova instances."
+        title={t('title')}
+        description={t('description')}
       />
 
       {message && (
@@ -212,31 +224,31 @@ export default function ConfigPackagesPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
-          <h2 className="font-semibold text-gray-900 mb-2">Export from this instance</h2>
+          <h2 className="font-semibold text-gray-900 mb-2">{t('exportSection')}</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Download a versioned JSON package that can be validated and applied on another instance.
+            {t('exportDescription')}
           </p>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Export scope</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('exportScope')}</label>
               <select
                 value={exportMode}
                 onChange={(event) => setExportMode(event.target.value as ExportMode)}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
               >
-                <option value="catalog">All service catalog configuration</option>
-                <option value="catalog_item">One service catalog item</option>
-                <option value="notifications">All notification rules</option>
-                <option value="notification_rule">One notification rule</option>
+                <option value="catalog">{t('exportModes.catalog')}</option>
+                <option value="catalog_item">{t('exportModes.catalog_item')}</option>
+                <option value="notifications">{t('exportModes.notifications')}</option>
+                <option value="notification_rule">{t('exportModes.notification_rule')}</option>
               </select>
             </div>
             {needsObjectId && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Object UUID</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('objectUuid')}</label>
                 <input
                   value={objectId}
                   onChange={(event) => setObjectId(event.target.value)}
-                  placeholder="Paste the service item or notification rule UUID"
+                  placeholder={t('objectUuidPlaceholder')}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 />
               </div>
@@ -247,15 +259,15 @@ export default function ConfigPackagesPage() {
               disabled={exporting || (needsObjectId && !objectId.trim())}
               className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {exporting ? 'Exporting...' : 'Export Package'}
+              {exporting ? t('exporting') : t('exportButton')}
             </button>
           </div>
         </Card>
 
         <Card>
-          <h2 className="font-semibold text-gray-900 mb-2">Import into this instance</h2>
+          <h2 className="font-semibold text-gray-900 mb-2">{t('importSection')}</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Upload a package from another instance, dry-run it, then apply the idempotent changes.
+            {t('importDescription')}
           </p>
           <div
             className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-indigo-300 transition-colors cursor-pointer"
@@ -273,7 +285,7 @@ export default function ConfigPackagesPage() {
               className="hidden"
               onChange={(event) => void handleFile(event.target.files?.[0])}
             />
-            <p className="text-sm text-gray-500">Drag & drop a JSON package here, or click to browse.</p>
+            <p className="text-sm text-gray-500">{t('dropzone')}</p>
             {bundle && (
               <p className="text-sm font-medium text-gray-900 mt-2">{bundle.name}</p>
             )}
@@ -285,7 +297,7 @@ export default function ConfigPackagesPage() {
               disabled={!bundle}
               className="px-5 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
-              Validate
+              {t('validate')}
             </button>
             <button
               type="button"
@@ -293,7 +305,7 @@ export default function ConfigPackagesPage() {
               disabled={!bundle || applying || (validation != null && !validation.valid)}
               className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
             >
-              {applying ? 'Applying...' : 'Apply Package'}
+              {applying ? t('applying') : t('applyButton')}
             </button>
           </div>
         </Card>
@@ -301,36 +313,36 @@ export default function ConfigPackagesPage() {
 
       {validation && (
         <Card className="mt-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Validation Result</h2>
+          <h2 className="font-semibold text-gray-900 mb-4">{t('validationResult')}</h2>
           <ValidationSummary report={validation} />
         </Card>
       )}
 
       <Card className="mt-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">Deployment History</h2>
+          <h2 className="font-semibold text-gray-900">{t('deploymentHistory')}</h2>
           <button
             type="button"
             onClick={() => void loadRuns()}
             className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50"
           >
-            Refresh
+            {tActions('refresh')}
           </button>
         </div>
         {loadingRuns ? (
           <Spinner />
         ) : runs.length === 0 ? (
-          <p className="text-sm text-gray-500">No configuration deployment runs yet.</p>
+          <p className="text-sm text-gray-500">{t('noRuns')}</p>
         ) : (
           <div className="overflow-x-auto border border-gray-100 rounded-lg">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-500">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium">Created</th>
-                  <th className="text-left px-3 py-2 font-medium">Package</th>
-                  <th className="text-left px-3 py-2 font-medium">Status</th>
-                  <th className="text-left px-3 py-2 font-medium">Mode</th>
-                  <th className="text-left px-3 py-2 font-medium">Actor</th>
+                  <th className="text-left px-3 py-2 font-medium">{t('table.created')}</th>
+                  <th className="text-left px-3 py-2 font-medium">{t('table.package')}</th>
+                  <th className="text-left px-3 py-2 font-medium">{tFields('status')}</th>
+                  <th className="text-left px-3 py-2 font-medium">{t('table.mode')}</th>
+                  <th className="text-left px-3 py-2 font-medium">{t('table.actor')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -342,8 +354,8 @@ export default function ConfigPackagesPage() {
                       <p className="font-mono text-xs text-gray-500">{run.package_checksum.slice(0, 16)}</p>
                     </td>
                     <td className="px-3 py-2 capitalize">{run.status}</td>
-                    <td className="px-3 py-2">{run.dry_run ? 'Dry run' : 'Apply'}</td>
-                    <td className="px-3 py-2">{run.actor_name || 'Unknown'}</td>
+                    <td className="px-3 py-2">{run.dry_run ? t('modeDryRun') : t('modeApply')}</td>
+                    <td className="px-3 py-2">{run.actor_name || t('unknownActor')}</td>
                   </tr>
                 ))}
               </tbody>

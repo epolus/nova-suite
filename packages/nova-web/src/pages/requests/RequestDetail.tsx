@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { requests as requestsApi, cmdb, auth } from '../../api/client';
+import { requests as requestsApi } from '../../api/client';
 import type { ServiceRequest, RequestTask, FormField } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/PageHeader';
@@ -10,27 +10,22 @@ import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import { formatDateTime } from '../../utils/dateTime';
 import { isFulfillerRole } from '../../utils/roles';
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-600',
-  in_progress: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
-  skipped: 'bg-gray-100 text-gray-400',
-  rejected: 'bg-red-100 text-red-700',
-  failed: 'bg-orange-100 text-orange-800',
-};
-
-const TYPE_COLORS: Record<string, string> = {
-  approval: 'bg-amber-100 text-amber-700',
-  manual: 'bg-blue-100 text-blue-700',
-  automated: 'bg-purple-100 text-purple-700',
-};
+import { useFieldLabel } from '@/i18n/hooks';
+import { useTranslations } from 'use-intl';
+import { TaskCard } from './RequestTaskCard';
+import { ResolvedCmdbRef, ResolvedUserRef } from './ResolvedRefs';
+import { RequestDetailSidebar } from './RequestDetailSidebar';
 
 export default function RequestDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const tRequests = useTranslations('pages.requests');
+  const tActions = useTranslations('common.actions');
+  const tMaster = useTranslations('common.masterData');
+  const tStates = useTranslations('common.states');
+  const fieldLabel = useFieldLabel();
   const [req, setReq] = useState<ServiceRequest | null>(null);
   const [tasks, setTasks] = useState<RequestTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +54,7 @@ export default function RequestDetail() {
         if (cancelled) return;
         setReq(null);
         setTasks([]);
-        setLoadError(err instanceof Error ? err.message : 'Failed to load request');
+        setLoadError(err instanceof Error ? err.message : tRequests('loadFailed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -67,7 +62,7 @@ export default function RequestDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, tRequests]);
 
   useEffect(() => {
     if (!id) return;
@@ -152,13 +147,13 @@ export default function RequestDetail() {
   if (!req) {
     return (
       <>
-        <PageHeader title="Request" description="This record could not be opened." />
+        <PageHeader title={tRequests('notFoundTitle')} description={tRequests('notFoundDescription')} />
         <Card>
           <p className="text-sm text-gray-700 mb-4">
-            {loadError || 'This request was not found, or you do not have permission to view it.'}
+            {loadError || tRequests('notFoundMessage')}
           </p>
           <Link to="/requests" className="text-indigo-600 text-sm font-medium hover:text-indigo-800">
-            &larr; Back to My Requests
+            &larr; {tRequests('backToMyRequests')}
           </Link>
         </Card>
       </>
@@ -187,8 +182,8 @@ export default function RequestDetail() {
   return (
     <>
       <PageHeader
-        title={`Request ${req.number}`}
-        description={(prevId || nextId) ? 'Use \u2190 / \u2192 to navigate records' : undefined}
+        title={`${tRequests('request')} ${req.number}`}
+        description={(prevId || nextId) ? tMaster('navigateRecords') : undefined}
         action={
           <div className="flex items-center gap-2">
             <button
@@ -196,7 +191,7 @@ export default function RequestDetail() {
               disabled={!prevId}
               onClick={() => prevId && navigate(`/requests/${prevId}`, { state: location.state })}
               className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Previous request (Left Arrow)"
+              title={tRequests('previousRequest')}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -207,7 +202,7 @@ export default function RequestDetail() {
               disabled={!nextId}
               onClick={() => nextId && navigate(`/requests/${nextId}`, { state: location.state })}
               className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Next request (Right Arrow)"
+              title={tRequests('nextRequest')}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -217,7 +212,7 @@ export default function RequestDetail() {
               onClick={() => navigate(-1)}
               className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              &larr; Back
+              &larr; {tActions('back')}
             </button>
           </div>
         }
@@ -227,45 +222,45 @@ export default function RequestDetail() {
         {/* Main details */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">Request Details</h3>
+            <h3 className="font-semibold text-gray-900 mb-4">{tRequests('requestDetails')}</h3>
             <dl className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <dt className="text-gray-500">Service Item</dt>
+                <dt className="text-gray-500">{tRequests('serviceItem')}</dt>
                 <dd className="font-medium text-gray-900 mt-0.5">{req.service_item_name}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">Requester</dt>
+                <dt className="text-gray-500">{tRequests('requester')}</dt>
                 <dd className="font-medium text-gray-900 mt-0.5">{req.requester_name}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">Priority</dt>
+                <dt className="text-gray-500">{fieldLabel('priority')}</dt>
                 <dd className="mt-0.5"><Badge value={req.priority} /></dd>
               </div>
               <div>
-                <dt className="text-gray-500">Status</dt>
+                <dt className="text-gray-500">{fieldLabel('status')}</dt>
                 <dd className="mt-0.5"><Badge value={req.status} /></dd>
               </div>
               <div>
-                <dt className="text-gray-500">Created</dt>
+                <dt className="text-gray-500">{fieldLabel('created')}</dt>
                 <dd className="font-medium text-gray-900 mt-0.5">{formatDateTime(req.created_at)}</dd>
               </div>
               {req.approved_by_name && (
                 <div>
-                  <dt className="text-gray-500">Approved by</dt>
+                  <dt className="text-gray-500">{tRequests('approvedBy')}</dt>
                   <dd className="font-medium text-gray-900 mt-0.5">{req.approved_by_name} &middot; {formatDateTime(req.approved_at)}</dd>
                 </div>
               )}
               {req.requested_for_name && req.requested_for !== req.requester_id && (
                 <div>
-                  <dt className="text-gray-500">Requested for</dt>
+                  <dt className="text-gray-500">{tRequests('requestedFor')}</dt>
                   <dd className="font-medium text-gray-900 mt-0.5">{req.requested_for_name}</dd>
                 </div>
               )}
               {req.batch_id && (
                 <div>
-                  <dt className="text-gray-500">Order</dt>
+                  <dt className="text-gray-500">{tRequests('order')}</dt>
                   <dd className="font-medium text-indigo-600 mt-0.5">
-                    Part of order ({req.batch_count || '?'} items)
+                    {tRequests('partOfOrder', { count: req.batch_count || '?' })}
                   </dd>
                 </div>
               )}
@@ -275,7 +270,7 @@ export default function RequestDetail() {
           {/* Form data */}
           {req.form_data && Object.keys(req.form_data).length > 0 && (
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">Submitted Data</h3>
+            <h3 className="font-semibold text-gray-900 mb-4">{tRequests('submittedData')}</h3>
             <dl className="space-y-3 text-sm">
               {Object.entries(req.form_data).map(([key, value]) => {
                 const fieldDef = req.form_schema?.fields?.find((f: FormField) => f.name === key);
@@ -289,7 +284,7 @@ export default function RequestDetail() {
                       ) : fieldDef?.type === 'user_ref' && value ? (
                         <ResolvedUserRef userId={String(value)} />
                       ) : fieldDef?.type === 'checkbox' ? (
-                        value === 'true' ? 'Yes' : 'No'
+                        value === 'true' ? tStates('yes') : tStates('no')
                       ) : (
                         String(value)
                       )}
@@ -303,23 +298,23 @@ export default function RequestDetail() {
 
           {req.delivery_info && (req.delivery_info.location || req.delivery_info.date_needed || req.delivery_info.instructions) && (
             <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">Delivery Information</h3>
+              <h3 className="font-semibold text-gray-900 mb-4">{tRequests('deliveryInformation')}</h3>
               <dl className="space-y-3 text-sm">
                 {req.delivery_info.location && (
                   <div>
-                    <dt className="text-gray-500">Location</dt>
+                    <dt className="text-gray-500">{fieldLabel('location')}</dt>
                     <dd className="font-medium text-gray-900 mt-0.5">{req.delivery_info.location}</dd>
                   </div>
                 )}
                 {req.delivery_info.date_needed && (
                   <div>
-                    <dt className="text-gray-500">Date Needed</dt>
+                    <dt className="text-gray-500">{tRequests('dateNeeded')}</dt>
                     <dd className="font-medium text-gray-900 mt-0.5">{req.delivery_info.date_needed}</dd>
                   </div>
                 )}
                 {req.delivery_info.instructions && (
                   <div>
-                    <dt className="text-gray-500">Special Instructions</dt>
+                    <dt className="text-gray-500">{tRequests('specialInstructions')}</dt>
                     <dd className="font-medium text-gray-900 mt-0.5">{req.delivery_info.instructions}</dd>
                   </div>
                 )}
@@ -329,7 +324,7 @@ export default function RequestDetail() {
 
           {req.notes && (
             <Card>
-              <h3 className="font-semibold text-gray-900 mb-2">Notes</h3>
+              <h3 className="font-semibold text-gray-900 mb-2">{fieldLabel('notes')}</h3>
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{req.notes}</p>
             </Card>
           )}
@@ -338,8 +333,8 @@ export default function RequestDetail() {
           {hasTasks && (
             <Card>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">Fulfillment Tasks</h3>
-                <span className="text-xs text-gray-500">{completedCount} / {totalActive} completed</span>
+                <h3 className="font-semibold text-gray-900">{tRequests('fulfillmentTasks')}</h3>
+                <span className="text-xs text-gray-500">{tRequests('completedCount', { completed: completedCount, total: totalActive })}</span>
               </div>
 
               {/* Progress bar */}
@@ -364,7 +359,7 @@ export default function RequestDetail() {
                           groupDone ? 'bg-green-600 text-white' : 'bg-indigo-600 text-white'
                         }`}>{order}</span>
                         <span className="text-xs font-medium text-gray-500">
-                          Step {order}{isParallel ? ` (${group.length} parallel tasks)` : ''}
+                          {tRequests('step', { order })}{isParallel ? ` ${tRequests('parallelTasks', { count: group.length })}` : ''}
                         </span>
                       </div>
                       <div className={isParallel ? 'grid grid-cols-1 md:grid-cols-2 divide-x divide-gray-100' : ''}>
@@ -392,205 +387,16 @@ export default function RequestDetail() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Legacy approval (only for items without workflow tasks) */}
-          {canApprove && (
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">Approval</h3>
-              <textarea
-                placeholder="Add notes (optional)..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none mb-3"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleApproval('reject')}
-                  disabled={actionLoading}
-                  className="flex-1 px-4 py-2 border border-red-300 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
-                >
-                  Reject
-                </button>
-                <button
-                  onClick={() => handleApproval('approve')}
-                  disabled={actionLoading}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
-                >
-                  Approve
-                </button>
-              </div>
-            </Card>
-          )}
-
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-3">Timeline</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex gap-3">
-                <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                <div>
-                  <p className="text-gray-900">Request submitted</p>
-                  <p className="text-gray-400 text-xs">{formatDateTime(req.created_at)}</p>
-                </div>
-              </div>
-              {req.approved_at && (
-                <div className="flex gap-3">
-                  <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${req.status === 'rejected' ? 'bg-red-500' : 'bg-green-500'}`} />
-                  <div>
-                    <p className="text-gray-900">{req.status === 'rejected' ? 'Rejected' : 'Approved'} by {req.approved_by_name}</p>
-                    <p className="text-gray-400 text-xs">{formatDateTime(req.approved_at)}</p>
-                  </div>
-                </div>
-              )}
-              {/* Task completions */}
-              {tasks.filter((t) => t.completed_at).map((t) => (
-                <div key={t.id} className="flex gap-3">
-                  <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${t.outcome === 'rejected' ? 'bg-red-500' : 'bg-green-500'}`} />
-                  <div>
-                    <p className="text-gray-900">
-                      {t.name} — {t.outcome === 'rejected' ? 'Rejected' : 'Completed'}
-                      {t.completed_by_name && ` by ${t.completed_by_name}`}
-                    </p>
-                    <p className="text-gray-400 text-xs">{formatDateTime(t.completed_at)}</p>
-                  </div>
-                </div>
-              ))}
-              {req.status === 'fulfilled' && (
-                <div className="flex gap-3">
-                  <div className="w-2 h-2 mt-1.5 rounded-full bg-green-600 flex-shrink-0" />
-                  <div>
-                    <p className="text-gray-900 font-medium">Request fulfilled</p>
-                    <p className="text-gray-400 text-xs">{formatDateTime(req.updated_at)}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
+        <RequestDetailSidebar
+          req={req}
+          tasks={tasks}
+          canApprove={canApprove}
+          notes={notes}
+          onNotesChange={setNotes}
+          actionLoading={actionLoading}
+          onApproval={handleApproval}
+        />
       </div>
     </>
   );
-}
-
-function TaskCard({
-  task, requestId, currentUserId, approvalSubjectId, actionLoading, taskNote, onNoteChange, onComplete, onAssign,
-}: {
-  task: RequestTask;
-  requestId: string;
-  currentUserId?: string;
-  /** User the approval is about (COALESCE(requested_for, requester_id)); cannot self-approve as employee. */
-  approvalSubjectId?: string | null;
-  actionLoading: boolean;
-  taskNote: string;
-  onNoteChange: (val: string) => void;
-  onComplete: (taskId: string, outcome: string) => void;
-  onAssign: (taskId: string) => void;
-}) {
-  const isActive = task.status === 'in_progress';
-  const isDone = ['completed', 'skipped', 'rejected', 'failed'].includes(task.status);
-  const isSelfApprovalBlocked =
-    task.task_type === 'approval' && approvalSubjectId !== undefined && approvalSubjectId === currentUserId;
-  const canAssign = task.task_type !== 'approval' && !task.assigned_to && Boolean(currentUserId);
-  const canApprove = task.task_type === 'approval' && !isSelfApprovalBlocked;
-  const canComplete = task.task_type !== 'approval';
-  const hasActions = isActive && (canAssign || canApprove || canComplete);
-
-  return (
-    <div className={`p-4 ${isDone ? 'opacity-60' : ''}`}>
-      <div className="flex items-start gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-medium text-gray-900">{task.name}</p>
-            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[task.task_type]}`}>
-              {task.task_type}
-            </span>
-            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[task.status]}`}>
-              {task.status.replace('_', ' ')}
-            </span>
-          </div>
-          {task.description && <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>}
-        </div>
-      </div>
-
-      <div className="text-xs text-gray-400 space-y-0.5 mb-2">
-        {task.assigned_group_name && <p>Group: {task.assigned_group_name}</p>}
-        {task.assigned_to_name && <p>Assigned to: {task.assigned_to_name}</p>}
-        {task.completed_by_name && <p>Completed by: {task.completed_by_name} at {formatDateTime(task.completed_at)}</p>}
-        {task.outcome && <p>Outcome: <span className={task.outcome === 'approved' ? 'text-green-600' : 'text-red-600'}>{task.outcome}</span></p>}
-        {task.notes && <p className="text-gray-600 italic">"{task.notes}"</p>}
-      </div>
-
-      {/* Action buttons for active tasks */}
-      {hasActions && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          {canAssign && (
-            <button
-              onClick={() => onAssign(task.id)}
-              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium mb-2 block"
-            >
-              Assign to me
-            </button>
-          )}
-          <textarea
-            value={taskNote}
-            onChange={(e) => onNoteChange(e.target.value)}
-            placeholder="Notes (optional)..."
-            rows={1}
-            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none resize-none mb-2"
-          />
-          {canApprove ? (
-            <div className="flex gap-2">
-              <button
-                onClick={() => onComplete(task.id, 'rejected')}
-                disabled={actionLoading}
-                className="flex-1 px-3 py-1.5 border border-red-300 text-red-700 rounded text-xs font-medium hover:bg-red-50 disabled:opacity-50"
-              >
-                Reject
-              </button>
-              <button
-                onClick={() => onComplete(task.id, 'approved')}
-                disabled={actionLoading}
-                className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50"
-              >
-                Approve
-              </button>
-            </div>
-          ) : canComplete ? (
-            <button
-              onClick={() => onComplete(task.id, 'completed')}
-              disabled={actionLoading}
-              className="w-full px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 disabled:opacity-50"
-            >
-              Mark Complete
-            </button>
-          ) : null}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ResolvedCmdbRef({ ciId }: { ciId: string }) {
-  const [label, setLabel] = useState<string>(ciId);
-  useEffect(() => {
-    cmdb.item(ciId).then((ci) => {
-      setLabel(ci.name || ciId);
-    }).catch(() => {});
-  }, [ciId]);
-  return (
-    <Link to={`/cmdb/${ciId}`} className="text-indigo-600 hover:text-indigo-800 hover:underline">
-      {label}
-    </Link>
-  );
-}
-
-function ResolvedUserRef({ userId }: { userId: string }) {
-  const [label, setLabel] = useState<string>(userId);
-  useEffect(() => {
-    auth.users().then((res) => {
-      const u = res.users.find((u: any) => u.id === userId);
-      if (u) setLabel(u.display_name || u.email);
-    }).catch(() => {});
-  }, [userId]);
-  return <span>{label}</span>;
 }

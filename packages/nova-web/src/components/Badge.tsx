@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { useStatusLabel } from '@/i18n/hooks';
+
 const colorMap: Record<string, string> = {
   // Statuses
   new: 'bg-blue-100 text-blue-800',
@@ -48,8 +50,9 @@ const colorMap: Record<string, string> = {
 };
 
 export default function Badge({ value, className = '' }: { value: string; className?: string }) {
+  const statusLabel = useStatusLabel();
   const color = colorMap[value] || 'bg-gray-100 text-gray-800';
-  const label = value.replace(/_/g, ' ');
+  const label = statusLabel(value);
   return (
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${color} ${className}`}

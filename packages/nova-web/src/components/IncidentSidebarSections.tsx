@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Link } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import type { SimilarIncident, KnowledgeSuggestion } from '../api/client';
 import Badge from './Badge';
 
@@ -12,21 +13,23 @@ export function SimilarIncidentsSection({
   loading?: boolean;
   onGoTo?: (id: string) => void;
 }) {
+  const t = useTranslations('components.incidentSidebar');
+
   return (
     <section>
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Similar Incidents</h4>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{t('similarIncidents')}</h4>
       <div className="space-y-2">
-        {!loading && incidents.length === 0 && <p className="text-sm text-gray-400">No similar incidents found.</p>}
+        {!loading && incidents.length === 0 && <p className="text-sm text-gray-400">{t('noSimilar')}</p>}
         {incidents.map((si) => {
           const inner = (
             <>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-mono text-indigo-600">{si.number}</span>
                 <Badge value={si.status} />
-                <span className="ml-auto text-xs text-gray-400">Score {si.similarity_score}</span>
+                <span className="ml-auto text-xs text-gray-400">{t('score', { score: si.similarity_score })}</span>
               </div>
               <p className="text-sm font-medium text-gray-900">{si.title}</p>
-              <p className="text-xs text-gray-500 mt-1">{si.service_name || si.ci_display_name || si.ci_name || 'General'}</p>
+              <p className="text-xs text-gray-500 mt-1">{si.service_name || si.ci_display_name || si.ci_name || t('general')}</p>
             </>
           );
           return onGoTo ? (
@@ -53,18 +56,20 @@ export function KbSuggestionsSection({
   loading?: boolean;
   onPreview?: (id: string) => void;
 }) {
+  const t = useTranslations('components.incidentSidebar');
+
   return (
     <section>
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Suggested Knowledge</h4>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{t('suggestedKnowledge')}</h4>
       <div className="space-y-2">
-        {!loading && articles.length === 0 && <p className="text-sm text-gray-400">No article suggestions yet.</p>}
+        {!loading && articles.length === 0 && <p className="text-sm text-gray-400">{t('noSuggestions')}</p>}
         {articles.map((article) => {
           const inner = (
             <>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-mono text-indigo-600">{article.number}</span>
                 {article.category_name && <span className="text-xs text-gray-500">{article.category_name}</span>}
-                <span className="ml-auto text-xs text-gray-400">Score {Number(article.suggestion_score || 0).toFixed(1)}</span>
+                <span className="ml-auto text-xs text-gray-400">{t('score', { score: Number(article.suggestion_score || 0).toFixed(1) })}</span>
               </div>
               <p className="text-sm font-medium text-gray-900">{article.title}</p>
               {article.excerpt && <p className="text-xs text-gray-500 mt-1 line-clamp-3">{article.excerpt}</p>}

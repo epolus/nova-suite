@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   admin,
@@ -13,8 +14,15 @@ import {
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
+import ChecklistFieldset from './assignment-groups/ChecklistFieldset';
+import { sortAssignmentGroups } from './assignment-groups/groupListSort';
 
 export default function AssignmentGroupDetailPage() {
+  const t = useTranslations('pages.admin.assignmentGroupDetail');
+  const tActions = useTranslations('common.actions');
+  const tFields = useTranslations('common.fields');
+  const tStates = useTranslations('common.states');
+  const noneOption = `— ${tStates('none')} —`;
   const { id } = useParams<{ id: string }>();
   const isNew = !id || id === 'new';
   const navigate = useNavigate();
@@ -28,8 +36,10 @@ export default function AssignmentGroupDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
-  const listParams =
-    (location.state as { listParams?: Record<string, string> } | null)?.listParams || {};
+  const listParams = useMemo<Record<string, string>>(
+    () => (location.state as { listParams?: Record<string, string> } | null)?.listParams || {},
+    [location.state],
+  );
   const activeFilter = listParams.active || 'all';
   const sortBy = listParams.sort_by || '';
   const sortDir = listParams.sort_dir === 'asc' ? 'asc' : 'desc';
@@ -58,7 +68,7 @@ export default function AssignmentGroupDetailPage() {
         setGroups(agRes.value.assignment_groups);
       } else {
         setGroups([]);
-        setLoadError(agRes.reason instanceof Error ? agRes.reason.message : 'Failed to load assignment groups');
+        setLoadError(agRes.reason instanceof Error ? agRes.reason.message : t('loadFailed'));
       }
 
       if (uRes.status === 'fulfilled') setUsers(uRes.value.users);
@@ -73,57 +83,20 @@ export default function AssignmentGroupDetailPage() {
       if (rolesRes.status === 'fulfilled') setRoles(rolesRes.value.roles);
       else setRoles([]);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Failed to load assignment group data');
+      setLoadError(err instanceof Error ? err.message : t('loadDataFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const sorted = useMemo(() => {
-    let list = groups;
-    if (activeFilter === 'active') list = list.filter((i) => i.is_active);
-    else if (activeFilter === 'inactive') list = list.filter((i) => !i.is_active);
-    if (search) {
-      list = list.filter(
-        (ag) =>
-          ag.name.toLowerCase().includes(search) ||
-          (ag.description?.toLowerCase().includes(search) ?? false) ||
-          (ag.manager_name?.toLowerCase().includes(search) ?? false),
-      );
-    }
-    for (const [col, val] of Object.entries(colFilters)) {
-      const lower = val.toLowerCase();
-      list = list.filter((item) => {
-        if (col === '_status') return (item.is_active ? 'active' : 'inactive').startsWith(lower);
-        const raw = (item as unknown as Record<string, unknown>)[col];
-        return raw != null && String(raw).toLowerCase().startsWith(lower);
-      });
-    }
-    if (!sortBy) return list;
-    return [...list].sort((a, b) => {
-      let aVal: unknown;
-      let bVal: unknown;
-      if (sortBy === '_status') {
-        aVal = a.is_active ? 0 : 1;
-        bVal = b.is_active ? 0 : 1;
-      } else {
-        aVal = (a as unknown as Record<string, unknown>)[sortBy];
-        bVal = (b as unknown as Record<string, unknown>)[sortBy];
-      }
-      if (aVal == null && bVal == null) return 0;
-      if (aVal == null) return -1;
-      if (bVal == null) return 1;
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortDir === 'desc' ? bVal - aVal : aVal - bVal;
-      }
-      const cmp = String(aVal).localeCompare(String(bVal), undefined, { sensitivity: 'base' });
-      return sortDir === 'desc' ? -cmp : cmp;
-    });
-  }, [groups, activeFilter, search, colFilters, sortBy, sortDir]);
+  const sorted = useMemo(
+    () => sortAssignmentGroups(groups, { activeFilter, search, colFilters, sortBy, sortDir }),
+    [groups, activeFilter, search, colFilters, sortBy, sortDir],
+  );
 
   const currentGroup = useMemo(() => {
     if (isNew || !id) return null;
@@ -224,7 +197,7 @@ export default function AssignmentGroupDetailPage() {
         await load();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : t('errorOccurred'));
       setSaving(false);
       return;
     }
@@ -235,7 +208,7 @@ export default function AssignmentGroupDetailPage() {
   if (loadError) {
     return (
       <>
-        <PageHeader title="Assignment Groups" />
+        <PageHeader title={t('title')} />
         <Card>
           <p className="text-sm text-red-700">{loadError}</p>
         </Card>
@@ -245,9 +218,9 @@ export default function AssignmentGroupDetailPage() {
   if (!isNew && !currentGroup) {
     return (
       <>
-        <PageHeader title="Assignment Group Not Found" />
+        <PageHeader title={t('notFoundTitle')} />
         <Card>
-          <p className="text-sm text-gray-600">The selected group could not be found.</p>
+          <p className="text-sm text-gray-600">{t('notFoundMessage')}</p>
         </Card>
       </>
     );
@@ -260,8 +233,8 @@ export default function AssignmentGroupDetailPage() {
   return (
     <>
       <PageHeader
-        title={isNew ? 'Create Assignment Group' : 'Edit Assignment Group'}
-        description={!isNew && (navInfo.prev || navInfo.next) ? 'Use \u2190 / \u2192 to navigate records' : undefined}
+        title={isNew ? t('createTitle') : t('editTitle')}
+        description={!isNew && (navInfo.prev || navInfo.next) ? t('navigateRecords') : undefined}
         action={
           <div className="flex items-center gap-2">
             {!isNew && (
@@ -271,7 +244,7 @@ export default function AssignmentGroupDetailPage() {
                   disabled={!navInfo.prev}
                   onClick={() => navInfo.prev && navigate(`/admin/assignment-groups/${navInfo.prev}`, { state: location.state })}
                   className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Previous group (Left Arrow)"
+                  title={t('previousGroup')}
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -282,7 +255,7 @@ export default function AssignmentGroupDetailPage() {
                   disabled={!navInfo.next}
                   onClick={() => navInfo.next && navigate(`/admin/assignment-groups/${navInfo.next}`, { state: location.state })}
                   className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Next group (Right Arrow)"
+                  title={t('nextGroup')}
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -295,7 +268,7 @@ export default function AssignmentGroupDetailPage() {
               onClick={() => navigate('/admin/assignment-groups')}
               className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              &larr; Back to List
+              {t('backToList')}
             </button>
           </div>
         }
@@ -308,44 +281,44 @@ export default function AssignmentGroupDetailPage() {
           )}
 
           <fieldset>
-            <legend className="text-sm font-semibold text-gray-700 mb-3">General</legend>
+            <legend className="text-sm font-semibold text-gray-700 mb-3">{t('general')}</legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-gray-600 mb-1">Name *</label>
-                <input required type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Service Desk" className={inputCls} />
+                <label className="block text-sm font-medium text-gray-600 mb-1">{tFields('name')} *</label>
+                <input required type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('placeholderName')} className={inputCls} />
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-gray-600 mb-1">Description</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What this group does" className={inputCls + ' resize-none'} />
+                <label className="block text-sm font-medium text-gray-600 mb-1">{tFields('description')}</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder={t('placeholderDescription')} className={inputCls + ' resize-none'} />
               </div>
             </div>
           </fieldset>
 
           <fieldset>
-            <legend className="text-sm font-semibold text-gray-700 mb-3">Organization</legend>
+            <legend className="text-sm font-semibold text-gray-700 mb-3">{t('organization')}</legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Manager</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{tFields('manager')}</label>
                 <select value={managerId} onChange={(e) => setManagerId(e.target.value)} className={selectCls}>
-                  <option value="">— None —</option>
+                  <option value="">{noneOption}</option>
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>{u.display_name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Cost Center</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{tFields('costCenter')}</label>
                 <select value={costCenterId} onChange={(e) => setCostCenterId(e.target.value)} className={selectCls}>
-                  <option value="">— None —</option>
+                  <option value="">{noneOption}</option>
                   {costCenters.filter((cc) => cc.is_active).map((cc) => (
                     <option key={cc.id} value={cc.id}>{cc.code} — {cc.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Parent Group</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{tFields('parentGroup')}</label>
                 <select value={parentGroupId} onChange={(e) => setParentGroupId(e.target.value)} className={selectCls}>
-                  <option value="">— None —</option>
+                  <option value="">{noneOption}</option>
                   {otherGroups.filter((g) => g.is_active).map((g) => (
                     <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
@@ -354,80 +327,39 @@ export default function AssignmentGroupDetailPage() {
             </div>
           </fieldset>
 
-          <fieldset>
-            <legend className="text-sm font-semibold text-gray-700 mb-3">
-              Members ({memberIds.length} selected)
-            </legend>
-            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-              {users.map((u) => (
-                <label key={u.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={memberIds.includes(u.id)}
-                    onChange={() => toggleMember(u.id)}
-                    className="rounded text-indigo-600"
-                  />
-                  <span className="text-gray-800">{u.display_name}</span>
-                  <span className="text-gray-400 text-xs ml-auto">{u.email}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <ChecklistFieldset
+            legend={t('members', { count: memberIds.length })}
+            options={users.map((u) => ({ id: u.id, label: u.display_name, secondary: u.email }))}
+            selectedIds={memberIds}
+            onToggle={toggleMember}
+          />
 
-          <fieldset>
-            <legend className="text-sm font-semibold text-gray-700 mb-3">
-              Covered Processes ({processIds.length} selected)
-            </legend>
-            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-              {processes.filter((p) => p.is_active).map((p) => (
-                <label key={p.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={processIds.includes(p.id)}
-                    onChange={() => toggleProcess(p.id)}
-                    className="rounded text-indigo-600"
-                  />
-                  <span className="text-gray-800">{p.name}</span>
-                </label>
-              ))}
-              {processes.filter((p) => p.is_active).length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-2">No processes configured yet.</p>
-              )}
-            </div>
-          </fieldset>
+          <ChecklistFieldset
+            legend={t('processes', { count: processIds.length })}
+            options={processes.filter((p) => p.is_active).map((p) => ({ id: p.id, label: p.name }))}
+            selectedIds={processIds}
+            onToggle={toggleProcess}
+            emptyMessage={t('noProcesses')}
+          />
 
-          <fieldset>
-            <legend className="text-sm font-semibold text-gray-700 mb-3">
-              Inherited Roles ({roleIds.length} selected)
-            </legend>
-            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-              {roles.filter((r) => r.is_active).map((r) => (
-                <label key={r.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={roleIds.includes(r.id)}
-                    onChange={() => toggleRole(r.id)}
-                    className="rounded text-indigo-600"
-                  />
-                  <span className="text-gray-800">{r.name}</span>
-                </label>
-              ))}
-              {roles.filter((r) => r.is_active).length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-2">No active roles configured yet.</p>
-              )}
-            </div>
-          </fieldset>
+          <ChecklistFieldset
+            legend={t('roles', { count: roleIds.length })}
+            options={roles.filter((r) => r.is_active).map((r) => ({ id: r.id, label: r.name }))}
+            selectedIds={roleIds}
+            onToggle={toggleRole}
+            emptyMessage={t('noRoles')}
+          />
 
           {!isNew && (
             <fieldset>
-              <legend className="text-sm font-semibold text-gray-700 mb-3">Status</legend>
+              <legend className="text-sm font-semibold text-gray-700 mb-3">{tFields('status')}</legend>
               <label className="flex items-center gap-3 cursor-pointer">
                 <div className="relative">
                   <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="sr-only peer" />
                   <div className="w-10 h-5 bg-gray-200 rounded-full peer-checked:bg-indigo-600 transition-colors" />
                   <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
                 </div>
-                <span className="text-sm text-gray-700">{isActive ? 'Active' : 'Inactive'}</span>
+                <span className="text-sm text-gray-700">{isActive ? tStates('active') : tStates('inactive')}</span>
               </label>
             </fieldset>
           )}
@@ -438,14 +370,14 @@ export default function AssignmentGroupDetailPage() {
               onClick={() => navigate('/admin/assignment-groups')}
               className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
             >
-              Cancel
+              {tActions('cancel')}
             </button>
             <button
               type="submit"
               disabled={saving}
               className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving...' : isNew ? 'Create Group' : 'Save Changes'}
+              {saving ? tActions('saving') : isNew ? t('createGroup') : t('saveChanges')}
             </button>
           </div>
         </form>

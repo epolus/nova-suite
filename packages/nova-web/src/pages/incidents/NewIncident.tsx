@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  attachments as attachmentsApi,
   incidents as incidentsApi,
   knowledge as knowledgeApi,
   problems as problemsApi,
@@ -13,22 +12,26 @@ import type {
   AssignmentGroupItem,
   CI,
   ServiceListItem,
-  KnowledgeArticleDetail,
   Problem,
 } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import { SearchableDropdown } from '../../components/SearchableDropdown';
 import { Button } from '../../components/ui/button';
-import { Card as UiCard, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { SimilarIncidentsSection, KbSuggestionsSection } from '../../components/IncidentSidebarSections';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
+import { useFieldLabel, useImpactUrgencyLabel } from '@/i18n/hooks';
+import { useTranslations } from 'use-intl';
+import { NewIncidentSidebar } from './NewIncidentSidebar';
 
 export default function NewIncident() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isEss = !isAgentRole(user?.roles);
+  const tIncidents = useTranslations('pages.incidents');
+  const tActions = useTranslations('common.actions');
+  const fieldLabel = useFieldLabel();
+  const { impact: impactLabel, urgency: urgencyLabel } = useImpactUrgencyLabel();
 
   // Form fields
   const [title, setTitle] = useState('');
@@ -54,10 +57,6 @@ export default function NewIncident() {
   const [similarIncidents, setSimilarIncidents] = useState<import('../../api/client').SimilarIncident[]>([]);
   const [kbSuggestions, setKbSuggestions] = useState<import('../../api/client').KnowledgeSuggestion[]>([]);
   const [loadingSidebar, setLoadingSidebar] = useState(false);
-  const [previewArticle, setPreviewArticle] = useState<KnowledgeArticleDetail | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState('');
-  const [previewAttachmentUrls, setPreviewAttachmentUrls] = useState<Record<string, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [assignmentGroups, setAssignmentGroups] = useState<AssignmentGroupItem[]>([]);
@@ -124,9 +123,9 @@ export default function NewIncident() {
 
   const handleSubmit = async () => {
     setError('');
-    if (!user) { setError('You must be signed in'); return; }
-    if (!title.trim()) { setError('Title is required'); return; }
-    if (!isEss && !assignmentGroupId) { setError('Assignment Group is required'); return; }
+    if (!user) { setError(tIncidents('mustBeSignedIn')); return; }
+    if (!title.trim()) { setError(tIncidents('titleRequired')); return; }
+    if (!isEss && !assignmentGroupId) { setError(tIncidents('assignmentGroupRequired')); return; }
     setSubmitting(true);
     try {
       const createPayload = {
@@ -155,7 +154,7 @@ export default function NewIncident() {
       }
       navigate(`/incidents/${res.id}`);
     } catch (err: any) {
-      setError(err.message || 'Failed to create incident');
+      setError(err.message || tIncidents('createFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -164,55 +163,19 @@ export default function NewIncident() {
   const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
   const selectCls = inputCls;
 
-  const openKnowledgePreview = async (articleId: string) => {
-    setPreviewError('');
-    setPreviewLoading(true);
-    try {
-      const article = await knowledgeApi.article(articleId);
-      setPreviewArticle(article);
-    } catch (err: unknown) {
-      setPreviewArticle(null);
-      setPreviewError(err instanceof Error ? err.message : 'Failed to load article preview');
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!previewArticle?.content) { setPreviewAttachmentUrls({}); return; }
-    const imageMatches = Array.from(previewArticle.content.matchAll(/!\[[^\]]*]\(attachment:([^)]+)\)/g));
-    const linkMatches = Array.from(previewArticle.content.matchAll(/\[[^\]]+]\(attachment:([^)]+)\)/g));
-    const ids = Array.from(new Set(
-      [...imageMatches, ...linkMatches]
-        .map((m) => m[1])
-        .filter((id): id is string => typeof id === 'string' && id.length > 0),
-    ));
-    if (ids.length === 0) { setPreviewAttachmentUrls({}); return; }
-    Promise.all(ids.map(async (id) => ({ id, url: await attachmentsApi.previewUrl(id) })))
-      .then((pairs) => {
-        if (cancelled) return;
-        const map: Record<string, string> = {};
-        for (const p of pairs) map[p.id] = p.url;
-        setPreviewAttachmentUrls(map);
-      })
-      .catch(() => { if (!cancelled) setPreviewAttachmentUrls({}); });
-    return () => { cancelled = true; };
-  }, [previewArticle?.content]);
-
   return (
     <>
       <PageHeader
-        title="New Incident"
+        title={tIncidents('newIncident')}
         action={
           <div className="flex items-center gap-2">
             <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Creating...' : 'Create Incident'}
+              {submitting ? tIncidents('creating') : tIncidents('createIncident')}
             </Button>
             <Button variant="outline" onClick={() => setSidebarOpen((p) => !p)}>
-              {sidebarOpen ? 'Hide Insights' : 'Show Insights'}
+              {sidebarOpen ? tIncidents('hideInsights') : tIncidents('showInsights')}
             </Button>
-            <Button variant="outline" onClick={() => navigate('/incidents')}>Cancel</Button>
+            <Button variant="outline" onClick={() => navigate('/incidents')}>{tActions('cancel')}</Button>
           </div>
         }
       />
@@ -233,10 +196,10 @@ export default function NewIncident() {
 
               {/* Caller Profile */}
               <Card>
-                <h3 className="font-semibold text-gray-900 mb-4">Caller Profile</h3>
+                <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('callerProfile')}</h3>
                 <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Caller</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('caller')}</label>
                     <SearchableDropdown<UserListItem>
                       items={users}
                       selectedId={callerId}
@@ -248,7 +211,7 @@ export default function NewIncident() {
                         const s = q.toLowerCase();
                         return u.display_name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s);
                       }}
-                      placeholder="Search user..."
+                      placeholder={tIncidents('searchUser')}
                       renderItem={(u) => (
                         <>
                           <span className="font-medium">{u.display_name}</span>
@@ -259,7 +222,7 @@ export default function NewIncident() {
                   </div>
                   {selectedCaller?.email && (
                     <div>
-                      <dt className="text-xs text-gray-500">Email</dt>
+                      <dt className="text-xs text-gray-500">{fieldLabel('email')}</dt>
                       <dd className="text-sm text-gray-900 mt-0.5">
                         <a href={`mailto:${selectedCaller.email}`} className="text-indigo-600 hover:text-indigo-800">
                           {selectedCaller.email}
@@ -269,23 +232,23 @@ export default function NewIncident() {
                   )}
                   {(selectedCaller?.phone || selectedCaller?.mobile) && (
                     <div>
-                      <dt className="text-xs text-gray-500">Phone</dt>
+                      <dt className="text-xs text-gray-500">{fieldLabel('phone')}</dt>
                       <dd className="text-sm text-gray-900 mt-0.5">{selectedCaller.phone || selectedCaller.mobile}</dd>
                     </div>
                   )}
                   {isEss && (
                     <div>
-                      <dt className="text-xs text-gray-500">Assignment</dt>
-                      <dd className="text-sm text-gray-900 mt-0.5">Service Desk</dd>
+                      <dt className="text-xs text-gray-500">{tIncidents('assignment')}</dt>
+                      <dd className="text-sm text-gray-900 mt-0.5">{tIncidents('serviceDesk')}</dd>
                     </div>
                   )}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Contact Info</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('contactInfo')}</label>
                     <input
                       type="text"
                       value={contactInfo}
                       onChange={(e) => setContactInfo(e.target.value)}
-                      placeholder="Phone, desk location, preferred contact method..."
+                      placeholder={tIncidents('contactInfoPlaceholder')}
                       className={inputCls}
                     />
                   </div>
@@ -294,27 +257,27 @@ export default function NewIncident() {
 
               {!isEss && (
                 <Card>
-                  <h3 className="font-semibold text-gray-900 mb-4">Summary</h3>
+                  <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('summary')}</h3>
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Assignment Group <span className="text-red-500">*</span>
+                        {fieldLabel('assignmentGroup')} <span className="text-red-500">*</span>
                       </label>
                       <select
                         value={assignmentGroupId}
                         onChange={(e) => { setAssignmentGroupId(e.target.value); setAssignedTo(''); }}
                         className={selectCls}
                       >
-                        <option value="">— None —</option>
+                        <option value="">{tIncidents('noneOption')}</option>
                         {assignmentGroups.filter((ag) => ag.is_active).map((ag) => (
                           <option key={ag.id} value={ag.id}>{ag.name}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Assigned To</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('assignedTo')}</label>
                       <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className={selectCls}>
-                        <option value="">— Unassigned —</option>
+                        <option value="">{tIncidents('unassignedOption')}</option>
                         {groupMembers.map((u) => (
                           <option key={u.id} value={u.id}>{u.display_name}</option>
                         ))}
@@ -326,10 +289,10 @@ export default function NewIncident() {
 
               {!isEss && (
                 <Card>
-                  <h3 className="font-semibold text-gray-900 mb-4">Service / CI Context</h3>
+                  <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('serviceCiContext')}</h3>
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Service</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('service')}</label>
                       <SearchableDropdown<ServiceListItem>
                         items={services}
                         selectedId={serviceId}
@@ -337,12 +300,12 @@ export default function NewIncident() {
                         onClear={() => setServiceId('')}
                         getItemId={(s) => s.id}
                         getDisplayText={(s) => s.name}
-                        placeholder="Search service..."
+                        placeholder={tIncidents('searchService')}
                         renderItem={(s) => s.name}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Configuration Item</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('configurationItem')}</label>
                       <SearchableDropdown<CI>
                         items={cis}
                         selectedId={configItemId}
@@ -350,32 +313,32 @@ export default function NewIncident() {
                         onClear={() => setConfigItemId('')}
                         getItemId={(ci) => ci.id}
                         getDisplayText={(ci) => ci.display_name || ci.name}
-                        placeholder="Search CI..."
+                        placeholder={tIncidents('searchCi')}
                         renderItem={(ci) => ci.display_name || ci.name}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('category')}</label>
                       <input
                         type="text"
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
-                        placeholder="Category"
+                        placeholder={fieldLabel('category')}
                         className={inputCls}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Subcategory</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('subcategory')}</label>
                       <input
                         type="text"
                         value={subcategory}
                         onChange={(e) => setSubcategory(e.target.value)}
-                        placeholder="Subcategory"
+                        placeholder={fieldLabel('subcategory')}
                         className={inputCls}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Related Problem</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('relatedProblem')}</label>
                       <SearchableDropdown<Problem>
                         items={problems}
                         selectedId={relatedProblemId}
@@ -383,7 +346,7 @@ export default function NewIncident() {
                         onClear={() => setRelatedProblemId('')}
                         getItemId={(p) => p.id}
                         getDisplayText={(p) => `${p.number} - ${p.title}`}
-                        placeholder="Search problem..."
+                        placeholder={tIncidents('searchProblem')}
                         renderItem={(p) => `${p.number} - ${p.title}`}
                       />
                     </div>
@@ -395,41 +358,41 @@ export default function NewIncident() {
             {/* ── Center pane ── */}
             <div className="min-w-0 lg:col-start-2">
               <Card>
-                <h3 className="font-semibold text-gray-900 mb-4">Incident Details</h3>
+                <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('incidentDetails')}</h3>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Title <span className="text-red-500">*</span>
+                      {fieldLabel('title')} <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Brief summary of the issue"
+                      placeholder={tIncidents('briefSummary')}
                       className={inputCls}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('description')}</label>
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       rows={8}
                       className={`${inputCls} resize-none`}
-                      placeholder="Describe the incident..."
+                      placeholder={tIncidents('describeIncident')}
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Impact</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('impact')}</label>
                       <select value={impact} onChange={(e) => setImpact(e.target.value)} className={selectCls}>
-                        {['low', 'medium', 'high'].map((v) => <option key={v} value={v}>{v}</option>)}
+                        {['low', 'medium', 'high'].map((v) => <option key={v} value={v}>{impactLabel(v)}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Urgency</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('urgency')}</label>
                       <select value={urgency} onChange={(e) => setUrgency(e.target.value)} className={selectCls}>
-                        {['low', 'medium', 'high'].map((v) => <option key={v} value={v}>{v}</option>)}
+                        {['low', 'medium', 'high'].map((v) => <option key={v} value={v}>{urgencyLabel(v)}</option>)}
                       </select>
                     </div>
                   </div>
@@ -441,75 +404,12 @@ export default function NewIncident() {
 
         {/* ── Intelligence Sidebar ── */}
         {sidebarOpen && (
-          <div className="mt-6 xl:mt-0 xl:w-[320px] xl:shrink-0">
-            <UiCard>
-              <CardHeader>
-                <CardTitle>Intelligent Sidebar</CardTitle>
-                <p className="text-xs text-gray-500">Similar incidents and suggested knowledge articles.</p>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                {loadingSidebar && <div className="text-sm text-gray-500">Loading recommendations...</div>}
-                <SimilarIncidentsSection incidents={similarIncidents} />
-                <KbSuggestionsSection articles={kbSuggestions} onPreview={openKnowledgePreview} />
-                {(previewLoading || previewError || previewArticle) && (
-                  <section className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <h5 className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Knowledge Preview</h5>
-                      <button
-                        type="button"
-                        onClick={() => { setPreviewArticle(null); setPreviewError(''); }}
-                        className="text-xs text-indigo-600 hover:text-indigo-800"
-                      >
-                        Close
-                      </button>
-                    </div>
-                    {previewLoading && <p className="text-sm text-gray-500">Loading article...</p>}
-                    {previewError && <p className="text-sm text-red-600">{previewError}</p>}
-                    {previewArticle && !previewLoading && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-mono text-indigo-600">{previewArticle.number}</p>
-                        <p className="text-sm font-semibold text-gray-900">{previewArticle.title}</p>
-                        <div className="text-xs text-gray-700 whitespace-pre-wrap max-h-44 overflow-y-auto space-y-2">
-                          {previewArticle.content
-                            ? previewArticle.content.split('\n').map((line, idx) => {
-                              const img = line.match(/^!\[([^\]]*)\]\(attachment:([^)]+)\)\s*$/);
-                              if (img) {
-                                const alt = img[1] || 'attachment image';
-                                const url = previewAttachmentUrls[img[2] || ''];
-                                return url
-                                  ? <img key={`img-${idx}`} src={url} alt={alt} className="max-w-full rounded border border-indigo-100" />
-                                  : <p key={`img-missing-${idx}`} className="text-gray-400">[image not available: {alt}]</p>;
-                              }
-                              const link = line.match(/^\[([^\]]+)\]\(attachment:([^)]+)\)\s*$/);
-                              if (link) {
-                                const label = link[1] || 'attachment';
-                                const url = previewAttachmentUrls[link[2] || ''];
-                                return url
-                                  ? (
-                                    <a key={`link-${idx}`} href={url} target="_blank" rel="noreferrer" className="text-indigo-700 underline">
-                                      {label}
-                                    </a>
-                                  )
-                                  : <p key={`link-missing-${idx}`} className="text-gray-400">[attachment not available: {label}]</p>;
-                              }
-                              return <p key={`line-${idx}`}>{line}</p>;
-                            })
-                            : <p>No content</p>}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/knowledge?articleId=${previewArticle.id}`)}
-                          className="text-xs font-medium text-indigo-700 hover:text-indigo-900"
-                        >
-                          Open full article
-                        </button>
-                      </div>
-                    )}
-                  </section>
-                )}
-              </CardContent>
-            </UiCard>
-          </div>
+          <NewIncidentSidebar
+            similarIncidents={similarIncidents}
+            kbSuggestions={kbSuggestions}
+            loadingSidebar={loadingSidebar}
+            navigate={navigate}
+          />
         )}
       </div>
     </>

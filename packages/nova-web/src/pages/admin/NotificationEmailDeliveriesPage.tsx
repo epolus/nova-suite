@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { Link } from 'react-router-dom';
 import { admin as adminApi, type NotificationEmailDelivery, type NotificationEmailDeliverySummary } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -10,6 +11,10 @@ import { formatDateTime } from '../../utils/dateTime';
 const STATUS_OPTIONS = ['', 'queued', 'sent', 'failed'] as const;
 
 export default function NotificationEmailDeliveriesPage() {
+  const t = useTranslations('pages.admin.notificationDeliveries');
+  const tActions = useTranslations('common.actions');
+  const tFields = useTranslations('common.fields');
+  const tTable = useTranslations('common.table');
   const [deliveries, setDeliveries] = useState<NotificationEmailDelivery[]>([]);
   const [summary, setSummary] = useState<NotificationEmailDeliverySummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,12 +40,12 @@ export default function NotificationEmailDeliveriesPage() {
       setSummary(res.summary);
       setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load notification deliveries');
+      setError(err instanceof Error ? err.message : t('loadFailed'));
     } finally {
       if (background) setRefreshing(false);
       else setLoading(false);
     }
-  }, [status, triggerKey, recipient, limit]);
+  }, [status, triggerKey, recipient, limit, t]);
 
   useEffect(() => {
     void load();
@@ -68,14 +73,14 @@ export default function NotificationEmailDeliveriesPage() {
   return (
     <>
       <PageHeader
-        title="Notification Email Deliveries"
-        description="Delivery log for workflow-driven notification emails."
+        title={t('title')}
+        description={t('description')}
       />
 
       <Card className="mb-4">
         <div className="flex flex-col xl:flex-row gap-3 items-start xl:items-end">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tFields('status')}</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
@@ -83,31 +88,31 @@ export default function NotificationEmailDeliveriesPage() {
             >
               {STATUS_OPTIONS.map((value) => (
                 <option key={value || 'all'} value={value}>
-                  {value ? value : 'all'}
+                  {value ? value : t('all')}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Trigger Key</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('triggerKey')}</label>
             <input
               value={triggerKey}
               onChange={(e) => setTriggerKey(e.target.value)}
-              placeholder="assigned, status_changed, ..."
+              placeholder={t('triggerKeyPlaceholder')}
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm w-72"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('recipientEmail')}</label>
             <input
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
-              placeholder="name@example.com"
+              placeholder={t('recipientPlaceholder')}
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm w-72"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Rows</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('rows')}</label>
             <select
               value={limit}
               onChange={(e) => setLimit(Number.parseInt(e.target.value, 10) || 100)}
@@ -123,22 +128,22 @@ export default function NotificationEmailDeliveriesPage() {
             onClick={() => void load(true)}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
           >
-            {refreshing ? 'Refreshing...' : 'Refresh'}
+            {refreshing ? t('refreshing') : t('refresh')}
           </button>
         </div>
       </Card>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <Card>
-          <p className="text-xs text-gray-500">Queued (matching)</p>
+          <p className="text-xs text-gray-500">{t('summary.queued')}</p>
           <p className="text-2xl font-semibold text-gray-900">{summaryByStatus.queued}</p>
         </Card>
         <Card>
-          <p className="text-xs text-gray-500">Sent (matching)</p>
+          <p className="text-xs text-gray-500">{t('summary.sent')}</p>
           <p className="text-2xl font-semibold text-green-700">{summaryByStatus.sent}</p>
         </Card>
         <Card>
-          <p className="text-xs text-gray-500">Failed (matching)</p>
+          <p className="text-xs text-gray-500">{t('summary.failed')}</p>
           <p className="text-2xl font-semibold text-red-700">{summaryByStatus.failed}</p>
         </Card>
       </div>
@@ -152,20 +157,20 @@ export default function NotificationEmailDeliveriesPage() {
         {loading ? (
           <Spinner />
         ) : deliveries.length === 0 ? (
-          <div className="text-center py-12 text-sm text-gray-400">No delivery logs found for current filters.</div>
+          <div className="text-center py-12 text-sm text-gray-400">{t('empty')}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">When</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Status</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Recipient</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Trigger</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Entity</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Locale</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Subject</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Error</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">{t('table.when')}</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">{t('table.status')}</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">{t('table.recipient')}</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">{t('table.trigger')}</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">{t('table.entity')}</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">{t('table.locale')}</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">{t('table.subject')}</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">{t('table.error')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -197,22 +202,22 @@ export default function NotificationEmailDeliveriesPage() {
                     <td className="px-3 py-2 text-xs">
                       {(() => {
                         const entityPath = getEntityPath(delivery);
-                        if (!entityPath) return <span className="text-gray-400">—</span>;
+                        if (!entityPath) return <span className="text-gray-400">{tTable('emDash')}</span>;
                         return (
                           <Link className="text-indigo-600 hover:text-indigo-700 underline" to={entityPath}>
-                            Open
+                            {tActions('open')}
                           </Link>
                         );
                       })()}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-600">
-                      {delivery.template_locale} (user {delivery.recipient_locale})
+                      {t('table.localeValue', { template: delivery.template_locale, recipient: delivery.recipient_locale })}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-800 max-w-[26rem] truncate" title={delivery.subject}>
                       {delivery.subject}
                     </td>
                     <td className="px-3 py-2 text-xs text-red-600 max-w-[20rem]">
-                      {delivery.last_error || '—'}
+                      {delivery.last_error || tTable('emDash')}
                     </td>
                   </tr>
                 ))}

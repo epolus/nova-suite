@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'use-intl';
 import { Link } from 'react-router-dom';
 import { importer } from '../../api/client';
 import type { ImportJob } from '../../api/client';
@@ -14,16 +15,10 @@ const STATUS_BADGES: Record<string, string> = {
   failed: 'bg-red-100 text-red-700',
 };
 
-const ENTITY_LABELS: Record<string, string> = {
-  departments: 'Departments',
-  cost_centers: 'Cost Centers',
-  users: 'Users',
-  assignment_groups: 'Assignment Groups',
-  cmdb: 'CMDB',
-  incidents: 'Incidents',
-};
-
 export default function ImportHistoryPage() {
+  const t = useTranslations('pages.admin.importHistory');
+  const tActions = useTranslations('common.actions');
+  const tTable = useTranslations('common.table');
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,9 +30,18 @@ export default function ImportHistoryPage() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this import job and all its staged rows?')) return;
+    if (!confirm(t('confirmDelete'))) return;
     await importer.deleteJob(id);
     setJobs(jobs.filter((j) => j.id !== id));
+  };
+
+  const entityLabels: Record<string, string> = {
+    departments: t('entities.departments'),
+    cost_centers: t('entities.cost_centers'),
+    users: t('entities.users'),
+    assignment_groups: t('entities.assignment_groups'),
+    cmdb: t('entities.cmdb'),
+    incidents: t('entities.incidents'),
   };
 
   if (loading) return <Spinner />;
@@ -45,14 +49,14 @@ export default function ImportHistoryPage() {
   return (
     <>
       <PageHeader
-        title="Import History"
-        description="Past data import jobs"
+        title={t('title')}
+        description={t('description')}
         action={
           <Link
             to="/admin/import"
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
           >
-            New Import
+            {t('newImport')}
           </Link>
         }
       />
@@ -62,28 +66,28 @@ export default function ImportHistoryPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Date</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Entity</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">File</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Committed</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Errors</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Created By</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.date')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.entity')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.file')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.status')}</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-500">{t('table.total')}</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-500">{t('table.committed')}</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-500">{t('table.errors')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.createdBy')}</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-gray-400">No imports yet</td>
+                  <td colSpan={9} className="px-4 py-12 text-center text-gray-400">{t('empty')}</td>
                 </tr>
               ) : jobs.map((job) => (
                 <tr key={job.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                     {formatDateTime(job.created_at)}
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{ENTITY_LABELS[job.entity_type] || job.entity_type}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">{entityLabels[job.entity_type] || job.entity_type}</td>
                   <td className="px-4 py-3 text-gray-600 font-mono text-xs">{job.file_name}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGES[job.status] || 'bg-gray-100 text-gray-600'}`}>
@@ -93,13 +97,13 @@ export default function ImportHistoryPage() {
                   <td className="px-4 py-3 text-right text-gray-700">{job.total_rows}</td>
                   <td className="px-4 py-3 text-right text-green-700">{job.committed_rows}</td>
                   <td className="px-4 py-3 text-right text-red-600">{job.error_rows}</td>
-                  <td className="px-4 py-3 text-gray-600">{job.created_by_name || '-'}</td>
+                  <td className="px-4 py-3 text-gray-600">{job.created_by_name || tTable('emDash')}</td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => handleDelete(job.id)}
                       className="text-xs text-red-600 hover:text-red-800"
                     >
-                      Delete
+                      {tActions('delete')}
                     </button>
                   </td>
                 </tr>

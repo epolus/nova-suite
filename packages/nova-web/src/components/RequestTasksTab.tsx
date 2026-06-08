@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTranslations } from 'use-intl';
 import { Link, useNavigate } from 'react-router-dom';
 import { requests as requestsApi } from '../api/client';
 import type { RequestTaskListItem, Pagination } from '../api/client';
@@ -29,6 +30,9 @@ interface Props {
 }
 
 export default function RequestTasksTab({ filterKey }: Props) {
+  const t = useTranslations('components.requestTasksTab');
+  const tActions = useTranslations('common.actions');
+  const tTable = useTranslations('common.table');
   const navigate = useNavigate();
   const { user } = useAuth();
   const { params, setSearch, setSort, setCols, setPage, setFilter } = useListParams({
@@ -67,7 +71,7 @@ export default function RequestTasksTab({ filterKey }: Props) {
     fetchTasks();
   }, [fetchTasks]);
 
-  const handleComplete = async (task: RequestTaskListItem, outcome: string) => {
+  const handleComplete = useCallback(async (task: RequestTaskListItem, outcome: string) => {
     setActionLoadingId(task.id);
     try {
       await requestsApi.completeTask(task.request_id, task.id, { outcome });
@@ -77,9 +81,9 @@ export default function RequestTasksTab({ filterKey }: Props) {
     } finally {
       setActionLoadingId(null);
     }
-  };
+  }, [fetchTasks]);
 
-  const handleAssign = async (task: RequestTaskListItem) => {
+  const handleAssign = useCallback(async (task: RequestTaskListItem) => {
     setActionLoadingId(task.id);
     try {
       await requestsApi.assignTask(task.request_id, task.id);
@@ -89,19 +93,19 @@ export default function RequestTasksTab({ filterKey }: Props) {
     } finally {
       setActionLoadingId(null);
     }
-  };
+  }, [fetchTasks]);
 
   const columns = useMemo((): DataColumnDef<RequestTaskListItem>[] => [
     {
       key: 'number',
-      label: 'Number',
+      label: t('columns.number'),
       sortable: true,
       defaultVisible: true,
       render: (t) => <span className="font-mono text-sm text-indigo-600 font-medium">{t.number}</span>,
     },
     {
       key: 'name',
-      label: 'Task',
+      label: t('columns.name'),
       sortable: true,
       defaultVisible: true,
       render: (t) => (
@@ -113,7 +117,7 @@ export default function RequestTasksTab({ filterKey }: Props) {
     },
     {
       key: 'task_type',
-      label: 'Type',
+      label: t('columns.taskType'),
       sortable: true,
       defaultVisible: true,
       render: (t) => (
@@ -124,14 +128,14 @@ export default function RequestTasksTab({ filterKey }: Props) {
     },
     {
       key: 'status',
-      label: 'Status',
+      label: t('columns.status'),
       sortable: true,
       defaultVisible: true,
       render: (t) => <Badge value={t.status} />,
     },
     {
       key: 'request_number',
-      label: 'Request',
+      label: t('columns.requestNumber'),
       sortable: true,
       defaultVisible: true,
       render: (t) => (
@@ -146,49 +150,49 @@ export default function RequestTasksTab({ filterKey }: Props) {
     },
     {
       key: 'service_item_name',
-      label: 'Service Item',
+      label: t('columns.serviceItem'),
       sortable: true,
       defaultVisible: true,
       render: (t) => <span className="text-gray-700 text-sm">{t.service_item_name}</span>,
     },
     {
       key: 'requester_name',
-      label: 'Requester',
+      label: t('columns.requester'),
       sortable: false,
       defaultVisible: false,
       render: (t) => <span className="text-gray-500 text-sm">{t.requester_name}</span>,
     },
     {
       key: 'assigned_group_name',
-      label: 'Group',
+      label: t('columns.assignedGroup'),
       sortable: true,
       defaultVisible: true,
-      render: (t) => <span className="text-gray-500 text-sm">{t.assigned_group_name || '—'}</span>,
+      render: (task) => <span className="text-gray-500 text-sm">{task.assigned_group_name || tTable('emDash')}</span>,
     },
     {
       key: 'assigned_to_name',
-      label: 'Assigned To',
+      label: t('columns.assignedTo'),
       sortable: true,
       defaultVisible: true,
-      render: (t) => <span className="text-gray-500 text-sm">{t.assigned_to_name || 'Unassigned'}</span>,
+      render: (task) => <span className="text-gray-500 text-sm">{task.assigned_to_name || t('unassigned')}</span>,
     },
     {
       key: 'created_at',
-      label: 'Created',
+      label: t('columns.createdAt'),
       sortable: true,
       defaultVisible: true,
       render: (t) => <span className="text-gray-500 text-xs">{formatDate(t.created_at)}</span>,
     },
     {
       key: 'completed_at',
-      label: 'Completed',
+      label: t('columns.completedAt'),
       sortable: true,
       defaultVisible: false,
       render: (t) => t.completed_at
         ? <span className="text-gray-500 text-xs">{formatDateTime(t.completed_at)}</span>
-        : <span className="text-gray-400">—</span>,
+        : <span className="text-gray-400">{tTable('emDash')}</span>,
     },
-  ], []);
+  ], [t, tTable]);
 
   const rowActions = useCallback((task: RequestTaskListItem) => {
     const isActive = task.status === 'in_progress';
@@ -210,7 +214,7 @@ export default function RequestTasksTab({ filterKey }: Props) {
             disabled={isLoading}
             className="px-2.5 py-1 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-md hover:bg-indigo-50 disabled:opacity-50 whitespace-nowrap"
           >
-            Assign to me
+            {t('assignToMe')}
           </button>
         )}
         {canApprove && (
@@ -220,14 +224,14 @@ export default function RequestTasksTab({ filterKey }: Props) {
               disabled={isLoading}
               className="px-2.5 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50 whitespace-nowrap"
             >
-              Reject
+              {t('reject')}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); handleComplete(task, 'approved'); }}
               disabled={isLoading}
               className="px-2.5 py-1 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
             >
-              Approve
+              {tActions('approve')}
             </button>
           </>
         )}
@@ -237,12 +241,12 @@ export default function RequestTasksTab({ filterKey }: Props) {
             disabled={isLoading}
             className="px-2.5 py-1 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
           >
-            Complete
+            {t('complete')}
           </button>
         )}
       </div>
     );
-  }, [actionLoadingId, user?.id]);
+  }, [actionLoadingId, user?.id, t, tActions, handleAssign, handleComplete]);
 
   return (
     <>
@@ -251,7 +255,7 @@ export default function RequestTasksTab({ filterKey }: Props) {
           <SearchBar
             value={params.search}
             onChange={setSearch}
-            placeholder="Search by task, request number, service..."
+            placeholder={t('searchPlaceholder')}
           />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -265,7 +269,7 @@ export default function RequestTasksTab({ filterKey }: Props) {
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {s === '' ? 'Active' : s.replace(/_/g, ' ')}
+              {s === '' ? t('active') : s.replace(/_/g, ' ')}
             </button>
           ))}
         </div>
@@ -282,7 +286,7 @@ export default function RequestTasksTab({ filterKey }: Props) {
           sortKey={params.sort}
           sortDir={params.dir}
           onSort={setSort}
-          emptyMessage={params.search ? `No tasks matching "${params.search}"` : 'No tasks to show.'}
+          emptyMessage={params.search ? t('emptySearch', { query: params.search }) : t('empty')}
           onRowClick={(task) => navigate(`/request-tasks/${task.id}`)}
           rowActions={rowActions}
           pagination={

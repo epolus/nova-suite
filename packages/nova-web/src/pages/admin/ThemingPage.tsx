@@ -1,69 +1,20 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'use-intl';
 import { settings as settingsApi, type ThemeSettings } from '../../api/client';
 import { useTheme } from '../../context/ThemeContext';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import { normalizeCurrencyCode } from '../../utils/currency';
+import { ColorInput } from './ThemingColorInput';
+import { COLOR_FIELDS, DARK_COLOR_FIELDS } from './themingFields';
 
 const DEFAULT_LOGO_SRC = '/default-logo.svg';
 
-const COLOR_FIELDS: { key: string; label: string; description: string; default: string }[] = [
-  { key: 'primary_color', label: 'Primary Color', description: 'Buttons, active nav items, links, and accents', default: '#4f46e5' },
-  { key: 'sidebar_bg', label: 'Sidebar Background', description: 'Main sidebar background color', default: '#0f172a' },
-  { key: 'sidebar_active_bg', label: 'Sidebar Active Item', description: 'Background for the active navigation item', default: '#4f46e5' },
-  { key: 'content_bg', label: 'Page Background', description: 'Main content area background color', default: '#f1f5f9' },
-  { key: 'login_bg_from', label: 'Login Background (Start)', description: 'Gradient start color for the login page', default: '#0f172a' },
-  { key: 'login_bg_to', label: 'Login Background (End)', description: 'Gradient end color for the login page', default: '#1e1b4b' },
-];
-
-const DARK_COLOR_FIELDS: { key: string; label: string; description: string; default: string }[] = [
-  { key: 'dark_content_bg', label: 'Dark Content Background', description: 'Main application background in dark mode', default: '#0b1220' },
-  { key: 'dark_surface_bg', label: 'Dark Surface', description: 'Cards, modals, and white panels in dark mode', default: '#1e293b' },
-  { key: 'dark_muted_bg', label: 'Dark Muted Background', description: 'Inputs and neutral subtle backgrounds', default: '#111827' },
-  { key: 'dark_border_color', label: 'Dark Border Color', description: 'Borders and dividers in dark mode', default: '#475569' },
-  { key: 'dark_text_primary', label: 'Dark Primary Text', description: 'Main text color in dark mode', default: '#f1f5f9' },
-  { key: 'dark_text_muted', label: 'Dark Muted Text', description: 'Secondary labels and helper text', default: '#94a3b8' },
-];
-
-function ColorInput({ label, description, value, onChange }: {
-  label: string;
-  description: string;
-  value: string;
-  onChange: (v: string) => void;
-  default?: string;
-}) {
-  return (
-    <div className="flex items-center gap-4">
-      <div
-        className="w-10 h-10 rounded-lg border-2 border-gray-200 flex-shrink-0 cursor-pointer relative overflow-hidden"
-        style={{ backgroundColor: value }}
-      >
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-        />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-900">{label}</span>
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-24 px-2 py-1 border border-gray-200 rounded text-xs font-mono text-gray-600 focus:ring-1 focus:ring-indigo-500 outline-none"
-          />
-        </div>
-        <p className="text-xs text-gray-400 mt-0.5">{description}</p>
-      </div>
-    </div>
-  );
-}
-
 export default function ThemingPage() {
+  const t = useTranslations('pages.admin.theming');
+  const tActions = useTranslations('common.actions');
   const { reload } = useTheme();
   const [form, setForm] = useState<Partial<ThemeSettings>>({});
   const [loading, setLoading] = useState(true);
@@ -148,8 +99,8 @@ export default function ThemingPage() {
   return (
     <>
       <PageHeader
-        title="Theming & Branding"
-        description="Customize the look and feel of your Nova Suite instance."
+        title={t('title')}
+        description={t('description')}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -157,59 +108,59 @@ export default function ThemingPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* App Identity */}
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">Application Identity</h3>
+            <h3 className="font-semibold text-gray-900 mb-4">{t('applicationIdentity')}</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Application Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('appName')}</label>
                 <input
                   type="text"
                   value={form.app_name || ''}
                   onChange={(e) => setField('app_name', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                  placeholder="Nova Suite"
+                  placeholder={t('appNamePlaceholder')}
                 />
-                <p className="text-xs text-gray-400 mt-1">Shown in the sidebar header and login page</p>
+                <p className="text-xs text-gray-400 mt-1">{t('appNameHint')}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subtitle</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('subtitle')}</label>
                 <input
                   type="text"
                   value={form.app_subtitle || ''}
                   onChange={(e) => setField('app_subtitle', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                  placeholder="Service Management"
+                  placeholder={t('subtitlePlaceholder')}
                 />
-                <p className="text-xs text-gray-400 mt-1">Displayed below the app name</p>
+                <p className="text-xs text-gray-400 mt-1">{t('subtitleHint')}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Catalog Currency</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('catalogCurrency')}</label>
                 <input
                   type="text"
                   value={form.catalog_currency || 'USD'}
                   onChange={(e) => setField('catalog_currency', normalizeCurrencyCode(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none uppercase"
-                  placeholder="USD"
+                  placeholder={t('catalogCurrencyPlaceholder')}
                   maxLength={8}
                 />
-                <p className="text-xs text-gray-400 mt-1">Currency code used to display service item prices (for example: USD, EUR, CHF)</p>
+                <p className="text-xs text-gray-400 mt-1">{t('catalogCurrencyHint')}</p>
               </div>
             </div>
           </Card>
 
           {/* Logo */}
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">Logo</h3>
+            <h3 className="font-semibold text-gray-900 mb-4">{t('logo')}</h3>
             <div className="flex items-start gap-6">
               <div className="w-24 h-24 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 flex-shrink-0">
                 {logoPreview ? (
-                  <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" />
+                  <img src={logoPreview} alt={t('logoAlt')} className="w-full h-full object-contain p-2" />
                 ) : (
                   <span className="text-3xl text-gray-300">🖼️</span>
                 )}
               </div>
               <div className="space-y-2">
                 <p className="text-sm text-gray-600">
-                  Upload a logo (PNG, JPG, SVG). Recommended size: 200x200px or larger.
+                  {t('logoHint')}
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -217,7 +168,7 @@ export default function ThemingPage() {
                     disabled={uploadingLogo}
                     className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                   >
-                    {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                    {uploadingLogo ? t('uploading') : t('uploadLogo')}
                   </button>
                   {hasLogo && (
                     <button
@@ -225,7 +176,7 @@ export default function ThemingPage() {
                       disabled={uploadingLogo}
                       className="px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-xs font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
                     >
-                      Remove
+                      {tActions('remove')}
                     </button>
                   )}
                 </div>
@@ -246,13 +197,13 @@ export default function ThemingPage() {
 
           {/* Colors */}
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">Colors</h3>
+            <h3 className="font-semibold text-gray-900 mb-4">{t('colorsTitle')}</h3>
             <div className="space-y-4">
               {COLOR_FIELDS.map((cf) => (
                 <ColorInput
                   key={cf.key}
-                  label={cf.label}
-                  description={cf.description}
+                  label={t(`colors.${cf.labelKey}.label`)}
+                  description={t(`colors.${cf.labelKey}.description`)}
                   value={(form[cf.key] as string) || cf.default}
                   onChange={(v) => setField(cf.key, v)}
                 />
@@ -262,25 +213,25 @@ export default function ThemingPage() {
 
           {/* Dark mode colors */}
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-1">Dark Mode Colors</h3>
+            <h3 className="font-semibold text-gray-900 mb-1">{t('darkModeColors')}</h3>
             <div className="mb-4 flex items-start justify-between gap-3">
               <p className="text-xs text-gray-500">
-                These colors are used when users enable dark mode with the toggle switch.
+                {t('darkModeHint')}
               </p>
               <button
                 type="button"
                 onClick={resetDarkDefaults}
                 className="shrink-0 px-2.5 py-1.5 border border-gray-300 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-50 transition-colors"
               >
-                Reset dark defaults
+                {t('resetDarkDefaults')}
               </button>
             </div>
             <div className="space-y-4">
               {DARK_COLOR_FIELDS.map((cf) => (
                 <ColorInput
                   key={cf.key}
-                  label={cf.label}
-                  description={cf.description}
+                  label={t(`colors.${cf.labelKey}.label`)}
+                  description={t(`colors.${cf.labelKey}.description`)}
                   value={(form[cf.key] as string) || cf.default}
                   onChange={(v) => setField(cf.key, v)}
                 />
@@ -295,10 +246,10 @@ export default function ThemingPage() {
               disabled={saving}
               className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? tActions('saving') : tActions('save')}
             </button>
             {saved && (
-              <span className="text-sm text-green-600 font-medium">Changes saved and applied!</span>
+              <span className="text-sm text-green-600 font-medium">{t('saved')}</span>
             )}
           </div>
         </div>
@@ -306,7 +257,7 @@ export default function ThemingPage() {
         {/* Preview */}
         <div className="space-y-6">
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">Preview</h3>
+            <h3 className="font-semibold text-gray-900 mb-4">{t('preview')}</h3>
 
             {/* Sidebar preview */}
             <div
@@ -321,12 +272,12 @@ export default function ThemingPage() {
                   <div>
                     <h4 className="text-sm font-bold text-white">
                       <span style={{ color: form.primary_color || '#4f46e5' }}>
-                        {(form.app_name || 'Nova Suite').split(' ')[0]}
+                        {(form.app_name || t('defaultAppName')).split(' ')[0]}
                       </span>
                       {' '}
-                      {(form.app_name || 'Nova Suite').split(' ').slice(1).join(' ')}
+                      {(form.app_name || t('defaultAppName')).split(' ').slice(1).join(' ')}
                     </h4>
-                    <p className="text-[10px] text-gray-400">{form.app_subtitle || 'Service Management'}</p>
+                    <p className="text-[10px] text-gray-400">{form.app_subtitle || t('defaultSubtitle')}</p>
                   </div>
                 </div>
               </div>
@@ -335,20 +286,20 @@ export default function ThemingPage() {
                   className="px-3 py-2 rounded-md text-xs font-medium text-white"
                   style={{ backgroundColor: form.sidebar_active_bg || '#4f46e5' }}
                 >
-                  Dashboard
+                  {t('previewNav.dashboard')}
                 </div>
                 <div className="px-3 py-2 rounded-md text-xs font-medium text-gray-400">
-                  My Todo
+                  {t('previewNav.myTodo')}
                 </div>
                 <div className="px-3 py-2 rounded-md text-xs font-medium text-gray-400">
-                  Incidents
+                  {t('previewNav.incidents')}
                 </div>
               </div>
             </div>
 
             {/* Login preview */}
             <div className="mt-4">
-              <p className="text-xs text-gray-500 mb-2">Login page background</p>
+              <p className="text-xs text-gray-500 mb-2">{t('loginPageBackground')}</p>
               <div
                 className="rounded-xl h-24 flex items-center justify-center"
                 style={{
@@ -358,30 +309,30 @@ export default function ThemingPage() {
                 <div className="text-center">
                   <p className="text-sm font-bold text-white">
                     <span style={{ color: form.primary_color || '#4f46e5' }}>
-                      {(form.app_name || 'Nova Suite').split(' ')[0]}
+                      {(form.app_name || t('defaultAppName')).split(' ')[0]}
                     </span>
                     {' '}
-                    {(form.app_name || 'Nova Suite').split(' ').slice(1).join(' ')}
+                    {(form.app_name || t('defaultAppName')).split(' ').slice(1).join(' ')}
                   </p>
-                  <p className="text-[10px] text-gray-400">{form.app_subtitle || 'Service Management'}</p>
+                  <p className="text-[10px] text-gray-400">{form.app_subtitle || t('defaultSubtitle')}</p>
                 </div>
               </div>
             </div>
 
             {/* Button preview */}
             <div className="mt-4">
-              <p className="text-xs text-gray-500 mb-2">Button preview</p>
+              <p className="text-xs text-gray-500 mb-2">{t('buttonPreview')}</p>
               <button
                 className="px-4 py-2 text-white rounded-lg text-sm font-medium"
                 style={{ backgroundColor: form.primary_color || '#4f46e5' }}
               >
-                Primary Button
+                {t('primaryButton')}
               </button>
             </div>
 
             {/* Dark mode preview */}
             <div className="mt-4">
-              <p className="text-xs text-gray-500 mb-2">Dark mode preview</p>
+              <p className="text-xs text-gray-500 mb-2">{t('darkModePreview')}</p>
               <div
                 className="rounded-xl p-3 border"
                 style={{
@@ -400,13 +351,13 @@ export default function ThemingPage() {
                     className="text-sm font-semibold"
                     style={{ color: form.dark_text_primary || '#f1f5f9' }}
                   >
-                    Incident Insights
+                    {t('incidentInsights')}
                   </p>
                   <p
                     className="text-xs mt-1"
                     style={{ color: form.dark_text_muted || '#94a3b8' }}
                   >
-                    Similar incidents and knowledge suggestions in dark mode.
+                    {t('similarIncidents')}
                   </p>
                   <div
                     className="mt-3 rounded px-2 py-1 text-xs"
@@ -415,7 +366,7 @@ export default function ThemingPage() {
                       color: form.dark_text_primary || '#f1f5f9',
                     }}
                   >
-                    Example input surface
+                    {t('exampleInputSurface')}
                   </div>
                 </div>
               </div>

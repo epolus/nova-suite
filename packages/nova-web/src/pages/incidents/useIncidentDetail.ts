@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useCallback, useRef, useMemo, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, type FormEvent } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   incidents as incidentsApi,
@@ -17,35 +17,20 @@ import type {
   Attachment,
   ServiceListItem,
   UserListItem,
-  SimilarIncident,
-  KnowledgeSuggestion,
   CI,
   Problem,
 } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { isFulfillerRole } from '../../utils/roles';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
-
-const SIDEBAR_STORAGE_KEY = 'incident_detail_intelligence_sidebar_open';
-
-const EMPTY_FIELDS = {
-  impact: '',
-  urgency: '',
-  status: '',
-  pendingReason: '',
-  assignmentGroupId: '',
-  assignedTo: '',
-  callerId: '',
-  contactInfo: '',
-  serviceId: '',
-  configurationItemId: '',
-  title: '',
-  description: '',
-  category: '',
-  subcategory: '',
-  resolutionNotes: '',
-  relatedProblemId: '',
-};
+import {
+  EMPTY_FIELDS,
+  SIDEBAR_STORAGE_KEY,
+  buildFieldsFromIncident,
+  buildIncidentUpdates,
+} from './incidentDetailFields';
+import { useIncidentAttachments } from './useIncidentAttachments';
+import { useIncidentSidebar } from './useIncidentSidebar';
 
 export function useIncidentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -53,8 +38,10 @@ export function useIncidentDetail() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const listParams: Record<string, string> =
-    (location.state as { listParams?: Record<string, string> })?.listParams || {};
+  const listParams = useMemo<Record<string, string>>(
+    () => (location.state as { listParams?: Record<string, string> })?.listParams || {},
+    [location.state],
+  );
 
   // Core data
   const [inc, setInc] = useState<Incident | null>(null);
@@ -87,12 +74,22 @@ export function useIncidentDetail() {
   );
 
   // Attachments
-  const [fileAttachments, setFileAttachments] = useState<Attachment[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewName, setPreviewName] = useState('');
+  const {
+    fileAttachments,
+    setFileAttachments,
+    uploading,
+    dragOver,
+    setDragOver,
+    fileInputRef,
+    previewUrl,
+    previewName,
+    closePreview,
+    handleFileUpload,
+    handleDrop,
+    handleDeleteAttachment,
+    handlePreview,
+    formatSize,
+  } = useIncidentAttachments(id);
 
   // Journal
   const [journalContent, setJournalContent] = useState('');
@@ -100,10 +97,10 @@ export function useIncidentDetail() {
   const [journalVisible, setJournalVisible] = useState(true);
 
   // Intelligence sidebar
-  const [similarIncidents, setSimilarIncidents] = useState<SimilarIncident[]>([]);
-  const [kbSuggestions, setKbSuggestions] = useState<KnowledgeSuggestion[]>([]);
-  const [loadingSidebar, setLoadingSidebar] = useState(false);
-  const [sidebarError, setSidebarError] = useState<string | null>(null);
+  const { similarIncidents, kbSuggestions, loadingSidebar, sidebarError } = useIncidentSidebar(
+    id,
+    intelligenceOpen,
+  );
 
   // Resolve with KB modal
   const [kbResolveOpen, setKbResolveOpen] = useState(false);
@@ -118,24 +115,7 @@ export function useIncidentDetail() {
   // ─── Helpers ───
 
   const syncFields = (i: Incident) => {
-    setFields({
-      impact: i.impact,
-      urgency: i.urgency,
-      status: i.status,
-      pendingReason: i.resolution_code || '',
-      assignmentGroupId: i.assignment_group_id || '',
-      assignedTo: i.assigned_to || '',
-      callerId: i.caller_id || '',
-      contactInfo: i.contact_info || '',
-      serviceId: i.service_id || '',
-      configurationItemId: i.configuration_item_id || '',
-      title: i.title,
-      description: i.description || '',
-      category: i.category || '',
-      subcategory: i.subcategory || '',
-      resolutionNotes: i.resolution_notes || '',
-      relatedProblemId: '',
-    });
+    setFields(buildFieldsFromIncident(i));
   };
 
   const refresh = useCallback(async () => {
@@ -247,27 +227,7 @@ export function useIncidentDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id, isFulfiller]);
-
-  useEffect(() => {
-    if (!id || !intelligenceOpen) return;
-    setLoadingSidebar(true);
-    setSidebarError(null);
-    Promise.all([
-      incidentsApi.similar(id, { limit: 6 }),
-      knowledgeApi.suggestionsForIncident(id, { limit: 6 }),
-    ])
-      .then(([similarRes, kbRes]) => {
-        setSimilarIncidents(similarRes.incidents);
-        setKbSuggestions(kbRes.articles);
-      })
-      .catch((err: Error) => {
-        setSidebarError(err.message || 'Failed to load suggestions');
-        setSimilarIncidents([]);
-        setKbSuggestions([]);
-      })
-      .finally(() => setLoadingSidebar(false));
-  }, [id, intelligenceOpen]);
+  }, [id, isFulfiller, listParams, setFileAttachments]);
 
   // ─── Navigation ───
 
@@ -370,38 +330,7 @@ export function useIncidentDetail() {
       }
     }
     await withSave(async () => {
-      const updates: Record<string, unknown> = {};
-      if (fields.impact !== inc.impact) updates.impact = fields.impact;
-      if (fields.urgency !== inc.urgency) updates.urgency = fields.urgency;
-      if (fields.status !== inc.status) updates.status = fields.status;
-      if (fields.title !== inc.title) updates.title = fields.title;
-      if (fields.description !== (inc.description || '')) updates.description = fields.description || null;
-      if (fields.category !== (inc.category || '')) updates.category = fields.category || null;
-      if (fields.subcategory !== (inc.subcategory || '')) updates.subcategory = fields.subcategory || null;
-      if (fields.contactInfo !== (inc.contact_info || '')) updates.contact_info = fields.contactInfo || null;
-      if (fields.pendingReason !== (inc.resolution_code || '')) updates.resolution_code = fields.pendingReason || null;
-
-      const newAgId = fields.assignmentGroupId || null;
-      if (newAgId !== (inc.assignment_group_id || null)) updates.assignment_group_id = newAgId;
-
-      const newAssignedTo = fields.assignedTo || null;
-      if (newAssignedTo !== (inc.assigned_to || null)) updates.assigned_to = newAssignedTo;
-
-      const newCallerId = fields.callerId || null;
-      if (newCallerId !== (inc.caller_id || null)) updates.caller_id = newCallerId;
-
-      const newServiceId = fields.serviceId || null;
-      if (newServiceId !== (inc.service_id || null)) updates.service_id = newServiceId;
-
-      const newCiId = fields.configurationItemId || null;
-      if (newCiId !== (inc.configuration_item_id || null)) updates.configuration_item_id = newCiId;
-
-      if (
-        (fields.status === 'resolved' || inc.status === 'resolved') &&
-        fields.resolutionNotes !== (inc.resolution_notes || '')
-      ) {
-        updates.resolution_notes = fields.resolutionNotes || null;
-      }
+      const updates = buildIncidentUpdates(fields, inc);
 
       if (Object.keys(updates).length > 0) {
         await incidentsApi.update(id, updates as Partial<Incident>);
@@ -457,82 +386,6 @@ export function useIncidentDetail() {
     });
     setJournal((prev) => [entry, ...prev]);
     setJournalContent('');
-  };
-
-  const handleFileUpload = useCallback(
-    async (files: FileList | File[]) => {
-      if (!id) return;
-      setUploading(true);
-      try {
-        for (const file of Array.from(files)) {
-          const att = await attachmentsApi.upload('incident', id, file);
-          setFileAttachments((prev) => [att, ...prev]);
-        }
-      } finally {
-        setUploading(false);
-      }
-    },
-    [id],
-  );
-
-  useEffect(() => {
-    const handler = async (e: ClipboardEvent) => {
-      if (!id) return;
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      const filesToUpload: File[] = [];
-      for (const item of Array.from(items)) {
-        if (item.kind === 'file') {
-          const file = item.getAsFile();
-          if (file) {
-            const ext = file.type.split('/')[1] || 'png';
-            const name =
-              file.name && file.name !== 'image.png' ? file.name : `pasted-${Date.now()}.${ext}`;
-            filesToUpload.push(new File([file], name, { type: file.type }));
-          }
-        }
-      }
-      if (filesToUpload.length > 0) {
-        e.preventDefault();
-        await handleFileUpload(filesToUpload);
-      }
-    };
-    document.addEventListener('paste', handler);
-    return () => document.removeEventListener('paste', handler);
-  }, [id, handleFileUpload]);
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer.files.length > 0) {
-      await handleFileUpload(Array.from(e.dataTransfer.files));
-    }
-  };
-
-  const handleDeleteAttachment = async (attId: string) => {
-    await attachmentsApi.delete(attId);
-    setFileAttachments((prev) => prev.filter((a) => a.id !== attId));
-  };
-
-  const handlePreview = async (att: Attachment) => {
-    if (att.mime_type.startsWith('image/')) {
-      const url = await attachmentsApi.previewUrl(att.id);
-      setPreviewUrl(url);
-      setPreviewName(att.file_name);
-    } else {
-      await attachmentsApi.download(att.id, att.file_name);
-    }
-  };
-
-  const closePreview = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   return {

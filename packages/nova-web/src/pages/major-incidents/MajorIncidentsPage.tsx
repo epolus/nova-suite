@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import SearchBar from '../../components/SearchBar';
 import DataTable, { type DataColumnDef } from '../../components/DataTable';
@@ -9,6 +10,7 @@ import Badge from '../../components/Badge';
 import { majorIncidents as majorIncidentsApi } from '../../api/client';
 import { useListParams } from '../../hooks/useListParams';
 import { formatDate } from '../../utils/dateTime';
+import { useStatusLabel } from '@/i18n/hooks';
 import { MAJOR_INCIDENT_STATUS_OPTIONS } from './majorIncidentListConfig';
 
 export interface MajorIncidentListItem {
@@ -43,11 +45,15 @@ function createMajorIncidentListParams(args: {
   return apiParams;
 }
 
-function buildColumns(listParams: Record<string, string>): DataColumnDef<MajorIncidentListItem>[] {
+function buildColumns(
+  listParams: Record<string, string>,
+  tFields: ReturnType<typeof useTranslations<'common.fields'>>,
+  tTable: ReturnType<typeof useTranslations<'common.table'>>,
+): DataColumnDef<MajorIncidentListItem>[] {
   return [
     {
       key: 'number',
-      label: 'Number',
+      label: tFields('number'),
       sortable: true,
       defaultVisible: true,
       className: 'whitespace-nowrap font-mono text-xs',
@@ -64,7 +70,7 @@ function buildColumns(listParams: Record<string, string>): DataColumnDef<MajorIn
     },
     {
       key: 'title',
-      label: 'Title',
+      label: tFields('title'),
       sortable: true,
       defaultVisible: true,
       className: 'max-w-xs truncate',
@@ -81,14 +87,14 @@ function buildColumns(listParams: Record<string, string>): DataColumnDef<MajorIn
     },
     {
       key: 'status',
-      label: 'Status',
+      label: tFields('status'),
       sortable: true,
       defaultVisible: true,
       render: (row) => <Badge value={row.status} />,
     },
     {
       key: 'priority',
-      label: 'Priority',
+      label: tFields('priority'),
       sortable: true,
       defaultVisible: true,
       render: (row) => (
@@ -99,24 +105,30 @@ function buildColumns(listParams: Record<string, string>): DataColumnDef<MajorIn
     },
     {
       key: 'declared_major_at',
-      label: 'Declared',
+      label: tFields('declared'),
       sortable: true,
       defaultVisible: true,
       render: (row) => (
-        <span className="text-gray-500 text-xs">{row.declared_major_at ? formatDate(row.declared_major_at) : '—'}</span>
+        <span className="text-gray-500 text-xs">{row.declared_major_at ? formatDate(row.declared_major_at) : tTable('emDash')}</span>
       ),
     },
     {
       key: 'participant_count',
-      label: 'Participants',
+      label: tFields('participants'),
       sortable: false,
       defaultVisible: true,
-      render: (row) => <span className="text-gray-600 text-sm">{row.participant_count ?? '—'}</span>,
+      render: (row) => <span className="text-gray-600 text-sm">{row.participant_count ?? tTable('emDash')}</span>,
     },
   ];
 }
 
 export default function MajorIncidentsPage() {
+  const t = useTranslations('pages.majorIncidents');
+  const tFields = useTranslations('common.fields');
+  const tTable = useTranslations('common.table');
+  const tStates = useTranslations('common.states');
+  const statusLabelFn = useStatusLabel();
+
   const { params, setSearch, setSort, setCols, setPage, setFilter } = useListParams({
     defaultCols: DEFAULT_COLS,
     filterKeys: ['status'],
@@ -141,7 +153,10 @@ export default function MajorIncidentsPage() {
     });
   }, [statusFilter, params.search, params.sort, params.dir]);
 
-  const columns = useMemo(() => buildColumns(getListParams()), [getListParams]);
+  const columns = useMemo(
+    () => buildColumns(getListParams(), tFields, tTable),
+    [getListParams, tFields, tTable],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -161,7 +176,7 @@ export default function MajorIncidentsPage() {
         setErr('');
       })
       .catch((e: unknown) => {
-        if (!cancelled) setErr(e instanceof Error ? e.message : 'Failed to load');
+        if (!cancelled) setErr(e instanceof Error ? e.message : t('loadFailed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -169,21 +184,21 @@ export default function MajorIncidentsPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.page, statusFilter, params.search, params.sort, params.dir]);
+  }, [params.page, statusFilter, params.search, params.sort, params.dir, t]);
 
   const pages = Math.max(1, Math.ceil(total / 20));
 
   return (
     <>
       <PageHeader
-        title="Major incidents"
-        description="Active and recent major incident command records."
+        title={t('title')}
+        description={t('description')}
       />
       {err && <p className="text-sm text-red-600 mb-4">{err}</p>}
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
-          <SearchBar value={params.search} onChange={setSearch} placeholder="Search by number or title…" />
+          <SearchBar value={params.search} onChange={setSearch} placeholder={t('searchPlaceholder')} />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           {MAJOR_INCIDENT_STATUS_OPTIONS.map((s) => (
@@ -195,7 +210,7 @@ export default function MajorIncidentsPage() {
                 statusFilter === s ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {s.replace(/_/g, ' ')}
+              {s === 'active' ? tStates('active') : s === 'all' ? tStates('all') : statusLabelFn(s)}
             </button>
           ))}
         </div>
@@ -212,7 +227,7 @@ export default function MajorIncidentsPage() {
           sortKey={params.sort}
           sortDir={params.dir}
           onSort={setSort}
-          emptyMessage={params.search ? `No major incidents matching "${params.search}"` : 'No major incidents found.'}
+          emptyMessage={params.search ? t('emptySearch', { query: params.search }) : t('empty')}
           onRowClick={(row) => navigate(`/major-incidents/${row.id}`, { state: { listParams: getListParams() } })}
           pagination={
             pages > 1

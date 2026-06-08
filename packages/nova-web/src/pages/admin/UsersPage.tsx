@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import {
   admin,
   type AdminUser,
@@ -15,158 +16,170 @@ import { formatDate } from '../../utils/dateTime';
 
 const DEFAULT_COLS = ['user', 'title', 'user_id', 'department_name', 'manager_name', 'roles', '_status'];
 
-const ALL_COLUMNS: DataColumnDef<AdminUser>[] = [
-  {
-    key: 'user',
-    label: 'User',
-    sortable: true,
-    defaultVisible: true,
-    render: (u) => {
-      const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ');
-      const showSubtitle = fullName && fullName !== u.display_name;
-      return (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
-            {(u.first_name || u.display_name).charAt(0)}
+function buildColumns(
+  tFields: ReturnType<typeof useTranslations<'common.fields'>>,
+  tTable: ReturnType<typeof useTranslations<'common.table'>>,
+  tStates: ReturnType<typeof useTranslations<'common.states'>>,
+  tPage: ReturnType<typeof useTranslations<'pages.admin.usersPage'>>,
+): DataColumnDef<AdminUser>[] {
+  return [
+    {
+      key: 'user',
+      label: tFields('user'),
+      sortable: true,
+      defaultVisible: true,
+      render: (u) => {
+        const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ');
+        const showSubtitle = fullName && fullName !== u.display_name;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
+              {(u.first_name || u.display_name).charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium text-gray-900 truncate">{u.display_name}</p>
+              <p className="text-xs text-gray-500 truncate">
+                {showSubtitle ? `${fullName} · ${u.email}` : u.email}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="font-medium text-gray-900 truncate">{u.display_name}</p>
-            <p className="text-xs text-gray-500 truncate">
-              {showSubtitle ? `${fullName} · ${u.email}` : u.email}
-            </p>
-          </div>
-        </div>
-      );
+        );
+      },
     },
-  },
-  {
-    key: 'title',
-    label: 'Job Title',
-    sortable: true,
-    defaultVisible: true,
-    render: (u) => <span className="text-gray-600">{u.title || '—'}</span>,
-  },
-  {
-    key: 'user_id',
-    label: 'Employee ID',
-    sortable: true,
-    defaultVisible: true,
-    render: (u) => <span className="text-gray-500 font-mono text-xs">{u.user_id || '—'}</span>,
-  },
-  {
-    key: 'email',
-    label: 'Email',
-    sortable: true,
-    defaultVisible: false,
-    render: (u) => <span className="text-gray-600">{u.email}</span>,
-  },
-  {
-    key: 'phone',
-    label: 'Phone',
-    sortable: true,
-    defaultVisible: false,
-    render: (u) => <span className="text-gray-500">{u.phone || '—'}</span>,
-  },
-  {
-    key: 'location',
-    label: 'Location',
-    sortable: true,
-    defaultVisible: false,
-    render: (u) => <span className="text-gray-500">{u.location || '—'}</span>,
-  },
-  {
-    key: 'employee_type',
-    label: 'Type',
-    sortable: true,
-    defaultVisible: false,
-    render: (u) => <span className="text-gray-600 capitalize">{u.employee_type}</span>,
-  },
-  {
-    key: 'company_name',
-    label: 'Company',
-    sortable: true,
-    defaultVisible: false,
-    render: (u) => <span className="text-gray-500">{u.company_name || '—'}</span>,
-  },
-  {
-    key: 'department_name',
-    label: 'Department',
-    sortable: true,
-    defaultVisible: true,
-    render: (u) => <span className="text-gray-600">{u.department_name || '—'}</span>,
-  },
-  {
-    key: 'cost_center_name',
-    label: 'Cost Center',
-    sortable: true,
-    defaultVisible: false,
-    render: (u) => (
-      <span className="text-gray-500">
-        {u.cost_center_code ? `${u.cost_center_code} – ${u.cost_center_name}` : '—'}
-      </span>
-    ),
-  },
-  {
-    key: 'manager_name',
-    label: 'Manager',
-    sortable: true,
-    defaultVisible: true,
-    render: (u) => <span className="text-gray-500">{u.manager_name || '—'}</span>,
-  },
-  {
-    key: 'roles',
-    label: 'Roles',
-    sortable: false,
-    defaultVisible: true,
-    render: (u) => (
-      <div className="flex flex-wrap gap-1">
-        {u.roles.length > 0 ? (
-          u.roles.map((r) => <Badge key={r} value={r} />)
-        ) : (
-          <span className="text-gray-400 text-xs">No roles</span>
-        )}
-      </div>
-    ),
-  },
-  {
-    key: 'start_date',
-    label: 'Start Date',
-    sortable: true,
-    defaultVisible: false,
-    render: (u) => (
-      <span className="text-gray-500 text-xs">{formatDate(u.start_date)}</span>
-    ),
-  },
-  {
-    key: '_status',
-    label: 'Status',
-    sortable: true,
-    defaultVisible: true,
-    render: (u) =>
-      u.is_active ? (
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-          Active
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-          Inactive
+    {
+      key: 'title',
+      label: tFields('jobTitle'),
+      sortable: true,
+      defaultVisible: true,
+      render: (u) => <span className="text-gray-600">{u.title || tTable('emDash')}</span>,
+    },
+    {
+      key: 'user_id',
+      label: tFields('employeeId'),
+      sortable: true,
+      defaultVisible: true,
+      render: (u) => <span className="text-gray-500 font-mono text-xs">{u.user_id || tTable('emDash')}</span>,
+    },
+    {
+      key: 'email',
+      label: tFields('email'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => <span className="text-gray-600">{u.email}</span>,
+    },
+    {
+      key: 'phone',
+      label: tFields('phone'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => <span className="text-gray-500">{u.phone || tTable('emDash')}</span>,
+    },
+    {
+      key: 'location',
+      label: tFields('location'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => <span className="text-gray-500">{u.location || tTable('emDash')}</span>,
+    },
+    {
+      key: 'employee_type',
+      label: tFields('type'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => <span className="text-gray-600 capitalize">{u.employee_type}</span>,
+    },
+    {
+      key: 'company_name',
+      label: tFields('company'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => <span className="text-gray-500">{u.company_name || tTable('emDash')}</span>,
+    },
+    {
+      key: 'department_name',
+      label: tFields('department'),
+      sortable: true,
+      defaultVisible: true,
+      render: (u) => <span className="text-gray-600">{u.department_name || tTable('emDash')}</span>,
+    },
+    {
+      key: 'cost_center_name',
+      label: tFields('costCenter'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => (
+        <span className="text-gray-500">
+          {u.cost_center_code ? `${u.cost_center_code} – ${u.cost_center_name}` : tTable('emDash')}
         </span>
       ),
-  },
-  {
-    key: 'created_at',
-    label: 'Created',
-    sortable: true,
-    defaultVisible: false,
-    render: (u) => (
-      <span className="text-gray-500 text-xs">{formatDate(u.created_at)}</span>
-    ),
-  },
-];
+    },
+    {
+      key: 'manager_name',
+      label: tFields('manager'),
+      sortable: true,
+      defaultVisible: true,
+      render: (u) => <span className="text-gray-500">{u.manager_name || tTable('emDash')}</span>,
+    },
+    {
+      key: 'roles',
+      label: tFields('roles'),
+      sortable: false,
+      defaultVisible: true,
+      render: (u) => (
+        <div className="flex flex-wrap gap-1">
+          {u.roles.length > 0 ? (
+            u.roles.map((r) => <Badge key={r} value={r} />)
+          ) : (
+            <span className="text-gray-400 text-xs">{tPage('noRoles')}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'start_date',
+      label: tFields('startDate'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => (
+        <span className="text-gray-500 text-xs">{formatDate(u.start_date)}</span>
+      ),
+    },
+    {
+      key: '_status',
+      label: tFields('status'),
+      sortable: true,
+      defaultVisible: true,
+      render: (u) =>
+        u.is_active ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+            {tStates('active')}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+            {tStates('inactive')}
+          </span>
+        ),
+    },
+    {
+      key: 'created_at',
+      label: tFields('created'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => (
+        <span className="text-gray-500 text-xs">{formatDate(u.created_at)}</span>
+      ),
+    },
+  ];
+}
 
 export default function UsersPage() {
+  const tPage = useTranslations('pages.admin.usersPage');
+  const tFields = useTranslations('common.fields');
+  const tTable = useTranslations('common.table');
+  const tStates = useTranslations('common.states');
+
   const { params, setSearch, setSort, setCols, setFilter, setColumnFilter } = useListParams({
     defaultCols: DEFAULT_COLS,
     filterKeys: ['active'],
@@ -194,7 +207,6 @@ export default function UsersPage() {
     loadData();
   }, [loadData]);
 
-  // Filter
   const filtered = useMemo(() => {
     let list = users;
     if (activeFilter === 'active') list = list.filter((u) => u.is_active);
@@ -228,7 +240,6 @@ export default function UsersPage() {
     return list;
   }, [users, activeFilter, params.search, params.columnFilters]);
 
-  // Client-side sort
   const sorted = useMemo(() => {
     if (!params.sort) return filtered;
     return [...filtered].sort((a, b) => {
@@ -253,32 +264,34 @@ export default function UsersPage() {
     return lp;
   }, [activeFilter, params.search, params.sort, params.dir, params.columnFilters]);
 
-  const columns = useMemo(() => ALL_COLUMNS, []);
+  const columns = useMemo(
+    () => buildColumns(tFields, tTable, tStates, tPage),
+    [tFields, tPage, tStates, tTable],
+  );
 
   if (loading) return <Spinner />;
 
   return (
     <>
       <PageHeader
-        title="User Administration"
-        description="Manage users, roles, and organizational assignments."
+        title={tPage('title')}
+        description={tPage('description')}
         action={
           <button
             onClick={() => navigate('/admin/users/new', { state: { listParams: getListParams() } })}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
           >
-            + New User
+            {tPage('newUser')}
           </button>
         }
       />
 
-      {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
           <SearchBar
             value={params.search}
             onChange={setSearch}
-            placeholder="Search by name, email, ID, role, department..."
+            placeholder={tPage('searchPlaceholder')}
           />
         </div>
         <div className="flex gap-2 items-center">
@@ -292,12 +305,12 @@ export default function UsersPage() {
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {f}
+              {f === 'all' ? tStates('all') : f === 'active' ? tStates('active') : tStates('inactive')}
             </button>
           ))}
         </div>
         <div className="ml-auto text-sm text-gray-500 self-center">
-          {sorted.length} user{sorted.length !== 1 ? 's' : ''}
+          {tPage('count', { count: sorted.length })}
         </div>
       </div>
 
@@ -311,14 +324,12 @@ export default function UsersPage() {
         onSort={setSort}
         columnFilters={params.columnFilters}
         onColumnFilter={setColumnFilter}
-        emptyMessage={params.search ? `No users matching "${params.search}"` : 'No users found.'}
+        emptyMessage={params.search ? tPage('emptySearch', { query: params.search }) : tPage('empty')}
         onRowClick={(u) => navigate(`/admin/users/${u.id}`, { state: { listParams: getListParams() } })}
       />
     </>
   );
 }
-
-// ─── Helpers ───
 
 function getSortValue(user: AdminUser, key: string): unknown {
   if (key === 'user') return user.display_name;

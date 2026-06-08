@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 
 interface Props<T> {
   items: T[];
@@ -25,9 +26,12 @@ export function SearchableDropdown<T>({
   renderItem,
   filterFn,
   fallbackDisplayText,
-  placeholder = 'Search...',
+  placeholder,
   className,
 }: Props<T>) {
+  const t = useTranslations('components.searchableDropdown');
+  const tFilters = useTranslations('common.filters');
+  const resolvedPlaceholder = placeholder ?? tFilters('searchPlaceholder');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -71,7 +75,7 @@ export function SearchableDropdown<T>({
         value={displayValue}
         onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         className={inputCls}
       />
       {selectedId && !open && (
@@ -86,7 +90,7 @@ export function SearchableDropdown<T>({
       {open && (
         <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-gray-400">No results found</p>
+            <p className="px-3 py-2 text-sm text-gray-400">{t('noResults')}</p>
           ) : (
             filtered.map((item) => {
               const itemId = getItemId(item);

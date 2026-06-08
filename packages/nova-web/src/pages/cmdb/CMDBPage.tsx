@@ -1,20 +1,21 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { cmdb } from '../../api/client';
 import type { CI, CIClass, Pagination } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/PageHeader';
-import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import SearchBar from '../../components/SearchBar';
-import DataTable, { type DataColumnDef } from '../../components/DataTable';
+import DataTable from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
-import { formatDate } from '../../utils/dateTime';
 import { hasConfigurationRole, isAgentRole } from '../../utils/roles';
+import { useFieldLabel } from '@/i18n/hooks';
 import { CMDB_BULK_ACTIONS } from './cmdbListConfig';
+import { buildColumns, type CmdbListLabels } from './cmdbColumns';
 
 const DEFAULT_COLS = ['name', 'class_display_name', 'status', 'environment', 'managed_by_name', 'assigned_to_name', 'supported_by_name', 'updated_at'];
 const PRESETS_KEY = 'nova_filter_presets_cmdb';
@@ -27,95 +28,19 @@ interface FilterPreset {
   columnFilters: Record<string, string>;
 }
 
-const ALL_COLUMNS: DataColumnDef<CI>[] = [
-  {
-    key: 'name',
-    label: 'Name',
-    sortable: true,
-    defaultVisible: true,
-    render: (ci) => (
-      <div>
-        <Link
-          to={`/cmdb/${ci.id}`}
-          className="text-indigo-600 font-medium hover:text-indigo-800"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {ci.display_name || ci.name}
-        </Link>
-        <p className="text-xs text-gray-400">{ci.name}</p>
-      </div>
-    ),
-  },
-  {
-    key: 'class_display_name',
-    label: 'Class',
-    sortable: true,
-    defaultVisible: true,
-    render: (ci) => <span className="text-gray-700">{ci.class_display_name}</span>,
-  },
-  {
-    key: 'status',
-    label: 'Status',
-    sortable: true,
-    defaultVisible: true,
-    render: (ci) => <Badge value={ci.status} />,
-  },
-  {
-    key: 'environment',
-    label: 'Environment',
-    sortable: true,
-    defaultVisible: true,
-    render: (ci) => <Badge value={ci.environment} />,
-  },
-  {
-    key: 'managed_by_name',
-    label: 'Managed By',
-    sortable: true,
-    defaultVisible: true,
-    render: (ci) => <span className="text-gray-500">{ci.managed_by_name || '—'}</span>,
-  },
-  {
-    key: 'assigned_to_name',
-    label: 'Assigned To',
-    sortable: true,
-    defaultVisible: true,
-    render: (ci) => <span className="text-gray-500">{ci.assigned_to_name || '—'}</span>,
-  },
-  {
-    key: 'supported_by_name',
-    label: 'Supported By',
-    sortable: true,
-    defaultVisible: true,
-    render: (ci) => <span className="text-gray-500">{ci.supported_by_name || '—'}</span>,
-  },
-  {
-    key: 'location',
-    label: 'Location',
-    sortable: true,
-    defaultVisible: false,
-    render: (ci) => <span className="text-gray-500">{ci.location || '—'}</span>,
-  },
-  {
-    key: 'created_at',
-    label: 'Created',
-    sortable: true,
-    defaultVisible: false,
-    render: (ci) => (
-      <span className="text-gray-500 text-xs">{formatDate(ci.created_at)}</span>
-    ),
-  },
-  {
-    key: 'updated_at',
-    label: 'Updated',
-    sortable: true,
-    defaultVisible: true,
-    render: (ci) => (
-      <span className="text-gray-500 text-xs">{formatDate(ci.updated_at)}</span>
-    ),
-  },
-];
-
 export default function CMDBPage() {
+  const tCmdb = useTranslations('pages.cmdb');
+  const tList = useTranslations('common.list');
+  const tFilters = useTranslations('common.filters');
+  const tActions = useTranslations('common.actions');
+  const tMaster = useTranslations('common.masterData');
+  const tTable = useTranslations('common.table');
+  const fieldLabel = useFieldLabel();
+  const listLabels = useMemo<CmdbListLabels>(
+    () => ({ field: fieldLabel, emDash: tTable('emDash') }),
+    [fieldLabel, tTable],
+  );
+
   const { params, setSearch, setSort, setCols, setPage, setFilter, setColumnFilter, update } = useListParams({
     defaultCols: DEFAULT_COLS,
     filterKeys: ['class_id'],
@@ -166,6 +91,8 @@ export default function CMDBPage() {
       setPagination(res.pagination);
       setLoading(false);
     }).catch(() => setLoading(false));
+    // params.columnFilters is depended on by value via cfKey (stringified), not by identity
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.page, classFilter, params.search, params.sort, params.dir, cfKey]);
 
   const getListParams = useCallback((): Record<string, string> => {
@@ -182,7 +109,7 @@ export default function CMDBPage() {
     return lp;
   }, [classFilter, params.search, params.sort, params.dir, params.columnFilters]);
 
-  const columns = useMemo(() => ALL_COLUMNS, []);
+  const columns = useMemo(() => buildColumns(listLabels), [listLabels]);
   const hasActiveFilter = !!params.search || classFilter !== '' || Object.values(params.columnFilters).some(Boolean);
   const applyPreset = (preset: FilterPreset) => {
     update({
@@ -274,20 +201,20 @@ export default function CMDBPage() {
   return (
     <>
       <PageHeader
-        title="Configuration Management Database"
-        description="Manage your infrastructure inventory."
+        title={tCmdb('title')}
+        description={tCmdb('description')}
         action={canCreate ? (
           <button
             onClick={() => navigate('/cmdb/new')}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
           >
-            + New CI
+            + {tCmdb('newCiShort')}
           </button>
         ) : undefined}
       />
       {isAgent && (presets.length > 0 || hasActiveFilter) && (
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-xs font-medium text-gray-400">Saved:</span>
+          <span className="text-xs font-medium text-gray-400">{tFilters('saved')}</span>
           {presets.map((preset) => (
             <div key={preset.id} className="flex items-center gap-0.5 pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700">
               <button onClick={() => applyPreset(preset)} className="hover:text-indigo-600 transition-colors">{preset.name}</button>
@@ -301,30 +228,29 @@ export default function CMDBPage() {
                 value={savePresetName}
                 onChange={(e) => setSavePresetName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') { setShowSaveInput(false); setSavePresetName(''); } }}
-                placeholder="Filter name..."
+                placeholder={tFilters('filterNamePlaceholder')}
                 className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-none focus:ring-1 focus:ring-indigo-400 w-36"
               />
-              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">Save</button>
-              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">{tActions('save')}</button>
+              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">{tActions('cancel')}</button>
             </div>
           ) : hasActiveFilter && (
             <button
               onClick={() => setShowSaveInput(true)}
               className="px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
             >
-              + Save current filter
+              + {tFilters('saveCurrent')}
             </button>
           )}
         </div>
       )}
 
-      {/* Search + Class filter */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="w-full sm:w-80">
           <SearchBar
             value={params.search}
             onChange={setSearch}
-            placeholder="Search CIs by name..."
+            placeholder={tCmdb('searchPlaceholder')}
           />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -334,7 +260,7 @@ export default function CMDBPage() {
               !classFilter ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
-            All Types
+            {tCmdb('filters.allTypes')}
           </button>
           {classes.map((c) => (
             <button
@@ -349,7 +275,7 @@ export default function CMDBPage() {
           ))}
           {isAgent && (
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
-              {exporting ? 'Exporting...' : 'Export CSV'}
+              {exporting ? tList('exporting') : tList('exportCsv')}
             </Button>
           )}
         </div>
@@ -357,7 +283,7 @@ export default function CMDBPage() {
 
       {isAgent && CMDB_BULK_ACTIONS.length > 0 && selectedIds.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl mb-4 flex-wrap">
-          <span className="text-sm font-semibold text-indigo-900">{selectedIds.length} selected</span>
+          <span className="text-sm font-semibold text-indigo-900">{tList('selected', { count: selectedIds.length })}</span>
           <div className="flex items-center gap-2 flex-wrap">
             {CMDB_BULK_ACTIONS.map((action) => (
               <Button
@@ -371,12 +297,12 @@ export default function CMDBPage() {
                   }
                 }}
               >
-                {action.label}
+                {tCmdb('bulk.openSelected')}
               </Button>
             ))}
           </div>
           <button onClick={() => setSelectedIds([])} className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-            Clear selection
+            {tMaster('clearSelection')}
           </button>
         </div>
       )}
@@ -394,7 +320,11 @@ export default function CMDBPage() {
           onSort={setSort}
           columnFilters={params.columnFilters}
           onColumnFilter={setColumnFilter}
-          emptyMessage={params.search ? `No CIs matching "${params.search}"` : 'No configuration items found.'}
+          emptyMessage={
+            params.search
+              ? tCmdb('emptySearch', { query: params.search })
+              : tCmdb('empty')
+          }
           onRowClick={(ci) => {
             navigate(`/cmdb/${ci.id}`, { state: { listParams: getListParams() } });
           }}

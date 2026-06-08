@@ -8,16 +8,27 @@ import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import { hasConfigurationRole } from '../../utils/roles';
-
-type UserOption = { id: string; display_name: string; email: string };
-type RefOption = { id: string; label: string };
-type RefDataMap = Record<string, RefOption[]>;
+import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
+import { useTranslations } from 'use-intl';
+import { resolveClassAttrs, classEmoji } from './cmdbHelpers';
+import {
+  CiAttributeFields,
+  UserPicker,
+  type UserOption,
+  type RefDataMap,
+} from './cmdbFormFields';
 
 export default function CIForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const isEdit = !!id;
+  const tCmdb = useTranslations('pages.cmdb');
+  const tActions = useTranslations('common.actions');
+  const tMaster = useTranslations('common.masterData');
+  const tStates = useTranslations('common.states');
+  const fieldLabel = useFieldLabel();
+  const statusLabel = useStatusLabel();
 
   const [classes, setClasses] = useState<CIClass[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -45,27 +56,7 @@ export default function CIForm() {
   const [attributes, setAttributes] = useState<Record<string, string>>({});
 
   const selectedClass = classes.find((c) => c.id === classId);
-
-  const resolveAllAttrs = (cls: CIClass | undefined): Record<string, { type: string; reference_table?: string }> => {
-    if (!cls) return {};
-    const result: Record<string, { type: string; reference_table?: string }> = {};
-    const visited = new Set<string>();
-    let current: CIClass | undefined = cls;
-    const chain: CIClass[] = [];
-    while (current && !visited.has(current.id)) {
-      visited.add(current.id);
-      chain.unshift(current);
-      current = current.parent_class ? classes.find((c) => c.id === current!.parent_class) : undefined;
-    }
-    for (const c of chain) {
-      for (const [key, val] of Object.entries(c.attributes)) {
-        if (!result[key]) result[key] = val;
-      }
-    }
-    return result;
-  };
-
-  const classAttrs = resolveAllAttrs(selectedClass);
+  const classAttrs = resolveClassAttrs(selectedClass?.id, classes);
 
   useEffect(() => {
     const promises: Promise<any>[] = [
@@ -138,13 +129,12 @@ export default function CIForm() {
       setError(String(err));
       setLoading(false);
     });
-  }, [id]);
+  }, [id, isEdit]);
 
   // When class changes in create mode, reset attributes
   const handleClassChange = (newClassId: string) => {
     setClassId(newClassId);
-    const cls = classes.find((c) => c.id === newClassId);
-    const allAttrs = resolveAllAttrs(cls);
+    const allAttrs = resolveClassAttrs(newClassId, classes);
     const defaults: Record<string, string> = {};
     for (const key of Object.keys(allAttrs)) {
       defaults[key] = '';
@@ -153,8 +143,8 @@ export default function CIForm() {
   };
 
   const handleSubmit = async () => {
-    if (!name.trim()) { setError('Name is required'); return; }
-    if (!classId) { setError('Class is required'); return; }
+    if (!name.trim()) { setError(tCmdb('nameRequired')); return; }
+    if (!classId) { setError(tCmdb('classRequired')); return; }
     setSaving(true);
     setError('');
 
@@ -193,8 +183,8 @@ export default function CIForm() {
   if (!canEdit) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-500">You don't have permission to manage configuration items.</p>
-        <button onClick={() => navigate(-1)} className="mt-4 text-indigo-600 hover:text-indigo-800 text-sm font-medium">Go back</button>
+        <p className="text-gray-500">{tCmdb('noPermission')}</p>
+        <button onClick={() => navigate(-1)} className="mt-4 text-indigo-600 hover:text-indigo-800 text-sm font-medium">{tCmdb('goBack')}</button>
       </div>
     );
   }
@@ -202,11 +192,11 @@ export default function CIForm() {
   return (
     <>
       <PageHeader
-        title={isEdit ? `Edit: ${displayName || name}` : 'New Configuration Item'}
-        description={isEdit ? `${selectedClass?.display_name || ''} · ${name}` : 'Create a new CI in the CMDB'}
+        title={isEdit ? tCmdb('editTitle', { name: displayName || name }) : tCmdb('newCi')}
+        description={isEdit ? `${selectedClass?.display_name || ''} · ${name}` : tCmdb('createDescription')}
         action={
           <button onClick={() => navigate(-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-            &larr; Cancel
+            &larr; {tActions('cancel')}
           </button>
         }
       />
@@ -219,11 +209,11 @@ export default function CIForm() {
       {!isEdit && step === 1 && (
         <div className="max-w-2xl">
           <Card>
-            <h3 className="font-semibold text-gray-900 mb-2">Step 1: Select CI Class</h3>
-            <p className="text-sm text-gray-500 mb-4">Choose the type of configuration item you want to create.</p>
+            <h3 className="font-semibold text-gray-900 mb-2">{tCmdb('step1Title')}</h3>
+            <p className="text-sm text-gray-500 mb-4">{tCmdb('step1Description')}</p>
 
             {classes.length === 0 ? (
-              <p className="text-sm text-gray-400">No CI classes found. Ask an admin to create one.</p>
+              <p className="text-sm text-gray-400">{tCmdb('noCiClasses')}</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {classes.map((cls) => (
@@ -237,12 +227,12 @@ export default function CIForm() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{cls.icon === 'server' ? '🖥️' : cls.icon === 'network' ? '🌐' : cls.icon === 'database' ? '🗄️' : cls.icon === 'application' ? '📱' : cls.icon === 'storage' ? '💾' : '📦'}</span>
+                      <span className="text-2xl">{classEmoji(cls.icon)}</span>
                       <div>
                         <h4 className="font-semibold text-gray-900">{cls.display_name}</h4>
                         {cls.description && <p className="text-xs text-gray-500 mt-0.5">{cls.description}</p>}
                         {Object.keys(cls.attributes).length > 0 && (
-                          <p className="text-xs text-gray-400 mt-1">{Object.keys(cls.attributes).length} attribute{Object.keys(cls.attributes).length !== 1 ? 's' : ''}</p>
+                          <p className="text-xs text-gray-400 mt-1">{tCmdb('attributeCount', { count: Object.keys(cls.attributes).length })}</p>
                         )}
                       </div>
                     </div>
@@ -261,74 +251,74 @@ export default function CIForm() {
             {/* Basic Info */}
             <Card>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">Basic Information</h3>
+                <h3 className="font-semibold text-gray-900">{tCmdb('basicInformation')}</h3>
                 {!isEdit && (
                   <button onClick={() => setStep(1)} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                    &larr; Change Class
+                    {tCmdb('changeClass')}
                   </button>
                 )}
               </div>
 
               {selectedClass && (
                 <div className="flex items-center gap-2 mb-4 p-2 bg-indigo-50 rounded-lg">
-                  <span className="text-lg">{selectedClass.icon === 'server' ? '🖥️' : selectedClass.icon === 'network' ? '🌐' : selectedClass.icon === 'database' ? '🗄️' : selectedClass.icon === 'application' ? '📱' : selectedClass.icon === 'storage' ? '💾' : '📦'}</span>
+                  <span className="text-lg">{classEmoji(selectedClass.icon)}</span>
                   <span className="text-sm font-medium text-indigo-700">{selectedClass.display_name}</span>
                 </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Name *</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('name')} *</label>
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g. web-server-01"
+                    placeholder={tCmdb('namePlaceholder')}
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Display Name</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('displayName')}</label>
                   <input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g. Web Server 01 (Production)"
+                    placeholder={tCmdb('displayNamePlaceholder')}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('status')}</label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="active">Active</option>
-                    <option value="planned">Planned</option>
-                    <option value="maintenance">Maintenance</option>
-                    <option value="retired">Retired</option>
+                    <option value="active">{tStates('active')}</option>
+                    <option value="planned">{statusLabel('planned')}</option>
+                    <option value="maintenance">{statusLabel('maintenance')}</option>
+                    <option value="retired">{statusLabel('retired')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Environment</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('environment')}</label>
                   <select
                     value={environment}
                     onChange={(e) => setEnvironment(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="production">Production</option>
-                    <option value="staging">Staging</option>
-                    <option value="development">Development</option>
-                    <option value="test">Test</option>
+                    <option value="production">{statusLabel('production')}</option>
+                    <option value="staging">{statusLabel('staging')}</option>
+                    <option value="development">{statusLabel('development')}</option>
+                    <option value="test">{statusLabel('test')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Location</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('location')}</label>
                   <select
                     value={locationId}
                     onChange={(e) => setLocationId(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="">— None —</option>
+                    <option value="">{tStates('none')}</option>
                     {locations.map((loc) => (
                       <option key={loc.id} value={loc.id}>
                         {loc.code} - {loc.name}
@@ -338,7 +328,7 @@ export default function CIForm() {
                 </div>
                 {isEdit && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Class</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('class')}</label>
                     <select
                       value={classId}
                       onChange={(e) => handleClassChange(e.target.value)}
@@ -353,79 +343,24 @@ export default function CIForm() {
 
             {/* Class Attributes */}
             {Object.keys(classAttrs).length > 0 && (
-              <Card>
-                <h3 className="font-semibold text-gray-900 mb-4">
-                  {selectedClass?.display_name} Attributes
-                  <span className="ml-2 text-xs font-normal bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-                    {Object.keys(classAttrs).length}
-                  </span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(classAttrs).map(([attrName, attrDef]) => {
-                    const attrType = (attrDef as any)?.type || 'string';
-                    const refTable = (attrDef as any)?.reference_table;
-                    const refLabel = refTable === 'users' ? 'Users' : refTable === 'assignment_groups' ? 'Groups' : refTable === 'departments' ? 'Departments' : refTable === 'cost_centers' ? 'Cost Centers' : refTable === 'services' ? 'Services' : refTable;
-                    return (
-                      <div key={attrName}>
-                        <label className="block text-xs font-medium text-gray-500 mb-1 capitalize">
-                          {attrName.replace(/_/g, ' ')}
-                          <span className="ml-1 text-gray-300 font-normal">
-                            ({attrType === 'reference' ? `ref → ${refLabel}` : attrType})
-                          </span>
-                        </label>
-                        {attrType === 'reference' && refTable ? (
-                          <select
-                            value={attributes[attrName] || ''}
-                            onChange={(e) => setAttributes({ ...attributes, [attrName]: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                          >
-                            <option value="">-- None --</option>
-                            {(refData[refTable] || []).map((opt) => (
-                              <option key={opt.id} value={opt.id}>{opt.label}</option>
-                            ))}
-                          </select>
-                        ) : attrType === 'boolean' ? (
-                          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mt-1">
-                            <input
-                              type="checkbox"
-                              checked={attributes[attrName] === 'true'}
-                              onChange={(e) => setAttributes({ ...attributes, [attrName]: e.target.checked ? 'true' : 'false' })}
-                              className="w-4 h-4 text-indigo-600 rounded border-gray-300"
-                            />
-                            {attrName.replace(/_/g, ' ')}
-                          </label>
-                        ) : attrType === 'number' || attrType === 'integer' ? (
-                          <input
-                            type="number"
-                            value={attributes[attrName] || ''}
-                            onChange={(e) => setAttributes({ ...attributes, [attrName]: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                        ) : (
-                          <input
-                            type="text"
-                            value={attributes[attrName] || ''}
-                            onChange={(e) => setAttributes({ ...attributes, [attrName]: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder={`Enter ${attrName.replace(/_/g, ' ')}`}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
+              <CiAttributeFields
+                classAttrs={classAttrs}
+                className={selectedClass?.display_name ?? ''}
+                attributes={attributes}
+                setAttributes={setAttributes}
+                refData={refData}
+              />
             )}
 
             {/* Notes */}
             <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">Notes</h3>
+              <h3 className="font-semibold text-gray-900 mb-4">{fieldLabel('notes')}</h3>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                placeholder="Additional notes about this CI..."
+                placeholder={tCmdb('notesPlaceholder')}
               />
             </Card>
           </div>
@@ -433,24 +368,24 @@ export default function CIForm() {
           {/* Sidebar */}
           <div className="space-y-6">
             <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">Ownership</h3>
+              <h3 className="font-semibold text-gray-900 mb-4">{tCmdb('ownership')}</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Managed By</label>
-                  <UserPicker users={users} value={managedBy} onChange={setManagedBy} placeholder="Select manager..." />
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{tCmdb('managedBy')}</label>
+                  <UserPicker users={users} value={managedBy} onChange={setManagedBy} placeholder={tCmdb('selectManager')} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Assigned To</label>
-                  <UserPicker users={users} value={assignedTo} onChange={setAssignedTo} placeholder="Select assignee..." />
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('assignedTo')}</label>
+                  <UserPicker users={users} value={assignedTo} onChange={setAssignedTo} placeholder={tCmdb('selectAssignee')} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Supported By Group</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{tCmdb('supportedByGroup')}</label>
                   <select
                     value={supportedBy}
                     onChange={(e) => setSupportedBy(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="">-- None --</option>
+                    <option value="">{tStates('none')}</option>
                     {groups.map((g) => (
                       <option key={g.id} value={g.id}>{g.name}</option>
                     ))}
@@ -464,31 +399,11 @@ export default function CIForm() {
               disabled={saving || !name.trim() || !classId}
               className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Configuration Item'}
+              {saving ? tActions('saving') : isEdit ? tMaster('saveChanges') : tCmdb('createConfigurationItem')}
             </button>
           </div>
         </div>
       )}
     </>
-  );
-}
-
-function UserPicker({ users, value, onChange, placeholder }: {
-  users: UserOption[];
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-    >
-      <option value="">{placeholder || 'None'}</option>
-      {users.map((u) => (
-        <option key={u.id} value={u.id}>{u.display_name} ({u.email})</option>
-      ))}
-    </select>
   );
 }

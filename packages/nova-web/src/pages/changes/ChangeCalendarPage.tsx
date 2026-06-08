@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { changes } from '../../api/client';
 import type { Change, ChangeBlackout } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -10,11 +11,7 @@ import { formatDate, formatDateTime } from '../../utils/dateTime';
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
 function toDateKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -77,6 +74,7 @@ function buildGrid(year: number, month: number): Date[] {
 
 export default function ChangeCalendarPage() {
   const navigate = useNavigate();
+  const tChanges = useTranslations('pages.changes');
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
@@ -159,11 +157,11 @@ export default function ChangeCalendarPage() {
   return (
     <>
       <PageHeader
-        title="Change Calendar"
-        description="Scheduled changes, conflicts, and blackout windows."
+        title={tChanges('calendar')}
+        description={tChanges('calendarDescription')}
         action={
           <Link to="/changes" className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-            Back to Changes
+            {tChanges('backToChanges')}
           </Link>
         }
       />
@@ -185,7 +183,7 @@ export default function ChangeCalendarPage() {
                 </svg>
               </button>
               <h2 className="text-base font-semibold text-gray-900 w-44 text-center">
-                {MONTHS[viewMonth]} {viewYear}
+                {tChanges(`months.${viewMonth}` as 'months.0')} {viewYear}
               </h2>
               <button
                 onClick={nextMonth}
@@ -200,7 +198,7 @@ export default function ChangeCalendarPage() {
               onClick={goToday}
               className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
             >
-              Today
+              {tChanges('today')}
             </button>
           </div>
 
@@ -208,9 +206,9 @@ export default function ChangeCalendarPage() {
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* Day headers */}
             <div className="grid grid-cols-7 border-b border-gray-100">
-              {DAYS.map((d) => (
+              {DAY_KEYS.map((d) => (
                 <div key={d} className="py-2 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  {d}
+                  {tChanges(`days.${d}` as 'days.mon')}
                 </div>
               ))}
             </div>
@@ -254,7 +252,7 @@ export default function ChangeCalendarPage() {
                         {day.getDate()}
                       </span>
                       {isBlackout && (
-                        <span className="text-[9px] font-semibold text-red-500 uppercase tracking-wider leading-none">Blackout</span>
+                        <span className="text-[9px] font-semibold text-red-500 uppercase tracking-wider leading-none">{tChanges('blackout')}</span>
                       )}
                     </div>
 
@@ -272,7 +270,7 @@ export default function ChangeCalendarPage() {
                         </div>
                       ))}
                       {dayChanges.length > 3 && (
-                        <p className="text-[10px] text-gray-400 pl-1">+{dayChanges.length - 3} more</p>
+                        <p className="text-[10px] text-gray-400 pl-1">{tChanges('moreChanges', { count: dayChanges.length - 3 })}</p>
                       )}
                     </div>
                   </div>
@@ -286,12 +284,12 @@ export default function ChangeCalendarPage() {
             {Object.entries(RISK_COLOR).map(([level, cls]) => (
               <div key={level} className="flex items-center gap-1.5">
                 <span className={`w-2.5 h-2.5 rounded-full ${cls}`} />
-                <span className="text-xs text-gray-500 capitalize">{level.replace('_', ' ')}</span>
+                <span className="text-xs text-gray-500 capitalize">{tChanges(`riskLevels.${level === 'very_high' ? 'veryHigh' : level}` as 'riskLevels.low')}</span>
               </div>
             ))}
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded bg-red-100 border border-red-200" />
-              <span className="text-xs text-gray-500">Blackout</span>
+              <span className="text-xs text-gray-500">{tChanges('blackout')}</span>
             </div>
           </div>
         </div>
@@ -321,7 +319,7 @@ export default function ChangeCalendarPage() {
 
               {selectedChanges.length === 0 ? (
                 <div className="px-4 py-8 text-center">
-                  <p className="text-sm text-gray-400">No changes scheduled.</p>
+                  <p className="text-sm text-gray-400">{tChanges('noChangesScheduled')}</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
@@ -338,11 +336,11 @@ export default function ChangeCalendarPage() {
                       </div>
                       <p className="text-sm font-medium text-gray-900 leading-snug">{c.title}</p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {c.scheduled_start ? formatDateTime(c.scheduled_start) : 'No start time'}
+                        {c.scheduled_start ? formatDateTime(c.scheduled_start) : tChanges('noStartTime')}
                         {c.scheduled_end ? ` → ${formatDateTime(c.scheduled_end)}` : ''}
                       </p>
                       {(c.conflict_count ?? 0) > 0 && (
-                        <p className="text-xs text-red-600 mt-1 font-medium">{c.conflict_count} conflict{c.conflict_count! > 1 ? 's' : ''}</p>
+                        <p className="text-xs text-red-600 mt-1 font-medium">{tChanges('conflictCount', { count: c.conflict_count ?? 0 })}</p>
                       )}
                     </Link>
                   ))}
@@ -354,11 +352,11 @@ export default function ChangeCalendarPage() {
           {/* Blackout windows */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Blackout Windows</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{tChanges('blackoutWindows')}</p>
             </div>
             {blackouts.length === 0 ? (
               <div className="px-4 py-6 text-center">
-                <p className="text-sm text-gray-400">No blackout windows.</p>
+                <p className="text-sm text-gray-400">{tChanges('noBlackoutWindows')}</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">

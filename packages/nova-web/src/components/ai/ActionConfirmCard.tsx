@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState } from 'react';
+import { useTranslations } from 'use-intl';
 import type { AiPendingAction } from '../../api/client';
+import { useFieldLabel, useImpactUrgencyLabel } from '../../i18n/hooks';
 
 interface ActionConfirmCardProps {
   action: AiPendingAction;
@@ -17,14 +19,19 @@ export default function ActionConfirmCard({
   onDismiss,
   onApplyAutomation,
 }: ActionConfirmCardProps) {
+  const t = useTranslations('components.actionConfirmCard');
+  const tActions = useTranslations('common.actions');
+  const tConfirm = useTranslations('components.confirmDialog');
+  const fieldLabel = useFieldLabel();
+  const { impact: impactLabel, urgency: urgencyLabel } = useImpactUrgencyLabel();
   const [draft, setDraft] = useState<Record<string, unknown>>(action.payload);
 
   if (action.action_type === 'propose_create_incident') {
     return (
       <div className="rounded-lg border border-indigo-200 bg-indigo-50/80 p-3 text-sm space-y-2">
-        <p className="font-medium text-indigo-900">Confirm incident creation</p>
+        <p className="font-medium text-indigo-900">{t('confirmIncidentCreation')}</p>
         <label className="block">
-          <span className="text-xs text-gray-600">Title</span>
+          <span className="text-xs text-gray-600">{fieldLabel('title')}</span>
           <input
             className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
             value={String(draft.title ?? '')}
@@ -32,7 +39,7 @@ export default function ActionConfirmCard({
           />
         </label>
         <label className="block">
-          <span className="text-xs text-gray-600">Description</span>
+          <span className="text-xs text-gray-600">{fieldLabel('description')}</span>
           <textarea
             rows={3}
             className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -42,27 +49,27 @@ export default function ActionConfirmCard({
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <span className="text-xs text-gray-600">Impact</span>
+            <span className="text-xs text-gray-600">{fieldLabel('impact')}</span>
             <select
               className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
               value={String(draft.impact ?? 'medium')}
               onChange={(e) => setDraft((p) => ({ ...p, impact: e.target.value }))}
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
+              <option value="low">{impactLabel('low')}</option>
+              <option value="medium">{impactLabel('medium')}</option>
+              <option value="high">{impactLabel('high')}</option>
             </select>
           </label>
           <label className="block">
-            <span className="text-xs text-gray-600">Urgency</span>
+            <span className="text-xs text-gray-600">{fieldLabel('urgency')}</span>
             <select
               className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
               value={String(draft.urgency ?? 'medium')}
               onChange={(e) => setDraft((p) => ({ ...p, urgency: e.target.value }))}
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
+              <option value="low">{urgencyLabel('low')}</option>
+              <option value="medium">{urgencyLabel('medium')}</option>
+              <option value="high">{urgencyLabel('high')}</option>
             </select>
           </label>
         </div>
@@ -73,10 +80,10 @@ export default function ActionConfirmCard({
             onClick={() => onConfirm(draft)}
             className="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 disabled:opacity-50"
           >
-            {confirming ? 'Creating…' : 'Create incident'}
+            {confirming ? t('creatingIncident') : t('createIncident')}
           </button>
           <button type="button" onClick={onDismiss} className="px-3 py-1.5 rounded-md text-xs text-gray-600 hover:bg-gray-100">
-            Dismiss
+            {tActions('dismiss')}
           </button>
         </div>
       </div>
@@ -86,7 +93,7 @@ export default function ActionConfirmCard({
   if (action.action_type === 'propose_work_note') {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-sm space-y-2">
-        <p className="font-medium text-amber-900">Confirm work note</p>
+        <p className="font-medium text-amber-900">{t('confirmWorkNote')}</p>
         <textarea
           rows={4}
           className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -99,7 +106,7 @@ export default function ActionConfirmCard({
             checked={draft.is_customer_visible !== false}
             onChange={(e) => setDraft((p) => ({ ...p, is_customer_visible: e.target.checked }))}
           />
-          Visible to customer
+          {t('visibleToCustomer')}
         </label>
         <div className="flex gap-2">
           <button
@@ -108,10 +115,10 @@ export default function ActionConfirmCard({
             onClick={() => onConfirm(draft)}
             className="px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-50"
           >
-            {confirming ? 'Saving…' : 'Add note'}
+            {confirming ? t('savingNote') : t('addNote')}
           </button>
           <button type="button" onClick={onDismiss} className="px-3 py-1.5 rounded-md text-xs text-gray-600 hover:bg-gray-100">
-            Dismiss
+            {tActions('dismiss')}
           </button>
         </div>
       </div>
@@ -123,7 +130,7 @@ export default function ActionConfirmCard({
     const errors = action.validation_errors ?? [];
     return (
       <div className="rounded-lg border border-violet-200 bg-violet-50/80 p-3 text-sm space-y-2">
-        <p className="font-medium text-violet-900">Proposed automation config</p>
+        <p className="font-medium text-violet-900">{t('proposedAutomationConfig')}</p>
         {draft.summary ? <p className="text-xs text-gray-600">{String(draft.summary)}</p> : null}
         {errors.length > 0 && (
           <ul className="text-xs text-red-700 list-disc pl-4">
@@ -142,11 +149,11 @@ export default function ActionConfirmCard({
               onClick={() => onApplyAutomation(automation)}
               className="px-3 py-1.5 rounded-md bg-violet-600 text-white text-xs font-medium hover:bg-violet-700"
             >
-              Apply to editor
+              {t('applyToEditor')}
             </button>
           )}
           <button type="button" onClick={onDismiss} className="px-3 py-1.5 rounded-md text-xs text-gray-600 hover:bg-gray-100">
-            Dismiss
+            {tActions('dismiss')}
           </button>
         </div>
       </div>
@@ -155,7 +162,7 @@ export default function ActionConfirmCard({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
-      <p className="font-medium">Pending action: {action.action_type}</p>
+      <p className="font-medium">{t('pendingAction', { actionType: action.action_type })}</p>
       <div className="flex gap-2 mt-2">
         <button
           type="button"
@@ -163,10 +170,10 @@ export default function ActionConfirmCard({
           onClick={() => onConfirm(draft)}
           className="px-3 py-1.5 rounded-md bg-gray-800 text-white text-xs disabled:opacity-50"
         >
-          Confirm
+          {tConfirm('confirm')}
         </button>
         <button type="button" onClick={onDismiss} className="px-3 py-1.5 rounded-md text-xs text-gray-600 hover:bg-gray-100">
-          Dismiss
+          {tActions('dismiss')}
         </button>
       </div>
     </div>

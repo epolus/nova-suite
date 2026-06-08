@@ -8,6 +8,11 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 
 export default defineConfig({
   envDir: repoRoot,
+  resolve: {
+    alias: {
+      '@': path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'src'),
+    },
+  },
   plugins: [react()],
   server: {
     proxy: {

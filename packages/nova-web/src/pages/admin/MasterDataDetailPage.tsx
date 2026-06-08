@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
@@ -40,6 +41,11 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
   searchFilter,
   fields,
 }: MasterDataDetailPageProps<T>) {
+  const t = useTranslations('pages.admin.masterDataDetail');
+  const tMaster = useTranslations('common.masterData');
+  const tActions = useTranslations('common.actions');
+  const tFields = useTranslations('common.fields');
+  const tStates = useTranslations('common.states');
   const { id } = useParams<{ id: string }>();
   const isNew = !id || id === 'new';
   const navigate = useNavigate();
@@ -50,8 +56,10 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const listParams =
-    (location.state as { listParams?: Record<string, string> } | null)?.listParams || {};
+  const listParams = useMemo<Record<string, string>>(
+    () => (location.state as { listParams?: Record<string, string> } | null)?.listParams || {},
+    [location.state],
+  );
   const activeFilter = listParams.active || 'all';
   const sortBy = listParams.sort_by || '';
   const sortDir = listParams.sort_dir === 'asc' ? 'asc' : 'desc';
@@ -168,7 +176,7 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
         await load();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : t('errorOccurred'));
       setSaving(false);
       return;
     }
@@ -181,8 +189,8 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
   return (
     <>
       <PageHeader
-        title={isNew ? `Create ${singular}` : `Edit ${singular}`}
-        description={!isNew && (navInfo.prev || navInfo.next) ? 'Use \u2190 / \u2192 to navigate records' : undefined}
+        title={isNew ? t('create', { entity: singular }) : t('edit', { entity: singular })}
+        description={!isNew && (navInfo.prev || navInfo.next) ? t('navigateRecords') : undefined}
         action={
           <div className="flex items-center gap-2">
             {!isNew && (
@@ -192,7 +200,7 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
                   disabled={!navInfo.prev}
                   onClick={() => navInfo.prev && navigate(`${basePath}/${navInfo.prev}`, { state: location.state })}
                   className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title={`Previous ${singular.toLowerCase()} (Left Arrow)`}
+                  title={t('previousEntity', { entity: singular.toLowerCase() })}
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -203,7 +211,7 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
                   disabled={!navInfo.next}
                   onClick={() => navInfo.next && navigate(`${basePath}/${navInfo.next}`, { state: location.state })}
                   className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title={`Next ${singular.toLowerCase()} (Right Arrow)`}
+                  title={t('nextEntity', { entity: singular.toLowerCase() })}
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -216,7 +224,7 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
               onClick={() => navigate(basePath)}
               className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              &larr; Back to List
+              {t('backToList')}
             </button>
           </div>
         }
@@ -268,7 +276,7 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
 
           {!isNew && (
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Status</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">{tFields('status')}</label>
               <label className="flex items-center gap-3 cursor-pointer">
                 <div className="relative">
                   <input
@@ -280,7 +288,7 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
                   <div className="w-10 h-5 bg-gray-200 rounded-full peer-checked:bg-indigo-600 transition-colors" />
                   <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
                 </div>
-                <span className="text-sm text-gray-700">{isActive ? 'Active' : 'Inactive'}</span>
+                <span className="text-sm text-gray-700">{isActive ? tStates('active') : tStates('inactive')}</span>
               </label>
             </div>
           )}
@@ -291,14 +299,14 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
               onClick={() => navigate(basePath)}
               className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
             >
-              Cancel
+              {tActions('cancel')}
             </button>
             <button
               type="submit"
               disabled={saving}
               className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving...' : isNew ? `Create ${singular}` : 'Save Changes'}
+              {saving ? tActions('saving') : isNew ? t('create', { entity: singular }) : tMaster('saveChanges')}
             </button>
           </div>
         </form>

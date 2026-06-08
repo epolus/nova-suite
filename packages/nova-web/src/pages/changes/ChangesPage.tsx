@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { changes } from '../../api/client';
-import type { Change, Pagination } from '../../api/client';
+import type { Change } from '../../api/client';
+import { useChangesList, useInvalidateChanges } from '@/hooks/queries';
 import PageHeader from '../../components/PageHeader';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
@@ -14,6 +16,7 @@ import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { formatDate } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
+import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import { CHANGE_BULK_ACTIONS, CHANGE_RISK_OPTIONS, CHANGE_STATUS_OPTIONS } from './changeListConfig';
 
 const DEFAULT_COLS = ['number', 'title', 'status', 'stage', 'risk_level', 'priority', 'scheduled_start', 'updated_at'];
@@ -28,11 +31,16 @@ interface FilterPreset {
   columnFilters: Record<string, string>;
 }
 
-function buildColumns(listParams: Record<string, string>): DataColumnDef<Change>[] {
+type ChangeListLabels = {
+  field: ReturnType<typeof useFieldLabel>;
+  emDash: string;
+};
+
+function buildColumns(listParams: Record<string, string>, labels: ChangeListLabels): DataColumnDef<Change>[] {
   return [
     {
       key: 'number',
-      label: 'Number',
+      label: labels.field('number'),
       sortable: true,
       defaultVisible: true,
       render: (c) => (
@@ -46,21 +54,34 @@ function buildColumns(listParams: Record<string, string>): DataColumnDef<Change>
         </Link>
       ),
     },
-    { key: 'title', label: 'Title', sortable: true, defaultVisible: true, render: (c) => c.title },
-    { key: 'status', label: 'Status', sortable: true, defaultVisible: true, render: (c) => <Badge value={c.status} /> },
-    { key: 'stage', label: 'Stage', sortable: true, defaultVisible: true, render: (c) => <span className="capitalize">{c.stage}</span> },
-    { key: 'risk_level', label: 'Risk', sortable: true, defaultVisible: true, render: (c) => <span className="capitalize">{c.risk_level.replace('_', ' ')}</span> },
-    { key: 'priority', label: 'Priority', sortable: true, defaultVisible: true, render: (c) => <span className="capitalize">{c.priority}</span> },
-    { key: 'change_type_name', label: 'Type', sortable: false, defaultVisible: false, render: (c) => c.change_type_name || '—' },
-    { key: 'assignment_group_name', label: 'Assignment Group', sortable: false, defaultVisible: false, render: (c) => c.assignment_group_name || '—' },
-    { key: 'pending_approvals', label: 'Pending Approvals', sortable: false, defaultVisible: false, render: (c) => String(c.pending_approvals || 0) },
-    { key: 'conflict_count', label: 'Conflicts', sortable: false, defaultVisible: true, render: (c) => String(c.conflict_count || 0) },
-    { key: 'scheduled_start', label: 'Scheduled Start', sortable: true, defaultVisible: true, render: (c) => c.scheduled_start ? formatDate(c.scheduled_start) : '—' },
-    { key: 'updated_at', label: 'Updated', sortable: true, defaultVisible: true, render: (c) => formatDate(c.updated_at) },
+    { key: 'title', label: labels.field('title'), sortable: true, defaultVisible: true, render: (c) => c.title },
+    { key: 'status', label: labels.field('status'), sortable: true, defaultVisible: true, render: (c) => <Badge value={c.status} /> },
+    { key: 'stage', label: labels.field('stage'), sortable: true, defaultVisible: true, render: (c) => <span className="capitalize">{c.stage}</span> },
+    { key: 'risk_level', label: labels.field('risk'), sortable: true, defaultVisible: true, render: (c) => <span className="capitalize">{c.risk_level.replace('_', ' ')}</span> },
+    { key: 'priority', label: labels.field('priority'), sortable: true, defaultVisible: true, render: (c) => <span className="capitalize">{c.priority}</span> },
+    { key: 'change_type_name', label: labels.field('type'), sortable: false, defaultVisible: false, render: (c) => c.change_type_name || labels.emDash },
+    { key: 'assignment_group_name', label: labels.field('assignmentGroup'), sortable: false, defaultVisible: false, render: (c) => c.assignment_group_name || labels.emDash },
+    { key: 'pending_approvals', label: labels.field('pendingApprovals'), sortable: false, defaultVisible: false, render: (c) => String(c.pending_approvals || 0) },
+    { key: 'conflict_count', label: labels.field('conflicts'), sortable: false, defaultVisible: true, render: (c) => String(c.conflict_count || 0) },
+    { key: 'scheduled_start', label: labels.field('scheduledStart'), sortable: true, defaultVisible: true, render: (c) => c.scheduled_start ? formatDate(c.scheduled_start) : labels.emDash },
+    { key: 'updated_at', label: labels.field('updated'), sortable: true, defaultVisible: true, render: (c) => formatDate(c.updated_at) },
   ];
 }
 
 export default function ChangesPage() {
+  const tChanges = useTranslations('pages.changes');
+  const tList = useTranslations('common.list');
+  const tFilters = useTranslations('common.filters');
+  const tActions = useTranslations('common.actions');
+  const tMaster = useTranslations('common.masterData');
+  const tTable = useTranslations('common.table');
+  const fieldLabel = useFieldLabel();
+  const statusLabel = useStatusLabel();
+  const listLabels = useMemo<ChangeListLabels>(
+    () => ({ field: fieldLabel, emDash: tTable('emDash') }),
+    [fieldLabel, tTable],
+  );
+
   const { user } = useAuth();
   const isAgent = isAgentRole(user?.roles);
   const { params, setSearch, setSort, setCols, setPage, setFilter, setColumnFilter, update } = useListParams({
@@ -68,14 +89,11 @@ export default function ChangesPage() {
     filterKeys: ['status', 'risk_level'],
     storageKey: 'changes',
   });
-  const [data, setData] = useState<Change[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const invalidateChanges = useInvalidateChanges();
   const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
     `presets:${PRESETS_KEY}`,
     [],
@@ -86,28 +104,29 @@ export default function ChangesPage() {
   const navigate = useNavigate();
   const status = params.filters.status || 'all';
   const risk = params.filters.risk_level || 'all';
-  const cfKey = JSON.stringify(params.columnFilters);
 
-  useEffect(() => {
-    setLoading(true);
-    setSelectedIds([]);
-    const apiParams: Record<string, string> = {};
-    if (status !== 'all') apiParams.status = status;
-    if (risk !== 'all') apiParams.risk_level = risk;
-    if (params.search) apiParams.search = params.search;
+  const apiParams = useMemo(() => {
+    const p: Record<string, string> = {};
+    if (status !== 'all') p.status = status;
+    if (risk !== 'all') p.risk_level = risk;
+    if (params.search) p.search = params.search;
     if (params.sort) {
-      apiParams.sort_by = params.sort;
-      apiParams.sort_dir = params.dir;
+      p.sort_by = params.sort;
+      p.sort_dir = params.dir;
     }
     for (const [col, val] of Object.entries(params.columnFilters)) {
-      if (val) apiParams[`cf.${col}`] = val;
+      if (val) p[`cf.${col}`] = val;
     }
-    changes.list(apiParams, params.page, 20).then((res) => {
-      setData(res.changes);
-      setPagination(res.pagination);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [status, risk, params.search, params.sort, params.dir, params.page, cfKey, refreshKey]);
+    return p;
+  }, [status, risk, params.search, params.sort, params.dir, params.columnFilters]);
+
+  const { data: listResult, isLoading: loading, isFetching } = useChangesList(apiParams, params.page);
+  const data: Change[] = listResult?.changes ?? [];
+  const pagination = listResult?.pagination ?? null;
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [params.page, apiParams, isFetching]);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};
@@ -121,7 +140,7 @@ export default function ChangesPage() {
     return lp;
   }, [status, risk, params.search, params.sort, params.dir]);
 
-  const columns = useMemo(() => buildColumns(getListParams()), [getListParams]);
+  const columns = useMemo(() => buildColumns(getListParams(), listLabels), [getListParams, listLabels]);
   const hasActiveFilter = !!params.search || status !== 'all' || risk !== 'all' || Object.values(params.columnFilters).some(Boolean);
   const applyPreset = (preset: FilterPreset) => {
     update({
@@ -157,7 +176,7 @@ export default function ChangesPage() {
       await Promise.all(selectedIds.map((id) => changes.update(id, { status: 'closed' })));
       setSelectedIds([]);
       setConfirmClose(false);
-      setRefreshKey((k) => k + 1);
+      invalidateChanges();
     } finally {
       setBulkLoading(false);
     }
@@ -229,18 +248,18 @@ export default function ChangesPage() {
   return (
     <>
       <PageHeader
-        title="Changes"
-        description="ITIL change requests with approvals, scheduling, implementation and review."
+        title={tChanges('title')}
+        description={tChanges('description')}
         action={
           <div className="flex items-center gap-2">
-            <Link to="/changes/calendar" className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Calendar</Link>
-            <Link to="/changes/new" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">+ New Change</Link>
+            <Link to="/changes/calendar" className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">{tChanges('calendar')}</Link>
+            <Link to="/changes/new" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">+ {tChanges('newChange')}</Link>
           </div>
         }
       />
       {isAgent && (presets.length > 0 || hasActiveFilter) && (
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-xs font-medium text-gray-400">Saved:</span>
+          <span className="text-xs font-medium text-gray-400">{tFilters('saved')}</span>
           {presets.map((preset) => (
             <div key={preset.id} className="flex items-center gap-0.5 pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700">
               <button onClick={() => applyPreset(preset)} className="hover:text-indigo-600 transition-colors">{preset.name}</button>
@@ -254,25 +273,25 @@ export default function ChangesPage() {
                 value={savePresetName}
                 onChange={(e) => setSavePresetName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') { setShowSaveInput(false); setSavePresetName(''); } }}
-                placeholder="Filter name..."
+                placeholder={tFilters('filterNamePlaceholder')}
                 className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-none focus:ring-1 focus:ring-indigo-400 w-36"
               />
-              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">Save</button>
-              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">{tActions('save')}</button>
+              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">{tActions('cancel')}</button>
             </div>
           ) : hasActiveFilter && (
             <button
               onClick={() => setShowSaveInput(true)}
               className="px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
             >
-              + Save current filter
+              + {tFilters('saveCurrent')}
             </button>
           )}
         </div>
       )}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
-          <SearchBar value={params.search} onChange={setSearch} placeholder="Search by number, title, description..." />
+          <SearchBar value={params.search} onChange={setSearch} placeholder={tChanges('searchPlaceholder')} />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           {CHANGE_STATUS_OPTIONS.map((s) => (
@@ -281,7 +300,7 @@ export default function ChangesPage() {
               onClick={() => setFilter('status', s === 'all' ? '' : s)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${status === s ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
             >
-              {s.replace(/_/g, ' ')}
+              {s === 'all' ? tList('allStatuses') : statusLabel(s)}
             </button>
           ))}
         </div>
@@ -292,36 +311,36 @@ export default function ChangesPage() {
               onClick={() => setFilter('risk_level', r === 'all' ? '' : r)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors capitalize ${risk === r ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
             >
-              {r.replace('_', ' ')}
+              {r === 'all' ? tList('allStatuses') : statusLabel(r)}
             </button>
           ))}
           {isAgent && (
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
-              {exporting ? 'Exporting...' : 'Export CSV'}
+              {exporting ? tList('exporting') : tList('exportCsv')}
             </Button>
           )}
         </div>
       </div>
       {isAgent && selectedIds.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl mb-4 flex-wrap">
-          <span className="text-sm font-semibold text-indigo-900">{selectedIds.length} selected</span>
+          <span className="text-sm font-semibold text-indigo-900">{tList('selected', { count: selectedIds.length })}</span>
           <div className="flex items-center gap-2 flex-wrap">
             {CHANGE_BULK_ACTIONS.map((action) => (
               confirmClose ? (
                 <span key={action.id} className="inline-flex items-center gap-2">
-                  <span className="text-xs text-gray-600">Close {selectedIds.length} changes?</span>
-                  <Button size="sm" variant="warning" disabled={bulkLoading} onClick={handleBulkClose}>Confirm</Button>
-                  <button onClick={() => setConfirmClose(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                  <span className="text-xs text-gray-600">{tChanges('bulk.confirmClose', { count: selectedIds.length })}</span>
+                  <Button size="sm" variant="warning" disabled={bulkLoading} onClick={handleBulkClose}>{tMaster('confirm')}</Button>
+                  <button onClick={() => setConfirmClose(false)} className="text-xs text-gray-500 hover:text-gray-700">{tActions('cancel')}</button>
                 </span>
               ) : (
                 <Button key={action.id} size="sm" variant={action.variant} onClick={() => setConfirmClose(true)}>
-                  {action.label}
+                  {tChanges('bulk.closeChanges')}
                 </Button>
               )
             ))}
           </div>
           <button onClick={() => { setSelectedIds([]); setConfirmClose(false); }} className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-            Clear selection
+            {tMaster('clearSelection')}
           </button>
         </div>
       )}
@@ -336,7 +355,11 @@ export default function ChangesPage() {
           onSort={setSort}
           columnFilters={params.columnFilters}
           onColumnFilter={setColumnFilter}
-          emptyMessage={params.search ? `No changes matching "${params.search}"` : 'No changes found.'}
+          emptyMessage={
+            params.search
+              ? tChanges('emptySearch', { query: params.search })
+              : tChanges('empty')
+          }
           onRowClick={(c) => navigate(`/changes/${c.id}`, { state: { listParams: getListParams() } })}
           selectable={isAgent}
           selectedIds={selectedIds}

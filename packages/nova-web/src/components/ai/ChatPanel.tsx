@@ -103,6 +103,8 @@ export default function ChatPanel({ persona, context, onClose, onApplyAutomation
     return () => {
       cancelled = true;
     };
+    // Create one conversation per persona; greeting text is refreshed separately on locale change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persona]);
 
   // Refresh welcome text when the user changes UI language (profile / language switcher).

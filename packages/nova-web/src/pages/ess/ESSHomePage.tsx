@@ -1,16 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { useAuth } from '../../context/AuthContext';
 import { search as searchApi, type SearchResult } from '../../api/client';
-
-// ─── Time-based greeting ─────────────────────────────────────
-function getGreeting(name: string): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return `Good morning, ${name}`;
-  if (hour < 17) return `Good afternoon, ${name}`;
-  return `Good evening, ${name}`;
-}
 
 const TYPE_ICON: Record<string, string> = {
   incident: '🔥',
@@ -20,16 +13,16 @@ const TYPE_ICON: Record<string, string> = {
   ci:       '🖥️',
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  incident: 'Incident',
-  knowledge: 'Knowledge',
-  ci: 'CMDB',
-  change: 'Change',
-  problem: 'Problem',
-};
+function useGreeting(name: string): string {
+  const t = useTranslations('pages.ess.home');
+  const hour = new Date().getHours();
+  if (hour < 12) return t('goodMorning', { name });
+  if (hour < 17) return t('goodAfternoon', { name });
+  return t('goodEvening', { name });
+}
 
-// ─── Inline search bar ────────────────────────────────────────
 function ESSSearchBar() {
+  const t = useTranslations('pages.ess.home');
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -41,7 +34,6 @@ function ESSSearchBar() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
@@ -51,6 +43,15 @@ function ESSSearchBar() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  const typeLabel = useCallback(
+    (type: string) => {
+      const key = type as 'incident' | 'change' | 'problem' | 'knowledge' | 'ci';
+      if (key in TYPE_ICON) return t(`searchTypes.${key}`);
+      return type;
+    },
+    [t],
+  );
 
   const doSearch = useCallback(async (q: string) => {
     if (q.length < 2) {
@@ -66,11 +67,11 @@ function ESSSearchBar() {
       setActiveIndex(0);
     } catch (err: unknown) {
       setResults([]);
-      setSearchError(err instanceof Error ? err.message : 'Search failed');
+      setSearchError(err instanceof Error ? err.message : t('searchFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const handleChange = (q: string) => {
     setQuery(q);
@@ -126,22 +127,21 @@ function ESSSearchBar() {
           onChange={(e) => handleChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search knowledge articles, services, your requests..."
+          placeholder={t('searchPlaceholder')}
           className="w-full pl-12 pr-4 py-4 text-base rounded-2xl border border-gray-200 shadow-md focus:outline-none focus:ring-2 focus:border-transparent bg-white placeholder-gray-400 text-gray-900"
           style={{ '--tw-ring-color': 'var(--color-primary)' } as React.CSSProperties}
         />
       </div>
 
-      {/* Dropdown */}
       {showDropdown && (
         <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
           {searchError ? (
             <p className="px-4 py-6 text-sm text-red-600 text-center">{searchError}</p>
           ) : loading && results.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-gray-400 text-center">Searching...</p>
+            <p className="px-4 py-6 text-sm text-gray-400 text-center">{t('searching')}</p>
           ) : results.length === 0 ? (
             <p className="px-4 py-6 text-sm text-gray-400 text-center">
-              No results for <span className="font-medium text-gray-600">"{query}"</span>
+              {t('noResultsFor', { query })}
             </p>
           ) : (
             results.map((r, i) => (
@@ -158,7 +158,7 @@ function ESSSearchBar() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                      {TYPE_LABEL[r.type] ?? r.type}
+                      {typeLabel(r.type)}
                     </span>
                     <span className="text-[10px] text-gray-400 font-mono">{r.identifier}</span>
                   </div>
@@ -178,19 +178,16 @@ function ESSSearchBar() {
   );
 }
 
-// ─── Quick action cards ───────────────────────────────────────
 interface QuickCard {
-  label: string;
-  description: string;
+  labelKey: 'catalog' | 'requests' | 'knowledge';
   path: string;
   icon: React.ReactNode;
   color: string;
 }
 
-const quickCards: QuickCard[] = [
+const quickCardDefs: QuickCard[] = [
   {
-    label: 'Service Catalog',
-    description: 'Browse and request IT services, hardware, and software.',
+    labelKey: 'catalog',
     path: '/catalog',
     color: 'bg-violet-500',
     icon: (
@@ -200,8 +197,7 @@ const quickCards: QuickCard[] = [
     ),
   },
   {
-    label: 'My Requests',
-    description: 'Track the status of your active and past service requests.',
+    labelKey: 'requests',
     path: '/requests',
     color: 'bg-sky-500',
     icon: (
@@ -211,8 +207,7 @@ const quickCards: QuickCard[] = [
     ),
   },
   {
-    label: 'Knowledge Base',
-    description: 'Find answers, guides, and how-to articles from your IT team.',
+    labelKey: 'knowledge',
     path: '/knowledge',
     color: 'bg-emerald-500',
     icon: (
@@ -223,19 +218,18 @@ const quickCards: QuickCard[] = [
   },
 ];
 
-// ─── Page ────────────────────────────────────────────────────
 export default function ESSHomePage() {
+  const t = useTranslations('pages.ess.home');
+  const tActions = useTranslations('common.actions');
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const displayName = user?.display_name?.split(' ')[0] ?? 'there';
-  const greeting = getGreeting(displayName);
+  const displayName = user?.display_name?.split(' ')[0] ?? t('defaultName');
+  const greeting = useGreeting(displayName);
 
   return (
     <div className="flex flex-col">
-      {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-indigo-950 text-white">
-        {/* subtle grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.04]"
           style={{
@@ -248,19 +242,18 @@ export default function ESSHomePage() {
             {greeting}
           </h1>
           <p className="text-slate-400 text-base mb-10">
-            How can we help you today?
+            {t('helpToday')}
           </p>
           <ESSSearchBar />
         </div>
       </section>
 
-      {/* ── Quick actions ── */}
       <section className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-10">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-          Quick access
+          {t('quickAccess')}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {quickCards.map((card) => (
+          {quickCardDefs.map((card) => (
             <button
               key={card.path}
               onClick={() => navigate(card.path)}
@@ -269,10 +262,10 @@ export default function ESSHomePage() {
               <div className={`w-11 h-11 ${card.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}>
                 {card.icon}
               </div>
-              <p className="text-base font-semibold text-gray-900 mb-1">{card.label}</p>
-              <p className="text-sm text-gray-500 leading-snug">{card.description}</p>
+              <p className="text-base font-semibold text-gray-900 mb-1">{t(`cards.${card.labelKey}.label`)}</p>
+              <p className="text-sm text-gray-500 leading-snug">{t(`cards.${card.labelKey}.description`)}</p>
               <div className="mt-4 flex items-center gap-1 text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-                Open
+                {tActions('open')}
                 <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
@@ -282,17 +275,23 @@ export default function ESSHomePage() {
         </div>
       </section>
 
-      {/* ── Help tip ── */}
       <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 pb-12">
         <div className="rounded-xl bg-blue-50 border border-blue-100 px-5 py-4 flex items-start gap-3 dark:bg-slate-900/40 dark:border-slate-700">
           <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5 dark:text-sky-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div>
-            <p className="text-sm font-medium text-blue-800 dark:text-sky-100">Need help?</p>
+            <p className="text-sm font-medium text-blue-800 dark:text-sky-100">{t('helpTitle')}</p>
             <p className="text-sm text-blue-600 mt-0.5 dark:text-sky-200/90">
-              Browse the <button onClick={() => navigate('/knowledge')} className="underline font-medium hover:text-blue-800 dark:hover:text-white">Knowledge Base</button> for guides and FAQs, or{' '}
-              <button onClick={() => navigate('/catalog')} className="underline font-medium hover:text-blue-800 dark:hover:text-white">open a request</button> and our IT team will be in touch.
+              {t('helpBrowse')}{' '}
+              <button onClick={() => navigate('/knowledge')} className="underline font-medium hover:text-blue-800 dark:hover:text-white">
+                {t('helpKnowledgeLink')}
+              </button>{' '}
+              {t('helpMiddle')}{' '}
+              <button onClick={() => navigate('/catalog')} className="underline font-medium hover:text-blue-800 dark:hover:text-white">
+                {t('helpRequestLink')}
+              </button>{' '}
+              {t('helpEnd')}
             </p>
           </div>
         </div>

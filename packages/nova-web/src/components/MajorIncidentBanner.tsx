@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { majorIncidents as majorIncidentsApi } from '../api/client';
 
 export default function MajorIncidentBanner() {
+  const t = useTranslations('components.majorIncidentBanner');
   const [items, setItems] = useState<Array<{ id: string; number: string; title: string; status: string; priority: number }>>([]);
 
   useEffect(() => {
@@ -21,10 +23,10 @@ export default function MajorIncidentBanner() {
       }
     };
     void load();
-    const t = setInterval(load, 60_000);
+    const timer = setInterval(load, 60_000);
     return () => {
       cancelled = true;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, []);
 
@@ -33,7 +35,7 @@ export default function MajorIncidentBanner() {
   return (
     <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-semibold uppercase tracking-wide text-red-800">Major incident</span>
+        <span className="font-semibold uppercase tracking-wide text-red-800">{t('label')}</span>
         {items.map((it) => (
           <Link
             key={it.id}

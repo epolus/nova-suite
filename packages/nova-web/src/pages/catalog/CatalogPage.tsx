@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { catalog } from '../../api/client';
 import type { Category, ServiceItem } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -15,14 +16,15 @@ import { formatCurrency } from '../../utils/currency';
 function CatalogImage({ itemId }: { itemId: string }) {
   const [src, setSrc] = useState<string>('');
   useEffect(() => {
+    let objectUrl = '';
     const token = localStorage.getItem('nova_token');
     fetch(`/api/catalog/items/${itemId}/picture`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((res) => { if (res.ok) return res.blob(); throw new Error(); })
-      .then((blob) => setSrc(URL.createObjectURL(blob)))
+      .then((blob) => { objectUrl = URL.createObjectURL(blob); setSrc(objectUrl); })
       .catch(() => {});
-    return () => { if (src) URL.revokeObjectURL(src); };
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [itemId]);
   if (!src) return null;
   return (
@@ -33,6 +35,8 @@ function CatalogImage({ itemId }: { itemId: string }) {
 }
 
 export default function CatalogPage() {
+  const t = useTranslations('pages.catalog');
+  const tCommon = useTranslations('common');
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<ServiceItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -68,8 +72,8 @@ export default function CatalogPage() {
   return (
     <>
       <PageHeader
-        title="Service Catalog"
-        description="Browse available services and add items to your cart."
+        title={t('title')}
+        description={t('listDescription')}
         action={
           <Link
             to="/cart"
@@ -78,7 +82,7 @@ export default function CatalogPage() {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
             </svg>
-            Cart
+            {tCommon('cart.label')}
             {cartCount > 0 && (
               <span className="bg-white text-indigo-700 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                 {cartCount}
@@ -93,7 +97,7 @@ export default function CatalogPage() {
           <SearchBar
             value={search}
             onChange={setSearch}
-            placeholder="Search services..."
+            placeholder={t('searchPlaceholder')}
           />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -105,7 +109,7 @@ export default function CatalogPage() {
                 : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
             }`}
           >
-            All
+            {tCommon('states.all')}
           </button>
           {categories.map((cat) => (
             <button
@@ -125,7 +129,7 @@ export default function CatalogPage() {
 
       {filteredItems.length === 0 ? (
         <div className="text-center py-16 text-gray-400 text-sm">
-          {search ? `No services matching "${search}"` : 'No services available.'}
+          {search ? t('noServicesSearch', { query: search }) : t('noServices')}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -148,16 +152,16 @@ export default function CatalogPage() {
                     )}
                     {item.approval_required && (
                       <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
-                        Manager approval
+                        {t('managerApproval')}
                       </span>
                     )}
                   </div>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">{item.short_description}</p>
                 <div className="mt-4 flex items-center justify-between">
-                  <span className="text-xs text-gray-400">SLA: {item.sla_hours}h</span>
+                  <span className="text-xs text-gray-400">{t('slaHours', { hours: item.sla_hours })}</span>
                   <span className="text-sm font-medium text-indigo-600 group-hover:text-indigo-700">
-                    Open item
+                    {t('openItem')}
                   </span>
                 </div>
               </Card>

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import type { ServiceItem } from '../api/client';
 
 const RECENT_STORAGE_KEY = 'nova_admin_recent_catalog_items';
@@ -41,10 +42,12 @@ export default function ServiceItemCombobox({
   value,
   onChange,
   taskCounts = {},
-  placeholder = 'Search and select a service item…',
+  placeholder,
   disabled = false,
   className = '',
 }: Props) {
+  const t = useTranslations('components.serviceItemCombobox');
+  const resolvedPlaceholder = placeholder ?? t('selectPlaceholder');
   const listId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -210,7 +213,7 @@ export default function ServiceItemCombobox({
         aria-controls={listId}
       >
         <span className={selected ? 'truncate font-medium' : 'truncate text-gray-400'}>
-          {selected ? displayLabel : placeholder}
+          {selected ? displayLabel : resolvedPlaceholder}
         </span>
         <span className="flex-shrink-0 text-gray-400" aria-hidden>
           {open ? '▲' : '▼'}
@@ -230,12 +233,12 @@ export default function ServiceItemCombobox({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onInputKeyDown}
-              placeholder="Type to filter…"
+              placeholder={t('filterPlaceholder')}
               className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           {rows.length === 0 ? (
-            <div className="px-3 py-6 text-center text-xs text-gray-400">No matching service items.</div>
+            <div className="px-3 py-6 text-center text-xs text-gray-400">{t('noMatches')}</div>
           ) : (
             rows.map((row, idx) => {
               if (row.type === 'section') {

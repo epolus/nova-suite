@@ -1,96 +1,102 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { admin, type CompanyItem } from '../../api/client';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
 
-const columns: ColumnDef<CompanyItem>[] = [
-  {
-    key: 'name',
-    label: 'Name',
-    sortable: true,
-    render: (c) => <span className="font-medium text-gray-900">{c.name}</span>,
-  },
-  {
-    key: 'code',
-    label: 'Code',
-    sortable: true,
-    render: (c) => <span className="font-mono text-xs text-gray-700">{c.code || '—'}</span>,
-  },
-  {
-    key: 'country',
-    label: 'Country',
-    sortable: true,
-    render: (c) => <span className="text-gray-600">{c.country || '—'}</span>,
-  },
-  {
-    key: 'city',
-    label: 'City',
-    sortable: true,
-    render: (c) => <span className="text-gray-600">{c.city || '—'}</span>,
-  },
-  {
-    key: 'parent_company_name',
-    label: 'Parent',
-    sortable: true,
-    render: (c) =>
-      c.parent_company_id && c.parent_company_name ? (
-        <Link
-          to={`/admin/companies/${c.parent_company_id}`}
-          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {c.parent_company_name}
-        </Link>
-      ) : (
-        <span className="text-gray-400">—</span>
-      ),
-  },
-  {
-    key: 'contact_user_name',
-    label: 'Contact',
-    sortable: true,
-    render: (c) =>
-      c.contact_user_id && c.contact_user_name ? (
-        <Link
-          to={`/admin/users/${c.contact_user_id}`}
-          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {c.contact_user_name}
-        </Link>
-      ) : (
-        <span className="text-gray-400">—</span>
-      ),
-  },
-  {
-    key: 'location_count',
-    label: 'Locations',
-    sortable: true,
-    render: (c) => (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-        {c.location_count}
-      </span>
-    ),
-  },
-];
-
-const fields: FieldDef[] = [
-  { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. ACME AG' },
-  { key: 'code', label: 'Code', type: 'text', placeholder: 'e.g. ACME-CH' },
-  { key: 'website', label: 'Website', type: 'text', placeholder: 'e.g. https://acme.example' },
-  { key: 'phone', label: 'Phone', type: 'text', placeholder: 'e.g. +41 44 123 45 67' },
-  { key: 'street', label: 'Street', type: 'text', placeholder: 'e.g. Bahnhofstrasse 1' },
-  { key: 'city', label: 'City', type: 'text', placeholder: 'e.g. Zurich' },
-  { key: 'state', label: 'State', type: 'text', placeholder: 'e.g. ZH' },
-  { key: 'zip', label: 'ZIP', type: 'text', placeholder: 'e.g. 8001' },
-  { key: 'country', label: 'Country', type: 'text', placeholder: 'e.g. Switzerland' },
-  { key: 'parent_company_id', label: 'Parent Company ID', type: 'text', placeholder: 'Optional UUID' },
-  { key: 'contact_user_id', label: 'Contact User ID', type: 'text', placeholder: 'Optional UUID' },
-  { key: 'description', label: 'Description', type: 'textarea', placeholder: 'Optional notes' },
-];
-
 export default function CompaniesPage() {
+  const t = useTranslations('pages.admin.companies');
+  const tFields = useTranslations('common.fields');
+  const tTable = useTranslations('common.table');
+  const tMaster = useTranslations('common.masterData');
+
+  const columns = useMemo((): ColumnDef<CompanyItem>[] => [
+    {
+      key: 'name',
+      label: tFields('name'),
+      sortable: true,
+      render: (c) => <span className="font-medium text-gray-900">{c.name}</span>,
+    },
+    {
+      key: 'code',
+      label: tFields('code'),
+      sortable: true,
+      render: (c) => <span className="font-mono text-xs text-gray-700">{c.code || tTable('emDash')}</span>,
+    },
+    {
+      key: 'country',
+      label: tFields('country'),
+      sortable: true,
+      render: (c) => <span className="text-gray-600">{c.country || tTable('emDash')}</span>,
+    },
+    {
+      key: 'city',
+      label: tFields('city'),
+      sortable: true,
+      render: (c) => <span className="text-gray-600">{c.city || tTable('emDash')}</span>,
+    },
+    {
+      key: 'parent_company_name',
+      label: tFields('parent'),
+      sortable: true,
+      render: (c) =>
+        c.parent_company_id && c.parent_company_name ? (
+          <Link
+            to={`/admin/companies/${c.parent_company_id}`}
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {c.parent_company_name}
+          </Link>
+        ) : (
+          <span className="text-gray-400">{tTable('emDash')}</span>
+        ),
+    },
+    {
+      key: 'contact_user_name',
+      label: tFields('contact'),
+      sortable: true,
+      render: (c) =>
+        c.contact_user_id && c.contact_user_name ? (
+          <Link
+            to={`/admin/users/${c.contact_user_id}`}
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {c.contact_user_name}
+          </Link>
+        ) : (
+          <span className="text-gray-400">{tTable('emDash')}</span>
+        ),
+    },
+    {
+      key: 'location_count',
+      label: tFields('locations'),
+      sortable: true,
+      render: (c) => (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          {c.location_count}
+        </span>
+      ),
+    },
+  ], [tFields, tTable]);
+
+  const fields = useMemo((): FieldDef[] => [
+    { key: 'name', label: tFields('name'), type: 'text', required: true, placeholder: t('placeholderName') },
+    { key: 'code', label: tFields('code'), type: 'text', placeholder: t('placeholderCode') },
+    { key: 'website', label: tFields('website'), type: 'text', placeholder: t('placeholderWebsite') },
+    { key: 'phone', label: tFields('phone'), type: 'text', placeholder: t('placeholderPhone') },
+    { key: 'street', label: tFields('street'), type: 'text', placeholder: t('placeholderStreet') },
+    { key: 'city', label: tFields('city'), type: 'text', placeholder: t('placeholderCity') },
+    { key: 'state', label: tFields('state'), type: 'text', placeholder: t('placeholderState') },
+    { key: 'zip', label: tFields('zip'), type: 'text', placeholder: t('placeholderZip') },
+    { key: 'country', label: tFields('country'), type: 'text', placeholder: t('placeholderCountry') },
+    { key: 'parent_company_id', label: tFields('parentCompany'), type: 'text', placeholder: t('placeholderOptionalUuid') },
+    { key: 'contact_user_id', label: tFields('contactUserId'), type: 'text', placeholder: t('placeholderOptionalUuid') },
+    { key: 'description', label: tFields('description'), type: 'textarea', placeholder: tMaster('optionalNotes') },
+  ], [t, tFields, tMaster]);
+
   const fetchItems = useCallback(async () => {
     const res = await admin.companies();
     return res.companies;
@@ -98,8 +104,8 @@ export default function CompaniesPage() {
 
   return (
     <MasterDataPage<CompanyItem>
-      title="Companies"
-      description="Manage legal entities, business units, and hierarchy."
+      title={t('title')}
+      description={t('description')}
       storageKey="admin_companies"
       detailBasePath="/admin/companies"
       columns={columns}

@@ -26,6 +26,8 @@ function useFullWidthContent(pathname: string): boolean {
 }
 
 function NotificationBell() {
+  const t = useTranslations('common.notifications');
+  const tStates = useTranslations('common.states');
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -80,7 +82,7 @@ function NotificationBell() {
       setItems((prev) => prev.map((x) => ({ ...x, is_read: true })));
       setUnread(0);
     } catch {
-      setActionError('Failed to mark all notifications as read.');
+      setActionError(t('markAllFailed'));
     } finally {
       setActionLoading(false);
     }
@@ -89,7 +91,7 @@ function NotificationBell() {
   const handleDeleteAll = async () => {
     if (actionLoading) return;
     if (items.length === 0) return;
-    if (!window.confirm('Delete all notifications?')) return;
+    if (!window.confirm(t('deleteAllConfirm'))) return;
     setActionLoading(true);
     setActionError(null);
     try {
@@ -97,7 +99,7 @@ function NotificationBell() {
       setItems([]);
       setUnread(0);
     } catch {
-      setActionError('Failed to delete notifications.');
+      setActionError(t('deleteFailed'));
     } finally {
       setActionLoading(false);
     }
@@ -135,7 +137,7 @@ function NotificationBell() {
       <button
         onClick={handleOpen}
         className="relative p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-        title="Notifications"
+        title={t('title')}
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 01-6 0" />
@@ -153,7 +155,7 @@ function NotificationBell() {
       {open && (
         <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
           <div className="px-3 py-2 border-b border-gray-100 text-sm font-semibold text-gray-900 flex items-center justify-between gap-3">
-            <span>Notifications</span>
+            <span>{t('title')}</span>
             <div className="flex items-center gap-2">
               {items.some((n) => !n.is_read) && (
                 <button
@@ -161,7 +163,7 @@ function NotificationBell() {
                   disabled={actionLoading}
                   className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
                 >
-                  Mark all read
+                  {t('markAllRead')}
                 </button>
               )}
               {items.length > 0 && (
@@ -170,7 +172,7 @@ function NotificationBell() {
                   disabled={actionLoading}
                   className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50"
                 >
-                  Delete all
+                  {t('deleteAll')}
                 </button>
               )}
             </div>
@@ -178,9 +180,9 @@ function NotificationBell() {
           {actionError && <div className="px-3 py-2 border-b border-gray-100 text-xs text-red-600">{actionError}</div>}
           <div className="max-h-80 overflow-y-auto">
             {loading ? (
-              <p className="px-3 py-4 text-xs text-gray-500">Loading...</p>
+              <p className="px-3 py-4 text-xs text-gray-500">{tStates('loading')}</p>
             ) : items.length === 0 ? (
-              <p className="px-3 py-4 text-xs text-gray-500">No notifications</p>
+              <p className="px-3 py-4 text-xs text-gray-500">{t('empty')}</p>
             ) : (
               items.map((n) => (
                 <button

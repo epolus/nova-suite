@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { admin, type AssignmentGroupItem } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Spinner from '../../components/Spinner';
@@ -10,98 +11,108 @@ import { useListParams } from '../../hooks/useListParams';
 
 const DEFAULT_COLS = ['name', 'manager_name', 'member_count', 'processes', 'cost_center_name', '_status'];
 
-const ALL_COLUMNS: DataColumnDef<AssignmentGroupItem>[] = [
-  {
-    key: 'name',
-    label: 'Name',
-    sortable: true,
-    defaultVisible: true,
-    render: (ag) => <span className="font-medium text-gray-900">{ag.name}</span>,
-  },
-  {
-    key: 'description',
-    label: 'Description',
-    sortable: true,
-    defaultVisible: false,
-    className: 'max-w-xs truncate',
-    render: (ag) => <span className="text-gray-500">{ag.description || '—'}</span>,
-  },
-  {
-    key: 'manager_name',
-    label: 'Manager',
-    sortable: true,
-    defaultVisible: true,
-    render: (ag) => <span className="text-gray-700">{ag.manager_name || '—'}</span>,
-  },
-  {
-    key: 'member_count',
-    label: 'Members',
-    sortable: true,
-    defaultVisible: true,
-    render: (ag) => <span className="text-gray-600">{ag.member_count}</span>,
-  },
-  {
-    key: 'processes',
-    label: 'Processes',
-    sortable: false,
-    defaultVisible: true,
-    render: (ag) => (
-      <div className="flex flex-wrap gap-1">
-        {ag.processes.length > 0
-          ? ag.processes.map((p) => (
-              <span
-                key={p.id}
-                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-              >
-                {p.name}
-              </span>
-            ))
-          : <span className="text-gray-400">—</span>}
-      </div>
-    ),
-  },
-  {
-    key: 'cost_center_name',
-    label: 'Cost Center',
-    sortable: true,
-    defaultVisible: true,
-    render: (ag) =>
-      ag.cost_center_name ? (
-        <span className="text-gray-600">
-          {ag.cost_center_code} — {ag.cost_center_name}
-        </span>
-      ) : (
-        <span className="text-gray-400">—</span>
+function buildColumns(
+  tFields: ReturnType<typeof useTranslations<'common.fields'>>,
+  tTable: ReturnType<typeof useTranslations<'common.table'>>,
+  tStates: ReturnType<typeof useTranslations<'common.states'>>,
+): DataColumnDef<AssignmentGroupItem>[] {
+  return [
+    {
+      key: 'name',
+      label: tFields('name'),
+      sortable: true,
+      defaultVisible: true,
+      render: (ag) => <span className="font-medium text-gray-900">{ag.name}</span>,
+    },
+    {
+      key: 'description',
+      label: tFields('description'),
+      sortable: true,
+      defaultVisible: false,
+      className: 'max-w-xs truncate',
+      render: (ag) => <span className="text-gray-500">{ag.description || tTable('emDash')}</span>,
+    },
+    {
+      key: 'manager_name',
+      label: tFields('manager'),
+      sortable: true,
+      defaultVisible: true,
+      render: (ag) => <span className="text-gray-700">{ag.manager_name || tTable('emDash')}</span>,
+    },
+    {
+      key: 'member_count',
+      label: tFields('members'),
+      sortable: true,
+      defaultVisible: true,
+      render: (ag) => <span className="text-gray-600">{ag.member_count}</span>,
+    },
+    {
+      key: 'processes',
+      label: tFields('processes'),
+      sortable: false,
+      defaultVisible: true,
+      render: (ag) => (
+        <div className="flex flex-wrap gap-1">
+          {ag.processes.length > 0
+            ? ag.processes.map((p) => (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {p.name}
+                </span>
+              ))
+            : <span className="text-gray-400">{tTable('emDash')}</span>}
+        </div>
       ),
-  },
-  {
-    key: 'parent_group_name',
-    label: 'Parent Group',
-    sortable: true,
-    defaultVisible: false,
-    render: (ag) => <span className="text-gray-600">{ag.parent_group_name || '—'}</span>,
-  },
-  {
-    key: '_status',
-    label: 'Status',
-    sortable: true,
-    defaultVisible: true,
-    render: (ag) =>
-      ag.is_active ? (
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-          Active
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-          Inactive
-        </span>
-      ),
-  },
-];
+    },
+    {
+      key: 'cost_center_name',
+      label: tFields('costCenter'),
+      sortable: true,
+      defaultVisible: true,
+      render: (ag) =>
+        ag.cost_center_name ? (
+          <span className="text-gray-600">
+            {ag.cost_center_code} — {ag.cost_center_name}
+          </span>
+        ) : (
+          <span className="text-gray-400">{tTable('emDash')}</span>
+        ),
+    },
+    {
+      key: 'parent_group_name',
+      label: tFields('parentGroup'),
+      sortable: true,
+      defaultVisible: false,
+      render: (ag) => <span className="text-gray-600">{ag.parent_group_name || tTable('emDash')}</span>,
+    },
+    {
+      key: '_status',
+      label: tFields('status'),
+      sortable: true,
+      defaultVisible: true,
+      render: (ag) =>
+        ag.is_active ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+            {tStates('active')}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+            {tStates('inactive')}
+          </span>
+        ),
+    },
+  ];
+}
 
 export default function AssignmentGroupsPage() {
+  const tPage = useTranslations('pages.admin.assignmentGroupsPage');
+  const tFields = useTranslations('common.fields');
+  const tTable = useTranslations('common.table');
+  const tStates = useTranslations('common.states');
   const { params, setSearch, setSort, setCols, setFilter, setColumnFilter } = useListParams({
     defaultCols: DEFAULT_COLS,
     filterKeys: ['active'],
@@ -191,26 +202,31 @@ export default function AssignmentGroupsPage() {
     return lp;
   }, [activeFilter, params.search, params.sort, params.dir, params.columnFilters]);
 
+  const columns = useMemo(
+    () => buildColumns(tFields, tTable, tStates),
+    [tFields, tStates, tTable],
+  );
+
   if (loading) return <Spinner />;
 
   return (
     <>
       <PageHeader
-        title="Assignment Groups"
-        description="Manage assignment groups for incident routing and team organization."
+        title={tPage('title')}
+        description={tPage('description')}
         action={
           <button
             onClick={() => navigate('/admin/assignment-groups/new', { state: { listParams: getListParams() } })}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
           >
-            + New Group
+            {tPage('newGroup')}
           </button>
         }
       />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
-          <SearchBar value={params.search} onChange={setSearch} placeholder="Search groups..." />
+          <SearchBar value={params.search} onChange={setSearch} placeholder={tPage('searchPlaceholder')} />
         </div>
         <div className="flex gap-2 items-center">
           {(['all', 'active', 'inactive'] as const).map((f) => (
@@ -223,17 +239,17 @@ export default function AssignmentGroupsPage() {
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {f}
+              {f === 'all' ? tStates('all') : f === 'active' ? tStates('active') : tStates('inactive')}
             </button>
           ))}
         </div>
         <div className="ml-auto text-sm text-gray-500 self-center">
-          {sorted.length} group{sorted.length !== 1 ? 's' : ''}
+          {tPage('count', { count: sorted.length })}
         </div>
       </div>
 
       <DataTable
-        columns={ALL_COLUMNS}
+        columns={columns}
         data={sorted}
         visibleColumns={params.cols}
         onColumnsChange={setCols}
@@ -242,7 +258,7 @@ export default function AssignmentGroupsPage() {
         onSort={setSort}
         columnFilters={params.columnFilters}
         onColumnFilter={setColumnFilter}
-        emptyMessage={params.search ? `No results for "${params.search}"` : 'No assignment groups found.'}
+        emptyMessage={params.search ? tPage('emptySearch', { query: params.search }) : tPage('empty')}
         onRowClick={(item) => navigate(`/admin/assignment-groups/${item.id}`, { state: { listParams: getListParams() } })}
       />
     </>

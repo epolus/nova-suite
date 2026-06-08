@@ -1,11 +1,17 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { admin, knowledge, type AssignmentGroupItem, type KnowledgeApprovalWorkflow, type KnowledgeCategory } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 
 export default function KnowledgeWorkflowsPage() {
+  const t = useTranslations('pages.admin.knowledgeWorkflows');
+  const tActions = useTranslations('common.actions');
+  const tFields = useTranslations('common.fields');
+  const tStates = useTranslations('common.states');
+
   const [workflows, setWorkflows] = useState<KnowledgeApprovalWorkflow[]>([]);
   const [categories, setCategories] = useState<KnowledgeCategory[]>([]);
   const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
@@ -107,7 +113,7 @@ export default function KnowledgeWorkflowsPage() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this workflow?')) return;
+    if (!confirm(t('confirmDeleteWorkflow'))) return;
     await knowledge.deleteWorkflow(id);
     load();
   };
@@ -149,7 +155,7 @@ export default function KnowledgeWorkflowsPage() {
   };
 
   const deleteCategory = async (id: string) => {
-    if (!confirm('Delete this category?')) return;
+    if (!confirm(t('confirmDeleteCategory'))) return;
     await knowledge.deleteCategory(id);
     if (editingCategoryId === id) setEditingCategoryId(null);
     load();
@@ -160,14 +166,14 @@ export default function KnowledgeWorkflowsPage() {
   return (
     <>
       <PageHeader
-        title="Knowledge Approval Workflows"
-        description="Configure approval steps (assignment groups) for knowledge articles."
+        title={t('title')}
+        description={t('description')}
         action={
           <button
             onClick={() => setEditingId('new')}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
           >
-            + New Workflow
+            {t('newWorkflow')}
           </button>
         }
       />
@@ -175,9 +181,9 @@ export default function KnowledgeWorkflowsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <Card className="lg:col-span-1">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-gray-900">Categories & Subcategories</p>
+            <p className="text-sm font-semibold text-gray-900">{t('categoriesSection')}</p>
             <button onClick={startNewCategory} className="text-xs text-indigo-600 hover:text-indigo-800">
-              + New
+              {t('newCategory')}
             </button>
           </div>
           <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
@@ -185,15 +191,15 @@ export default function KnowledgeWorkflowsPage() {
               <div key={c.id} className={`p-2.5 rounded border ${editingCategoryId === c.id ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200'}`}>
                 <button className="w-full text-left" onClick={() => startEditCategory(c.id)}>
                   <p className="text-sm font-medium text-gray-900">{categoryLabelById.get(c.id) || c.name}</p>
-                  <p className="text-xs text-gray-500">{c.is_active ? 'active' : 'inactive'}</p>
+                  <p className="text-xs text-gray-500">{c.is_active ? tStates('active') : tStates('inactive')}</p>
                 </button>
                 <div className="mt-1.5 flex items-center gap-2">
-                  <button onClick={() => startEditCategory(c.id)} className="text-xs text-indigo-600 hover:text-indigo-800">Edit</button>
-                  <button onClick={() => deleteCategory(c.id)} className="text-xs text-red-600 hover:text-red-800">Delete</button>
+                  <button onClick={() => startEditCategory(c.id)} className="text-xs text-indigo-600 hover:text-indigo-800">{tActions('edit')}</button>
+                  <button onClick={() => deleteCategory(c.id)} className="text-xs text-red-600 hover:text-red-800">{tActions('delete')}</button>
                 </div>
               </div>
             ))}
-            {categories.length === 0 && <p className="text-sm text-gray-400 py-6 text-center">No categories yet.</p>}
+            {categories.length === 0 && <p className="text-sm text-gray-400 py-6 text-center">{t('noCategories')}</p>}
           </div>
         </Card>
 
@@ -202,7 +208,7 @@ export default function KnowledgeWorkflowsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{tFields('name')}</label>
                   <input
                     value={categoryForm.name}
                     onChange={(e) => setCategoryForm((p) => ({ ...p, name: e.target.value }))}
@@ -210,13 +216,13 @@ export default function KnowledgeWorkflowsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Parent Category (optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('parentCategoryOptional')}</label>
                   <select
                     value={categoryForm.parent_id}
                     onChange={(e) => setCategoryForm((p) => ({ ...p, parent_id: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
                   >
-                    <option value="">Top-level category</option>
+                    <option value="">{t('topLevelCategory')}</option>
                     {categories
                       .filter((c) => c.id !== editingCategoryId)
                       .map((c) => (
@@ -225,7 +231,7 @@ export default function KnowledgeWorkflowsPage() {
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{tFields('description')}</label>
                   <textarea
                     rows={3}
                     value={categoryForm.description}
@@ -234,14 +240,14 @@ export default function KnowledgeWorkflowsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Active</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{tStates('active')}</label>
                   <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                     <input
                       type="checkbox"
                       checked={categoryForm.is_active}
                       onChange={(e) => setCategoryForm((p) => ({ ...p, is_active: e.target.checked }))}
                     />
-                    Enabled
+                    {tStates('enabled')}
                   </label>
                 </div>
               </div>
@@ -251,18 +257,18 @@ export default function KnowledgeWorkflowsPage() {
                   disabled={savingCategory || !categoryForm.name.trim()}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {savingCategory ? 'Saving...' : editingCategoryId === 'new' ? 'Create Category' : 'Save Category'}
+                  {savingCategory ? tActions('saving') : editingCategoryId === 'new' ? t('createCategory') : t('saveCategory')}
                 </button>
                 <button
                   onClick={() => setEditingCategoryId(null)}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  Cancel
+                  {tActions('cancel')}
                 </button>
               </div>
             </div>
           ) : (
-            <div className="text-sm text-gray-400 py-16 text-center">Select a category/subcategory or create a new one.</div>
+            <div className="text-sm text-gray-400 py-16 text-center">{t('selectCategoryHint')}</div>
           )}
         </Card>
       </div>
@@ -274,15 +280,15 @@ export default function KnowledgeWorkflowsPage() {
               <div key={w.id} className={`p-3 rounded-lg border ${editingId === w.id ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200'}`}>
                 <button className="w-full text-left" onClick={() => setEditingId(w.id)}>
                   <p className="text-sm font-medium text-gray-900">{w.name}</p>
-                  <p className="text-xs text-gray-500">{w.category_name || 'Default'} • {w.steps?.length || 0} step(s)</p>
+                  <p className="text-xs text-gray-500">{w.category_name || t('default')} • {t('stepsCount', { count: w.steps?.length || 0 })}</p>
                 </button>
                 <div className="mt-2 flex items-center gap-2">
-                  <button onClick={() => setEditingId(w.id)} className="text-xs text-indigo-600 hover:text-indigo-800">Edit</button>
-                  <button onClick={() => remove(w.id)} className="text-xs text-red-600 hover:text-red-800">Delete</button>
+                  <button onClick={() => setEditingId(w.id)} className="text-xs text-indigo-600 hover:text-indigo-800">{tActions('edit')}</button>
+                  <button onClick={() => remove(w.id)} className="text-xs text-red-600 hover:text-red-800">{tActions('delete')}</button>
                 </div>
               </div>
             ))}
-            {workflows.length === 0 && <p className="text-sm text-gray-400 py-8 text-center">No workflows configured.</p>}
+            {workflows.length === 0 && <p className="text-sm text-gray-400 py-8 text-center">{t('noWorkflows')}</p>}
           </div>
         </Card>
 
@@ -291,7 +297,7 @@ export default function KnowledgeWorkflowsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{tFields('name')}</label>
                   <input
                     value={form.name}
                     onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
@@ -299,18 +305,18 @@ export default function KnowledgeWorkflowsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category (optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('categoryOptional')}</label>
                   <select
                     value={form.category_id}
                     onChange={(e) => setForm((p) => ({ ...p, category_id: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
                   >
-                    <option value="">Default (all categories)</option>
+                    <option value="">{t('defaultAllCategories')}</option>
                     {categories.map((c) => <option key={c.id} value={c.id}>{categoryLabelById.get(c.id) || c.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('sortOrder')}</label>
                   <input
                     type="number"
                     value={form.sort_order}
@@ -319,32 +325,32 @@ export default function KnowledgeWorkflowsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Active</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{tStates('active')}</label>
                   <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                     <input
                       type="checkbox"
                       checked={form.is_active}
                       onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))}
                     />
-                    Enabled
+                    {tStates('enabled')}
                   </label>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium text-gray-800">Approval Steps</p>
+                  <p className="text-sm font-medium text-gray-800">{t('approvalSteps')}</p>
                   <button
                     onClick={() => setForm((p) => ({ ...p, steps: [...p.steps, { assignment_group_id: '' }] }))}
                     className="text-xs text-indigo-600 hover:text-indigo-800"
                   >
-                    + Add Step
+                    {t('addStep')}
                   </button>
                 </div>
                 <div className="space-y-2">
                   {form.steps.map((s, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-12">Step {idx + 1}</span>
+                      <span className="text-xs text-gray-500 w-12">{t('step', { number: idx + 1 })}</span>
                       <select
                         value={s.assignment_group_id}
                         onChange={(e) =>
@@ -355,7 +361,7 @@ export default function KnowledgeWorkflowsPage() {
                         }
                         className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
                       >
-                        <option value="">Select group</option>
+                        <option value="">{t('selectGroup')}</option>
                         {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                       </select>
                       <button
@@ -363,7 +369,7 @@ export default function KnowledgeWorkflowsPage() {
                         className="text-xs text-red-600 hover:text-red-800"
                         disabled={form.steps.length <= 1}
                       >
-                        Remove
+                        {tActions('remove')}
                       </button>
                     </div>
                   ))}
@@ -376,18 +382,18 @@ export default function KnowledgeWorkflowsPage() {
                   disabled={saving || !form.name || form.steps.every((s) => !s.assignment_group_id)}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {saving ? 'Saving...' : editingId === 'new' ? 'Create Workflow' : 'Save Changes'}
+                  {saving ? tActions('saving') : editingId === 'new' ? t('createWorkflow') : t('saveChanges')}
                 </button>
                 <button
                   onClick={() => setEditingId(null)}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  Cancel
+                  {tActions('cancel')}
                 </button>
               </div>
             </div>
           ) : (
-            <div className="text-sm text-gray-400 py-16 text-center">Select a workflow or create a new one.</div>
+            <div className="text-sm text-gray-400 py-16 text-center">{t('selectWorkflowHint')}</div>
           )}
         </Card>
       </div>

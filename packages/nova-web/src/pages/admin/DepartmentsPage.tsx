@@ -1,47 +1,53 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { admin, type CostCenterItem, type DepartmentItem } from '../../api/client';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
 
-const columns: ColumnDef<DepartmentItem>[] = [
-  {
-    key: 'name',
-    label: 'Name',
-    sortable: true,
-    render: (d) => <span className="font-medium text-gray-900">{d.name}</span>,
-  },
-  {
-    key: 'description',
-    label: 'Description',
-    sortable: true,
-    render: (d) => <span className="text-gray-500">{d.description || '—'}</span>,
-    className: 'max-w-xs truncate',
-  },
-  {
-    key: 'parent_department_name',
-    label: 'Parent Department',
-    sortable: true,
-    render: (d) => <span className="text-gray-500">{d.parent_department_name || '—'}</span>,
-  },
-  {
-    key: 'cost_center_name',
-    label: 'Cost Center',
-    sortable: true,
-    render: (d) => <span className="text-gray-500">{d.cost_center_name || '—'}</span>,
-  },
-  {
-    key: 'user_count',
-    label: 'Users',
-    sortable: true,
-    render: (d) => (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-        {d.user_count}
-      </span>
-    ),
-  },
-];
-
 export default function DepartmentsPage() {
+  const t = useTranslations('pages.admin.departments');
+  const tFields = useTranslations('common.fields');
+  const tTable = useTranslations('common.table');
+  const tStates = useTranslations('common.states');
+
+  const columns = useMemo((): ColumnDef<DepartmentItem>[] => [
+    {
+      key: 'name',
+      label: tFields('name'),
+      sortable: true,
+      render: (d) => <span className="font-medium text-gray-900">{d.name}</span>,
+    },
+    {
+      key: 'description',
+      label: tFields('description'),
+      sortable: true,
+      render: (d) => <span className="text-gray-500">{d.description || tTable('emDash')}</span>,
+      className: 'max-w-xs truncate',
+    },
+    {
+      key: 'parent_department_name',
+      label: tFields('parentDepartment'),
+      sortable: true,
+      render: (d) => <span className="text-gray-500">{d.parent_department_name || tTable('emDash')}</span>,
+    },
+    {
+      key: 'cost_center_name',
+      label: tFields('costCenter'),
+      sortable: true,
+      render: (d) => <span className="text-gray-500">{d.cost_center_name || tTable('emDash')}</span>,
+    },
+    {
+      key: 'user_count',
+      label: tFields('users'),
+      sortable: true,
+      render: (d) => (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          {d.user_count}
+        </span>
+      ),
+    },
+  ], [tFields, tTable]);
+
   const fetchItems = useCallback(async () => {
     const res = await admin.departments();
     return res.departments;
@@ -67,15 +73,17 @@ export default function DepartmentsPage() {
     };
   }, []);
 
+  const noneOption = `— ${tStates('none')} —`;
+
   const fields: FieldDef[] = useMemo(() => [
-    { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. Engineering' },
-    { key: 'description', label: 'Description', type: 'textarea', placeholder: 'Brief description of the department' },
+    { key: 'name', label: tFields('name'), type: 'text', required: true, placeholder: t('placeholderName') },
+    { key: 'description', label: tFields('description'), type: 'textarea', placeholder: t('placeholderDescription') },
     {
       key: 'parent_department_id',
-      label: 'Parent Department',
+      label: tFields('parentDepartment'),
       type: 'select',
       options: [
-        { value: '', label: '— None —' },
+        { value: '', label: noneOption },
         ...allDepartmentsForOptions
           .filter((d) => d.is_active)
           .map((d) => ({ value: d.id, label: d.name })),
@@ -83,21 +91,21 @@ export default function DepartmentsPage() {
     },
     {
       key: 'cost_center_id',
-      label: 'Cost Center',
+      label: tFields('costCenter'),
       type: 'select',
       options: [
-        { value: '', label: '— None —' },
+        { value: '', label: noneOption },
         ...allCostCentersForOptions
           .filter((cc) => cc.is_active)
           .map((cc) => ({ value: cc.id, label: `${cc.code} - ${cc.name}` })),
       ],
     },
-  ], [allCostCentersForOptions, allDepartmentsForOptions]);
+  ], [allCostCentersForOptions, allDepartmentsForOptions, noneOption, t, tFields]);
 
   return (
     <MasterDataPage<DepartmentItem>
-      title="Departments"
-      description="Manage organizational departments."
+      title={t('title')}
+      description={t('description')}
       storageKey="admin_departments"
       detailBasePath="/admin/departments"
       columns={columns}

@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { problems as problemsApi } from '../../api/client';
-import type { Pagination, Problem } from '../../api/client';
+import type { Problem } from '../../api/client';
+import { useProblemsList, useInvalidateProblems } from '@/hooks/queries';
 import PageHeader from '../../components/PageHeader';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
@@ -14,6 +16,7 @@ import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { formatDate } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
+import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import { PROBLEM_BULK_ACTIONS, PROBLEM_PRIORITY_OPTIONS, PROBLEM_STATUS_OPTIONS } from './problemListConfig';
 
 const DEFAULT_COLS = ['number', 'title', 'status', 'priority', 'assignment_group_name', 'incident_count', 'updated_at'];
@@ -28,11 +31,16 @@ interface FilterPreset {
   columnFilters: Record<string, string>;
 }
 
-function buildColumns(listParams: Record<string, string>): DataColumnDef<Problem>[] {
+type ProblemListLabels = {
+  field: ReturnType<typeof useFieldLabel>;
+  emDash: string;
+};
+
+function buildColumns(listParams: Record<string, string>, labels: ProblemListLabels): DataColumnDef<Problem>[] {
   return [
     {
       key: 'number',
-      label: 'Number',
+      label: labels.field('number'),
       sortable: true,
       defaultVisible: true,
       render: (p) => (
@@ -46,20 +54,33 @@ function buildColumns(listParams: Record<string, string>): DataColumnDef<Problem
         </Link>
       ),
     },
-    { key: 'title', label: 'Title', sortable: true, defaultVisible: true, render: (p) => p.title },
-    { key: 'status', label: 'Status', sortable: true, defaultVisible: true, render: (p) => <Badge value={p.status} /> },
-    { key: 'priority', label: 'Priority', sortable: true, defaultVisible: true, render: (p) => <span className="capitalize">{p.priority}</span> },
-    { key: 'category', label: 'Category', sortable: true, defaultVisible: false, render: (p) => p.category || '—' },
-    { key: 'assignment_group_name', label: 'Assignment Group', sortable: true, defaultVisible: true, render: (p) => p.assignment_group_name || '—' },
-    { key: 'assigned_to_name', label: 'Assigned To', sortable: true, defaultVisible: false, render: (p) => p.assigned_to_name || '—' },
-    { key: 'incident_count', label: '#Incidents', sortable: false, defaultVisible: true, render: (p) => String(p.incident_count || 0) },
-    { key: 'open_incident_count', label: '#Open Incidents', sortable: false, defaultVisible: false, render: (p) => String(p.open_incident_count || 0) },
-    { key: 'updated_at', label: 'Updated', sortable: true, defaultVisible: true, render: (p) => formatDate(p.updated_at) },
-    { key: 'created_at', label: 'Created', sortable: true, defaultVisible: false, render: (p) => formatDate(p.created_at) },
+    { key: 'title', label: labels.field('title'), sortable: true, defaultVisible: true, render: (p) => p.title },
+    { key: 'status', label: labels.field('status'), sortable: true, defaultVisible: true, render: (p) => <Badge value={p.status} /> },
+    { key: 'priority', label: labels.field('priority'), sortable: true, defaultVisible: true, render: (p) => <span className="capitalize">{p.priority}</span> },
+    { key: 'category', label: labels.field('category'), sortable: true, defaultVisible: false, render: (p) => p.category || labels.emDash },
+    { key: 'assignment_group_name', label: labels.field('assignmentGroup'), sortable: true, defaultVisible: true, render: (p) => p.assignment_group_name || labels.emDash },
+    { key: 'assigned_to_name', label: labels.field('assignedTo'), sortable: true, defaultVisible: false, render: (p) => p.assigned_to_name || labels.emDash },
+    { key: 'incident_count', label: labels.field('incidentCount'), sortable: false, defaultVisible: true, render: (p) => String(p.incident_count || 0) },
+    { key: 'open_incident_count', label: labels.field('openIncidentCount'), sortable: false, defaultVisible: false, render: (p) => String(p.open_incident_count || 0) },
+    { key: 'updated_at', label: labels.field('updated'), sortable: true, defaultVisible: true, render: (p) => formatDate(p.updated_at) },
+    { key: 'created_at', label: labels.field('created'), sortable: true, defaultVisible: false, render: (p) => formatDate(p.created_at) },
   ];
 }
 
 export default function ProblemsPage() {
+  const tProblems = useTranslations('pages.problems');
+  const tList = useTranslations('common.list');
+  const tFilters = useTranslations('common.filters');
+  const tActions = useTranslations('common.actions');
+  const tMaster = useTranslations('common.masterData');
+  const tTable = useTranslations('common.table');
+  const fieldLabel = useFieldLabel();
+  const statusLabel = useStatusLabel();
+  const listLabels = useMemo<ProblemListLabels>(
+    () => ({ field: fieldLabel, emDash: tTable('emDash') }),
+    [fieldLabel, tTable],
+  );
+
   const { user } = useAuth();
   const isAgent = isAgentRole(user?.roles);
   const { params, setSearch, setSort, setCols, setPage, setFilter, setColumnFilter, update } = useListParams({
@@ -68,14 +89,11 @@ export default function ProblemsPage() {
     storageKey: 'problems',
   });
   const navigate = useNavigate();
-  const [data, setData] = useState<Problem[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const invalidateProblems = useInvalidateProblems();
   const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
     `presets:${PRESETS_KEY}`,
     [],
@@ -86,28 +104,29 @@ export default function ProblemsPage() {
 
   const status = params.filters.status || 'all';
   const priority = params.filters.priority || 'all';
-  const cfKey = JSON.stringify(params.columnFilters);
 
-  useEffect(() => {
-    setLoading(true);
-    setSelectedIds([]);
-    const apiParams: Record<string, string> = {};
-    if (status !== 'all') apiParams.status = status;
-    if (priority !== 'all') apiParams.priority = priority;
-    if (params.search) apiParams.search = params.search;
+  const apiParams = useMemo(() => {
+    const p: Record<string, string> = {};
+    if (status !== 'all') p.status = status;
+    if (priority !== 'all') p.priority = priority;
+    if (params.search) p.search = params.search;
     if (params.sort) {
-      apiParams.sort_by = params.sort;
-      apiParams.sort_dir = params.dir;
+      p.sort_by = params.sort;
+      p.sort_dir = params.dir;
     }
     for (const [col, val] of Object.entries(params.columnFilters)) {
-      if (val) apiParams[`cf.${col}`] = val;
+      if (val) p[`cf.${col}`] = val;
     }
-    problemsApi.list(apiParams, params.page, 20).then((res) => {
-      setData(res.problems);
-      setPagination(res.pagination);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [status, priority, params.search, params.sort, params.dir, params.page, cfKey, refreshKey]);
+    return p;
+  }, [status, priority, params.search, params.sort, params.dir, params.columnFilters]);
+
+  const { data: listResult, isLoading: loading, isFetching } = useProblemsList(apiParams, params.page);
+  const data: Problem[] = listResult?.problems ?? [];
+  const pagination = listResult?.pagination ?? null;
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [params.page, apiParams, isFetching]);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};
@@ -121,7 +140,7 @@ export default function ProblemsPage() {
     return lp;
   }, [status, priority, params.search, params.sort, params.dir]);
 
-  const columns = useMemo(() => buildColumns(getListParams()), [getListParams]);
+  const columns = useMemo(() => buildColumns(getListParams(), listLabels), [getListParams, listLabels]);
   const hasActiveFilter = !!params.search || status !== 'all' || priority !== 'all' || Object.values(params.columnFilters).some(Boolean);
   const applyPreset = (preset: FilterPreset) => {
     update({
@@ -157,7 +176,7 @@ export default function ProblemsPage() {
       await Promise.all(selectedIds.map((id) => problemsApi.update(id, { status: 'closed' })));
       setSelectedIds([]);
       setConfirmClose(false);
-      setRefreshKey((k) => k + 1);
+      invalidateProblems();
     } finally {
       setBulkLoading(false);
     }
@@ -226,14 +245,18 @@ export default function ProblemsPage() {
 
   return (
     <>
-      <PageHeader title="Problems" description="Root cause investigations and known-error tracking." action={
-        <Link to="/problems/new" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
-          + New Problem
-        </Link>
-      } />
+      <PageHeader
+        title={tProblems('title')}
+        description={tProblems('description')}
+        action={
+          <Link to="/problems/new" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+            + {tProblems('newProblem')}
+          </Link>
+        }
+      />
       {isAgent && (presets.length > 0 || hasActiveFilter) && (
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-xs font-medium text-gray-400">Saved:</span>
+          <span className="text-xs font-medium text-gray-400">{tFilters('saved')}</span>
           {presets.map((preset) => (
             <div key={preset.id} className="flex items-center gap-0.5 pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700">
               <button onClick={() => applyPreset(preset)} className="hover:text-indigo-600 transition-colors">{preset.name}</button>
@@ -247,25 +270,25 @@ export default function ProblemsPage() {
                 value={savePresetName}
                 onChange={(e) => setSavePresetName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') { setShowSaveInput(false); setSavePresetName(''); } }}
-                placeholder="Filter name..."
+                placeholder={tFilters('filterNamePlaceholder')}
                 className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-none focus:ring-1 focus:ring-indigo-400 w-36"
               />
-              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">Save</button>
-              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">{tActions('save')}</button>
+              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">{tActions('cancel')}</button>
             </div>
           ) : hasActiveFilter && (
             <button
               onClick={() => setShowSaveInput(true)}
               className="px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
             >
-              + Save current filter
+              + {tFilters('saveCurrent')}
             </button>
           )}
         </div>
       )}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
-          <SearchBar value={params.search} onChange={setSearch} placeholder="Search by number, title, description..." />
+          <SearchBar value={params.search} onChange={setSearch} placeholder={tProblems('searchPlaceholder')} />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           {PROBLEM_STATUS_OPTIONS.map((s) => (
@@ -274,7 +297,7 @@ export default function ProblemsPage() {
               onClick={() => setFilter('status', s === 'all' ? '' : s)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${status === s ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
             >
-              {s.replace(/_/g, ' ')}
+              {s === 'all' ? tList('allStatuses') : statusLabel(s)}
             </button>
           ))}
         </div>
@@ -285,36 +308,36 @@ export default function ProblemsPage() {
               onClick={() => setFilter('priority', p === 'all' ? '' : p)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors capitalize ${priority === p ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
             >
-              {p}
+              {p === 'all' ? tList('allStatuses') : statusLabel(p)}
             </button>
           ))}
           {isAgent && (
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
-              {exporting ? 'Exporting...' : 'Export CSV'}
+              {exporting ? tList('exporting') : tList('exportCsv')}
             </Button>
           )}
         </div>
       </div>
       {isAgent && selectedIds.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl mb-4 flex-wrap">
-          <span className="text-sm font-semibold text-indigo-900">{selectedIds.length} selected</span>
+          <span className="text-sm font-semibold text-indigo-900">{tList('selected', { count: selectedIds.length })}</span>
           <div className="flex items-center gap-2 flex-wrap">
             {PROBLEM_BULK_ACTIONS.map((action) => (
               confirmClose ? (
                 <span key={action.id} className="inline-flex items-center gap-2">
-                  <span className="text-xs text-gray-600">Close {selectedIds.length} problems?</span>
-                  <Button size="sm" variant="warning" disabled={bulkLoading} onClick={handleBulkClose}>Confirm</Button>
-                  <button onClick={() => setConfirmClose(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                  <span className="text-xs text-gray-600">{tProblems('bulk.confirmClose', { count: selectedIds.length })}</span>
+                  <Button size="sm" variant="warning" disabled={bulkLoading} onClick={handleBulkClose}>{tMaster('confirm')}</Button>
+                  <button onClick={() => setConfirmClose(false)} className="text-xs text-gray-500 hover:text-gray-700">{tActions('cancel')}</button>
                 </span>
               ) : (
                 <Button key={action.id} size="sm" variant={action.variant} onClick={() => setConfirmClose(true)}>
-                  {action.label}
+                  {tProblems('bulk.closeProblems')}
                 </Button>
               )
             ))}
           </div>
           <button onClick={() => { setSelectedIds([]); setConfirmClose(false); }} className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-            Clear selection
+            {tMaster('clearSelection')}
           </button>
         </div>
       )}
@@ -329,7 +352,11 @@ export default function ProblemsPage() {
           onSort={setSort}
           columnFilters={params.columnFilters}
           onColumnFilter={setColumnFilter}
-          emptyMessage={params.search ? `No problems matching "${params.search}"` : 'No problems found.'}
+          emptyMessage={
+            params.search
+              ? tProblems('emptySearch', { query: params.search })
+              : tProblems('empty')
+          }
           onRowClick={(p) => navigate(`/problems/${p.id}`, { state: { listParams: getListParams() } })}
           selectable={isAgent}
           selectedIds={selectedIds}

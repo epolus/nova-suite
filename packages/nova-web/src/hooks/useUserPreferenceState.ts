@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { auth } from '../api/client';
 
 interface WrappedPreference<T> {
@@ -32,6 +32,8 @@ export function useUserPreferenceState<T>(
   legacyStorageKey?: string,
 ): [T, (next: T | ((prev: T) => T)) => void] {
   const [value, setValue] = useState<T>(() => readLegacyValue(legacyStorageKey, fallback));
+  const fallbackRef = useRef(fallback);
+  fallbackRef.current = fallback;
 
   useEffect(() => {
     let alive = true;
@@ -39,7 +41,7 @@ export function useUserPreferenceState<T>(
       .then((res) => {
         if (!alive) return;
         if (!res.preference) {
-          const local = readLegacyValue(legacyStorageKey, fallback);
+          const local = readLegacyValue(legacyStorageKey, fallbackRef.current);
           const payload: Record<string, unknown> = { value: local as unknown };
           void auth.setPreference(scope, payload).catch(() => {
             // Keep local fallback if backend is unavailable.

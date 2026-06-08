@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { useTranslations } from 'use-intl';
 import type { DragEvent, RefObject } from 'react';
 import type { Attachment } from '../api/client';
 import Card from './Card';
@@ -30,6 +31,7 @@ function AttachmentRow({ att, onPreview, onDownload, onDelete, formatSize }: {
   onDelete: (id: string) => void;
   formatSize: (bytes: number) => string;
 }) {
+  const t = useTranslations('components.attachmentCard');
   const icon = att.mime_type.startsWith('image/') ? '📷' : att.mime_type.includes('pdf') ? '📄' : '📎';
   return (
     <div className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 group">
@@ -42,8 +44,8 @@ function AttachmentRow({ att, onPreview, onDownload, onDelete, formatSize }: {
           {formatSize(att.size_bytes)} · {att.uploaded_by_name || att.uploaded_by} · {formatDateTime(att.created_at)}
         </p>
       </div>
-      <button onClick={() => onDownload(att)} className="text-xs text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Download">&#8681;</button>
-      <button onClick={() => onDelete(att.id)} className="text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete">&#10005;</button>
+      <button onClick={() => onDownload(att)} className="text-xs text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" title={t('download')}>&#8681;</button>
+      <button onClick={() => onDelete(att.id)} className="text-xs text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title={t('delete')}>&#10005;</button>
     </div>
   );
 }
@@ -54,11 +56,13 @@ export function AttachmentCard({
   onDragOver, onDragLeave, onDrop, onClickZone, onFileChange,
   onPreview, onDownload, onDelete, onClosePreview, formatSize,
 }: Props) {
+  const t = useTranslations('components.attachmentCard');
+
   return (
     <>
       <Card>
         <h3 className="font-semibold text-gray-900 mb-4">
-          Attachments
+          {t('title')}
           {attachments.length > 0 && (
             <span className="ml-2 text-xs font-normal text-gray-400">({attachments.length})</span>
           )}
@@ -80,11 +84,11 @@ export function AttachmentCard({
             onChange={(e) => e.target.files && onFileChange(Array.from(e.target.files))}
           />
           {uploading ? (
-            <p className="text-sm text-indigo-600 font-medium">Uploading...</p>
+            <p className="text-sm text-indigo-600 font-medium">{t('uploading')}</p>
           ) : (
             <>
-              <p className="text-sm text-gray-500">Drop files here, click to browse, or paste from clipboard</p>
-              <p className="text-xs text-gray-400 mt-1">Supports images, documents, and other files up to 20 MB</p>
+              <p className="text-sm text-gray-500">{t('dropHint')}</p>
+              <p className="text-xs text-gray-400 mt-1">{t('sizeHint')}</p>
             </>
           )}
         </div>
@@ -103,7 +107,7 @@ export function AttachmentCard({
           </div>
         )}
         {attachments.length === 0 && !uploading && (
-          <p className="text-sm text-gray-400 text-center py-2">No attachments yet</p>
+          <p className="text-sm text-gray-400 text-center py-2">{t('empty')}</p>
         )}
       </Card>
 

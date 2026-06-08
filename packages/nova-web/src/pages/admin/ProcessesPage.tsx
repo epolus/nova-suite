@@ -1,36 +1,41 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useTranslations } from 'use-intl';
 import { admin, type ProcessItem } from '../../api/client';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
 
-const columns: ColumnDef<ProcessItem>[] = [
-  {
-    key: 'name',
-    label: 'Name',
-    sortable: true,
-    render: (p) => <span className="font-medium text-gray-900">{p.name}</span>,
-  },
-  {
-    key: 'description',
-    label: 'Description',
-    sortable: true,
-    render: (p) => <span className="text-gray-500">{p.description || '—'}</span>,
-    className: 'max-w-md',
-  },
-  {
-    key: 'group_count',
-    label: 'Groups',
-    sortable: true,
-    render: (p) => <span className="text-gray-600">{p.group_count}</span>,
-  },
-];
-
-const fields: FieldDef[] = [
-  { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. Incident Management' },
-  { key: 'description', label: 'Description', type: 'textarea', placeholder: 'What this process covers' },
-];
-
 export default function ProcessesPage() {
+  const t = useTranslations('pages.admin.processes');
+  const tFields = useTranslations('common.fields');
+  const tTable = useTranslations('common.table');
+
+  const columns = useMemo((): ColumnDef<ProcessItem>[] => [
+    {
+      key: 'name',
+      label: tFields('name'),
+      sortable: true,
+      render: (p) => <span className="font-medium text-gray-900">{p.name}</span>,
+    },
+    {
+      key: 'description',
+      label: tFields('description'),
+      sortable: true,
+      render: (p) => <span className="text-gray-500">{p.description || tTable('emDash')}</span>,
+      className: 'max-w-md',
+    },
+    {
+      key: 'group_count',
+      label: tFields('groups'),
+      sortable: true,
+      render: (p) => <span className="text-gray-600">{p.group_count}</span>,
+    },
+  ], [tFields, tTable]);
+
+  const fields = useMemo((): FieldDef[] => [
+    { key: 'name', label: tFields('name'), type: 'text', required: true, placeholder: t('placeholderName') },
+    { key: 'description', label: tFields('description'), type: 'textarea', placeholder: t('placeholderDescription') },
+  ], [t, tFields]);
+
   const fetchItems = useCallback(async () => {
     const res = await admin.processes();
     return res.processes;
@@ -38,8 +43,8 @@ export default function ProcessesPage() {
 
   return (
     <MasterDataPage<ProcessItem>
-      title="Processes"
-      description="Manage ITIL processes that assignment groups can cover."
+      title={t('title')}
+      description={t('description')}
       storageKey="admin_processes"
       columns={columns}
       fields={fields}

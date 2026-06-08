@@ -56,9 +56,77 @@ interface UseListParamsOptions {
 
 const CF_PREFIX = 'cf.';
 
+export function parseListSearchParams(
+  searchParams: URLSearchParams,
+  { defaultCols, filterKeys = [], prefix = '' }: Pick<UseListParamsOptions, 'defaultCols' | 'filterKeys' | 'prefix'>,
+  saved: SavedPrefs | null = null,
+): ListParams {
+  const p = (key: string) => `${prefix}${key}`;
+  const colsRaw = searchParams.get(p('cols'));
+  const urlSort = searchParams.get(p('sort'));
+
+  let cols: string[];
+  if (colsRaw) cols = colsRaw.split(',').filter(Boolean);
+  else if (saved?.cols) cols = saved.cols;
+  else cols = defaultCols;
+
+  let sort = '';
+  let dir: SortDir = 'asc';
+  if (urlSort) {
+    sort = urlSort;
+    dir = (searchParams.get(p('dir')) as SortDir) || 'asc';
+  } else if (saved?.sort) {
+    sort = saved.sort;
+    dir = saved.dir || 'asc';
+  }
+
+  const columnFilters: Record<string, string> = {};
+  searchParams.forEach((val, key) => {
+    const cfKey = prefix ? `${prefix}${CF_PREFIX}` : CF_PREFIX;
+    if (key.startsWith(cfKey)) columnFilters[key.slice(cfKey.length)] = val;
+  });
+
+  return {
+    search: searchParams.get(p('search')) || '',
+    sort,
+    dir,
+    cols,
+    page: Math.max(1, parseInt(searchParams.get(p('page')) || '1', 10) || 1),
+    filters: filterKeys.reduce<Record<string, string>>((acc, key) => {
+      const val = searchParams.get(p(key));
+      if (val) acc[key] = val;
+      return acc;
+    }, {}),
+    columnFilters,
+  };
+}
+
+export function buildListSearchParams(
+  params: ListParams,
+  { filterKeys = [], prefix = '' }: Pick<UseListParamsOptions, 'filterKeys' | 'prefix'>,
+): URLSearchParams {
+  const p = (key: string) => `${prefix}${key}`;
+  const next = new URLSearchParams();
+  if (params.search) next.set(p('search'), params.search);
+  if (params.sort) {
+    next.set(p('sort'), params.sort);
+    next.set(p('dir'), params.dir);
+  }
+  if (params.page > 1) next.set(p('page'), String(params.page));
+  for (const key of filterKeys) {
+    const val = params.filters[key];
+    if (val) next.set(p(key), val);
+  }
+  const cfKey = prefix ? `${prefix}${CF_PREFIX}` : CF_PREFIX;
+  for (const [col, val] of Object.entries(params.columnFilters)) {
+    if (val) next.set(`${cfKey}${col}`, val);
+  }
+  return next;
+}
+
 export function useListParams({ defaultCols, filterKeys = [], prefix = '', storageKey }: UseListParamsOptions) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const p = (key: string) => `${prefix}${key}`;
+  const p = useCallback((key: string) => `${prefix}${key}`, [prefix]);
   const [savedPrefs, setSavedPrefs] = useState<SavedPrefs | null>(() => loadPrefs(storageKey));
 
   useEffect(() => {
@@ -123,7 +191,7 @@ export function useListParams({ defaultCols, filterKeys = [], prefix = '', stora
       }, {}),
       columnFilters,
     };
-  }, [searchParams, defaultCols, filterKeys, prefix, savedPrefs]);
+  }, [searchParams, defaultCols, filterKeys, prefix, savedPrefs, p]);
 
   const update = useCallback(
     (patch: Partial<ListParams>) => {
@@ -192,7 +260,7 @@ export function useListParams({ defaultCols, filterKeys = [], prefix = '', stora
         });
       }
     },
-    [setSearchParams, defaultCols, filterKeys, prefix, storageKey],
+    [setSearchParams, defaultCols, filterKeys, prefix, storageKey, p],
   );
 
   const setSearch = useCallback(

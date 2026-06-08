@@ -1,18 +1,21 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { admin, type CompanyItem } from '../../api/client';
 import type { FieldDef } from './MasterDataPage';
 import MasterDataDetailPage from './MasterDataDetailPage';
 
 export default function CompaniesDetailPage() {
+  const t = useTranslations('pages.admin.companies');
+  const tFields = useTranslations('common.fields');
+  const tMaster = useTranslations('common.masterData');
+  const tStates = useTranslations('common.states');
   const { id } = useParams<{ id: string }>();
-  const [parentCompanyOptions, setParentCompanyOptions] = useState<Array<{ value: string; label: string }>>([
-    { value: '', label: '— None —' },
-  ]);
-  const [contactUserOptions, setContactUserOptions] = useState<Array<{ value: string; label: string }>>([
-    { value: '', label: '— None —' },
-  ]);
+  const [parentCompanyOptions, setParentCompanyOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [contactUserOptions, setContactUserOptions] = useState<Array<{ value: string; label: string }>>([]);
+
+  const noneOption = `— ${tStates('none')} —`;
 
   useEffect(() => {
     let alive = true;
@@ -20,13 +23,13 @@ export default function CompaniesDetailPage() {
       .then(([companiesRes, usersRes]) => {
         if (!alive) return;
         setParentCompanyOptions([
-          { value: '', label: '— None —' },
+          { value: '', label: noneOption },
           ...companiesRes.companies
             .filter((c) => c.id !== id)
             .map((c) => ({ value: c.id, label: c.name })),
         ]);
         setContactUserOptions([
-          { value: '', label: '— None —' },
+          { value: '', label: noneOption },
           ...usersRes.users.map((u) => ({ value: u.id, label: u.display_name })),
         ]);
       })
@@ -36,22 +39,22 @@ export default function CompaniesDetailPage() {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, noneOption]);
 
   const fields: FieldDef[] = useMemo(() => [
-    { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. ACME AG' },
-    { key: 'code', label: 'Code', type: 'text', placeholder: 'e.g. ACME-CH' },
-    { key: 'website', label: 'Website', type: 'text', placeholder: 'e.g. https://acme.example' },
-    { key: 'phone', label: 'Phone', type: 'text', placeholder: 'e.g. +41 44 123 45 67' },
-    { key: 'street', label: 'Street', type: 'text', placeholder: 'e.g. Bahnhofstrasse 1' },
-    { key: 'city', label: 'City', type: 'text', placeholder: 'e.g. Zurich' },
-    { key: 'state', label: 'State', type: 'text', placeholder: 'e.g. ZH' },
-    { key: 'zip', label: 'ZIP', type: 'text', placeholder: 'e.g. 8001' },
-    { key: 'country', label: 'Country', type: 'text', placeholder: 'e.g. Switzerland' },
-    { key: 'parent_company_id', label: 'Parent Company', type: 'select', options: parentCompanyOptions },
-    { key: 'contact_user_id', label: 'Contact User', type: 'select', options: contactUserOptions },
-    { key: 'description', label: 'Description', type: 'textarea', placeholder: 'Optional notes' },
-  ], [parentCompanyOptions, contactUserOptions]);
+    { key: 'name', label: tFields('name'), type: 'text', required: true, placeholder: t('placeholderName') },
+    { key: 'code', label: tFields('code'), type: 'text', placeholder: t('placeholderCode') },
+    { key: 'website', label: tFields('website'), type: 'text', placeholder: t('placeholderWebsite') },
+    { key: 'phone', label: tFields('phone'), type: 'text', placeholder: t('placeholderPhone') },
+    { key: 'street', label: tFields('street'), type: 'text', placeholder: t('placeholderStreet') },
+    { key: 'city', label: tFields('city'), type: 'text', placeholder: t('placeholderCity') },
+    { key: 'state', label: tFields('state'), type: 'text', placeholder: t('placeholderState') },
+    { key: 'zip', label: tFields('zip'), type: 'text', placeholder: t('placeholderZip') },
+    { key: 'country', label: tFields('country'), type: 'text', placeholder: t('placeholderCountry') },
+    { key: 'parent_company_id', label: tFields('parentCompany'), type: 'select', options: parentCompanyOptions },
+    { key: 'contact_user_id', label: tFields('contactUserId'), type: 'select', options: contactUserOptions },
+    { key: 'description', label: tFields('description'), type: 'textarea', placeholder: tMaster('optionalNotes') },
+  ], [t, tFields, tMaster, parentCompanyOptions, contactUserOptions]);
 
   const fetchItems = useCallback(async () => {
     const res = await admin.companies();
@@ -60,7 +63,7 @@ export default function CompaniesDetailPage() {
 
   return (
     <MasterDataDetailPage<CompanyItem>
-      title="Companies"
+      title={t('title')}
       basePath="/admin/companies"
       fields={fields}
       fetchItems={fetchItems}

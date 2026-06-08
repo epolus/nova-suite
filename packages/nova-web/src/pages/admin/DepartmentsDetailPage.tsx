@@ -1,10 +1,15 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { admin, type CostCenterItem, type DepartmentItem } from '../../api/client';
 import type { FieldDef } from './MasterDataPage';
 import MasterDataDetailPage from './MasterDataDetailPage';
 
 export default function DepartmentsDetailPage() {
+  const t = useTranslations('pages.admin.departments');
+  const tFields = useTranslations('common.fields');
+  const tStates = useTranslations('common.states');
+
   const fetchItems = useCallback(async () => {
     const res = await admin.departments();
     return res.departments;
@@ -30,15 +35,17 @@ export default function DepartmentsDetailPage() {
     };
   }, []);
 
+  const noneOption = `— ${tStates('none')} —`;
+
   const fields: FieldDef[] = useMemo(() => [
-    { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. Engineering' },
-    { key: 'description', label: 'Description', type: 'textarea', placeholder: 'Brief description of the department' },
+    { key: 'name', label: tFields('name'), type: 'text', required: true, placeholder: t('placeholderName') },
+    { key: 'description', label: tFields('description'), type: 'textarea', placeholder: t('placeholderDescription') },
     {
       key: 'parent_department_id',
-      label: 'Parent Department',
+      label: tFields('parentDepartment'),
       type: 'select',
       options: [
-        { value: '', label: '— None —' },
+        { value: '', label: noneOption },
         ...allDepartmentsForOptions
           .filter((d) => d.is_active)
           .map((d) => ({ value: d.id, label: d.name })),
@@ -46,20 +53,20 @@ export default function DepartmentsDetailPage() {
     },
     {
       key: 'cost_center_id',
-      label: 'Cost Center',
+      label: tFields('costCenter'),
       type: 'select',
       options: [
-        { value: '', label: '— None —' },
+        { value: '', label: noneOption },
         ...allCostCentersForOptions
           .filter((cc) => cc.is_active)
           .map((cc) => ({ value: cc.id, label: `${cc.code} - ${cc.name}` })),
       ],
     },
-  ], [allCostCentersForOptions, allDepartmentsForOptions]);
+  ], [t, tFields, noneOption, allCostCentersForOptions, allDepartmentsForOptions]);
 
   return (
     <MasterDataDetailPage<DepartmentItem>
-      title="Departments"
+      title={t('title')}
       basePath="/admin/departments"
       fields={fields}
       fetchItems={fetchItems}

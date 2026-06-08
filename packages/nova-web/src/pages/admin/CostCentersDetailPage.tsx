@@ -1,16 +1,20 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useTranslations } from 'use-intl';
 import { admin, type CostCenterItem } from '../../api/client';
 import type { FieldDef } from './MasterDataPage';
 import MasterDataDetailPage from './MasterDataDetailPage';
 
-const fields: FieldDef[] = [
-  { key: 'code', label: 'Code', type: 'text', required: true, placeholder: 'e.g. CC-ENG-002' },
-  { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. Engineering R&D' },
-  { key: 'description', label: 'Description', type: 'textarea', placeholder: 'Purpose of this cost center' },
-];
-
 export default function CostCentersDetailPage() {
+  const t = useTranslations('pages.admin.costCenters');
+  const tFields = useTranslations('common.fields');
+
+  const fields = useMemo((): FieldDef[] => [
+    { key: 'code', label: tFields('code'), type: 'text', required: true, placeholder: t('placeholderCode') },
+    { key: 'name', label: tFields('name'), type: 'text', required: true, placeholder: t('placeholderName') },
+    { key: 'description', label: tFields('description'), type: 'textarea', placeholder: t('placeholderDescription') },
+  ], [t, tFields]);
+
   const fetchItems = useCallback(async () => {
     const res = await admin.costCenters();
     return res.cost_centers;
@@ -18,7 +22,7 @@ export default function CostCentersDetailPage() {
 
   return (
     <MasterDataDetailPage<CostCenterItem>
-      title="Cost Centers"
+      title={t('title')}
       basePath="/admin/cost-centers"
       fields={fields}
       fetchItems={fetchItems}

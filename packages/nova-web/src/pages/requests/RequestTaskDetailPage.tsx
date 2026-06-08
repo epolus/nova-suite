@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { requests as requestsApi } from '../../api/client';
 import type { RequestTaskListItem } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -20,6 +21,10 @@ export default function RequestTaskDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { taskId = '' } = useParams();
+  const tRequests = useTranslations('pages.requests');
+  const tActions = useTranslations('common.actions');
+  const tFields = useTranslations('common.fields');
+  const tTable = useTranslations('common.table');
   const [task, setTask] = useState<RequestTaskListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -34,10 +39,10 @@ export default function RequestTaskDetailPage() {
         setLoading(false);
       })
       .catch((err: Error) => {
-        setError(err.message || 'Failed to load task');
+        setError(err.message || tRequests('loadTaskFailed'));
         setLoading(false);
       });
-  }, [taskId]);
+  }, [taskId, tRequests]);
 
   const refresh = async () => {
     if (!taskId) return;
@@ -71,9 +76,9 @@ export default function RequestTaskDetailPage() {
   if (!task) {
     return (
       <>
-        <PageHeader title="Request Task" description="Task detail" />
+        <PageHeader title={tRequests('taskDetailTitle')} description={tRequests('taskDetailDescription')} />
         <Card>
-          <p className="text-sm text-red-600">{error || 'Task not found'}</p>
+          <p className="text-sm text-red-600">{error || tRequests('taskNotFound')}</p>
         </Card>
       </>
     );
@@ -92,20 +97,20 @@ export default function RequestTaskDetailPage() {
     <>
       <PageHeader
         title={task.name}
-        description={`Task ${task.number}`}
+        description={tRequests('taskNumber', { number: task.number })}
         action={
           <div className="flex items-center gap-2">
             <Link
               to="/request-tasks"
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
             >
-              Back to Request Tasks
+              {tRequests('backToRequestTasks')}
             </Link>
             <button
               onClick={() => navigate(`/requests/${task.request_id}`)}
               className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
             >
-              Open Request
+              {tRequests('openRequest')}
             </button>
           </div>
         }
@@ -123,7 +128,7 @@ export default function RequestTaskDetailPage() {
             </div>
 
             <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Request Context</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{tRequests('requestContext')}</p>
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <Link
                   to={`/requests/${task.request_id}`}
@@ -134,42 +139,42 @@ export default function RequestTaskDetailPage() {
                 <span className="text-gray-400">•</span>
                 <span className="text-gray-700">{task.service_item_name}</span>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Requester: {task.requester_name}</p>
+              <p className="text-xs text-gray-500 mt-1">{tRequests('requesterLabel', { name: task.requester_name })}</p>
             </div>
 
             {task.description && (
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</h3>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{tFields('description')}</h3>
                 <p className="text-sm text-gray-800 whitespace-pre-wrap">{task.description}</p>
               </div>
             )}
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Instructions</h3>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap">{task.instructions || '—'}</p>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{tRequests('instructions')}</h3>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">{task.instructions || tTable('emDash')}</p>
             </div>
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Task Notes</h3>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{task.notes || '—'}</p>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{tRequests('taskNotes')}</h3>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{task.notes || tTable('emDash')}</p>
             </div>
           </div>
         </Card>
 
         <Card>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Task Details</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">{tRequests('taskDetails')}</h3>
           <div className="space-y-3 text-sm">
             <div>
-              <span className="text-gray-500">Request</span>
+              <span className="text-gray-500">{tRequests('request')}</span>
               <div className="font-medium">
                 <Link to={`/requests/${task.request_id}`} className="text-indigo-600 hover:text-indigo-800">
                   {task.request_number}
                 </Link>
               </div>
             </div>
-            <div><span className="text-gray-500">Request Status</span><div className="font-medium">{task.request_status}</div></div>
-            <div><span className="text-gray-500">Assigned Group</span><div className="font-medium">{task.assigned_group_name || '—'}</div></div>
-            <div><span className="text-gray-500">Assigned To</span><div className="font-medium">{task.assigned_to_name || 'Unassigned'}</div></div>
-            <div><span className="text-gray-500">Created</span><div className="font-medium">{formatDateTime(task.created_at)}</div></div>
-            <div><span className="text-gray-500">Completed</span><div className="font-medium">{formatDateTime(task.completed_at)}</div></div>
+            <div><span className="text-gray-500">{tRequests('requestStatus')}</span><div className="font-medium">{task.request_status}</div></div>
+            <div><span className="text-gray-500">{tRequests('assignedGroup')}</span><div className="font-medium">{task.assigned_group_name || tTable('emDash')}</div></div>
+            <div><span className="text-gray-500">{tFields('assignedTo')}</span><div className="font-medium">{task.assigned_to_name || tRequests('unassigned')}</div></div>
+            <div><span className="text-gray-500">{tFields('created')}</span><div className="font-medium">{formatDateTime(task.created_at)}</div></div>
+            <div><span className="text-gray-500">{tRequests('complete')}</span><div className="font-medium">{formatDateTime(task.completed_at)}</div></div>
           </div>
 
           {canTakeAction && hasActions && (
@@ -180,7 +185,7 @@ export default function RequestTaskDetailPage() {
                   disabled={actionLoading}
                   className="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-md hover:bg-indigo-50 disabled:opacity-50"
                 >
-                  Assign to me
+                  {tRequests('assignToMe')}
                 </button>
               )}
               {canApproveReject && (
@@ -190,14 +195,14 @@ export default function RequestTaskDetailPage() {
                     disabled={actionLoading}
                     className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50"
                   >
-                    Reject
+                    {tActions('reject')}
                   </button>
                   <button
                     onClick={() => handleComplete('approved')}
                     disabled={actionLoading}
                     className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
                   >
-                    Approve
+                    {tActions('approve')}
                   </button>
                 </>
               )}
@@ -207,7 +212,7 @@ export default function RequestTaskDetailPage() {
                   disabled={actionLoading}
                   className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  Complete
+                  {tRequests('complete')}
                 </button>
               )}
             </div>

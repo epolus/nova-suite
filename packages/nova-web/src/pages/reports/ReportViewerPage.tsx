@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
@@ -43,12 +44,15 @@ function ResultCard({
   result: ReportComponentResult;
   onOpenPath: (path: string) => void;
 }) {
+  const t = useTranslations('pages.reports');
+  const tTable = useTranslations('common.table');
+
   if (result.type === 'kpi') {
     return (
       <Card>
         <p className="text-xs uppercase tracking-wide text-gray-400">{DATASET_LABELS[result.dataset]}</p>
-        <p className="text-sm font-medium text-gray-700 mt-1">{component.title || 'KPI'}</p>
-        <p className="text-3xl font-bold text-indigo-600 mt-2">{result.value ?? '—'}</p>
+        <p className="text-sm font-medium text-gray-700 mt-1">{component.title || t('kpiFallback')}</p>
+        <p className="text-3xl font-bold text-indigo-600 mt-2">{result.value ?? tTable('emDash')}</p>
       </Card>
     );
   }
@@ -58,7 +62,7 @@ function ResultCard({
     return (
       <Card>
         <p className="text-xs uppercase tracking-wide text-gray-400">{DATASET_LABELS[result.dataset]}</p>
-        <p className="text-sm font-medium text-gray-800 mt-1">{component.title || 'Chart'}</p>
+        <p className="text-sm font-medium text-gray-800 mt-1">{component.title || t('chartFallback')}</p>
         <div className="mt-3 space-y-2">
           {result.points.map((point, index) => (
             <button
@@ -81,7 +85,7 @@ function ResultCard({
               </div>
             </button>
           ))}
-          {result.points.length === 0 && <p className="text-sm text-gray-500">No chart data.</p>}
+          {result.points.length === 0 && <p className="text-sm text-gray-500">{t('noChartData')}</p>}
         </div>
       </Card>
     );
@@ -103,12 +107,12 @@ function ResultCard({
     return (
       <Card>
         <p className="text-xs uppercase tracking-wide text-gray-400">{DATASET_LABELS[result.dataset]}</p>
-        <p className="text-sm font-medium text-gray-800 mt-1">{component.title || 'Chart'}</p>
+        <p className="text-sm font-medium text-gray-800 mt-1">{component.title || t('chartFallback')}</p>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-[120px_minmax(0,1fr)] gap-3 items-start">
           <div
             className="h-[120px] w-[120px] rounded-full border border-gray-100"
             style={{ background: pieBackground }}
-            aria-label="Pie chart"
+            aria-label={t('pieChartAria')}
           />
           <div className="space-y-1.5">
             {result.points.map((point, index) => (
@@ -132,7 +136,7 @@ function ResultCard({
                 </div>
               </button>
             ))}
-            {result.points.length === 0 && <p className="text-sm text-gray-500">No chart data.</p>}
+            {result.points.length === 0 && <p className="text-sm text-gray-500">{t('noChartData')}</p>}
           </div>
         </div>
       </Card>
@@ -147,7 +151,7 @@ function ResultCard({
     <Card padding={false}>
       <div className="px-4 py-3 border-b border-gray-100">
         <p className="text-xs uppercase tracking-wide text-gray-400">{DATASET_LABELS[result.dataset]}</p>
-        <p className="text-sm font-medium text-gray-800 mt-1">{component.title || 'Table'}</p>
+        <p className="text-sm font-medium text-gray-800 mt-1">{component.title || t('tableFallback')}</p>
       </div>
       <div className="overflow-auto">
         <table className="w-full text-sm">
@@ -172,7 +176,7 @@ function ResultCard({
               >
                 {columns.map((column) => (
                   <td key={column} className="px-4 py-2 text-gray-700 align-top">
-                    {String(row[column] ?? '—')}
+                    {String(row[column] ?? tTable('emDash'))}
                   </td>
                 ))}
               </tr>
@@ -180,7 +184,7 @@ function ResultCard({
             {result.rows.length === 0 && (
               <tr>
                 <td colSpan={Math.max(columns.length, 1)} className="px-4 py-5 text-sm text-gray-500">
-                  No data returned.
+                  {t('noDataReturned')}
                 </td>
               </tr>
             )}
@@ -192,13 +196,14 @@ function ResultCard({
 }
 
 export default function ReportViewerPage() {
+  const t = useTranslations('pages.reports');
   const { reportId = '' } = useParams<{ reportId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [title, setTitle] = useState('Report');
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState<string | null>(null);
   const [results, setResults] = useState<Array<{ component: ReportComponentConfig; result: ReportComponentResult }>>([]);
   const [autoRefreshSeconds, setAutoRefreshSeconds] = useUserPreferenceState<number>(
@@ -224,7 +229,7 @@ export default function ReportViewerPage() {
       const run = await reports.runDefinition(reportId);
       setResults(run.results);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to run report');
+      setError(err instanceof Error ? err.message : t('runFailed'));
     } finally {
       setRunning(false);
       if (autoRefreshSeconds > 0) {
@@ -242,7 +247,7 @@ export default function ReportViewerPage() {
       setDescription(detail.report.description);
       await runNow();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report');
+      setError(err instanceof Error ? err.message : t('loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -254,6 +259,8 @@ export default function ReportViewerPage() {
       return;
     }
     void load();
+    // load/runNow intentionally re-run only on view permission or report id change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView, reportId]);
 
   useEffect(() => {
@@ -271,6 +278,8 @@ export default function ReportViewerPage() {
       });
     }, 1000);
     return () => window.clearInterval(timer);
+    // runNow is stable for this effect's purpose; timer restarts only on these inputs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefreshSeconds, canView, reportId, running, loading]);
 
   useEffect(() => {
@@ -282,9 +291,9 @@ export default function ReportViewerPage() {
   if (!canView) {
     return (
       <>
-        <PageHeader title="Report viewer" description="Read-only report execution." />
+        <PageHeader title={t('viewer')} description={t('viewerDescription')} />
         <Card>
-          <p className="text-sm text-gray-600">You do not have permission to view reports.</p>
+          <p className="text-sm text-gray-600">{t('noPermissionView')}</p>
         </Card>
       </>
     );
@@ -293,8 +302,8 @@ export default function ReportViewerPage() {
   return (
     <>
       <PageHeader
-        title={title}
-        description={description || 'Custom report view.'}
+        title={title || t('viewer')}
+        description={description || t('customView')}
         action={(
           <div className="flex items-center gap-2">
             <button
@@ -302,31 +311,31 @@ export default function ReportViewerPage() {
               disabled={running || loading}
               className="px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
             >
-              {running ? 'Running...' : 'Run now'}
+              {running ? t('running') : t('runNow')}
             </button>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500">Auto update</label>
+              <label className="text-xs text-gray-500">{t('autoUpdate')}</label>
               <select
                 value={String(autoRefreshSeconds)}
                 onChange={(event) => setAutoRefreshSeconds(Number.parseInt(event.target.value, 10) || 0)}
                 className="px-2 py-1.5 rounded-md border border-gray-200 text-xs"
               >
-                <option value="0">Off</option>
-                <option value="30">30s</option>
-                <option value="60">1m</option>
-                <option value="300">5m</option>
+                <option value="0">{t('autoUpdateOff')}</option>
+                <option value="30">{t('autoUpdate30s')}</option>
+                <option value="60">{t('autoUpdate1m')}</option>
+                <option value="300">{t('autoUpdate5m')}</option>
               </select>
             </div>
             {autoRefreshSeconds > 0 && (
               <span className="text-xs text-gray-500">
-                refresh in {secondsUntilRefresh}s
+                {t('refreshIn', { seconds: secondsUntilRefresh })}
               </span>
             )}
             <Link
               to={`/reports/${reportId}/builder`}
               className="px-3 py-2 rounded-lg text-sm bg-indigo-600 text-white hover:bg-indigo-700"
             >
-              Open builder
+              {t('openBuilder')}
             </Link>
           </div>
         )}
@@ -346,7 +355,7 @@ export default function ReportViewerPage() {
           ))}
           {results.length === 0 && (
             <Card>
-              <p className="text-sm text-gray-500">This report has no components yet.</p>
+              <p className="text-sm text-gray-500">{t('noComponents')}</p>
             </Card>
           )}
         </div>
@@ -354,4 +363,3 @@ export default function ReportViewerPage() {
     </>
   );
 }
-

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'use-intl';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { temporal as temporalApi } from '../../api/client';
 import type { TemporalOverview, WorkflowExecution } from '../../api/client';
@@ -41,6 +42,9 @@ function formatDuration(start: string | null, end: string | null): string {
 }
 
 export default function WorkflowsPage() {
+  const t = useTranslations('pages.admin.workflows');
+  const tStates = useTranslations('common.states');
+  const tTable = useTranslations('common.table');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -81,11 +85,11 @@ export default function WorkflowsPage() {
       }
       setNextPageToken(res.nextPageToken);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load workflows');
+      setError(err instanceof Error ? err.message : t('loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, searchQuery, t]);
 
   useEffect(() => {
     loadWorkflows();
@@ -122,20 +126,21 @@ export default function WorkflowsPage() {
       retentionMismatch ? overview.retentionDaysServer : (overview.retentionDaysServer ?? overview.retentionDaysConfigured),
     );
 
+  const emDash = tTable('emDash');
   const overviewCards = [
-    { label: 'Running', value: overview?.running ?? '—', color: 'text-blue-600', bg: 'bg-blue-50', sub: null as string | null },
-    { label: 'Completed (24h)', value: overview?.completedLast24h ?? '—', color: 'text-green-600', bg: 'bg-green-50', sub: null as string | null },
-    { label: 'Failed (24h)', value: overview?.failedLast24h ?? '—', color: 'text-red-600', bg: 'bg-red-50', sub: null as string | null },
+    { label: t('overview.running'), value: overview?.running ?? emDash, color: 'text-blue-600', bg: 'bg-blue-50', sub: null as string | null },
+    { label: t('overview.completed24h'), value: overview?.completedLast24h ?? emDash, color: 'text-green-600', bg: 'bg-green-50', sub: null as string | null },
+    { label: t('overview.failed24h'), value: overview?.failedLast24h ?? emDash, color: 'text-red-600', bg: 'bg-red-50', sub: null as string | null },
     {
-      label: 'Retention',
-      value: retentionPrimary ?? '—',
+      label: t('overview.retention'),
+      value: retentionPrimary ?? emDash,
       color: 'text-gray-600',
       bg: 'bg-gray-50',
       sub:
         retentionMismatch && overview
-          ? `App setting ${fmtDays(overview.retentionDaysConfigured) ?? '—'} · namespace ${fmtDays(overview.retentionDaysServer) ?? '—'}`
+          ? t('overview.retentionMismatch', { app: fmtDays(overview.retentionDaysConfigured) ?? emDash, namespace: fmtDays(overview.retentionDaysServer) ?? emDash })
           : overview && overview.retentionDaysServer == null
-            ? `App setting ${fmtDays(overview.retentionDaysConfigured) ?? '—'}`
+            ? t('overview.retentionAppOnly', { app: fmtDays(overview.retentionDaysConfigured) ?? emDash })
             : null,
     },
   ];
@@ -143,14 +148,14 @@ export default function WorkflowsPage() {
   return (
     <>
       <PageHeader
-        title="Workflows"
-        description={`Temporal workflow executions${overview ? ` — ${overview.namespace} namespace` : ''}`}
+        title={t('title')}
+        description={overview ? t('descriptionWithNamespace', { namespace: overview.namespace }) : t('description')}
         action={
           <button
             onClick={() => navigate('/admin/workflows/editor')}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
           >
-            Open Workflow Editor
+            {t('openEditor')}
           </button>
         }
       />
@@ -177,7 +182,7 @@ export default function WorkflowsPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by Workflow ID..."
+            placeholder={t('searchPlaceholder')}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
           />
         </div>
@@ -192,7 +197,7 @@ export default function WorkflowsPage() {
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {s === 'all' ? 'All' : s}
+              {s === 'all' ? tStates('all') : t(`statuses.${s}` as 'statuses.Running')}
             </button>
           ))}
         </div>
@@ -212,19 +217,19 @@ export default function WorkflowsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Workflow ID</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Type</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Task Queue</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Start Time</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Duration</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.workflowId')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.type')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.status')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.taskQueue')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.startTime')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-500">{t('table.duration')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {workflows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
-                      {searchQuery ? `No workflows matching "${searchQuery}"` : 'No workflow executions found'}
+                      {searchQuery ? t('emptySearch', { query: searchQuery }) : t('empty')}
                     </td>
                   </tr>
                 ) : (
@@ -246,7 +251,7 @@ export default function WorkflowsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={wf.status} /></td>
-                      <td className="px-4 py-3 text-gray-500">{wf.taskQueue || '—'}</td>
+                      <td className="px-4 py-3 text-gray-500">{wf.taskQueue || emDash}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs">
                         {formatDateTime(wf.startTime)}
                       </td>
@@ -268,7 +273,7 @@ export default function WorkflowsPage() {
                 disabled={loading}
                 className="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
               >
-                {loading ? 'Loading...' : 'Load more'}
+                {loading ? tStates('loading') : t('loadMore')}
               </button>
             </div>
           )}

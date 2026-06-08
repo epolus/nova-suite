@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import UnifiedAutomationDesigner from '../../components/workflow/UnifiedAutomationDesigner';
 import { admin, type WorkflowDefinition } from '../../api/client';
@@ -31,8 +32,9 @@ function normalizeLoadedDefinition(
 }
 
 export default function WorkflowEditorPage() {
+  const t = useTranslations('pages.admin.workflows.editor');
   const [definitionId, setDefinitionId] = useState<string | null>(null);
-  const [definitionName, setDefinitionName] = useState('New Workflow Definition');
+  const [definitionName, setDefinitionName] = useState('');
   const [definitions, setDefinitions] = useState<WorkflowDefinition[]>([]);
   const [loadingDefinitions, setLoadingDefinitions] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -56,6 +58,10 @@ export default function WorkflowEditorPage() {
   useEffect(() => {
     void refreshDefinitions();
   }, [refreshDefinitions]);
+
+  useEffect(() => {
+    if (!definitionName) setDefinitionName(t('newDefinition'));
+  }, [definitionName, t]);
 
   const parsedAutomationConfig = useMemo(() => {
     try {
@@ -82,13 +88,13 @@ export default function WorkflowEditorPage() {
 
   const resetEditor = () => {
     setDefinitionId(null);
-    setDefinitionName('New Workflow Definition');
+    setDefinitionName(t('newDefinition'));
     setWorkflowType('ticket-triage-workflow');
     setAutomationConfigJson('{\n  \n}');
     setLoadedPublishedDefinition(null);
     setLoadedVersion(0);
     setLoadedPublishedAt(null);
-    setMessage('Started a new unified workflow draft');
+    setMessage(t('startedNewDraft'));
   };
 
   const loadDefinition = async (id: string) => {
@@ -104,7 +110,7 @@ export default function WorkflowEditorPage() {
       setLoadedPublishedDefinition(def.published_definition);
       setLoadedVersion(def.version);
       setLoadedPublishedAt(def.published_at);
-      setMessage(`Loaded "${def.name}"`);
+      setMessage(t('loaded', { name: def.name }));
     } finally {
       setBusy(false);
     }
@@ -112,15 +118,15 @@ export default function WorkflowEditorPage() {
 
   const saveDraft = async () => {
     if (!definitionName.trim()) {
-      setMessage('Name is required to save');
+      setMessage(t('nameRequired'));
       return;
     }
     if (!workflowType.trim()) {
-      setMessage('Workflow type is required to save');
+      setMessage(t('workflowTypeRequired'));
       return;
     }
     if (!parsedAutomationConfig.valid) {
-      setMessage('Automation config JSON is invalid');
+      setMessage(t('invalidJson'));
       return;
     }
     setBusy(true);
@@ -140,7 +146,7 @@ export default function WorkflowEditorPage() {
         });
       }
       await refreshDefinitions();
-      setMessage('Draft saved');
+      setMessage(t('saved'));
     } finally {
       setBusy(false);
     }
@@ -148,11 +154,11 @@ export default function WorkflowEditorPage() {
 
   const publishDefinition = async () => {
     if (!definitionId) {
-      setMessage('Save draft first before publishing');
+      setMessage(t('saveDraftFirst'));
       return;
     }
     if (!parsedAutomationConfig.valid) {
-      setMessage('Cannot publish: automation config JSON is invalid.');
+      setMessage(t('cannotPublish'));
       return;
     }
     setBusy(true);
@@ -164,7 +170,7 @@ export default function WorkflowEditorPage() {
       setLoadedVersion((v) => v + 1);
       setLoadedPublishedAt(new Date().toISOString());
       await refreshDefinitions();
-      setMessage('Published new unified version');
+      setMessage(t('published'));
     } finally {
       setBusy(false);
     }
@@ -172,7 +178,7 @@ export default function WorkflowEditorPage() {
 
   const duplicateDefinition = async () => {
     if (!definitionId) {
-      setMessage('Load or save a definition before duplicating');
+      setMessage(t('duplicateFirst'));
       return;
     }
     setBusy(true);
@@ -180,7 +186,7 @@ export default function WorkflowEditorPage() {
       const result = await admin.duplicateWorkflowDefinition(definitionId);
       await refreshDefinitions();
       await loadDefinition(result.id);
-      setMessage('Duplicated definition');
+      setMessage(t('duplicated'));
     } finally {
       setBusy(false);
     }
@@ -188,21 +194,21 @@ export default function WorkflowEditorPage() {
 
   const copyJson = async () => {
     await navigator.clipboard.writeText(JSON.stringify(serializedDraft, null, 2));
-    setMessage('Unified workflow JSON copied');
+    setMessage(t('copyJsonDone'));
   };
 
   return (
     <>
       <PageHeader
-        title="Workflow Designer"
-        description="Unified visual designer for reusable automation actions and workflow definitions."
+        title={t('title')}
+        description={t('description')}
         action={
           <div className="flex items-center gap-2">
             <button onClick={saveDraft} disabled={busy} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60">
-              Save Draft
+              {t('saveDraft')}
             </button>
             <button onClick={publishDefinition} disabled={busy || !definitionId || !parsedAutomationConfig.valid} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
-              Publish
+              {t('publish')}
             </button>
           </div>
         }
@@ -211,45 +217,45 @@ export default function WorkflowEditorPage() {
       <div className="mb-4 bg-white rounded-xl border border-gray-200 p-3">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 items-end">
           <div className="lg:col-span-2">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Definition Name</label>
-            <input value={definitionName} onChange={(e) => setDefinitionName(e.target.value)} className="w-full px-2.5 py-2 rounded border border-gray-200 text-sm" placeholder="Incident triage workflow" />
+            <label className="block text-xs font-medium text-gray-600 mb-1">{t('definitionName')}</label>
+            <input value={definitionName} onChange={(e) => setDefinitionName(e.target.value)} className="w-full px-2.5 py-2 rounded border border-gray-200 text-sm" placeholder={t('definitionPlaceholder')} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Saved Definitions</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">{t('definitions')}</label>
             <select value={definitionId ?? ''} disabled={loadingDefinitions || busy} onChange={(e) => { const id = e.target.value; if (id) void loadDefinition(id); }} className="w-full px-2.5 py-2 rounded border border-gray-200 text-sm bg-white">
-              <option value="">Select...</option>
+              <option value="">{t('select')}</option>
               {definitions.map((def) => <option key={def.id} value={def.id}>{def.name} ({def.workflow_type}) v{def.version}</option>)}
             </select>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={resetEditor} disabled={busy} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">New</button>
-            <button onClick={duplicateDefinition} disabled={busy || !definitionId} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">Duplicate</button>
+            <button onClick={resetEditor} disabled={busy} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">{t('new')}</button>
+            <button onClick={duplicateDefinition} disabled={busy || !definitionId} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">{t('duplicate')}</button>
           </div>
           <div className="flex justify-end">
-            <button onClick={copyJson} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Copy JSON</button>
+            <button onClick={copyJson} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">{t('copyJson')}</button>
           </div>
         </div>
         <div className="mt-3">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Workflow Type</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">{t('workflowType')}</label>
           <input value={workflowType} onChange={(e) => setWorkflowType(e.target.value)} className="w-full max-w-md px-2.5 py-2 rounded border border-gray-200 text-sm" />
         </div>
         {message && <p className="mt-2 text-xs text-gray-600">{message}</p>}
         <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-2.5">
-          <p className="text-xs font-semibold text-gray-700 mb-1">Draft vs Published</p>
+          <p className="text-xs font-semibold text-gray-700 mb-1">{t('diffTitle')}</p>
           {!hasPublished ? (
-            <p className="text-xs text-gray-600">No published version yet. Publish this draft to establish a baseline.</p>
+            <p className="text-xs text-gray-600">{t('notPublished')}</p>
           ) : (
             <>
-              <p className="text-xs text-gray-600 mb-2">Published version: v{loadedVersion}{loadedPublishedAt ? ` at ${formatDateTime(loadedPublishedAt)}` : ''}</p>
-              <p className="text-xs text-gray-700 mb-2">{diffChanges.length === 0 ? 'Draft matches published.' : `${diffChanges.length} field-level change(s) since publish.`}</p>
+              <p className="text-xs text-gray-600 mb-2">{t('publishedVersion', { version: loadedVersion, date: loadedPublishedAt ? formatDateTime(loadedPublishedAt) : '' })}</p>
+              <p className="text-xs text-gray-700 mb-2">{diffChanges.length === 0 ? t('draftMatches') : t('fieldChanges', { count: diffChanges.length })}</p>
               {diffChanges.length > 0 && (
                 <div className="max-h-40 overflow-auto bg-white border border-gray-200 rounded p-2">
                   <ul className="text-xs text-gray-700 space-y-2">
                     {diffChanges.slice(0, 40).map((change, idx) => (
                       <li key={`${change.path}-${idx}`}>
                         <p className="font-medium">- [{change.kind}] {change.path}</p>
-                        <p className="text-[11px] text-gray-600">before: <span className="font-mono">{formatDiffValue(change.before)}</span></p>
-                        <p className="text-[11px] text-gray-600">after: <span className="font-mono">{formatDiffValue(change.after)}</span></p>
+                        <p className="text-[11px] text-gray-600">{t('before')} <span className="font-mono">{formatDiffValue(change.before)}</span></p>
+                        <p className="text-[11px] text-gray-600">{t('after')} <span className="font-mono">{formatDiffValue(change.after)}</span></p>
                       </li>
                     ))}
                   </ul>
@@ -266,7 +272,7 @@ export default function WorkflowEditorPage() {
           onApply={(cfg) => setAutomationConfigJson(JSON.stringify(cfg, null, 2))}
         />
         <div className="bg-white rounded-xl border border-gray-200 p-3">
-          <p className="text-sm font-semibold text-gray-900 mb-2">Unified Workflow JSON</p>
+          <p className="text-sm font-semibold text-gray-900 mb-2">{t('unifiedJson')}</p>
           <textarea
             rows={26}
             value={automationConfigJson}
@@ -274,7 +280,7 @@ export default function WorkflowEditorPage() {
             className="w-full px-2.5 py-2 rounded border border-gray-200 text-sm font-mono"
           />
           {!parsedAutomationConfig.valid && (
-            <p className="mt-2 text-xs text-red-700">JSON is invalid. Fix syntax to enable publish.</p>
+            <p className="mt-2 text-xs text-red-700">{t('jsonInvalid')}</p>
           )}
         </div>
       </div>

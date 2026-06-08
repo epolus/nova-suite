@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
@@ -16,6 +17,7 @@ function linesToArray(s: string): string[] {
 export default function MajorIncidentPostmortemPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const t = useTranslations('pages.majorIncidents.postmortem');
   const canManage = canManageMajorIncidents(user?.roles);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -24,7 +26,7 @@ export default function MajorIncidentPostmortemPage() {
   const [contribText, setContribText] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!id) return;
     try {
       const { postmortem } = await majorIncidentsApi.getPostmortem(id);
@@ -35,15 +37,15 @@ export default function MajorIncidentPostmortemPage() {
       }
       setErr('');
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Failed to load');
+      setErr(e instanceof Error ? e.message : t('loadFailed'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, t]);
 
   useEffect(() => {
     void load();
-  }, [id]);
+  }, [load]);
 
   const ensureDraft = async () => {
     if (!id || pm) return;
@@ -52,7 +54,7 @@ export default function MajorIncidentPostmortemPage() {
       await majorIncidentsApi.createPostmortem(id, { status: 'draft' });
       await load();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Failed to create postmortem');
+      setErr(e instanceof Error ? e.message : t('createFailed'));
     } finally {
       setSaving(false);
     }
@@ -76,7 +78,7 @@ export default function MajorIncidentPostmortemPage() {
       }
       await load();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Save failed');
+      setErr(e instanceof Error ? e.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -91,7 +93,7 @@ export default function MajorIncidentPostmortemPage() {
       await majorIncidentsApi.publishPostmortem(id, { root_causes, contributing_factors });
       await load();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Publish failed');
+      setErr(e instanceof Error ? e.message : t('publishFailed'));
     } finally {
       setSaving(false);
     }
@@ -102,33 +104,37 @@ export default function MajorIncidentPostmortemPage() {
   return (
     <>
       <PageHeader
-        title="Postmortem"
-        description="Blameless review — focus on systemic causes (min. 3 characters per line)."
+        title={t('title')}
+        description={t('description')}
         action={(
           <Link to={id ? `/major-incidents/${id}` : '/major-incidents'} className="text-sm text-indigo-600 hover:underline">
-            Back to war room
+            {t('backToWarRoom')}
           </Link>
         )}
       />
       {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
       {!canManage && (
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          You have read-only access. Postmortem edits require the <strong>major incident manager</strong> or <strong>admin</strong> role.
+          {t('readOnlyPrefix')}{' '}
+          <strong>{t('majorIncidentManagerRole')}</strong>{' '}
+          {t('readOnlyMiddle')}{' '}
+          <strong>{t('adminRole')}</strong>{' '}
+          {t('readOnlySuffix')}
         </p>
       )}
       {!pm && (
         <Card>
-          <p className="text-sm text-gray-600 mb-3">No postmortem record yet.</p>
+          <p className="text-sm text-gray-600 mb-3">{t('noRecord')}</p>
           {canManage && (
-            <Button type="button" onClick={ensureDraft} disabled={saving}>Start draft</Button>
+            <Button type="button" onClick={ensureDraft} disabled={saving}>{t('startDraft')}</Button>
           )}
         </Card>
       )}
       {pm && (
         <div className="space-y-4">
           <Card>
-            <p className="text-xs text-gray-500 mb-4">Status: {String(pm.status)}</p>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Root causes (one per line)</label>
+            <p className="text-xs text-gray-500 mb-4">{t('statusLabel', { status: String(pm.status) })}</p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('rootCausesLabel')}</label>
             <textarea
               className="w-full border rounded-md p-2 text-sm min-h-[120px] mb-4"
               value={rootText}
@@ -136,7 +142,7 @@ export default function MajorIncidentPostmortemPage() {
               readOnly={!canManage}
               disabled={!canManage}
             />
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contributing factors (one per line)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('contributingFactorsLabel')}</label>
             <textarea
               className="w-full border rounded-md p-2 text-sm min-h-[120px] mb-4"
               value={contribText}
@@ -146,9 +152,9 @@ export default function MajorIncidentPostmortemPage() {
             />
             {canManage && (
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={saveDraft} disabled={saving}>Save draft</Button>
+                <Button type="button" variant="outline" onClick={saveDraft} disabled={saving}>{t('saveDraft')}</Button>
                 <Button type="button" onClick={publish} disabled={saving || pm.status === 'published'}>
-                  Publish
+                  {t('publish')}
                 </Button>
               </div>
             )}

@@ -1,18 +1,21 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { admin, type LocationItem } from '../../api/client';
 import type { FieldDef } from './MasterDataPage';
 import MasterDataDetailPage from './MasterDataDetailPage';
 
 export default function LocationsDetailPage() {
+  const t = useTranslations('pages.admin.locations');
+  const tFields = useTranslations('common.fields');
+  const tMaster = useTranslations('common.masterData');
+  const tStates = useTranslations('common.states');
   const { id } = useParams<{ id: string }>();
-  const [companyOptions, setCompanyOptions] = useState<Array<{ value: string; label: string }>>([
-    { value: '', label: '— None —' },
-  ]);
-  const [parentLocationOptions, setParentLocationOptions] = useState<Array<{ value: string; label: string }>>([
-    { value: '', label: '— None —' },
-  ]);
+  const [companyOptions, setCompanyOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [parentLocationOptions, setParentLocationOptions] = useState<Array<{ value: string; label: string }>>([]);
+
+  const noneOption = `— ${tStates('none')} —`;
 
   useEffect(() => {
     let alive = true;
@@ -20,11 +23,11 @@ export default function LocationsDetailPage() {
       .then(([companiesRes, locationsRes]) => {
         if (!alive) return;
         setCompanyOptions([
-          { value: '', label: '— None —' },
+          { value: '', label: noneOption },
           ...companiesRes.companies.map((c) => ({ value: c.id, label: c.name })),
         ]);
         setParentLocationOptions([
-          { value: '', label: '— None —' },
+          { value: '', label: noneOption },
           ...locationsRes.locations
             .filter((l) => l.id !== id)
             .map((l) => ({ value: l.id, label: `${l.code} — ${l.name}` })),
@@ -36,30 +39,30 @@ export default function LocationsDetailPage() {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, noneOption]);
 
   const fields: FieldDef[] = useMemo(() => [
-    { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. Zurich HQ' },
-    { key: 'code', label: 'Code', type: 'text', required: true, placeholder: 'e.g. CH-ZRH-HQ' },
+    { key: 'name', label: tFields('name'), type: 'text', required: true, placeholder: t('placeholderName') },
+    { key: 'code', label: tFields('code'), type: 'text', required: true, placeholder: t('placeholderCode') },
     {
       key: 'source',
-      label: 'Source',
+      label: tFields('source'),
       type: 'select',
       options: [
-        { value: 'manual', label: 'manual' },
-        { value: 'import', label: 'import' },
-        { value: 'integration', label: 'integration' },
+        { value: 'manual', label: t('sourceOptions.manual') },
+        { value: 'import', label: t('sourceOptions.import') },
+        { value: 'integration', label: t('sourceOptions.integration') },
       ],
     },
-    { key: 'country', label: 'Country', type: 'text', placeholder: 'e.g. Switzerland' },
-    { key: 'state', label: 'State', type: 'text', placeholder: 'e.g. ZH' },
-    { key: 'city', label: 'City', type: 'text', placeholder: 'e.g. Zurich' },
-    { key: 'zip', label: 'ZIP', type: 'text', placeholder: 'e.g. 8001' },
-    { key: 'street', label: 'Street', type: 'text', placeholder: 'e.g. Bahnhofstrasse 1' },
-    { key: 'company_id', label: 'Company', type: 'select', options: companyOptions },
-    { key: 'parent_location_id', label: 'Parent Location', type: 'select', options: parentLocationOptions },
-    { key: 'description', label: 'Description', type: 'textarea', placeholder: 'Optional notes' },
-  ], [companyOptions, parentLocationOptions]);
+    { key: 'country', label: tFields('country'), type: 'text', placeholder: t('placeholderCountry') },
+    { key: 'state', label: tFields('state'), type: 'text', placeholder: t('placeholderState') },
+    { key: 'city', label: tFields('city'), type: 'text', placeholder: t('placeholderCity') },
+    { key: 'zip', label: tFields('zip'), type: 'text', placeholder: t('placeholderZip') },
+    { key: 'street', label: tFields('street'), type: 'text', placeholder: t('placeholderStreet') },
+    { key: 'company_id', label: tFields('company'), type: 'select', options: companyOptions },
+    { key: 'parent_location_id', label: tFields('parentLocation'), type: 'select', options: parentLocationOptions },
+    { key: 'description', label: tFields('description'), type: 'textarea', placeholder: tMaster('optionalNotes') },
+  ], [t, tFields, tMaster, companyOptions, parentLocationOptions]);
 
   const fetchItems = useCallback(async () => {
     const res = await admin.locations();
@@ -68,7 +71,7 @@ export default function LocationsDetailPage() {
 
   return (
     <MasterDataDetailPage<LocationItem>
-      title="Locations"
+      title={t('title')}
       basePath="/admin/locations"
       fields={fields}
       fetchItems={fetchItems}

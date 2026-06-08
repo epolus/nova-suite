@@ -1,19 +1,12 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { search, type SearchResult } from '../api/client';
 import PageHeader from '../components/PageHeader';
 import Spinner from '../components/Spinner';
 
 const TYPE_ORDER: SearchResult['type'][] = ['incident', 'change', 'problem', 'knowledge', 'ci'];
-
-const TYPE_LABEL: Record<SearchResult['type'], string> = {
-  incident: 'Incidents',
-  change: 'Changes',
-  problem: 'Problems',
-  knowledge: 'Knowledge',
-  ci: 'CMDB',
-};
 
 function groupByType(items: SearchResult[]): Record<SearchResult['type'], SearchResult[]> {
   return items.reduce((acc, item) => {
@@ -25,11 +18,14 @@ function groupByType(items: SearchResult[]): Record<SearchResult['type'], Search
 }
 
 export default function SearchResultsPage() {
+  const tSearch = useTranslations('pages.search');
   const [searchParams] = useSearchParams();
   const q = (searchParams.get('q') || '').trim();
   const requestedType = (searchParams.get('type') || '').trim() as SearchResult['type'] | '';
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
+
+  const typeLabel = (type: SearchResult['type']) => tSearch(`types.${type}` as 'types.incident');
 
   useEffect(() => {
     let alive = true;
@@ -61,19 +57,25 @@ export default function SearchResultsPage() {
   const grouped = useMemo(() => groupByType(results), [results]);
   const total = results.length;
 
+  const description = q
+    ? requestedType
+      ? tSearch('resultsInType', { query: q, type: typeLabel(requestedType) })
+      : tSearch('resultsFor', { query: q })
+    : tSearch('globalSearchHint');
+
   return (
     <>
       <PageHeader
-        title="Search Results"
-        description={q ? `Results for "${q}"${requestedType ? ` in ${TYPE_LABEL[requestedType]}` : ''}` : 'Type a query in Global Search'}
+        title={tSearch('title')}
+        description={description}
       />
 
       {loading ? (
         <Spinner />
       ) : !q ? (
-        <div className="text-sm text-gray-500">Open global search with Ctrl+K and press Enter to view grouped results.</div>
+        <div className="text-sm text-gray-500">{tSearch('openGlobalSearchHint')}</div>
       ) : total === 0 ? (
-        <div className="text-sm text-gray-500">No records found.</div>
+        <div className="text-sm text-gray-500">{tSearch('noRecords')}</div>
       ) : (
         <div className="space-y-6">
           {TYPE_ORDER.map((type) => {
@@ -82,7 +84,7 @@ export default function SearchResultsPage() {
             return (
               <section key={type} className="bg-white border border-gray-200 rounded-xl">
                 <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-gray-900">{TYPE_LABEL[type]}</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">{typeLabel(type)}</h3>
                   <span className="text-xs text-gray-500">{list.length}</span>
                 </div>
                 <div>
@@ -97,7 +99,7 @@ export default function SearchResultsPage() {
                           <p className="text-sm font-medium text-gray-900 truncate">{item.identifier} · {item.title}</p>
                           {item.subtitle && <p className="text-xs text-gray-500 truncate mt-0.5">{item.subtitle}</p>}
                         </div>
-                        <span className="text-[11px] text-gray-400">{TYPE_LABEL[type]}</span>
+                        <span className="text-[11px] text-gray-400">{typeLabel(type)}</span>
                       </div>
                     </Link>
                   ))}
@@ -110,4 +112,3 @@ export default function SearchResultsPage() {
     </>
   );
 }
-

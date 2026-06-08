@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
@@ -10,17 +11,20 @@ import { hasReportingCreateRole, hasReportingViewRole } from '../../utils/roles'
 import { formatDateTime } from '../../utils/dateTime';
 
 function NewReportCard({ onCreate, creating }: { onCreate: (name: string) => Promise<void>; creating: boolean }) {
+  const t = useTranslations('pages.reports');
+  const tActions = useTranslations('common.actions');
+
   const [name, setName] = useState('');
 
   return (
     <Card>
-      <h3 className="text-sm font-semibold text-gray-900">Create report</h3>
-      <p className="text-xs text-gray-500 mt-1">Start with an empty drag-and-drop canvas.</p>
+      <h3 className="text-sm font-semibold text-gray-900">{t('createReport')}</h3>
+      <p className="text-xs text-gray-500 mt-1">{t('createReportHint')}</p>
       <div className="mt-3 flex gap-2">
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="Report name..."
+          placeholder={t('reportNamePlaceholder')}
           className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
         />
         <button
@@ -32,7 +36,7 @@ function NewReportCard({ onCreate, creating }: { onCreate: (name: string) => Pro
           }}
           className="px-3 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
         >
-          {creating ? 'Creating...' : 'Create'}
+          {creating ? t('creating') : tActions('create')}
         </button>
       </div>
     </Card>
@@ -40,6 +44,8 @@ function NewReportCard({ onCreate, creating }: { onCreate: (name: string) => Pro
 }
 
 export default function ReportsLibraryPage() {
+  const t = useTranslations('pages.reports');
+  const tActions = useTranslations('common.actions');
   const navigate = useNavigate();
   const { user } = useAuth();
   const [items, setItems] = useState<ReportDefinitionSummary[]>([]);
@@ -51,18 +57,18 @@ export default function ReportsLibraryPage() {
   const canView = hasReportingViewRole(user?.roles);
   const canCreate = hasReportingCreateRole(user?.roles);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await reports.listDefinitions();
       setItems(res.reports);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load reports');
+      setError(err instanceof Error ? err.message : t('loadFailed'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     if (!canView) {
@@ -70,7 +76,7 @@ export default function ReportsLibraryPage() {
       return;
     }
     void load();
-  }, [canView]);
+  }, [canView, load]);
 
   const privateCount = useMemo(() => items.filter((item) => !item.is_shared).length, [items]);
 
@@ -87,7 +93,7 @@ export default function ReportsLibraryPage() {
       });
       navigate(`/reports/${res.report.id}/builder`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create report');
+      setError(err instanceof Error ? err.message : t('createFailed'));
     } finally {
       setCreating(false);
     }
@@ -99,7 +105,7 @@ export default function ReportsLibraryPage() {
       await reports.deleteDefinition(id);
       setItems((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete report');
+      setError(err instanceof Error ? err.message : t('deleteFailed'));
     } finally {
       setBusyDeleteId(null);
     }
@@ -108,9 +114,9 @@ export default function ReportsLibraryPage() {
   if (!canView) {
     return (
       <>
-        <PageHeader title="Reports" description="Custom reporting workspace." />
+        <PageHeader title={t('title')} description={t('workspaceDescription')} />
         <Card>
-          <p className="text-sm text-gray-600">You do not have permission to view reports.</p>
+          <p className="text-sm text-gray-600">{t('noPermissionView')}</p>
         </Card>
       </>
     );
@@ -119,14 +125,14 @@ export default function ReportsLibraryPage() {
   return (
     <>
       <PageHeader
-        title="Reports"
-        description={`Shared: ${items.length - privateCount} · Private: ${privateCount}`}
+        title={t('title')}
+        description={t('sharedPrivateCounts', { shared: items.length - privateCount, private: privateCount })}
         action={
           <button
             onClick={() => void load()}
             className="px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50"
           >
-            Refresh
+            {tActions('refresh')}
           </button>
         }
       />
@@ -148,12 +154,16 @@ export default function ReportsLibraryPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="text-sm font-semibold text-gray-900 truncate">{item.name}</h3>
-                  <p className="text-xs text-gray-500 mt-1">{item.description || 'No description'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{item.description || t('noDescription')}</p>
                   <p className="text-xs text-gray-400 mt-2">
-                    Updated {formatDateTime(item.updated_at)} · v{item.version}
+                    {t('updatedVersion', { date: formatDateTime(item.updated_at), version: item.version })}
                   </p>
                   <p className="text-xs mt-1 text-gray-500">
-                    {item.is_shared ? `Shared${item.allowed_roles.length ? ` (${item.allowed_roles.join(', ')})` : ' (all report roles)'}` : 'Private'}
+                    {item.is_shared
+                      ? item.allowed_roles.length
+                        ? t('sharedRoles', { roles: item.allowed_roles.join(', ') })
+                        : t('sharedAllRoles')
+                      : t('private')}
                   </p>
                 </div>
                 <div className="shrink-0 flex gap-2">
@@ -161,14 +171,14 @@ export default function ReportsLibraryPage() {
                     to={`/reports/${item.id}`}
                     className="px-2.5 py-1.5 rounded-md text-xs border border-gray-200 hover:bg-gray-50"
                   >
-                    View
+                    {tActions('view')}
                   </Link>
                   {item.can_edit && (
                     <Link
                       to={`/reports/${item.id}/builder`}
                       className="px-2.5 py-1.5 rounded-md text-xs bg-indigo-600 text-white hover:bg-indigo-700"
                     >
-                      Edit
+                      {tActions('edit')}
                     </Link>
                   )}
                 </div>
@@ -180,7 +190,7 @@ export default function ReportsLibraryPage() {
                     disabled={busyDeleteId === item.id}
                     className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
                   >
-                    {busyDeleteId === item.id ? 'Deleting...' : 'Delete'}
+                    {busyDeleteId === item.id ? t('deleting') : tActions('delete')}
                   </button>
                 </div>
               )}
@@ -188,7 +198,7 @@ export default function ReportsLibraryPage() {
           ))}
           {items.length === 0 && (
             <Card>
-              <p className="text-sm text-gray-500">No reports yet. Create one to get started.</p>
+              <p className="text-sm text-gray-500">{t('emptyLibrary')}</p>
             </Card>
           )}
         </div>
@@ -196,4 +206,3 @@ export default function ReportsLibraryPage() {
     </>
   );
 }
-

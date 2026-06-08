@@ -1,37 +1,43 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { requests } from '../../api/client';
 import type { ServiceItem, FormField } from '../../api/client';
 import DynamicFormField from '../../components/DynamicFormField';
+import { useStatusLabel } from '@/i18n/hooks';
 
-function validateFormData(fields: FormField[], data: Record<string, string>): Record<string, string> {
+function validateFormData(
+  fields: FormField[],
+  data: Record<string, string>,
+  t: (key: 'fieldRequired' | 'mustBeNumber' | 'minValue' | 'maxValue' | 'dateNotPast' | 'patternMismatch', values?: Record<string, string | number>) => string,
+): Record<string, string> {
   const errors: Record<string, string> = {};
   const now = new Date();
   const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   for (const field of fields) {
     const val = data[field.name] || '';
     if (field.required && !val.trim() && field.type !== 'checkbox') {
-      errors[field.name] = `${field.label || field.name} is required`;
+      errors[field.name] = t('fieldRequired', { field: field.label || field.name });
       continue;
     }
     if (!val) continue;
     if (field.type === 'number') {
       const n = Number(val);
-      if (isNaN(n)) { errors[field.name] = 'Must be a number'; continue; }
-      if (field.min != null && n < field.min) { errors[field.name] = `Minimum value is ${field.min}`; continue; }
-      if (field.max != null && n > field.max) { errors[field.name] = `Maximum value is ${field.max}`; continue; }
+      if (Number.isNaN(n)) { errors[field.name] = t('mustBeNumber'); continue; }
+      if (field.min != null && n < field.min) { errors[field.name] = t('minValue', { min: field.min }); continue; }
+      if (field.max != null && n > field.max) { errors[field.name] = t('maxValue', { max: field.max }); continue; }
     }
     if (field.type === 'date') {
       if (val < todayIso) {
-        errors[field.name] = 'Date cannot be in the past';
+        errors[field.name] = t('dateNotPast');
       }
       continue;
     }
     if (field.pattern) {
       try {
         if (!new RegExp(field.pattern).test(val)) {
-          errors[field.name] = 'Does not match the required pattern';
+          errors[field.name] = t('patternMismatch');
         }
       } catch {}
     }
@@ -39,12 +45,19 @@ function validateFormData(fields: FormField[], data: Record<string, string>): Re
   return errors;
 }
 
+const PRIORITY_VALUES = ['low', 'medium', 'high', 'critical'] as const;
+
 interface Props {
   item: ServiceItem;
   onClose: () => void;
 }
 
 export default function RequestModal({ item, onClose }: Props) {
+  const t = useTranslations('pages.catalog');
+  const tActions = useTranslations('common.actions');
+  const tValidation = useTranslations('common.validation');
+  const tFields = useTranslations('common.fields');
+  const statusLabel = useStatusLabel();
   const navigate = useNavigate();
   const fields: FormField[] = item.form_schema?.fields || [];
   const [formData, setFormData] = useState<Record<string, string>>(() => {
@@ -59,9 +72,15 @@ export default function RequestModal({ item, onClose }: Props) {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  const validate = useCallback(
+    (fieldsToValidate: FormField[], data: Record<string, string>) =>
+      validateFormData(fieldsToValidate, data, tValidation),
+    [tValidation],
+  );
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const errs = validateFormData(fields, formData);
+    const errs = validate(fields, formData);
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -75,8 +94,8 @@ export default function RequestModal({ item, onClose }: Props) {
         priority,
       });
       navigate(`/requests/${res.id}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit request');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t('submitFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -118,16 +137,15 @@ export default function RequestModal({ item, onClose }: Props) {
           ))}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{tFields('priority')}</label>
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
+              {PRIORITY_VALUES.map((value) => (
+                <option key={value} value={value}>{statusLabel(value)}</option>
+              ))}
             </select>
           </div>
 
@@ -137,14 +155,14 @@ export default function RequestModal({ item, onClose }: Props) {
               onClick={onClose}
               className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {tActions('cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {submitting ? 'Submitting...' : 'Submit Request'}
+              {submitting ? t('submitting') : t('submitRequest')}
             </button>
           </div>
         </form>

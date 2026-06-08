@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslations } from 'use-intl';
 import type { FormField } from '../api/client';
 import { cmdb, auth } from '../api/client';
 import UserDateInput from './UserDateInput';
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function DynamicFormField({ field, value, onChange }: Props) {
+  const t = useTranslations('components.dynamicFormField');
   const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
 
   return (
@@ -30,7 +32,7 @@ export default function DynamicFormField({ field, value, onChange }: Props) {
         />
       ) : field.type === 'select' ? (
         <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
-          <option value="">{field.placeholder || 'Select...'}</option>
+          <option value="">{field.placeholder || t('select')}</option>
           {field.options?.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       ) : field.type === 'multiselect' ? (
@@ -57,7 +59,7 @@ export default function DynamicFormField({ field, value, onChange }: Props) {
           type="email"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder || 'user@example.com'}
+          placeholder={field.placeholder || t('emailPlaceholder')}
           pattern={field.pattern}
           className={inputClass}
         />
@@ -117,6 +119,8 @@ function CmdbRefPicker({ value, onChange, ciClass, ciFilter, placeholder }: {
   ciFilter?: Record<string, string>;
   placeholder?: string;
 }) {
+  const t = useTranslations('components.dynamicFormField');
+  const tStates = useTranslations('common.states');
   const [inputText, setInputText] = useState('');
   const [options, setOptions] = useState<{ id: string; name: string; class_name: string }[]>([]);
   const [open, setOpen] = useState(false);
@@ -155,7 +159,7 @@ function CmdbRefPicker({ value, onChange, ciClass, ciFilter, placeholder }: {
       setInputText('');
       setResolved(true);
     }
-  }, [value]);
+  }, [value, buildParams, resolved]);
 
   // Fetch matching CIs when debounced search changes
   useEffect(() => {
@@ -214,7 +218,7 @@ function CmdbRefPicker({ value, onChange, ciClass, ciFilter, placeholder }: {
           value={inputText}
           onChange={(e) => { setInputText(e.target.value); if (!open) setOpen(true); }}
           onFocus={handleFocus}
-          placeholder={placeholder || `Search CMDB${ciClass ? ` (${ciClass})` : ''}...`}
+          placeholder={placeholder || t('searchCi', { suffix: ciClass ? t('searchCiSuffix', { class: ciClass }) : '' })}
           className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
         />
         {value && !open && (
@@ -232,10 +236,10 @@ function CmdbRefPicker({ value, onChange, ciClass, ciFilter, placeholder }: {
       {open && (
         <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-auto">
           {loading && options.length === 0 ? (
-            <div className="px-3 py-3 text-xs text-gray-400 text-center">Searching...</div>
+            <div className="px-3 py-3 text-xs text-gray-400 text-center">{tStates('loading')}</div>
           ) : options.length === 0 ? (
             <div className="px-3 py-3 text-xs text-gray-400 text-center">
-              {inputText ? `No CIs matching "${inputText}"` : 'No CIs found'}
+              {inputText ? t('noCiMatching', { query: inputText }) : t('noCiFound')}
             </div>
           ) : (
             options.map((ci) => (
@@ -266,6 +270,7 @@ function UserRefPicker({ value, onChange, placeholder }: {
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
+  const t = useTranslations('components.dynamicFormField');
   const [inputText, setInputText] = useState('');
   const [users, setUsers] = useState<{ id: string; display_name: string; email: string }[]>([]);
   const [open, setOpen] = useState(false);
@@ -291,6 +296,8 @@ function UserRefPicker({ value, onChange, placeholder }: {
         }
       }
     }).catch(() => setLoaded(true));
+    // Load the user list once on mount; the initial value is resolved here too
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Close dropdown when clicking outside
@@ -336,7 +343,7 @@ function UserRefPicker({ value, onChange, placeholder }: {
           value={inputText}
           onChange={(e) => { setInputText(e.target.value); if (!open) setOpen(true); }}
           onFocus={handleFocus}
-          placeholder={placeholder || 'Search users...'}
+          placeholder={placeholder || t('searchUser')}
           className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
         />
         {value && !open && (
@@ -349,10 +356,10 @@ function UserRefPicker({ value, onChange, placeholder }: {
       {open && (
         <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-auto">
           {!loaded ? (
-            <div className="px-3 py-3 text-xs text-gray-400 text-center">Loading users...</div>
+            <div className="px-3 py-3 text-xs text-gray-400 text-center">{t('loadingUsers')}</div>
           ) : filtered.length === 0 ? (
             <div className="px-3 py-3 text-xs text-gray-400 text-center">
-              {inputText ? `No users matching "${inputText}"` : 'No users found'}
+              {inputText ? t('noUserMatching', { query: inputText }) : t('noUserFound')}
             </div>
           ) : (
             filtered.slice(0, 25).map((u) => (

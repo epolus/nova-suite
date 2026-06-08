@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 import Card from './Card';
 import EmptyState from './EmptyState';
 import type { SortDir } from '../hooks/useListParams';
@@ -52,7 +53,7 @@ export default function DataTable<T extends { id: string }>({
   onSort,
   columnFilters,
   onColumnFilter,
-  emptyMessage = 'No data found.',
+  emptyMessage,
   onRowClick,
   rowActions,
   pagination,
@@ -60,6 +61,8 @@ export default function DataTable<T extends { id: string }>({
   selectedIds = [],
   onSelectionChange,
 }: DataTableProps<T>) {
+  const tTable = useTranslations('common.table');
+  const resolvedEmptyMessage = emptyMessage ?? tTable('noData');
   const visible = visibleColumns
     .map((key) => columns.find((c) => c.key === key))
     .filter(Boolean) as DataColumnDef<T>[];
@@ -118,7 +121,7 @@ export default function DataTable<T extends { id: string }>({
   return (
     <Card padding={false}>
       {data.length === 0 && !hasColumnFilters ? (
-        <EmptyState message={emptyMessage} />
+        <EmptyState message={resolvedEmptyMessage} />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -197,7 +200,7 @@ export default function DataTable<T extends { id: string }>({
               {data.length === 0 ? (
                 <tr>
                   <td colSpan={visible.length + (rowActions ? 1 : 0) + (selectable ? 1 : 0) + 1} className="py-12">
-                    <EmptyState message={emptyMessage} />
+                    <EmptyState message={resolvedEmptyMessage} />
                   </td>
                 </tr>
               ) : (
@@ -238,14 +241,14 @@ export default function DataTable<T extends { id: string }>({
 
       {pagination && pagination.pages > 1 && (
         <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between">
-          <p className="text-sm text-gray-500">{pagination.total} total</p>
+          <p className="text-sm text-gray-500">{tTable('total', { count: pagination.total })}</p>
           <div className="flex gap-2">
             <button
               disabled={pagination.page <= 1}
               onClick={() => pagination.onPageChange(pagination.page - 1)}
               className="px-3 py-1 text-sm border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
             >
-              Prev
+              {tTable('prev')}
             </button>
             <span className="px-2 py-1 text-sm text-gray-500">
               {pagination.page} / {pagination.pages}
@@ -255,7 +258,7 @@ export default function DataTable<T extends { id: string }>({
               onClick={() => pagination.onPageChange(pagination.page + 1)}
               className="px-3 py-1 text-sm border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
             >
-              Next
+              {tTable('next')}
             </button>
           </div>
         </div>
@@ -267,6 +270,7 @@ export default function DataTable<T extends { id: string }>({
 // ─── Column Filter Input (debounced) ───
 
 function ColumnFilterInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const tTable = useTranslations('common.table');
   const [local, setLocal] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -290,7 +294,7 @@ function ColumnFilterInput({ value, onChange }: { value: string; onChange: (v: s
       onChange={(e) => handleChange(e.target.value)}
       onClick={(e) => e.stopPropagation()}
       className="w-full px-2 py-1 text-xs border border-gray-200 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 placeholder-gray-300"
-      placeholder="Filter..."
+      placeholder={tTable('filterPlaceholder')}
     />
   );
 }
@@ -321,6 +325,7 @@ function ColumnPicker<T>({
   visibleColumns: string[];
   onChange: (cols: string[]) => void;
 }) {
+  const tTable = useTranslations('common.table');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -347,7 +352,7 @@ function ColumnPicker<T>({
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="text-gray-400 hover:text-gray-600 p-0.5 rounded"
-        title="Configure columns"
+        title={tTable('configureColumns')}
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -357,7 +362,7 @@ function ColumnPicker<T>({
 
       {open && (
         <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-          <p className="px-3 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Visible Columns</p>
+          <p className="px-3 pb-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{tTable('visibleColumns')}</p>
           {columns.map((col) => (
             <label
               key={col.key}

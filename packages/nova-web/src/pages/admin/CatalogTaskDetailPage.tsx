@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   useRegisterAiAutomationApply,
   useSetAiContext,
-} from '../../components/ai/AiAssistantProvider';
-import type { CatalogTasksListLocationState } from './CatalogTasksPage';
+} from '../../components/ai/aiAssistantContext';
 import { admin as adminApi, catalog, credentials as credentialsApi } from '../../api/client';
 import type { AllCatalogTask, AssignmentGroupItem, CatalogTask, ServiceItem, TenantCredentialListItem } from '../../api/client';
 import { validateAutomationConfig } from '@nova-suite/shared';
@@ -13,98 +13,15 @@ import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import ServiceItemCombobox from '../../components/ServiceItemCombobox';
-import UnifiedAutomationDesigner from '../../components/workflow/UnifiedAutomationDesigner';
-
-const TASK_TYPES = [
-  { value: 'approval', label: 'Approval' },
-  { value: 'manual', label: 'Manual' },
-  { value: 'automated', label: 'Automated' },
-] as const;
-
-function catalogTasksReturnState(serviceItemId: string | undefined): CatalogTasksListLocationState | undefined {
-  if (!serviceItemId) return undefined;
-  return { catalogTasksTab: 'by-item', focusServiceItemId: serviceItemId };
-}
-
-/** Full automation_config examples (replace editor). */
-const AUTOMATION_SNIPPETS: { id: string; label: string; json: string }[] = [
-  {
-    id: 'state_basic',
-    label: 'State machine: single HTTP step',
-    json: JSON.stringify(
-      {
-        kind: 'state_machine',
-        startAt: 'check',
-        states: [
-          {
-            id: 'check',
-            type: 'activity',
-            method: 'GET',
-            url: 'https://httpbin.org/status/200',
-            retryAttempts: 2,
-            retryBackoffSec: 2,
-            transitions: [{ to: 'done', when: 'success' }, { to: 'failed', when: 'failure' }],
-            onSuccess: { mergeFormData: { rest_ok: 'true' } },
-          },
-          { id: 'done', type: 'end', result: 'success' },
-          { id: 'failed', type: 'end', result: 'failure', onFailure: { skipTaskOrders: [], rejectRequest: false } },
-        ],
-      },
-      null,
-      2,
-    ),
-  },
-  {
-    id: 'state_decision',
-    label: 'State machine: decision + delay',
-    json: JSON.stringify(
-      {
-        kind: 'state_machine',
-        startAt: 'probe',
-        states: [
-          {
-            id: 'probe',
-            type: 'activity',
-            method: 'GET',
-            url: 'https://httpbin.org/json',
-            transitions: [{ to: 'branch' }],
-          },
-          {
-            id: 'branch',
-            type: 'decision',
-            condition: '{{response.status}}',
-            transitions: [{ to: 'pause', when: 'true' }, { to: 'rejected', when: 'false' }],
-          },
-          { id: 'pause', type: 'delay', delaySeconds: 5, transitions: [{ to: 'approved' }] },
-          { id: 'approved', type: 'end', result: 'success' },
-          { id: 'rejected', type: 'end', result: 'failure', onFailure: { rejectRequest: true } },
-        ],
-      },
-      null,
-      2,
-    ),
-  },
-];
-
-function isEmptyAutomationJson(s: string): boolean {
-  try {
-    const o = JSON.parse(s || '{}') as unknown;
-    return typeof o === 'object' && o !== null && !Array.isArray(o) && Object.keys(o as object).length === 0;
-  } catch {
-    return false;
-  }
-}
-
-const TEMPLATE_TOKENS: { label: string; token: string }[] = [
-  { label: 'request.number', token: '{{request.number}}' },
-  { label: 'request.id', token: '{{request.id}}' },
-  { label: 'request.form_data…', token: '{{request.form_data.FIELD}}' },
-  { label: 'response.body…', token: '{{response.body}}' },
-  { label: 'env var', token: '{{env.VAR_NAME}}' },
-  { label: 'vault credential', token: '{{cred.slug}}' },
-];
+import AutomationConfigField from './catalog-tasks/AutomationConfigField';
+import { catalogTasksReturnState, TASK_TYPE_VALUES } from './catalog-tasks/automationSnippets';
 
 export default function CatalogTaskDetailPage() {
+  const t = useTranslations('pages.admin.catalogTasks.detail');
+  const tCatalog = useTranslations('pages.admin.catalogTasks');
+  const tActions = useTranslations('common.actions');
+  const tFields = useTranslations('common.fields');
+  const tStates = useTranslations('common.states');
   const navigate = useNavigate();
   const { serviceItemId = '', taskId = '' } = useParams();
   const isNew = !taskId || taskId === 'new';
@@ -177,7 +94,7 @@ export default function CatalogTaskDetailPage() {
       }
 
       if (!effectiveItemId || !taskId) {
-        setError('Invalid catalog task URL.');
+        setError(t('invalidUrl'));
         setLoading(false);
         return;
       }
@@ -185,7 +102,7 @@ export default function CatalogTaskDetailPage() {
       const taskRes = await catalog.itemTasks(effectiveItemId);
       const task = taskRes.tasks.find((t) => t.id === taskId);
       if (!task) {
-        setError('Catalog task not found.');
+        setError(t('notFound'));
         setLoading(false);
         return;
       }
@@ -205,16 +122,16 @@ export default function CatalogTaskDetailPage() {
       setLoading(false);
     }).catch(() => {
       if (!active) return;
-      setError('Failed to load catalog task details.');
+      setError(t('loadFailed'));
       setLoading(false);
     });
 
     return () => { active = false; };
-  }, [serviceItemId, taskId, isNew]);
+  }, [serviceItemId, taskId, isNew, t]);
 
   const selectedItemName = useMemo(
-    () => items.find((i) => i.id === form.service_item_id)?.name || 'Catalog Task',
-    [items, form.service_item_id],
+    () => items.find((i) => i.id === form.service_item_id)?.name || t('fallbackTitle'),
+    [items, form.service_item_id, t],
   );
 
   const insertAtCursor = (snippet: string) => {
@@ -264,19 +181,19 @@ export default function CatalogTaskDetailPage() {
         try {
           const parsed = JSON.parse(form.automation_config_json || '{}') as unknown;
           if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-            setError('Automation config must be a JSON object.');
+            setError(t('automationMustBeObject'));
             setSaving(false);
             return;
           }
           automation_config = parsed as Record<string, unknown>;
           const validationErrors = validateAutomationConfig(automation_config);
           if (validationErrors.length > 0) {
-            setError(`Automation config is invalid: ${validationErrors.join('; ')}`);
+            setError(t('automationInvalid', { errors: validationErrors.join('; ') }));
             setSaving(false);
             return;
           }
         } catch {
-          setError('Automation config is not valid JSON.');
+          setError(t('automationNotJson'));
           setSaving(false);
           return;
         }
@@ -301,7 +218,7 @@ export default function CatalogTaskDetailPage() {
         state: catalogTasksReturnState(form.service_item_id),
       });
     } catch {
-      setError('Failed to save catalog task.');
+      setError(t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -314,15 +231,15 @@ export default function CatalogTaskDetailPage() {
   return (
     <>
       <PageHeader
-        title={isNew ? 'New Catalog Task' : 'Catalog Task Detail'}
-        description={`${isNew ? 'Create' : 'Update'} task for ${selectedItemName}.`}
+        title={isNew ? t('newTitle') : t('editTitle')}
+        description={t('description', { action: isNew ? t('create') : t('update'), item: selectedItemName })}
         action={
           <Link
             to="/admin/catalog-tasks"
             state={returnListState}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
           >
-            Back to list
+            {t('backToList')}
           </Link>
         }
       />
@@ -335,28 +252,28 @@ export default function CatalogTaskDetailPage() {
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Service item *</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{t('serviceItem')}</label>
             <ServiceItemCombobox
               items={items}
               value={form.service_item_id}
               onChange={(id) => setForm({ ...form, service_item_id: id })}
               taskCounts={taskCountsByItemId}
               disabled={!isNew}
-              placeholder="Search and select a service item…"
+              placeholder={tCatalog('serviceItemPlaceholder')}
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Task Type *</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{t('taskType')}</label>
             <select
               value={form.task_type}
               onChange={(e) => setForm((prev) => ({ ...prev, task_type: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              {TASK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              {TASK_TYPE_VALUES.map((type) => <option key={type} value={type}>{tCatalog(`filters.types.${type}`)}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Name *</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{t('name')}</label>
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -364,7 +281,7 @@ export default function CatalogTaskDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Order Group</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{t('orderGroup')}</label>
             <input
               type="number"
               min={1}
@@ -374,31 +291,31 @@ export default function CatalogTaskDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Assigned Group</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{t('assignedGroup')}</label>
             <select
               value={form.assigned_group_id}
               onChange={(e) => setForm({ ...form, assigned_group_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="">-- None --</option>
+              <option value="">{t('noneOption')}</option>
               {groups.filter((g) => g.is_active).map((g) => (
                 <option key={g.id} value={g.id}>{g.name}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">SLA (hours)</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{t('slaHours')}</label>
             <input
               type="number"
               min={0}
               value={form.sla_hours}
               onChange={(e) => setForm({ ...form, sla_hours: e.target.value })}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Optional"
+              placeholder={tStates('optional')}
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('description')}</label>
             <input
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -406,7 +323,7 @@ export default function CatalogTaskDetailPage() {
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Instructions</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{t('instructions')}</label>
             <textarea
               rows={4}
               value={form.instructions}
@@ -415,104 +332,22 @@ export default function CatalogTaskDetailPage() {
             />
           </div>
           {form.task_type === 'automated' && (
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                Automation (JSON)
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                Use state-machine format: <code className="bg-gray-100 px-1 rounded">kind: &quot;state_machine&quot;</code>,{' '}
-                <code className="bg-gray-100 px-1 rounded">startAt</code>, and <code className="bg-gray-100 px-1 rounded">states[]</code>. Supported state types:{' '}
-                <code className="bg-gray-100 px-1 rounded">activity</code>, <code className="bg-gray-100 px-1 rounded">decision</code>,{' '}
-                <code className="bg-gray-100 px-1 rounded">delay</code>, <code className="bg-gray-100 px-1 rounded">end</code>,{' '}
-                <code className="bg-gray-100 px-1 rounded">action.rest</code>, <code className="bg-gray-100 px-1 rounded">action.ci.lookup</code>,{' '}
-                <code className="bg-gray-100 px-1 rounded">action.ci.create</code>, <code className="bg-gray-100 px-1 rounded">decision.advanced</code>.{' '}
-                For secrets, use <code className="bg-gray-100 px-1 rounded">{'{{cred.slug}}'}</code> with Admin → Credentials.
-              </p>
-              <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-2 py-1.5 mb-2">
-                Task-to-task handoff: write values in Task 1 via <code className="bg-white px-1 rounded">mergeFormData</code>, then read them in Task 2 with{' '}
-                <code className="bg-white px-1 rounded">{'{{request.form_data.your_key}}'}</code>. Set Task 2 to a higher{' '}
-                <code className="bg-white px-1 rounded">task_order</code> so it runs after Task 1.
-              </p>
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="text-xs font-medium text-gray-600">Insert example</span>
-                {AUTOMATION_SNIPPETS.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => {
-                      if (!isEmptyAutomationJson(form.automation_config_json)) {
-                        const ok = window.confirm(
-                          `Replace the current automation JSON with “${s.label}”?`,
-                        );
-                        if (!ok) return;
-                      }
-                      replaceAutomationJson(s.json);
-                    }}
-                    className="px-2 py-1 text-xs font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="text-xs font-medium text-gray-600">Insert at cursor</span>
-                <button
-                  type="button"
-                  onClick={() => setShowVisualBuilder((v) => !v)}
-                  className="px-2 py-1 text-xs rounded-md border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
-                >
-                  {showVisualBuilder ? 'Hide visual builder' : 'Show visual builder'}
-                </button>
-                {vaultCreds.length > 0 && (
-                  <select
-                    className="text-xs border border-gray-200 rounded px-2 py-1 max-w-[220px] bg-white"
-                    defaultValue=""
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v) insertAtCursor(`{{cred.${v}}}`);
-                      e.target.value = '';
-                    }}
-                    title="Insert vault credential reference"
-                  >
-                    <option value="">Vault credential…</option>
-                    {vaultCreds.map((c) => (
-                      <option key={c.id} value={c.slug}>{c.label} ({c.slug})</option>
-                    ))}
-                  </select>
-                )}
-                {TEMPLATE_TOKENS.map((t) => (
-                  <button
-                    key={t.label}
-                    type="button"
-                    onClick={() => insertAtCursor(t.token)}
-                    className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              {showVisualBuilder && (
-                <div className="mb-3">
-                  <UnifiedAutomationDesigner
-                    initialConfigJson={form.automation_config_json}
-                    onApply={(cfg) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        automation_config_json: JSON.stringify(cfg, null, 2),
-                      }))
-                    }
-                  />
-                </div>
-              )}
-              <textarea
-                ref={automationTextareaRef}
-                rows={14}
-                value={form.automation_config_json}
-                onChange={(e) => setForm({ ...form, automation_config_json: e.target.value })}
-                spellCheck={false}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
-              />
-            </div>
+            <AutomationConfigField
+              value={form.automation_config_json}
+              onChange={(json) => setForm({ ...form, automation_config_json: json })}
+              textareaRef={automationTextareaRef}
+              onInsertAtCursor={insertAtCursor}
+              onReplaceJson={replaceAutomationJson}
+              showVisualBuilder={showVisualBuilder}
+              onToggleVisualBuilder={() => setShowVisualBuilder((v) => !v)}
+              onApplyVisualBuilder={(cfg) =>
+                setForm((prev) => ({
+                  ...prev,
+                  automation_config_json: JSON.stringify(cfg, null, 2),
+                }))
+              }
+              vaultCreds={vaultCreds}
+            />
           )}
         </div>
         <div className="mt-4 flex gap-2">
@@ -521,14 +356,14 @@ export default function CatalogTaskDetailPage() {
             disabled={!form.service_item_id || !form.name.trim() || saving}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
           >
-            {saving ? 'Saving...' : (isNew ? 'Create Task' : 'Save Changes')}
+            {saving ? tActions('saving') : (isNew ? t('createTask') : t('saveChanges'))}
           </button>
           <button
             type="button"
             onClick={() => navigate('/admin/catalog-tasks', { state: returnListState })}
             className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
           >
-            Cancel
+            {tActions('cancel')}
           </button>
         </div>
       </Card>

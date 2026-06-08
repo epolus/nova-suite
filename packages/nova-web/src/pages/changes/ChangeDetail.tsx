@@ -1,74 +1,24 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { changes, cmdb, incidents, problems } from '../../api/client';
-import type { AssignmentGroupItem, Change, ChangeApproval, ChangeConflict, ChangeDetail, ChangeType, CI, Incident, Problem, ServiceListItem, StandardChangeTemplate } from '../../api/client';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { changes } from '@/api/client';
+import type { Change } from '@/api/client';
+import { useChangeDetail } from './useChangeDetail';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
-import { SearchableDropdown } from '../../components/SearchableDropdown';
 import { Button } from '../../components/ui/button';
-import UserDateTimeInput from '../../components/UserDateTimeInput';
 import { formatDateTime } from '../../utils/dateTime';
-
-type FormState = {
-  change_type_id: string;
-  standard_change_id: string;
-  category: string;
-  title: string;
-  description: string;
-  reason_for_change: string;
-  risk_level: Change['risk_level'];
-  impact: string;
-  impact_description: string;
-  implementation_plan: string;
-  backout_plan: string;
-  test_plan: string;
-  assigned_to: string;
-  assignment_group_id: string;
-  service_id: string;
-  scheduled_start: string;
-  scheduled_end: string;
-  maintenance_window: string;
-  downtime_required: boolean;
-  related_problem_id: string;
-  related_incident_id: string;
-  priority: Change['priority'];
-  business_justification: string;
-  estimated_cost: string;
-  review_notes: string;
-  affected_cis: string[];
-};
-
-const EMPTY_FORM: FormState = {
-  change_type_id: '',
-  standard_change_id: '',
-  category: '',
-  title: '',
-  description: '',
-  reason_for_change: '',
-  risk_level: 'medium',
-  impact: 'medium',
-  impact_description: '',
-  implementation_plan: '',
-  backout_plan: '',
-  test_plan: '',
-  assigned_to: '',
-  assignment_group_id: '',
-  service_id: '',
-  scheduled_start: '',
-  scheduled_end: '',
-  maintenance_window: '',
-  downtime_required: false,
-  related_problem_id: '',
-  related_incident_id: '',
-  priority: 'medium',
-  business_justification: '',
-  estimated_cost: '',
-  review_notes: '',
-  affected_cis: [],
-};
+import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
+import { useTranslations } from 'use-intl';
+import { ChangeAssessmentForm } from './ChangeAssessmentForm';
+import {
+  ChangeApprovalsPanel,
+  ChangePlanningPanel,
+  ChangeImplementationPanel,
+  ChangeReviewPanel,
+} from './ChangeDetailPanels';
 
 function hasInvalidScheduleRange(start: string, end: string): boolean {
   if (!start || !end) return false;
@@ -79,115 +29,41 @@ function hasInvalidScheduleRange(start: string, end: string): boolean {
 }
 
 export default function ChangeDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const isNew = id === 'new';
   const navigate = useNavigate();
-  const location = useLocation();
-  const listParams: Record<string, string> = (location.state as { listParams?: Record<string, string> })?.listParams || {};
+  const tChanges = useTranslations('pages.changes');
+  const tActions = useTranslations('common.actions');
+  const tMaster = useTranslations('common.masterData');
+  const fieldLabel = useFieldLabel();
+  const statusLabel = useStatusLabel();
+  const {
+    id,
+    isNew,
+    listParams,
+    loading,
+    saving,
+    setSaving,
+    error,
+    setError,
+    change,
+    form,
+    setForm,
+    types,
+    templates,
+    templateOptions,
+    groups,
+    services,
+    cis,
+    incidentsList,
+    problemsList,
+    approvals,
+    conflicts,
+    prevId,
+    nextId,
+    goTo,
+    reload,
+  } = useChangeDetail();
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [change, setChange] = useState<ChangeDetail | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [types, setTypes] = useState<ChangeType[]>([]);
-  const [templates, setTemplates] = useState<StandardChangeTemplate[]>([]);
-  const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
-  const [services, setServices] = useState<ServiceListItem[]>([]);
-  const [cis, setCis] = useState<CI[]>([]);
-  const [incidentsList, setIncidentsList] = useState<Incident[]>([]);
-  const [problemsList, setProblemsList] = useState<Problem[]>([]);
-  const [approvals, setApprovals] = useState<ChangeApproval[]>([]);
-  const [conflicts, setConflicts] = useState<ChangeConflict[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'approvals' | 'planning' | 'implementation' | 'review'>('overview');
-  const [prevId, setPrevId] = useState<string | null>(null);
-  const [nextId, setNextId] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [typesRes, templatesRes, groupsRes, servicesRes, ciRes, incRes, prbRes] = await Promise.all([
-        changes.types(),
-        changes.standardTemplates(),
-        changes.assignmentGroups(),
-        incidents.services(),
-        cmdb.items({ status: 'active' }, 1, 100),
-        incidents.list({ status: 'new' }, 1, 100),
-        problems.list({}, 1, 100),
-      ]);
-      setTypes(typesRes.change_types);
-      setTemplates(templatesRes.templates);
-      setGroups(groupsRes.assignment_groups);
-      setServices(servicesRes.services);
-      setCis(ciRes.items);
-      setIncidentsList(incRes.incidents);
-      setProblemsList(prbRes.problems);
-
-      if (isNew) {
-        setChange(null);
-        setForm({
-          ...EMPTY_FORM,
-          change_type_id: typesRes.change_types[0]?.id || '',
-        });
-        setApprovals([]);
-        setConflicts([]);
-        setPrevId(null);
-        setNextId(null);
-      } else if (id) {
-        const [detail, nav, conflictRes] = await Promise.all([
-          changes.get(id),
-          changes.nav(id, listParams),
-          changes.conflicts(id),
-        ]);
-        setChange(detail);
-        setApprovals(detail.approvals || []);
-        setConflicts(conflictRes.conflicts || detail.conflicts || []);
-        setForm({
-          change_type_id: detail.change_type_id,
-          standard_change_id: detail.standard_change_id || '',
-          category: detail.category || '',
-          title: detail.title,
-          description: detail.description,
-          reason_for_change: detail.reason_for_change,
-          risk_level: detail.risk_level,
-          impact: detail.impact,
-          impact_description: detail.impact_description || '',
-          implementation_plan: detail.implementation_plan,
-          backout_plan: detail.backout_plan,
-          test_plan: detail.test_plan || '',
-          assigned_to: detail.assigned_to || '',
-          assignment_group_id: detail.assignment_group_id || '',
-          service_id: detail.service_id || '',
-          scheduled_start: detail.scheduled_start ? detail.scheduled_start.slice(0, 16) : '',
-          scheduled_end: detail.scheduled_end ? detail.scheduled_end.slice(0, 16) : '',
-          maintenance_window: detail.maintenance_window || '',
-          downtime_required: detail.downtime_required,
-          related_problem_id: detail.related_problem_id || '',
-          related_incident_id: detail.related_incident_id || '',
-          priority: detail.priority,
-          business_justification: detail.business_justification || '',
-          estimated_cost: detail.estimated_cost != null ? String(detail.estimated_cost) : '',
-          review_notes: detail.review_notes || '',
-          affected_cis: (detail.affected_cis || []).map((x) => x.ci_id),
-        });
-        setPrevId(nav.prev_id);
-        setNextId(nav.next_id);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load change');
-    } finally {
-      setLoading(false);
-    }
-  }, [id, isNew, JSON.stringify(listParams)]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const goTo = useCallback((targetId: string) => {
-    navigate(`/changes/${targetId}`, { state: { listParams }, replace: true });
-  }, [navigate, listParams]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -199,10 +75,6 @@ export default function ChangeDetailPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [prevId, nextId, goTo]);
 
-  const templateOptions = useMemo(
-    () => templates.filter((t) => t.change_type_id === form.change_type_id && t.is_active),
-    [templates, form.change_type_id],
-  );
   const hasRequiredFields =
     !!form.change_type_id &&
     !!form.title.trim() &&
@@ -226,12 +98,12 @@ export default function ChangeDetailPage() {
     setSaving(true);
     setError('');
     if (!form.assignment_group_id) {
-      setError('Assignment Group is required');
+      setError(tChanges('assignmentGroupRequired'));
       setSaving(false);
       return;
     }
     if (hasInvalidScheduleRange(form.scheduled_start, form.scheduled_end)) {
-      setError('Scheduled end must be greater than or equal to scheduled start.');
+      setError(tChanges('invalidScheduleRange'));
       setSaving(false);
       return;
     }
@@ -269,10 +141,10 @@ export default function ChangeDetailPage() {
         navigate(`/changes/${created.id}`, { state: { listParams }, replace: true });
       } else {
         await changes.update(id, payload);
-        await load();
+        await reload();
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to save change');
+      setError(e instanceof Error ? e.message : tChanges('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -282,7 +154,7 @@ export default function ChangeDetailPage() {
     if (!id || isNew) return;
     if ((action === 'schedule' || action === 'request_approval' || action === 'approve')
       && hasInvalidScheduleRange(form.scheduled_start, form.scheduled_end)) {
-      setError('Scheduled end must be greater than or equal to scheduled start.');
+      setError(tChanges('invalidScheduleRange'));
       return;
     }
     try {
@@ -291,9 +163,9 @@ export default function ChangeDetailPage() {
         scheduled_start: form.scheduled_start ? new Date(form.scheduled_start).toISOString() : null,
         scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null,
       });
-      await load();
+      await reload();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Transition failed');
+      setError(e instanceof Error ? e.message : tChanges('transitionFailed'));
     }
   };
 
@@ -301,9 +173,9 @@ export default function ChangeDetailPage() {
     if (!id || isNew) return;
     try {
       await changes.decideApproval(id, approvalId, decision);
-      await load();
+      await reload();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to save approval decision');
+      setError(e instanceof Error ? e.message : tChanges('approvalDecisionFailed'));
     }
   };
 
@@ -313,17 +185,17 @@ export default function ChangeDetailPage() {
   const selectCls = `${inputCls} bg-white`;
   const textareaCls = `${inputCls} resize-none`;
   const pageTitle = isNew
-    ? 'New Change'
+    ? tChanges('newChange')
     : change?.number
       ? `${change.number} — ${form.title || change.title || ''}`.trim()
-      : form.title || 'Change';
+      : form.title || tChanges('title');
 
   const tabs = [
-    { key: 'overview' as const, label: 'Assessment' },
-    { key: 'approvals' as const, label: `Approvals${approvals.length ? ` (${approvals.length})` : ''}` },
-    { key: 'planning' as const, label: 'Planning' },
-    { key: 'implementation' as const, label: 'Implementation' },
-    { key: 'review' as const, label: 'Review' },
+    { key: 'overview' as const, label: tChanges('tabs.assessment') },
+    { key: 'approvals' as const, label: `${tChanges('tabs.approvals')}${approvals.length ? ` (${approvals.length})` : ''}` },
+    { key: 'planning' as const, label: tChanges('tabs.planning') },
+    { key: 'implementation' as const, label: tChanges('tabs.implementation') },
+    { key: 'review' as const, label: tChanges('tabs.review') },
   ];
   const allowedActions = !isNew ? (change?.allowed_actions || []) : [];
   const canRequestApprovalFromForm =
@@ -336,17 +208,17 @@ export default function ChangeDetailPage() {
     && change?.status === 'assessment'
     && !allowedActions.includes('request_approval');
   const actionMeta: Record<string, { label: string; variant?: 'outline' | 'warning' }> = {
-    submit_assessment: { label: 'Submit Assessment', variant: 'outline' },
-    request_approval: { label: 'Request Approval', variant: 'outline' },
-    approve: { label: 'Approve', variant: 'outline' },
-    reject: { label: 'Reject', variant: 'warning' },
-    start_planning: { label: 'Start Planning', variant: 'outline' },
-    schedule: { label: 'Schedule', variant: 'outline' },
-    start_implementation: { label: 'Start Implementation', variant: 'outline' },
-    mark_implemented: { label: 'Mark Implemented', variant: 'outline' },
-    start_review: { label: 'Start Review', variant: 'outline' },
-    close: { label: 'Close', variant: 'outline' },
-    cancel: { label: 'Cancel', variant: 'warning' },
+    submit_assessment: { label: tChanges('actions.submitAssessment'), variant: 'outline' },
+    request_approval: { label: tChanges('actions.requestApproval'), variant: 'outline' },
+    approve: { label: tActions('approve'), variant: 'outline' },
+    reject: { label: tActions('reject'), variant: 'warning' },
+    start_planning: { label: tChanges('actions.startPlanning'), variant: 'outline' },
+    schedule: { label: tChanges('actions.schedule'), variant: 'outline' },
+    start_implementation: { label: tChanges('actions.startImplementation'), variant: 'outline' },
+    mark_implemented: { label: tChanges('actions.markImplemented'), variant: 'outline' },
+    start_review: { label: tChanges('actions.startReview'), variant: 'outline' },
+    close: { label: tChanges('actions.close'), variant: 'outline' },
+    cancel: { label: tChanges('actions.cancel'), variant: 'warning' },
   };
 
   return (
@@ -356,9 +228,9 @@ export default function ChangeDetailPage() {
         action={
           <div className="flex items-center gap-2">
             <Button onClick={save} disabled={saving || !hasRequiredFields}>
-              {saving ? 'Saving...' : isNew ? 'Create Change' : 'Save Changes'}
+              {saving ? tActions('saving') : isNew ? tChanges('createChange') : tMaster('saveChanges')}
             </Button>
-            {!isNew && allowedActions.map((action) => {
+            {!isNew && allowedActions.map((action: string) => {
               const meta = actionMeta[action];
               if (!meta) return null;
               return (
@@ -372,9 +244,9 @@ export default function ChangeDetailPage() {
                 </Button>
               );
             })}
-            <Button variant="outline" size="icon" onClick={() => prevId && goTo(prevId)} disabled={!prevId} title="Previous (Left Arrow)">&#8592;</Button>
-            <Button variant="outline" size="icon" onClick={() => nextId && goTo(nextId)} disabled={!nextId} title="Next (Right Arrow)">&#8594;</Button>
-            <Button variant="outline" onClick={() => navigate('/changes')}>Back to list</Button>
+            <Button variant="outline" size="icon" onClick={() => prevId && goTo(prevId)} disabled={!prevId} title={tMaster('previousEntity', { entity: tChanges('title') })}>&#8592;</Button>
+            <Button variant="outline" size="icon" onClick={() => nextId && goTo(nextId)} disabled={!nextId} title={tMaster('nextEntity', { entity: tChanges('title') })}>&#8594;</Button>
+            <Button variant="outline" onClick={() => navigate('/changes')}>{tChanges('backToList')}</Button>
           </div>
         }
       />
@@ -384,68 +256,62 @@ export default function ChangeDetailPage() {
       )}
       {showAssessmentHint && (
         <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-          <p className="font-medium mb-1">Complete required fields to unlock Request Approval:</p>
-          <p className="text-xs">
-            - Scheduled Start and Scheduled End must be set
-            {' · '}
-            - Service/CI context: set Service or Configuration Item
-            {' · '}
-            - Save changes
-          </p>
+          <p className="font-medium mb-1">{tChanges('assessmentHintTitle')}</p>
+          <p className="text-xs">{tChanges('assessmentHintBody')}</p>
           {canRequestApprovalFromForm && (
-            <p className="text-xs mt-1 font-medium">All required fields are set in the form. Click Save Changes to enable Request Approval.</p>
+            <p className="text-xs mt-1 font-medium">{tChanges('assessmentHintReady')}</p>
           )}
         </div>
       )}
 
       {/* ── Summary ── */}
       <Card className="mb-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Summary</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">{tChanges('summary')}</h3>
         {change && (
           <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100 flex-wrap">
             <Badge value={change.status} />
             <Badge value={change.stage} />
             {change.change_type_name && <span className="text-sm text-gray-600">{change.change_type_name}</span>}
-            <span className="text-xs text-gray-400 ml-auto">Updated {formatDateTime(change.updated_at)}</span>
+            <span className="text-xs text-gray-400 ml-auto">{tChanges('updatedAt', { time: formatDateTime(change.updated_at) })}</span>
           </div>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Change Type <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('changeType')} <span className="text-red-500">*</span></label>
             <select value={form.change_type_id} onChange={(e) => setForm((p) => ({ ...p, change_type_id: e.target.value, standard_change_id: '' }))} className={selectCls}>
-              <option value="">Select type</option>
+              <option value="">{tChanges('selectType')}</option>
               {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Standard Template</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('standardTemplate')}</label>
             <select value={form.standard_change_id} onChange={(e) => applyTemplate(e.target.value)} className={selectCls}>
-              <option value="">No template</option>
+              <option value="">{tChanges('noTemplate')}</option>
               {templateOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Risk</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('risk')}</label>
             <select value={form.risk_level} onChange={(e) => setForm((p) => ({ ...p, risk_level: e.target.value as Change['risk_level'] }))} className={selectCls}>
-              {['low', 'medium', 'high', 'very_high'].map((x) => <option key={x} value={x}>{x.replace('_', ' ')}</option>)}
+              {['low', 'medium', 'high', 'very_high'].map((x) => <option key={x} value={x}>{tChanges(`riskLevels.${x === 'very_high' ? 'veryHigh' : x}` as 'riskLevels.low')}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Priority</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('priority')}</label>
             <select value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value as Change['priority'] }))} className={selectCls}>
-              {['low', 'medium', 'high', 'critical'].map((x) => <option key={x} value={x}>{x}</option>)}
+              {['low', 'medium', 'high', 'critical'].map((x) => <option key={x} value={x}>{statusLabel(x)}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Assignment Group <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('assignmentGroup')} <span className="text-red-500">*</span></label>
             <select value={form.assignment_group_id} onChange={(e) => setForm((p) => ({ ...p, assignment_group_id: e.target.value }))} className={selectCls}>
-              <option value="">Select assignment group...</option>
+              <option value="">{tChanges('selectAssignmentGroup')}</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
-            <input value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} className={inputCls} placeholder="Category" />
+            <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('category')}</label>
+            <input value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} className={inputCls} placeholder={fieldLabel('category')} />
           </div>
         </div>
       </Card>
@@ -469,213 +335,38 @@ export default function ChangeDetailPage() {
 
       {/* ── Assessment / main form ── */}
       {(isNew || activeTab === 'overview') && (
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]">
-          {/* Left pane */}
-          <div className="space-y-6">
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">Scheduling</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Scheduled Start</label>
-                  <UserDateTimeInput
-                    value={form.scheduled_start}
-                    onChange={(v) => setForm((p) => ({ ...p, scheduled_start: v }))}
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Scheduled End</label>
-                  <UserDateTimeInput
-                    value={form.scheduled_end}
-                    onChange={(v) => setForm((p) => ({ ...p, scheduled_end: v }))}
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Maintenance Window</label>
-                  <input value={form.maintenance_window} onChange={(e) => setForm((p) => ({ ...p, maintenance_window: e.target.value }))} className={inputCls} placeholder="e.g. Saturdays 02:00–04:00" />
-                </div>
-                <div>
-                  <label className="flex items-center gap-2 text-xs font-medium text-gray-500 cursor-pointer">
-                    <input type="checkbox" checked={form.downtime_required} onChange={(e) => setForm((p) => ({ ...p, downtime_required: e.target.checked }))} className="rounded" />
-                    Downtime Required
-                  </label>
-                </div>
-              </div>
-            </Card>
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-3">Service / CI Context</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Service</label>
-                  <SearchableDropdown<ServiceListItem>
-                    items={services}
-                    selectedId={form.service_id}
-                    onSelect={(id) => setForm((p) => ({ ...p, service_id: id }))}
-                    onClear={() => setForm((p) => ({ ...p, service_id: '' }))}
-                    getItemId={(s) => s.id}
-                    getDisplayText={(s) => s.name}
-                    fallbackDisplayText={change?.service_name || ''}
-                    placeholder="Search service..."
-                    renderItem={(s) => s.name}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Configuration Item</label>
-                  <SearchableDropdown<CI>
-                    items={cis}
-                    selectedId={form.affected_cis[0] || ''}
-                    onSelect={(id) => setForm((p) => ({ ...p, affected_cis: [id] }))}
-                    onClear={() => setForm((p) => ({ ...p, affected_cis: [] }))}
-                    getItemId={(ci) => ci.id}
-                    getDisplayText={(ci) => ci.display_name || ci.name}
-                    placeholder="Search CI..."
-                    renderItem={(ci) => ci.display_name || ci.name}
-                  />
-                </div>
-              </div>
-            </Card>
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">Relationships</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Related Incident</label>
-                  <select value={form.related_incident_id} onChange={(e) => setForm((p) => ({ ...p, related_incident_id: e.target.value }))} className={selectCls}>
-                    <option value="">None</option>
-                    {incidentsList.map((i) => <option key={i.id} value={i.id}>{i.number} — {i.title}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Related Problem</label>
-                  <select value={form.related_problem_id} onChange={(e) => setForm((p) => ({ ...p, related_problem_id: e.target.value }))} className={selectCls}>
-                    <option value="">None</option>
-                    {problemsList.map((p) => <option key={p.id} value={p.id}>{p.number} — {p.title}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Estimated Cost</label>
-                  <input type="number" value={form.estimated_cost} onChange={(e) => setForm((p) => ({ ...p, estimated_cost: e.target.value }))} className={inputCls} placeholder="0.00" />
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Center pane */}
-          <div className="space-y-6 min-w-0">
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">Change Details</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Title <span className="text-red-500">*</span></label>
-                  <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} className={inputCls} placeholder="Change title" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
-                  <textarea rows={3} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} className={textareaCls} placeholder="Describe the change..." />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Reason for Change</label>
-                  <textarea rows={3} value={form.reason_for_change} onChange={(e) => setForm((p) => ({ ...p, reason_for_change: e.target.value }))} className={textareaCls} placeholder="Why is this change needed?" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Business Justification</label>
-                  <textarea rows={2} value={form.business_justification} onChange={(e) => setForm((p) => ({ ...p, business_justification: e.target.value }))} className={textareaCls} placeholder="Business justification..." />
-                </div>
-              </div>
-            </Card>
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">Plans</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Implementation Plan</label>
-                  <textarea rows={4} value={form.implementation_plan} onChange={(e) => setForm((p) => ({ ...p, implementation_plan: e.target.value }))} className={textareaCls} placeholder="Step-by-step implementation plan..." />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Backout Plan</label>
-                  <textarea rows={3} value={form.backout_plan} onChange={(e) => setForm((p) => ({ ...p, backout_plan: e.target.value }))} className={textareaCls} placeholder="How to roll back if needed..." />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Test Plan</label>
-                  <textarea rows={2} value={form.test_plan} onChange={(e) => setForm((p) => ({ ...p, test_plan: e.target.value }))} className={textareaCls} placeholder="How will success be verified?" />
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
+        <ChangeAssessmentForm
+          form={form}
+          setForm={setForm}
+          services={services}
+          cis={cis}
+          incidentsList={incidentsList}
+          problemsList={problemsList}
+          change={change}
+          inputCls={inputCls}
+          selectCls={selectCls}
+          textareaCls={textareaCls}
+        />
       )}
 
       {/* ── Approvals tab ── */}
       {!isNew && activeTab === 'approvals' && (
-        <Card>
-          <h3 className="font-semibold text-gray-900 mb-4">Approvals</h3>
-          <div className="space-y-3">
-            {approvals.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 capitalize">{a.approval_type} approval</p>
-                  <p className="text-xs text-gray-500">{a.approver_name || a.approver_group_name || 'Unassigned approver'}</p>
-                </div>
-                <Badge value={a.status} />
-                {a.status === 'pending' && (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button size="sm" onClick={() => decideApproval(a.id, 'approved')} className="bg-green-600 hover:bg-green-500 text-white">Approve</Button>
-                    <Button size="sm" variant="warning" onClick={() => decideApproval(a.id, 'rejected')}>Reject</Button>
-                    <Button size="sm" variant="outline" onClick={() => decideApproval(a.id, 'waived')}>Waive</Button>
-                  </div>
-                )}
-              </div>
-            ))}
-            {approvals.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No approval records.</p>}
-          </div>
-        </Card>
+        <ChangeApprovalsPanel approvals={approvals} decideApproval={decideApproval} />
       )}
 
       {/* ── Planning tab ── */}
       {!isNew && activeTab === 'planning' && (
-        <Card>
-          <h3 className="font-semibold text-gray-900 mb-4">Conflicts &amp; Scheduling</h3>
-          <div className="space-y-2">
-            {conflicts.map((c) => (
-              <div key={c.id} className={`p-3 rounded-lg border ${c.severity === 'blocking' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
-                <p className="text-sm font-medium capitalize">{c.conflict_type.replace('_', ' ')}</p>
-                <p className="text-xs text-gray-600 mt-0.5">{c.details || 'Conflict detected'}</p>
-              </div>
-            ))}
-            {conflicts.length === 0 && <p className="text-sm text-gray-500 text-center py-4">No conflicts detected.</p>}
-          </div>
-        </Card>
+        <ChangePlanningPanel conflicts={conflicts} />
       )}
 
       {/* ── Implementation tab ── */}
       {!isNew && activeTab === 'implementation' && (
-        <Card>
-          <h3 className="font-semibold text-gray-900 mb-4">Implementation Plans</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Implementation Plan</label>
-              <textarea rows={5} value={form.implementation_plan} onChange={(e) => setForm((p) => ({ ...p, implementation_plan: e.target.value }))} className={textareaCls} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Backout Plan</label>
-              <textarea rows={4} value={form.backout_plan} onChange={(e) => setForm((p) => ({ ...p, backout_plan: e.target.value }))} className={textareaCls} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Test Plan</label>
-              <textarea rows={3} value={form.test_plan} onChange={(e) => setForm((p) => ({ ...p, test_plan: e.target.value }))} className={textareaCls} />
-            </div>
-          </div>
-        </Card>
+        <ChangeImplementationPanel form={form} setForm={setForm} textareaCls={textareaCls} />
       )}
 
       {/* ── Review tab ── */}
       {!isNew && activeTab === 'review' && (
-        <Card>
-          <h3 className="font-semibold text-gray-900 mb-4">Post-Implementation Review</h3>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Review Notes (PIR)</label>
-            <textarea rows={6} value={form.review_notes} onChange={(e) => setForm((p) => ({ ...p, review_notes: e.target.value }))} className={textareaCls} placeholder="Post-implementation review notes..." />
-          </div>
-        </Card>
+        <ChangeReviewPanel form={form} setForm={setForm} textareaCls={textareaCls} />
       )}
 
     </>
