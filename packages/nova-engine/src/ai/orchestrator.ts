@@ -160,7 +160,7 @@ export async function runChatTurn(params: RunChatTurnParams): Promise<RunChatTur
   await prefetchIncidentContext(messages, { client, userId, tenantId, persona, context });
 
   const pendingActions: AiPendingActionSummary[] = [];
-  let totalUsage = { promptTokens: 0, completionTokens: 0 };
+  const totalUsage = { promptTokens: 0, completionTokens: 0 };
   let assistantContent = '';
   const allowedToolNames = new Set(tools.map((t) => t.name));
 

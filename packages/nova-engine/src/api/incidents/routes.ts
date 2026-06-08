@@ -39,10 +39,6 @@ import { isFulfillerRole } from '../roles';
 
 const router = Router();
 
-function normalizeGroupName(name: string): string {
-  return name.toLowerCase().replace(/[\s_-]/g, '');
-}
-
 function endUserIncidentVisibilityCondition(userParamRef: string): string {
   return `(i.caller_id = ${userParamRef} OR EXISTS (
     SELECT 1
