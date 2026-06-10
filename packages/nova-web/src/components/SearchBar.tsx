@@ -1,26 +1,22 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'use-intl';
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  debounceMs?: number;
 }
 
-export default function SearchBar({ value, onChange, placeholder, debounceMs = 300 }: Props) {
+export default function SearchBar({ value, onChange, placeholder }: Props) {
   const t = useTranslations('common.filters');
   const resolvedPlaceholder = placeholder ?? t('searchPlaceholder');
   const [local, setLocal] = useState(value);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => { setLocal(value); }, [value]);
 
-  const handleChange = (v: string) => {
-    setLocal(v);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => onChange(v), debounceMs);
+  const apply = () => {
+    if (local !== value) onChange(local);
   };
 
   return (
@@ -31,7 +27,13 @@ export default function SearchBar({ value, onChange, placeholder, debounceMs = 3
       <input
         type="text"
         value={local}
-        onChange={(e) => handleChange(e.target.value)}
+        onChange={(e) => setLocal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            apply();
+          }
+        }}
         placeholder={resolvedPlaceholder}
         className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
       />

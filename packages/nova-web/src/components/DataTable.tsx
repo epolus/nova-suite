@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useTranslations } from 'use-intl';
 import Card from './Card';
 import EmptyState from './EmptyState';
@@ -267,31 +267,29 @@ export default function DataTable<T extends { id: string }>({
   );
 }
 
-// ─── Column Filter Input (debounced) ───
+// ─── Column Filter Input (apply on Enter) ───
 
 function ColumnFilterInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const tTable = useTranslations('common.table');
   const [local, setLocal] = useState(value);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => { setLocal(value); }, [value]);
 
-  const handleChange = useCallback(
-    (v: string) => {
-      setLocal(v);
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => onChange(v), 350);
-    },
-    [onChange],
-  );
-
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  const apply = () => {
+    if (local !== value) onChange(local);
+  };
 
   return (
     <input
       type="text"
       value={local}
-      onChange={(e) => handleChange(e.target.value)}
+      onChange={(e) => setLocal(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          apply();
+        }
+      }}
       onClick={(e) => e.stopPropagation()}
       className="w-full px-2 py-1 text-xs border border-gray-200 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 placeholder-gray-300"
       placeholder={tTable('filterPlaceholder')}
