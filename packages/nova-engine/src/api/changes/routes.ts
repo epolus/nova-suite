@@ -28,6 +28,47 @@ const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
 
 const CHANGE_PROCESS_NAME = 'Change Management';
+
+/** Per-column "starts with" filters (cf.column=value) for list/nav queries. */
+const CHANGE_CF_MAP: Record<string, string> = {
+  number: 'c.number',
+  title: 'c.title',
+  status: 'c.status::text',
+  stage: 'c.stage::text',
+  risk_level: 'c.risk_level::text',
+  priority: 'c.priority::text',
+  change_type_name: 'ct.name',
+  assignment_group_name: 'ag.name',
+  assigned_to_name: 'u.display_name',
+  requested_by_name: 'r.display_name',
+  scheduled_start: 'c.scheduled_start::text',
+  updated_at: 'c.updated_at::text',
+};
+
+function appendChangeColumnFilters(
+  query: Request['query'],
+  conditions: string[],
+  params: unknown[],
+  idx: number,
+): number {
+  for (const [qKey, qVal] of Object.entries(query)) {
+    if (typeof qKey === 'string' && qKey.startsWith('cf.') && typeof qVal === 'string' && qVal) {
+      const col = CHANGE_CF_MAP[qKey.slice(3)];
+      if (col) {
+        conditions.push(`${col} ILIKE $${idx}`);
+        params.push(`${qVal}%`);
+        idx++;
+      }
+    }
+  }
+  return idx;
+}
+
+const CHANGE_LIST_FROM = `FROM changes c
+         JOIN change_types ct ON ct.id = c.change_type_id
+         LEFT JOIN assignment_groups ag ON ag.id = c.assignment_group_id
+         LEFT JOIN users u ON u.id = c.assigned_to
+         LEFT JOIN users r ON r.id = c.requested_by`;
 type ChangeTransitionAction =
   | 'submit_assessment'
   | 'request_approval'
@@ -687,6 +728,8 @@ router.get(
         idx++;
       }
 
+      idx = appendChangeColumnFilters(req.query, conditions, params, idx);
+
       const where = `WHERE ${conditions.join(' AND ')}`;
       const allowedSortCols: Record<string, string> = {
         number: 'c.number',
@@ -705,7 +748,7 @@ router.get(
 
       const count = await client.query(
         `SELECT count(*)
-         FROM changes c
+         ${CHANGE_LIST_FROM}
          ${where}`,
         params,
       );
@@ -791,12 +834,27 @@ router.get('/nav', async (req: Request, res: Response, next: NextFunction) => {
       params.push(`%${req.query.search}%`);
       idx++;
     }
+    idx = appendChangeColumnFilters(req.query, conditions, params, idx);
     const where = `WHERE ${conditions.join(' AND ')}`;
+    const allowedSortCols: Record<string, string> = {
+      number: 'c.number',
+      title: 'c.title',
+      status: 'c.status',
+      stage: 'c.stage',
+      risk_level: 'c.risk_level',
+      priority: 'c.priority',
+      scheduled_start: 'c.scheduled_start',
+      updated_at: 'c.updated_at',
+      created_at: 'c.created_at',
+    };
+    const sortCol = allowedSortCols[String(req.query.sort_by || '')];
+    const sortDir = req.query.sort_dir === 'desc' ? 'DESC' : 'ASC';
+    const orderClause = sortCol ? `ORDER BY ${sortCol} ${sortDir}` : 'ORDER BY c.updated_at DESC';
     const rows = await client.query(
       `SELECT c.id
-       FROM changes c
+       ${CHANGE_LIST_FROM}
        ${where}
-       ORDER BY c.updated_at DESC`,
+       ${orderClause}`,
       params,
     );
     const ids: string[] = rows.rows.map((r: { id: string }) => r.id);

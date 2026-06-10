@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslations } from 'use-intl';
 import { changes } from '../../api/client';
@@ -128,19 +128,7 @@ export default function ChangesPage() {
     setSelectedIds([]);
   }, [params.page, apiParams, isFetching]);
 
-  const getListParams = useCallback((): Record<string, string> => {
-    const lp: Record<string, string> = {};
-    if (status !== 'all') lp.status = status;
-    if (risk !== 'all') lp.risk_level = risk;
-    if (params.search) lp.search = params.search;
-    if (params.sort) {
-      lp.sort_by = params.sort;
-      lp.sort_dir = params.dir;
-    }
-    return lp;
-  }, [status, risk, params.search, params.sort, params.dir]);
-
-  const columns = useMemo(() => buildColumns(getListParams(), listLabels), [getListParams, listLabels]);
+  const columns = useMemo(() => buildColumns(apiParams, listLabels), [apiParams, listLabels]);
   const hasActiveFilter = !!params.search || status !== 'all' || risk !== 'all' || Object.values(params.columnFilters).some(Boolean);
   const applyPreset = (preset: FilterPreset) => {
     update({
@@ -360,7 +348,7 @@ export default function ChangesPage() {
               ? tChanges('emptySearch', { query: params.search })
               : tChanges('empty')
           }
-          onRowClick={(c) => navigate(`/changes/${c.id}`, { state: { listParams: getListParams() } })}
+          onRowClick={(c) => navigate(`/changes/${c.id}`, { state: { listParams: apiParams } })}
           selectable={isAgent}
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
