@@ -134,23 +134,6 @@ export default function IncidentsPage() {
     }
   }, [slaBreachedFilter, params.columnFilters, searchParams, setSearchParams, update]);
 
-  const getListParams = useCallback((): Record<string, string> => {
-    const lp: Record<string, string> = {};
-    if (assignedToMeFilter) lp.assigned_to_me = 'true';
-    if (slaBreachedFilter) lp.sla_breached = 'true';
-    if (statusFilter === 'active') {
-      lp.status_not_in = 'closed,cancelled';
-    }
-    else if (statusFilter !== 'all') lp.status = statusFilter;
-    if (params.search) lp.search = params.search;
-    if (params.sort) {
-      const sortKey = params.sort === 'sla' ? 'sla_due_at' : params.sort;
-      lp.sort_by = sortKey;
-      lp.sort_dir = params.dir;
-    }
-    return lp;
-  }, [statusFilter, assignedToMeFilter, slaBreachedFilter, params.search, params.sort, params.dir]);
-
   // ── Bulk actions ──
   const handleBulkAssign = async () => {
     if (!bulkGroupId || selectedIds.length === 0) return;
@@ -224,7 +207,7 @@ export default function IncidentsPage() {
     setPresets(next);
   };
 
-  const columns = useMemo(() => buildColumns(getListParams(), listLabels), [getListParams, listLabels]);
+  const columns = useMemo(() => buildColumns(apiParams, listLabels), [apiParams, listLabels]);
 
   return (
     <>
@@ -388,7 +371,7 @@ export default function IncidentsPage() {
               ? tIncidents('emptySearch', { query: params.search })
               : tIncidents('empty')
           }
-          onRowClick={(inc) => navigate(`/incidents/${inc.id}`, { state: { listParams: getListParams() } })}
+          onRowClick={(inc) => navigate(`/incidents/${inc.id}`, { state: { listParams: apiParams } })}
           selectable={!isEss}
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
