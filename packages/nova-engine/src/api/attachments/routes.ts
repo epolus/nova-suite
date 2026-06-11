@@ -6,6 +6,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { authenticate, setTenantRLS, releaseTenantClient, getRequestClient } from '../../middleware/auth';
 import { config } from '../../config';
+import { logger } from '../../logger';
 
 const router = Router();
 router.use(authenticate);
@@ -69,6 +70,7 @@ router.get('/', setTenantRLS, releaseTenantClient,
 
       if (!entityType || !entityId) { res.status(400).json({ error: 'entity_type and entity_id are required' }); return; }
 
+      const queryStart = Date.now();
       const result = await client.query(
         `SELECT a.*, u.display_name AS uploaded_by_name
          FROM attachments a
@@ -76,6 +78,30 @@ router.get('/', setTenantRLS, releaseTenantClient,
          WHERE a.entity_type = $1 AND a.entity_id = $2
          ORDER BY a.created_at DESC`,
         [entityType, entityId],
+      );
+      const queryMs = Date.now() - queryStart;
+      const requestStartedAt = (req as { _requestStartedAt?: number })._requestStartedAt;
+      const dbClientAcquiredAt = (req as { _dbClientAcquiredAt?: number })._dbClientAcquiredAt;
+      const authAndPoolMs =
+        requestStartedAt != null && dbClientAcquiredAt != null
+          ? dbClientAcquiredAt - requestStartedAt
+          : null;
+      const totalMs = requestStartedAt != null ? Date.now() - requestStartedAt : null;
+
+      logger.info(
+        {
+          entityType,
+          entityId,
+          authAndPoolMs,
+          queryMs,
+          totalMs,
+          rowCount: result.rowCount,
+        },
+        'attachments list timing',
+      );
+      res.setHeader(
+        'Server-Timing',
+        `auth-pool;dur=${authAndPoolMs ?? 0}, db;dur=${queryMs}`,
       );
 
       res.json({ attachments: result.rows });

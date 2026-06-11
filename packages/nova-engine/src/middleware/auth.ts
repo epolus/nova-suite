@@ -29,6 +29,7 @@ declare global {
 
 /** Verify JWT and attach user to request. */
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  (req as { _requestStartedAt?: number })._requestStartedAt = Date.now();
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Missing or invalid Authorization header' });
@@ -117,6 +118,7 @@ export async function setTenantRLS(req: Request, _res: Response, next: NextFunct
       await db.setTenantContext(client, req.user.tenant_id, req.user.id, req.user.roles.join(','));
       // Attach client to request for downstream use
       (req as any)._dbClient = client;
+      (req as any)._dbClientAcquiredAt = Date.now();
       next();
     } catch (err) {
       client.release();

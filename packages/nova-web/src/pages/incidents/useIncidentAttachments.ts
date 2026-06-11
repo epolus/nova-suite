@@ -6,11 +6,33 @@ import { formatAttachmentSize } from './incidentDetailFields';
 
 export function useIncidentAttachments(id: string | undefined) {
   const [fileAttachments, setFileAttachments] = useState<Attachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState('');
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    setFileAttachments([]);
+    setAttachmentsLoading(true);
+    void attachmentsApi
+      .list('incident', id)
+      .then((res) => {
+        if (!cancelled) setFileAttachments(res.attachments);
+      })
+      .catch(() => {
+        if (!cancelled) setFileAttachments([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAttachmentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   const handleFileUpload = useCallback(
     async (files: FileList | File[]) => {
@@ -85,6 +107,7 @@ export function useIncidentAttachments(id: string | undefined) {
   return {
     fileAttachments,
     setFileAttachments,
+    attachmentsLoading,
     uploading,
     dragOver,
     setDragOver,

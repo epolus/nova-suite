@@ -20,7 +20,7 @@ export default function IncidentDetail() {
   const {
     navigate, inc, loading, loadError, formError,
     intelligenceOpen, saving,
-    fileAttachments, uploading, dragOver, setDragOver, fileInputRef,
+    fileAttachments, attachmentsLoading, uploading, dragOver, setDragOver, fileInputRef,
     previewUrl, previewName, closePreview,
     kbSuggestions, kbResolveOpen, setKbResolveOpen, handleResolveWithKb,
     handleDrop, handleFileUpload, handleDeleteAttachment, handlePreview, formatSize,
@@ -78,6 +78,7 @@ export default function IncidentDetail() {
 
               <AttachmentCard
                 attachments={fileAttachments}
+                loading={attachmentsLoading}
                 uploading={uploading}
                 dragOver={dragOver}
                 fileInputRef={fileInputRef}

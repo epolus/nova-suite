@@ -7,6 +7,7 @@ import { formatDateTime } from '../utils/dateTime';
 
 interface Props {
   attachments: Attachment[];
+  loading?: boolean;
   uploading: boolean;
   dragOver: boolean;
   fileInputRef: RefObject<HTMLInputElement>;
@@ -51,12 +52,13 @@ function AttachmentRow({ att, onPreview, onDownload, onDelete, formatSize }: {
 }
 
 export function AttachmentCard({
-  attachments, uploading, dragOver, fileInputRef,
+  attachments, loading = false, uploading, dragOver, fileInputRef,
   previewUrl, previewName,
   onDragOver, onDragLeave, onDrop, onClickZone, onFileChange,
   onPreview, onDownload, onDelete, onClosePreview, formatSize,
 }: Props) {
   const t = useTranslations('components.attachmentCard');
+  const tStates = useTranslations('common.states');
 
   return (
     <>
@@ -106,7 +108,10 @@ export function AttachmentCard({
             ))}
           </div>
         )}
-        {attachments.length === 0 && !uploading && (
+        {loading && (
+          <p className="text-sm text-gray-500 text-center py-2">{tStates('loading')}</p>
+        )}
+        {attachments.length === 0 && !uploading && !loading && (
           <p className="text-sm text-gray-400 text-center py-2">{t('empty')}</p>
         )}
       </Card>

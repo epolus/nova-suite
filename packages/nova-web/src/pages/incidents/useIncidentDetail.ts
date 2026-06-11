@@ -5,7 +5,6 @@ import {
   incidents as incidentsApi,
   admin as adminApi,
   auth as authApi,
-  attachments as attachmentsApi,
   knowledge as knowledgeApi,
   cmdb as cmdbApi,
   problems as problemsApi,
@@ -14,7 +13,6 @@ import type {
   Incident,
   JournalEntry,
   AssignmentGroupItem,
-  Attachment,
   ServiceListItem,
   UserListItem,
   CI,
@@ -46,6 +44,7 @@ export function useIncidentDetail() {
   // Core data
   const [inc, setInc] = useState<Incident | null>(null);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
+  const [journalLoading, setJournalLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [prevId, setPrevId] = useState<string | null>(null);
@@ -76,7 +75,7 @@ export function useIncidentDetail() {
   // Attachments
   const {
     fileAttachments,
-    setFileAttachments,
+    attachmentsLoading,
     uploading,
     dragOver,
     setDragOver,
@@ -118,20 +117,31 @@ export function useIncidentDetail() {
     setFields(buildFieldsFromIncident(i));
   };
 
+  const loadJournal = useCallback(async (incidentId: string) => {
+    setJournalLoading(true);
+    try {
+      const jRes = await incidentsApi.journal(incidentId);
+      setJournal(jRes.entries);
+    } catch {
+      setJournal([]);
+    } finally {
+      setJournalLoading(false);
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     if (!id) return;
-    const [full, jRes, linkedProblemsRes] = await Promise.all([
+    const [full, linkedProblemsRes] = await Promise.all([
       incidentsApi.get(id),
-      incidentsApi.journal(id),
       incidentsApi.linkedProblems(id).catch(() => ({ problems: [] })),
     ]);
     setInc(full);
     syncFields(full);
-    setJournal(jRes.entries);
     const linkedIds = linkedProblemsRes.problems.map((p) => p.problem_id);
     setLinkedProblemIds(linkedIds);
     setField('relatedProblemId', linkedIds[0] || '');
-  }, [id]);
+    void loadJournal(id);
+  }, [id, loadJournal]);
 
   const withSave = async (fn: () => Promise<void>) => {
     setSaving(true);
@@ -150,24 +160,44 @@ export function useIncidentDetail() {
     setLoading(true);
     setLoadError(null);
 
-    const basePromises: [
-      Promise<Incident>,
-      Promise<{ entries: JournalEntry[] }>,
-      Promise<{ prev_id: string | null; next_id: string | null }>,
-      Promise<{ attachments: Attachment[] }>,
-    ] = [
-      incidentsApi.get(id),
-      incidentsApi.journal(id),
-      incidentsApi.nav(id, listParams),
-      attachmentsApi.list('incident', id),
-    ];
+    const incidentPromise = incidentsApi.get(id);
+
+    setPrevId(null);
+    setNextId(null);
+    void incidentsApi
+      .nav(id, listParams)
+      .then((navRes) => {
+        if (cancelled) return;
+        setPrevId(navRes.prev_id);
+        setNextId(navRes.next_id);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPrevId(null);
+        setNextId(null);
+      });
+
+    setJournal([]);
+    setJournalLoading(true);
+    void incidentsApi
+      .journal(id)
+      .then((jRes) => {
+        if (cancelled) return;
+        setJournal(jRes.entries);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setJournal([]);
+      })
+      .finally(() => {
+        if (!cancelled) setJournalLoading(false);
+      });
 
     const clearIncidentState = () => {
       setInc(null);
       setJournal([]);
       setPrevId(null);
       setNextId(null);
-      setFileAttachments([]);
       setAssignmentGroups([]);
       setServices([]);
       setCiOptions([]);
@@ -176,45 +206,74 @@ export function useIncidentDetail() {
       setLinkedProblemIds([]);
     };
 
-    const load = isFulfiller
-      ? Promise.all([
-          ...basePromises,
-          adminApi.assignmentGroups().catch(() => ({ assignment_groups: [] as AssignmentGroupItem[] })),
-          incidentsApi.services().catch(() => ({ services: [] as ServiceListItem[] })),
-          cmdbApi.items({ status: 'active' }, 1, 100).catch(() => ({ items: [] as CI[] })),
-          authApi.users().catch(() => ({ users: [] as UserListItem[] })),
-          problemsApi.list({}, 1, 100).catch(() => ({ problems: [] as Problem[] })),
-          incidentsApi.linkedProblems(id).catch(() => ({ problems: [] })),
-        ]).then(([incRes, jRes, navRes, attRes, agRes, svcRes, ciRes, usersRes, problemRes, linkedProblemsRes]) => {
+    setAssignmentGroups([]);
+    setServices([]);
+    setCiOptions([]);
+    setUsers([]);
+    setProblemOptions([]);
+    setLinkedProblemIds([]);
+
+    if (isFulfiller) {
+      void adminApi
+        .assignmentGroups()
+        .then((res) => {
+          if (!cancelled) setAssignmentGroups(res.assignment_groups);
+        })
+        .catch(() => {
+          if (!cancelled) setAssignmentGroups([]);
+        });
+      void incidentsApi
+        .services()
+        .then((res) => {
+          if (!cancelled) setServices(res.services);
+        })
+        .catch(() => {
+          if (!cancelled) setServices([]);
+        });
+      void cmdbApi
+        .items({ status: 'active' }, 1, 100)
+        .then((res) => {
+          if (!cancelled) setCiOptions(res.items);
+        })
+        .catch(() => {
+          if (!cancelled) setCiOptions([]);
+        });
+      void authApi
+        .users()
+        .then((res) => {
+          if (!cancelled) setUsers(res.users);
+        })
+        .catch(() => {
+          if (!cancelled) setUsers([]);
+        });
+      void problemsApi
+        .list({}, 1, 100)
+        .then((res) => {
+          if (!cancelled) setProblemOptions(res.problems);
+        })
+        .catch(() => {
+          if (!cancelled) setProblemOptions([]);
+        });
+      void incidentsApi
+        .linkedProblems(id)
+        .then((res) => {
           if (cancelled) return;
-          setInc(incRes);
-          setJournal(jRes.entries);
-          syncFields(incRes);
-          setPrevId(navRes.prev_id);
-          setNextId(navRes.next_id);
-          setAssignmentGroups(agRes.assignment_groups);
-          setFileAttachments(attRes.attachments);
-          setServices(svcRes.services);
-          setCiOptions(ciRes.items);
-          setUsers(usersRes.users);
-          setProblemOptions(problemRes.problems);
-          const linkedIds = linkedProblemsRes.problems.map((p) => p.problem_id);
+          const linkedIds = res.problems.map((p) => p.problem_id);
           setLinkedProblemIds(linkedIds);
           setField('relatedProblemId', linkedIds[0] || '');
-          setLoadError(null);
         })
-      : Promise.all(basePromises).then(([incRes, jRes, navRes, attRes]) => {
-          if (cancelled) return;
-          setInc(incRes);
-          setJournal(jRes.entries);
-          syncFields(incRes);
-          setPrevId(navRes.prev_id);
-          setNextId(navRes.next_id);
-          setFileAttachments(attRes.attachments);
-          setLoadError(null);
+        .catch(() => {
+          if (!cancelled) setLinkedProblemIds([]);
         });
+    }
 
-    load
+    incidentPromise
+      .then((incRes) => {
+        if (cancelled) return;
+        setInc(incRes);
+        syncFields(incRes);
+        setLoadError(null);
+      })
       .catch((err: unknown) => {
         if (cancelled) return;
         clearIncidentState();
@@ -227,7 +286,7 @@ export function useIncidentDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id, isFulfiller, listParams, setFileAttachments]);
+  }, [id, isFulfiller, listParams]);
 
   // ─── Navigation ───
 
@@ -399,6 +458,7 @@ export function useIncidentDetail() {
     // Core data
     inc,
     journal,
+    journalLoading,
     loading,
     loadError,
     // Reference data
@@ -431,6 +491,7 @@ export function useIncidentDetail() {
     setIntelligenceOpen,
     // Attachments
     fileAttachments,
+    attachmentsLoading,
     uploading,
     dragOver,
     setDragOver,

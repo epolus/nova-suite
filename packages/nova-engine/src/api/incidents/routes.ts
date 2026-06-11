@@ -36,6 +36,7 @@ import {
   enqueueNotificationDispatchStartJob,
 } from '../../temporal/workflow-start-queue';
 import { isFulfillerRole } from '../roles';
+import { logger } from '../../logger';
 
 const router = Router();
 
@@ -598,29 +599,58 @@ router.get('/nav', async (req: Request, res: Response, next: NextFunction) => {
     };
     const sortCol = allowedSortCols[req.query.sort_by as string];
     const sortDir = req.query.sort_dir === 'desc' ? 'DESC' : 'ASC';
-    const orderClause = sortCol
-      ? `ORDER BY ${sortCol} ${sortDir}`
-      : 'ORDER BY i.created_at DESC';
+    const orderExpr = sortCol
+      ? `${sortCol} ${sortDir} NULLS LAST, i.id ${sortDir}`
+      : 'i.created_at DESC NULLS LAST, i.id DESC';
 
-    // Get the ordered list of IDs matching filters
+    paramIdx++;
+    const currentIdParam = `$${paramIdx}`;
+    params.push(currentId);
+
+    const queryStart = Date.now();
     const result = await client.query(
-      `SELECT i.id
-       FROM incidents i
-       LEFT JOIN users a ON a.id = i.assigned_to
-       LEFT JOIN users c ON c.id = i.caller_id
-       LEFT JOIN assignment_groups ag ON ag.id = i.assignment_group_id
-       LEFT JOIN services svc ON svc.id = i.service_id
-       ${whereClause}
-       ${orderClause}`,
+      `WITH filtered AS (
+         SELECT i.id,
+                LAG(i.id) OVER (ORDER BY ${orderExpr}) AS prev_id,
+                LEAD(i.id) OVER (ORDER BY ${orderExpr}) AS next_id
+         FROM incidents i
+         LEFT JOIN users a ON a.id = i.assigned_to
+         LEFT JOIN users c ON c.id = i.caller_id
+         LEFT JOIN assignment_groups ag ON ag.id = i.assignment_group_id
+         LEFT JOIN services svc ON svc.id = i.service_id
+         ${whereClause}
+       )
+       SELECT prev_id, next_id FROM filtered WHERE id = ${currentIdParam}`,
       params,
     );
+    const queryMs = Date.now() - queryStart;
+    const requestStartedAt = (req as { _requestStartedAt?: number })._requestStartedAt;
+    const dbClientAcquiredAt = (req as { _dbClientAcquiredAt?: number })._dbClientAcquiredAt;
+    const authAndPoolMs =
+      requestStartedAt != null && dbClientAcquiredAt != null
+        ? dbClientAcquiredAt - requestStartedAt
+        : null;
+    const totalMs = requestStartedAt != null ? Date.now() - requestStartedAt : null;
 
-    const ids: string[] = result.rows.map((r: { id: string }) => r.id);
-    const currentIndex = ids.indexOf(currentId);
+    logger.info(
+      {
+        incidentId: currentId,
+        authAndPoolMs,
+        queryMs,
+        totalMs,
+        filterCount: conditions.length,
+      },
+      'incident nav timing',
+    );
+    res.setHeader(
+      'Server-Timing',
+      `auth-pool;dur=${authAndPoolMs ?? 0}, db;dur=${queryMs}`,
+    );
 
+    const row = result.rows[0];
     res.json({
-      prev_id: currentIndex > 0 ? ids[currentIndex - 1] : null,
-      next_id: currentIndex >= 0 && currentIndex < ids.length - 1 ? ids[currentIndex + 1] : null,
+      prev_id: row?.prev_id ?? null,
+      next_id: row?.next_id ?? null,
     });
   } catch (err) {
     next(err);
@@ -1267,6 +1297,7 @@ router.patch(
 router.get('/:id/journal', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
+    const queryStart = Date.now();
     const result = await client.query(
       `SELECT j.*, u.display_name AS author_name
        FROM incident_journal j
@@ -1274,6 +1305,29 @@ router.get('/:id/journal', async (req: Request, res: Response, next: NextFunctio
        WHERE j.incident_id = $1
        ORDER BY j.created_at DESC`,
       [req.params.id],
+    );
+    const queryMs = Date.now() - queryStart;
+    const requestStartedAt = (req as { _requestStartedAt?: number })._requestStartedAt;
+    const dbClientAcquiredAt = (req as { _dbClientAcquiredAt?: number })._dbClientAcquiredAt;
+    const authAndPoolMs =
+      requestStartedAt != null && dbClientAcquiredAt != null
+        ? dbClientAcquiredAt - requestStartedAt
+        : null;
+    const totalMs = requestStartedAt != null ? Date.now() - requestStartedAt : null;
+
+    logger.info(
+      {
+        incidentId: req.params.id,
+        authAndPoolMs,
+        queryMs,
+        totalMs,
+        rowCount: result.rowCount,
+      },
+      'incident journal timing',
+    );
+    res.setHeader(
+      'Server-Timing',
+      `auth-pool;dur=${authAndPoolMs ?? 0}, db;dur=${queryMs}`,
     );
 
     res.json({ entries: result.rows });

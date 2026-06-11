@@ -52,11 +52,12 @@ export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
 
 export function IncidentJournalCard({ d }: { d: IncidentDetailState }) {
   const {
-    inc, user, isFulfiller, isClosed, journal,
+    inc, user, isFulfiller, isClosed, journal, journalLoading,
     journalContent, setJournalContent, journalType, setJournalType, journalVisible, setJournalVisible,
     handleAddJournal,
   } = d;
   const tIncidents = useTranslations('pages.incidents');
+  const tStates = useTranslations('common.states');
   if (!inc) return null;
   return (
     <Card>
@@ -74,10 +75,14 @@ export function IncidentJournalCard({ d }: { d: IncidentDetailState }) {
         />
       )}
       <div className="space-y-3 divide-y divide-gray-50">
-        {(isFulfiller ? journal : journal.filter((e) => e.is_customer_visible)).map((entry) => (
-          <JournalEntryRow key={entry.id} entry={entry} isFulfiller={isFulfiller} />
-        ))}
-        {journal.length === 0 && (
+        {journalLoading ? (
+          <p className="text-sm text-gray-500 text-center py-4">{tStates('loading')}</p>
+        ) : (
+          (isFulfiller ? journal : journal.filter((e) => e.is_customer_visible)).map((entry) => (
+            <JournalEntryRow key={entry.id} entry={entry} isFulfiller={isFulfiller} />
+          ))
+        )}
+        {!journalLoading && journal.length === 0 && (
           <p className="text-sm text-gray-400 text-center py-4">{tIncidents('noActivity')}</p>
         )}
       </div>
