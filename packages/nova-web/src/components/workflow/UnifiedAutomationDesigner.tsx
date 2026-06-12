@@ -30,6 +30,7 @@ import {
   resolveBuilderNodeType,
   serializeBuilderToConfig,
   UNIFIED_PALETTE_TYPES,
+  UNIFIED_NODE_TYPE_MESSAGE_KEYS,
   type BuilderError,
   type UnifiedBuilderNodeData,
 } from './unifiedAutomationDesigner.internals';
@@ -216,7 +217,7 @@ function UnifiedAutomationDesignerInner({
       <div className="flex flex-wrap items-center gap-2 mb-2">
         {UNIFIED_PALETTE_TYPES.map((type) => (
           <button key={type} type="button" onClick={() => addNode(type)} className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white hover:bg-gray-50">
-            + {tNodeTypes(type as never)}
+            + {tNodeTypes(UNIFIED_NODE_TYPE_MESSAGE_KEYS[type] as never)}
           </button>
         ))}
         <button type="button" onClick={autoLayout} className="ml-auto px-2 py-1 text-xs rounded-md border border-gray-200 bg-white hover:bg-gray-50">

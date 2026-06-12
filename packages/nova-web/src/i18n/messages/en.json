@@ -2926,10 +2926,10 @@
         "decision": "Decision",
         "delay": "Delay",
         "end": "End",
-        "action.rest": "REST Action",
-        "action.ci.lookup": "CI Lookup",
-        "action.ci.create": "CI Create",
-        "decision.advanced": "Advanced Decision"
+        "actionRest": "REST Action",
+        "actionCiLookup": "CI Lookup",
+        "actionCiCreate": "CI Create",
+        "decisionAdvanced": "Advanced Decision"
       },
       "errors": {
         "kindMustBeStateMachine": "kind must be \"state_machine\".",

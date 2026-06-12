@@ -27,6 +27,19 @@ export const UNIFIED_PALETTE_TYPES: UnifiedBuilderNodeType[] = [
   'decision.advanced',
 ];
 
+/** i18n keys under `components.unifiedAutomationDesigner.nodeTypes` (dots in type ids are not valid message paths). */
+export const UNIFIED_NODE_TYPE_MESSAGE_KEYS: Record<UnifiedBuilderNodeType, string> = {
+  start: 'start',
+  activity: 'activity',
+  decision: 'decision',
+  delay: 'delay',
+  end: 'end',
+  'action.rest': 'actionRest',
+  'action.ci.lookup': 'actionCiLookup',
+  'action.ci.create': 'actionCiCreate',
+  'decision.advanced': 'decisionAdvanced',
+};
+
 export type UnifiedBuilderNodeData = {
   label: string;
   nodeType?: UnifiedBuilderNodeType;
