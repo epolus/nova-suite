@@ -133,6 +133,8 @@ export default function DataTable<T extends { id: string }>({
                     <input
                       ref={selectAllRef}
                       type="checkbox"
+                      name="datatable-select-all"
+                      aria-label={tTable('selectAll')}
                       checked={!!allSelected}
                       onChange={toggleAll}
                       className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
@@ -183,6 +185,8 @@ export default function DataTable<T extends { id: string }>({
                     <th key={col.key} className="px-6 py-1.5">
                       {col.filterable !== false ? (
                         <ColumnFilterInput
+                          columnKey={col.key}
+                          columnLabel={col.label}
                           value={columnFilters?.[col.key] || ''}
                           onChange={(v) => onColumnFilter!(col.key, v)}
                         />
@@ -214,6 +218,8 @@ export default function DataTable<T extends { id: string }>({
                       <td className="pl-4 pr-2 py-3" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
+                          name={`datatable-select-${item.id}`}
+                          aria-label={tTable('selectRow')}
                           checked={selectedIds.includes(item.id)}
                           onChange={() => toggleRow(item.id)}
                           className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
@@ -269,7 +275,17 @@ export default function DataTable<T extends { id: string }>({
 
 // ─── Column Filter Input (apply on Enter) ───
 
-function ColumnFilterInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ColumnFilterInput({
+  columnKey,
+  columnLabel,
+  value,
+  onChange,
+}: {
+  columnKey: string;
+  columnLabel: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   const tTable = useTranslations('common.table');
   const [local, setLocal] = useState(value);
 
@@ -282,6 +298,8 @@ function ColumnFilterInput({ value, onChange }: { value: string; onChange: (v: s
   return (
     <input
       type="text"
+      name={`datatable-filter-${columnKey}`}
+      aria-label={tTable('filterColumn', { label: columnLabel })}
       value={local}
       onChange={(e) => setLocal(e.target.value)}
       onKeyDown={(e) => {
@@ -368,6 +386,8 @@ function ColumnPicker<T>({
             >
               <input
                 type="checkbox"
+                name={`datatable-column-${col.key}`}
+                aria-label={col.label}
                 checked={visibleColumns.includes(col.key)}
                 onChange={() => toggle(col.key)}
                 className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"

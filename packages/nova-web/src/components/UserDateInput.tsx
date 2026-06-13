@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'use-intl';
+import { useFieldControl } from './ui/fieldControl';
 
 type DateFormat = 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
 
@@ -10,6 +11,9 @@ interface Props {
   className?: string;
   disallowPast?: boolean;
   showPickerButton?: boolean;
+  id?: string;
+  name?: string;
+  ariaLabel?: string;
 }
 
 function getDateFormat(): DateFormat {
@@ -82,9 +86,14 @@ export default function UserDateInput({
   className,
   disallowPast = false,
   showPickerButton = true,
+  id,
+  name,
+  ariaLabel,
 }: Props) {
   const tCommon = useTranslations('common');
   const tDate = useTranslations('common.date');
+  const field = useFieldControl(name, id);
+  const pickerId = `${field.id}-picker`;
   const fmt = useMemo(() => getDateFormat(), []);
   const [todayIso] = useState(() => {
     const now = new Date();
@@ -129,12 +138,15 @@ export default function UserDateInput({
     <div>
       <div className="relative">
         <input
+          id={field.id}
+          name={field.name}
           type="text"
           inputMode="numeric"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onBlur={() => commit(disallowPast)}
           placeholder={placeholderFor(fmt)}
+          aria-label={ariaLabel ?? placeholderFor(fmt)}
           className={className}
         />
         {showPickerButton && (
@@ -150,6 +162,8 @@ export default function UserDateInput({
         )}
         <input
           ref={pickerRef}
+          id={pickerId}
+          name={`${field.name}-picker`}
           type="date"
           value={value || ''}
           min={disallowPast ? todayIso : undefined}

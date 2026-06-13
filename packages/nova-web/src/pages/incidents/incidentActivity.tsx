@@ -6,7 +6,7 @@ import Badge from '../../components/Badge';
 import { formatDateTime } from '../../utils/dateTime';
 import { useFieldLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
-import { getInputCls, type IncidentDetailState } from './incidentDetailShared';
+import { getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
 
 export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
   const { inc, readonly, fields, setField } = d;
@@ -20,28 +20,28 @@ export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
       <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('incidentDetails')}</h3>
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('title')}</label>
+          <label htmlFor={INCIDENT_FIELD.title} className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('title')}</label>
           {readonly ? (
             <p className="text-sm font-medium text-gray-900">{inc.title}</p>
           ) : (
-            <input type="text" value={fields.title} onChange={(e) => setField('title', e.target.value)} className={inputCls} />
+            <input id={INCIDENT_FIELD.title} name={INCIDENT_FIELD.title} type="text" value={fields.title} onChange={(e) => setField('title', e.target.value)} className={inputCls} />
           )}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('description')}</label>
+          <label htmlFor={INCIDENT_FIELD.description} className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('description')}</label>
           {readonly ? (
             <p className="text-sm text-gray-900 whitespace-pre-wrap">{inc.description || tTable('emDash')}</p>
           ) : (
-            <textarea value={fields.description} onChange={(e) => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder={tIncidents('describeIncident')} />
+            <textarea id={INCIDENT_FIELD.description} name={INCIDENT_FIELD.description} value={fields.description} onChange={(e) => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder={tIncidents('describeIncident')} />
           )}
         </div>
         {(fields.status === 'resolved' || inc.status === 'resolved' || inc.resolution_notes) && (
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('resolutionNotes')}</label>
+            <label htmlFor={INCIDENT_FIELD.resolutionNotes} className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('resolutionNotes')}</label>
             {readonly ? (
               <p className="text-sm text-gray-900 whitespace-pre-wrap">{inc.resolution_notes || tTable('emDash')}</p>
             ) : (
-              <textarea value={fields.resolutionNotes} onChange={(e) => setField('resolutionNotes', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder={tIncidents('howResolved')} />
+              <textarea id={INCIDENT_FIELD.resolutionNotes} name={INCIDENT_FIELD.resolutionNotes} value={fields.resolutionNotes} onChange={(e) => setField('resolutionNotes', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder={tIncidents('howResolved')} />
             )}
           </div>
         )}
@@ -103,24 +103,46 @@ function JournalForm({
   onVisibleChange: (v: boolean) => void;
 }) {
   const tIncidents = useTranslations('pages.incidents');
+  const journalPlaceholder = isFulfiller ? tIncidents('journalForm.addCommentWorkNote') : tIncidents('journalForm.addComment');
   return (
     <form onSubmit={onSubmit} className="mb-4">
+      <label htmlFor={INCIDENT_FIELD.journalContent} className="sr-only">
+        {journalPlaceholder}
+      </label>
       <textarea
+        id={INCIDENT_FIELD.journalContent}
+        name={INCIDENT_FIELD.journalContent}
         value={content}
         onChange={(e) => onContentChange(e.target.value)}
-        placeholder={isFulfiller ? tIncidents('journalForm.addCommentWorkNote') : tIncidents('journalForm.addComment')}
+        placeholder={journalPlaceholder}
         rows={2}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
       />
       <div className="flex items-center gap-3 mt-2">
         {isFulfiller ? (
           <>
-            <select value={type} onChange={(e) => onTypeChange(e.target.value)} className="px-2 py-1 border border-gray-200 rounded text-xs">
+            <label htmlFor={INCIDENT_FIELD.journalType} className="sr-only">
+              {tIncidents('journalForm.comment')}
+            </label>
+            <select
+              id={INCIDENT_FIELD.journalType}
+              name={INCIDENT_FIELD.journalType}
+              value={type}
+              onChange={(e) => onTypeChange(e.target.value)}
+              className="px-2 py-1 border border-gray-200 rounded text-xs"
+            >
               <option value="comment">{tIncidents('journalForm.comment')}</option>
               <option value="work_note">{tIncidents('journalForm.workNote')}</option>
             </select>
-            <label className="flex items-center gap-1.5 text-xs text-gray-500">
-              <input type="checkbox" checked={visible} onChange={(e) => onVisibleChange(e.target.checked)} className="rounded" />
+            <label htmlFor={INCIDENT_FIELD.journalVisible} className="flex items-center gap-1.5 text-xs text-gray-500">
+              <input
+                id={INCIDENT_FIELD.journalVisible}
+                name={INCIDENT_FIELD.journalVisible}
+                type="checkbox"
+                checked={visible}
+                onChange={(e) => onVisibleChange(e.target.checked)}
+                className="rounded"
+              />
               {tIncidents('journalForm.customerVisible')}
             </label>
           </>

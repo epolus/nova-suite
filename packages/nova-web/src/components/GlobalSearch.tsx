@@ -300,6 +300,9 @@ export default function GlobalSearch() {
             )}
             <input
               ref={inputRef}
+              id="global-search"
+              name="global-search"
+              aria-label={t('placeholder')}
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               onKeyDown={handleKeyDown}

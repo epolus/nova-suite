@@ -6,7 +6,7 @@ import { formatDateTime } from '../../utils/dateTime';
 import type { UserListItem, ServiceListItem, CI, Problem } from '../../api/client';
 import { useFieldLabel, useImpactUrgencyLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
-import { getInputCls, type IncidentDetailState } from './incidentDetailShared';
+import { getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
 
 export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
   const { inc, readonly, fields, setField, requiredFieldMissing, assignmentGroups, groupMembers } = d;
@@ -21,13 +21,15 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
       <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('summary')}</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={`block text-xs font-medium mb-1 ${requiredFieldMissing.assignment_group ? 'text-red-600' : 'text-gray-500'}`}>
+          <label htmlFor={INCIDENT_FIELD.assignmentGroupId} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.assignment_group ? 'text-red-600' : 'text-gray-500'}`}>
             {fieldLabel('assignmentGroup')} <span className="text-red-500">*</span>
           </label>
           {readonly ? (
             <p className="text-sm text-gray-900 mt-0.5">{inc.assignment_group_name || tTable('emDash')}</p>
           ) : (
             <select
+              id={INCIDENT_FIELD.assignmentGroupId}
+              name={INCIDENT_FIELD.assignmentGroupId}
               value={fields.assignmentGroupId}
               onChange={(e) => { setField('assignmentGroupId', e.target.value); setField('assignedTo', ''); }}
               className={selectCls}
@@ -40,11 +42,11 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
           )}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('assignedTo')}</label>
+          <label htmlFor={INCIDENT_FIELD.assignedTo} className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('assignedTo')}</label>
           {readonly ? (
             <p className="text-sm text-gray-900 mt-0.5">{inc.assigned_to_name || tIncidents('unassigned')}</p>
           ) : (
-            <select value={fields.assignedTo} onChange={(e) => setField('assignedTo', e.target.value)} className={selectCls}>
+            <select id={INCIDENT_FIELD.assignedTo} name={INCIDENT_FIELD.assignedTo} value={fields.assignedTo} onChange={(e) => setField('assignedTo', e.target.value)} className={selectCls}>
               <option value="">{tIncidents('unassignedOption')}</option>
               {groupMembers.map((u) => (
                 <option key={u.id} value={u.id}>{u.display_name}</option>
@@ -53,49 +55,49 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
           )}
         </div>
         <div>
-          <label className={`block text-xs font-medium mb-1 ${requiredFieldMissing.impact ? 'text-red-600' : 'text-gray-500'}`}>
+          <label htmlFor={INCIDENT_FIELD.impact} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.impact ? 'text-red-600' : 'text-gray-500'}`}>
             {fieldLabel('impact')} <span className="text-red-500">*</span>
           </label>
           {readonly ? (
             <Badge value={inc.impact} />
           ) : (
-            <select value={fields.impact} onChange={(e) => setField('impact', e.target.value)} className={selectCls}>
+            <select id={INCIDENT_FIELD.impact} name={INCIDENT_FIELD.impact} value={fields.impact} onChange={(e) => setField('impact', e.target.value)} className={selectCls}>
               {['low', 'medium', 'high'].map((v) => <option key={v} value={v}>{impactLabel(v)}</option>)}
             </select>
           )}
         </div>
         <div>
-          <label className={`block text-xs font-medium mb-1 ${requiredFieldMissing.urgency ? 'text-red-600' : 'text-gray-500'}`}>
+          <label htmlFor={INCIDENT_FIELD.urgency} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.urgency ? 'text-red-600' : 'text-gray-500'}`}>
             {fieldLabel('urgency')} <span className="text-red-500">*</span>
           </label>
           {readonly ? (
             <Badge value={inc.urgency} />
           ) : (
-            <select value={fields.urgency} onChange={(e) => setField('urgency', e.target.value)} className={selectCls}>
+            <select id={INCIDENT_FIELD.urgency} name={INCIDENT_FIELD.urgency} value={fields.urgency} onChange={(e) => setField('urgency', e.target.value)} className={selectCls}>
               {['low', 'medium', 'high'].map((v) => <option key={v} value={v}>{urgencyLabel(v)}</option>)}
             </select>
           )}
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('openTime')}</label>
+          <span className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('openTime')}</span>
           <div className="flex items-center gap-2">
             <p className="text-sm text-gray-900 mt-0.5">{formatDateTime(inc.created_at)}</p>
             <Badge value={inc.status} />
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('slaDueDate')}</label>
+          <span className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('slaDueDate')}</span>
           <p className="text-sm text-gray-900 mt-0.5">{inc.sla_due_at ? formatDateTime(inc.sla_due_at) : tTable('emDash')}</p>
         </div>
         {(fields.status === 'pending' || inc.status === 'pending') && (
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">
+            <label htmlFor={INCIDENT_FIELD.pendingReason} className="block text-xs font-medium text-gray-500 mb-1">
               {tIncidents('pendingReason')} <span className="text-red-500">*</span>
             </label>
             {readonly ? (
               <p className="text-sm text-gray-900 mt-0.5">{inc.resolution_code || tTable('emDash')}</p>
             ) : (
-              <select value={fields.pendingReason} onChange={(e) => setField('pendingReason', e.target.value)} className={selectCls}>
+              <select id={INCIDENT_FIELD.pendingReason} name={INCIDENT_FIELD.pendingReason} value={fields.pendingReason} onChange={(e) => setField('pendingReason', e.target.value)} className={selectCls}>
                 <option value="">{tIncidents('selectReason')}</option>
                 <option value="waiting_for_caller">{tIncidents('pendingReasons.waitingForCaller')}</option>
                 <option value="waiting_for_vendor">{tIncidents('pendingReasons.waitingForVendor')}</option>
@@ -123,13 +125,16 @@ export function IncidentCallerCard({ d }: { d: IncidentDetailState }) {
       <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('callerProfile')}</h3>
       <div className="grid grid-cols-1 gap-4">
         <div>
-          <label className={`block text-xs font-medium mb-1 ${requiredFieldMissing.caller ? 'text-red-600' : 'text-gray-500'}`}>
+          <label htmlFor={INCIDENT_FIELD.callerId} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.caller ? 'text-red-600' : 'text-gray-500'}`}>
             {fieldLabel('caller')} <span className="text-red-500">*</span>
           </label>
           {readonly ? (
             <p className="text-sm font-medium text-gray-900">{inc.caller_name || tTable('emDash')}</p>
           ) : (
             <SearchableDropdown<UserListItem>
+              id={INCIDENT_FIELD.callerId}
+              name={INCIDENT_FIELD.callerId}
+              ariaLabel={fieldLabel('caller')}
               items={users}
               selectedId={fields.callerId}
               onSelect={(id) => setField('callerId', id)}
@@ -172,11 +177,11 @@ export function IncidentCallerCard({ d }: { d: IncidentDetailState }) {
           </div>
         )}
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('contactInfo')}</label>
+          <label htmlFor={INCIDENT_FIELD.contactInfo} className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('contactInfo')}</label>
           {readonly ? (
             <p className="text-sm text-gray-900">{inc.contact_info || tTable('emDash')}</p>
           ) : (
-            <input type="text" value={fields.contactInfo} onChange={(e) => setField('contactInfo', e.target.value)} placeholder={tIncidents('additionalContactInfo')} className={inputCls} />
+            <input id={INCIDENT_FIELD.contactInfo} name={INCIDENT_FIELD.contactInfo} type="text" value={fields.contactInfo} onChange={(e) => setField('contactInfo', e.target.value)} placeholder={tIncidents('additionalContactInfo')} className={inputCls} />
           )}
         </div>
       </div>
@@ -196,7 +201,7 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
       <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('serviceCiContext')}</h3>
       <dl className="space-y-3 text-sm">
         <div>
-          <dt className={`mb-1 ${requiredFieldMissing.service_or_ci ? 'text-red-600' : 'text-gray-500'}`}>
+          <dt id={`${INCIDENT_FIELD.serviceId}-label`} className={`mb-1 ${requiredFieldMissing.service_or_ci ? 'text-red-600' : 'text-gray-500'}`}>
             {fieldLabel('service')} <span className="text-red-500">*</span>
           </dt>
           <dd className="text-gray-900 mt-0.5">
@@ -204,6 +209,9 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
               inc.service_name || tTable('emDash')
             ) : (
               <SearchableDropdown<ServiceListItem>
+                id={INCIDENT_FIELD.serviceId}
+                name={INCIDENT_FIELD.serviceId}
+                ariaLabel={fieldLabel('service')}
                 items={services}
                 selectedId={fields.serviceId}
                 onSelect={(id) => setField('serviceId', id)}
@@ -218,7 +226,7 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
           </dd>
         </div>
         <div>
-          <dt className={`mb-1 ${requiredFieldMissing.service_or_ci ? 'text-red-600' : 'text-gray-500'}`}>
+          <dt id={`${INCIDENT_FIELD.configurationItemId}-label`} className={`mb-1 ${requiredFieldMissing.service_or_ci ? 'text-red-600' : 'text-gray-500'}`}>
             {tIncidents('configurationItem')} <span className="text-red-500">*</span>
           </dt>
           <dd className="mt-0.5">
@@ -230,6 +238,9 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
               ) : tTable('emDash')
             ) : (
               <SearchableDropdown<CI>
+                id={INCIDENT_FIELD.configurationItemId}
+                name={INCIDENT_FIELD.configurationItemId}
+                ariaLabel={tIncidents('configurationItem')}
                 items={ciOptions}
                 selectedId={fields.configurationItemId}
                 onSelect={(id) => setField('configurationItemId', id)}
@@ -244,27 +255,27 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
           </dd>
         </div>
         <div>
-          <dt className="text-gray-500">{fieldLabel('category')}</dt>
+          <dt id={`${INCIDENT_FIELD.category}-label`} className="text-gray-500">{fieldLabel('category')}</dt>
           <dd className="text-gray-900 mt-0.5">
             {readonly ? (
               inc.category || tTable('emDash')
             ) : (
-              <input type="text" value={fields.category} onChange={(e) => setField('category', e.target.value)} placeholder={fieldLabel('category')} className={inputCls} />
+              <input id={INCIDENT_FIELD.category} name={INCIDENT_FIELD.category} type="text" value={fields.category} onChange={(e) => setField('category', e.target.value)} placeholder={fieldLabel('category')} className={inputCls} aria-labelledby={`${INCIDENT_FIELD.category}-label`} />
             )}
           </dd>
         </div>
         <div>
-          <dt className="text-gray-500">{fieldLabel('subcategory')}</dt>
+          <dt id={`${INCIDENT_FIELD.subcategory}-label`} className="text-gray-500">{fieldLabel('subcategory')}</dt>
           <dd className="text-gray-900 mt-0.5">
             {readonly ? (
               inc.subcategory || tTable('emDash')
             ) : (
-              <input type="text" value={fields.subcategory} onChange={(e) => setField('subcategory', e.target.value)} placeholder={fieldLabel('subcategory')} className={inputCls} />
+              <input id={INCIDENT_FIELD.subcategory} name={INCIDENT_FIELD.subcategory} type="text" value={fields.subcategory} onChange={(e) => setField('subcategory', e.target.value)} placeholder={fieldLabel('subcategory')} className={inputCls} aria-labelledby={`${INCIDENT_FIELD.subcategory}-label`} />
             )}
           </dd>
         </div>
         <div>
-          <dt className="text-gray-500 mb-1">{tIncidents('relatedProblem')}</dt>
+          <dt id={`${INCIDENT_FIELD.relatedProblemId}-label`} className="text-gray-500 mb-1">{tIncidents('relatedProblem')}</dt>
           <dd className="mt-0.5">
             {readonly ? (
               selectedProblem ? (
@@ -274,6 +285,9 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
               ) : tTable('emDash')
             ) : (
               <SearchableDropdown<Problem>
+                id={INCIDENT_FIELD.relatedProblemId}
+                name={INCIDENT_FIELD.relatedProblemId}
+                ariaLabel={tIncidents('relatedProblem')}
                 items={problemOptions}
                 selectedId={fields.relatedProblemId}
                 onSelect={(id) => setField('relatedProblemId', id)}

@@ -230,6 +230,8 @@ export default function ServiceItemCombobox({
             <input
               ref={inputRef}
               type="text"
+              name="service-item-filter"
+              aria-label={t('filterPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onInputKeyDown}

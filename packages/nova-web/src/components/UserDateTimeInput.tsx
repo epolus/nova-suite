@@ -2,15 +2,21 @@
 import { useRef } from 'react';
 import { useTranslations } from 'use-intl';
 import { formatDateTime } from '../utils/dateTime';
+import { useFieldControl } from './ui/fieldControl';
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  id?: string;
+  name?: string;
+  ariaLabel?: string;
 }
 
-export default function UserDateTimeInput({ value, onChange, className }: Props) {
+export default function UserDateTimeInput({ value, onChange, className, id, name, ariaLabel }: Props) {
   const t = useTranslations('components.userDateTimeInput');
+  const field = useFieldControl(name, id);
+  const pickerId = `${field.id}-picker`;
   const nativePickerRef = useRef<HTMLInputElement>(null);
   const display = value ? formatDateTime(value) : '';
 
@@ -28,11 +34,14 @@ export default function UserDateTimeInput({ value, onChange, className }: Props)
   return (
     <div className="grid grid-cols-[1fr_36px] gap-2">
       <input
+        id={field.id}
+        name={field.name}
         type="text"
         value={display}
         readOnly
         onClick={openPicker}
         placeholder={t('placeholder')}
+        aria-label={ariaLabel ?? t('placeholder')}
         className={className}
       />
       <button
@@ -46,6 +55,8 @@ export default function UserDateTimeInput({ value, onChange, className }: Props)
       </button>
       <input
         ref={nativePickerRef}
+        id={pickerId}
+        name={`${field.name}-picker`}
         type="datetime-local"
         value={value || ''}
         onChange={(e) => onChange(e.target.value || '')}

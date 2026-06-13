@@ -1,16 +1,21 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'use-intl';
+import { useFieldControl } from './ui/fieldControl';
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  id?: string;
+  name?: string;
+  ariaLabel?: string;
 }
 
-export default function SearchBar({ value, onChange, placeholder }: Props) {
+export default function SearchBar({ value, onChange, placeholder, id, name, ariaLabel }: Props) {
   const t = useTranslations('common.filters');
   const resolvedPlaceholder = placeholder ?? t('searchPlaceholder');
+  const field = useFieldControl(name ?? 'list-search', id);
   const [local, setLocal] = useState(value);
 
   useEffect(() => { setLocal(value); }, [value]);
@@ -25,6 +30,8 @@ export default function SearchBar({ value, onChange, placeholder }: Props) {
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
       </svg>
       <input
+        id={field.id}
+        name={field.name}
         type="text"
         value={local}
         onChange={(e) => setLocal(e.target.value)}
@@ -35,6 +42,7 @@ export default function SearchBar({ value, onChange, placeholder }: Props) {
           }
         }}
         placeholder={resolvedPlaceholder}
+        aria-label={ariaLabel ?? resolvedPlaceholder}
         className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
       />
       {local && (

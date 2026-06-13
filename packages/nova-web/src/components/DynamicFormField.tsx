@@ -4,6 +4,7 @@ import { useTranslations } from 'use-intl';
 import type { FormField } from '../api/client';
 import { cmdb, auth } from '../api/client';
 import UserDateInput from './UserDateInput';
+import { useFieldControl } from './ui/fieldControl';
 
 interface Props {
   field: FormField;
@@ -14,16 +15,22 @@ interface Props {
 export default function DynamicFormField({ field, value, onChange }: Props) {
   const t = useTranslations('components.dynamicFormField');
   const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
+  const fieldControl = useFieldControl(field.name);
+  const labelText = field.label || field.name;
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {field.type !== 'checkbox' && (field.label || field.name)}
-        {field.required && field.type !== 'checkbox' && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      {field.type !== 'checkbox' && (
+        <label htmlFor={fieldControl.id} className="block text-sm font-medium text-gray-700 mb-1">
+          {labelText}
+          {field.required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+      )}
 
       {field.type === 'textarea' ? (
         <textarea
+          id={fieldControl.id}
+          name={fieldControl.name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
@@ -31,12 +38,14 @@ export default function DynamicFormField({ field, value, onChange }: Props) {
           className={`${inputClass} resize-none`}
         />
       ) : field.type === 'select' ? (
-        <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+        <select id={fieldControl.id} name={fieldControl.name} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
           <option value="">{field.placeholder || t('select')}</option>
           {field.options?.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       ) : field.type === 'multiselect' ? (
         <select
+          id={fieldControl.id}
+          name={fieldControl.name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={inputClass}
@@ -46,6 +55,8 @@ export default function DynamicFormField({ field, value, onChange }: Props) {
         </select>
       ) : field.type === 'number' ? (
         <input
+          id={fieldControl.id}
+          name={fieldControl.name}
           type="number"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -56,6 +67,8 @@ export default function DynamicFormField({ field, value, onChange }: Props) {
         />
       ) : field.type === 'email' ? (
         <input
+          id={fieldControl.id}
+          name={fieldControl.name}
           type="email"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -66,20 +79,41 @@ export default function DynamicFormField({ field, value, onChange }: Props) {
       ) : field.type === 'checkbox' ? (
         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
           <input
+            id={fieldControl.id}
+            name={fieldControl.name}
             type="checkbox"
             checked={value === 'true'}
             onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
             className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
           />
-          {field.label || field.name}
+          {labelText}
           {field.required && <span className="text-red-500 ml-1">*</span>}
         </label>
       ) : field.type === 'cmdb_ref' ? (
-        <CmdbRefPicker value={value} onChange={onChange} ciClass={field.ci_class} ciFilter={field.ci_filter} placeholder={field.placeholder} />
+        <CmdbRefPicker
+          id={fieldControl.id}
+          name={fieldControl.name}
+          ariaLabel={labelText}
+          value={value}
+          onChange={onChange}
+          ciClass={field.ci_class}
+          ciFilter={field.ci_filter}
+          placeholder={field.placeholder}
+        />
       ) : field.type === 'user_ref' ? (
-        <UserRefPicker value={value} onChange={onChange} placeholder={field.placeholder} />
+        <UserRefPicker
+          id={fieldControl.id}
+          name={fieldControl.name}
+          ariaLabel={labelText}
+          value={value}
+          onChange={onChange}
+          placeholder={field.placeholder}
+        />
       ) : field.type === 'date' ? (
         <UserDateInput
+          id={fieldControl.id}
+          name={fieldControl.name}
+          ariaLabel={labelText}
           value={value}
           onChange={onChange}
           className={inputClass}
@@ -87,6 +121,8 @@ export default function DynamicFormField({ field, value, onChange }: Props) {
         />
       ) : (
         <input
+          id={fieldControl.id}
+          name={fieldControl.name}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -112,7 +148,10 @@ function useDebounce(value: string, delay: number) {
 }
 
 /* ─── CMDB Reference Picker ─── */
-function CmdbRefPicker({ value, onChange, ciClass, ciFilter, placeholder }: {
+function CmdbRefPicker({ id, name, ariaLabel, value, onChange, ciClass, ciFilter, placeholder }: {
+  id: string;
+  name: string;
+  ariaLabel: string;
   value: string;
   onChange: (v: string) => void;
   ciClass?: string;
@@ -215,6 +254,9 @@ function CmdbRefPicker({ value, onChange, ciClass, ciFilter, placeholder }: {
     <div className="relative" ref={containerRef}>
       <div className="relative">
         <input
+          id={id}
+          name={name}
+          aria-label={ariaLabel}
           value={inputText}
           onChange={(e) => { setInputText(e.target.value); if (!open) setOpen(true); }}
           onFocus={handleFocus}
@@ -265,7 +307,10 @@ function CmdbRefPicker({ value, onChange, ciClass, ciFilter, placeholder }: {
 }
 
 /* ─── User Reference Picker ─── */
-function UserRefPicker({ value, onChange, placeholder }: {
+function UserRefPicker({ id, name, ariaLabel, value, onChange, placeholder }: {
+  id: string;
+  name: string;
+  ariaLabel: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -340,6 +385,9 @@ function UserRefPicker({ value, onChange, placeholder }: {
     <div className="relative" ref={containerRef}>
       <div className="relative">
         <input
+          id={id}
+          name={name}
+          aria-label={ariaLabel}
           value={inputText}
           onChange={(e) => { setInputText(e.target.value); if (!open) setOpen(true); }}
           onFocus={handleFocus}

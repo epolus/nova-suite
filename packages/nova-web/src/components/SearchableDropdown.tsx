@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useTranslations } from 'use-intl';
+import { useFieldControl } from './ui/fieldControl';
 
 interface Props<T> {
   items: T[];
@@ -14,6 +15,9 @@ interface Props<T> {
   fallbackDisplayText?: string;
   placeholder?: string;
   className?: string;
+  id?: string;
+  name?: string;
+  ariaLabel?: string;
 }
 
 export function SearchableDropdown<T>({
@@ -28,10 +32,14 @@ export function SearchableDropdown<T>({
   fallbackDisplayText,
   placeholder,
   className,
+  id,
+  name,
+  ariaLabel,
 }: Props<T>) {
   const t = useTranslations('components.searchableDropdown');
   const tFilters = useTranslations('common.filters');
   const resolvedPlaceholder = placeholder ?? tFilters('searchPlaceholder');
+  const field = useFieldControl(name, id);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -71,11 +79,14 @@ export function SearchableDropdown<T>({
   return (
     <div ref={ref} className={`relative ${className ?? ''}`}>
       <input
+        id={field.id}
+        name={field.name}
         type="text"
         value={displayValue}
         onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         placeholder={resolvedPlaceholder}
+        aria-label={ariaLabel ?? resolvedPlaceholder}
         className={inputCls}
       />
       {selectedId && !open && (

@@ -166,6 +166,8 @@
       "number": "Number",
       "actions": "Actions",
       "selectAll": "Select all",
+      "selectRow": "Select row",
+      "filterColumn": "Filter {label}",
       "rowsPerPage": "Rows per page",
       "showing": "Showing {from}-{to} of {total}",
       "nextPage": "Next page",
