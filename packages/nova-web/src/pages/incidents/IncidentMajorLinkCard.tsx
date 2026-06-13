@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { majorIncidents as majorIncidentsApi, incidents as incidentsApi } from '../../api/client';
+import { incidents as incidentsApi } from '../../api/client';
+import { useInvalidateMajorIncidents, useLinkableMajorIncidents } from '../../hooks/queries';
 import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import { Button } from '../../components/ui/button';
@@ -12,26 +13,14 @@ export function IncidentMajorLinkCard({ d }: { d: IncidentDetailState }) {
   const { inc, isFulfiller, readonly, isClosed, isResolved, refresh } = d;
   const tIncidents = useTranslations('pages.incidents');
   const tTable = useTranslations('common.table');
+  const invalidateMajorIncidents = useInvalidateMajorIncidents();
+
+  const showLinkUi = Boolean(inc?.id && isFulfiller && !readonly && !isClosed && !isResolved);
+  const { data: linkableMajors = [] } = useLinkableMajorIncidents(showLinkUi);
 
   const [linkMajorSelect, setLinkMajorSelect] = useState('');
-  const [linkableMajors, setLinkableMajors] = useState<Array<{ id: string; number: string; title: string; status: string }>>([]);
   const [linkMajorBusy, setLinkMajorBusy] = useState(false);
   const [linkMajorErr, setLinkMajorErr] = useState('');
-
-  useEffect(() => {
-    if (!inc?.id || !isFulfiller || readonly || isClosed || isResolved) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await majorIncidentsApi.list({ status_not_in: 'resolved,cancelled,pending_acceptance' }, 1, 50);
-        const rows = (res.major_incidents as Array<{ id: string; number: string; title: string; status: string }>) ?? [];
-        if (!cancelled) setLinkableMajors(rows);
-      } catch {
-        if (!cancelled) setLinkableMajors([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [inc?.id, isFulfiller, readonly, isClosed, isResolved]);
 
   if (!inc) return null;
 
@@ -42,6 +31,7 @@ export function IncidentMajorLinkCard({ d }: { d: IncidentDetailState }) {
     try {
       await incidentsApi.linkMajorIncident(inc.id, { major_incident_id: linkMajorSelect });
       setLinkMajorSelect('');
+      invalidateMajorIncidents.summaries();
       await refresh();
     } catch (err: unknown) {
       setLinkMajorErr(err instanceof Error ? err.message : tIncidents('linkFailed'));
@@ -57,7 +47,7 @@ export function IncidentMajorLinkCard({ d }: { d: IncidentDetailState }) {
   const linkedMajorIds = new Set(linkedMajor.map((m) => m.id));
   const linkChoices = linkableMajors.filter((m) => !linkedMajorIds.has(m.id));
 
-  if (!(linkedMajor.length > 0 || (isFulfiller && !readonly && !isClosed && !isResolved))) {
+  if (!(linkedMajor.length > 0 || showLinkUi)) {
     return null;
   }
 
@@ -66,12 +56,7 @@ export function IncidentMajorLinkCard({ d }: { d: IncidentDetailState }) {
       padding={false}
       className="mb-3 border-l-[3px] border-l-indigo-500 border-y border-r border-gray-200 rounded-lg bg-indigo-50/25 px-3 py-2 dark:border-gray-600 dark:border-l-indigo-400 dark:bg-indigo-950/55"
     >
-      {linkedMajor.length === 0 &&
-      isFulfiller &&
-      !readonly &&
-      !isClosed &&
-      !isResolved &&
-      linkChoices.length > 0 ? (
+      {linkedMajor.length === 0 && showLinkUi && linkChoices.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-900/90 dark:text-indigo-100 shrink-0">
             {tIncidents('majorIncident')}
@@ -121,7 +106,7 @@ export function IncidentMajorLinkCard({ d }: { d: IncidentDetailState }) {
               ))}
             </ul>
           ) : null}
-          {isFulfiller && !readonly && !isClosed && !isResolved && linkChoices.length > 0 && (
+          {showLinkUi && linkChoices.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-indigo-100/60 dark:border-indigo-700/50">
               <label htmlFor="link-major-select-linked" className="sr-only">
                 {tIncidents('linkToMajor')}
@@ -138,7 +123,7 @@ export function IncidentMajorLinkCard({ d }: { d: IncidentDetailState }) {
                 ))}
               </select>
               <Button type="button" variant="outline" size="sm" onClick={() => void handleLinkMajor()} disabled={!linkMajorSelect || linkMajorBusy}>
-                {linkMajorBusy ? 'Linking…' : 'Link'}
+                {linkMajorBusy ? tIncidents('linking') : tIncidents('link')}
               </Button>
             </div>
           )}

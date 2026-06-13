@@ -7,6 +7,7 @@ import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import { Button } from '../../components/ui/button';
 import { majorIncidents as majorIncidentsApi } from '../../api/client';
+import { useInvalidateMajorIncidents } from '../../hooks/queries';
 import { MajorIncidentTimelineList } from './majorIncidentTimeline';
 import { useMajorIncidentTimeline } from './majorIncidentFeed';
 import { useAuth } from '../../context/AuthContext';
@@ -23,6 +24,7 @@ export default function MajorIncidentWarRoom() {
   const tPostmortem = useTranslations('pages.majorIncidents.postmortem');
   const { buildFeedItems } = useMajorIncidentTimeline();
   const canManage = canManageMajorIncidents(user?.roles);
+  const invalidateMajorIncidents = useInvalidateMajorIncidents();
   const [data, setData] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -60,6 +62,11 @@ export default function MajorIncidentWarRoom() {
     return () => clearInterval(timer);
   }, [load]);
 
+  const invalidateSummaries = useCallback(() => {
+    invalidateMajorIncidents.summaries();
+    if (id) invalidateMajorIncidents.detail(id);
+  }, [id, invalidateMajorIncidents]);
+
   const sendUpdate = async () => {
     if (!id || !updateBody.trim()) return;
     setSaving(true);
@@ -84,6 +91,7 @@ export default function MajorIncidentWarRoom() {
       await majorIncidentsApi.resolve(id, { solution });
       setResolveModalOpen(false);
       setResolveSolution('');
+      invalidateSummaries();
       await load();
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : t('resolveFailed'));
@@ -97,6 +105,7 @@ export default function MajorIncidentWarRoom() {
     setAcceptBusy(true);
     try {
       await majorIncidentsApi.acceptMajor(id);
+      invalidateSummaries();
       await load();
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : t('acceptFailed'));
@@ -113,6 +122,7 @@ export default function MajorIncidentWarRoom() {
       await majorIncidentsApi.rejectPromotion(id, reason ? { reason } : undefined);
       setRejectModalOpen(false);
       setRejectReason('');
+      invalidateSummaries();
       await load();
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : t('rejectFailed'));
@@ -152,6 +162,7 @@ export default function MajorIncidentWarRoom() {
     setLinkBusy(incidentId);
     try {
       await majorIncidentsApi.linkRelated(id, { incident_id: incidentId, link_reason: t('linkReason') });
+      invalidateSummaries();
       await load();
       await loadSuggested();
     } catch (e: unknown) {

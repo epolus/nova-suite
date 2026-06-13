@@ -11,6 +11,7 @@ import {
   type RoleItem,
   type UserListItem,
 } from '../../api/client';
+import { useInvalidateReferenceData } from '../../hooks/queries';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
@@ -27,6 +28,7 @@ export default function AssignmentGroupDetailPage() {
   const isNew = !id || id === 'new';
   const navigate = useNavigate();
   const location = useLocation();
+  const invalidateReference = useInvalidateReferenceData();
 
   const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
   const [users, setUsers] = useState<UserListItem[]>([]);
@@ -196,6 +198,7 @@ export default function AssignmentGroupDetailPage() {
         await admin.updateAssignmentGroup(currentGroup.id, payload);
         await load();
       }
+      invalidateReference.assignmentGroups();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('errorOccurred'));
       setSaving(false);

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState } from 'react';
 import { majorIncidents as majorIncidentsApi } from '../../api/client';
+import { useInvalidateMajorIncidents } from '../../hooks/queries';
 import PageHeader from '../../components/PageHeader';
 import { Button } from '../../components/ui/button';
 import { canCreateMajorIncidentRecord } from '../../utils/roles';
@@ -20,6 +21,7 @@ export function IncidentDetailHeader({ d }: { d: IncidentDetailState }) {
 
   const [declareMajorBusy, setDeclareMajorBusy] = useState(false);
   const [declareMajorErr, setDeclareMajorErr] = useState('');
+  const invalidateMajorIncidents = useInvalidateMajorIncidents();
 
   if (!inc) return null;
 
@@ -38,6 +40,7 @@ export function IncidentDetailHeader({ d }: { d: IncidentDetailState }) {
         affected_service_ids: inc.service_id ? [inc.service_id] : [],
       });
       const mid = (res.major_incident as { id: string }).id;
+      invalidateMajorIncidents.summaries();
       navigate(`/major-incidents/${mid}`);
     } catch (err: unknown) {
       setDeclareMajorErr(err instanceof Error ? err.message : tIncidents('promoteFailed'));

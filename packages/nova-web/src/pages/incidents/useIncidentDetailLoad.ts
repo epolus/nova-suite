@@ -1,32 +1,13 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import {
-  incidents as incidentsApi,
-  admin as adminApi,
-  auth as authApi,
-  cmdb as cmdbApi,
-  problems as problemsApi,
-} from '../../api/client';
-import type {
-  Incident,
-  JournalEntry,
-  AssignmentGroupItem,
-  ServiceListItem,
-  UserListItem,
-  CI,
-  Problem,
-} from '../../api/client';
-import type { EMPTY_FIELDS } from './incidentDetailFields';
-
-type FieldKey = keyof typeof EMPTY_FIELDS;
+import { incidents as incidentsApi } from '../../api/client';
+import type { Incident, JournalEntry } from '../../api/client';
 
 type LoadParams = {
   id: string | undefined;
-  isFulfiller: boolean;
   listParams: Record<string, string>;
   syncFields: (incident: Incident) => void;
-  setField: (key: FieldKey, val: string) => void;
   setLoading: Dispatch<SetStateAction<boolean>>;
   setLoadError: Dispatch<SetStateAction<string | null>>;
   setInc: Dispatch<SetStateAction<Incident | null>>;
@@ -34,20 +15,12 @@ type LoadParams = {
   setJournalLoading: Dispatch<SetStateAction<boolean>>;
   setPrevId: Dispatch<SetStateAction<string | null>>;
   setNextId: Dispatch<SetStateAction<string | null>>;
-  setAssignmentGroups: Dispatch<SetStateAction<AssignmentGroupItem[]>>;
-  setServices: Dispatch<SetStateAction<ServiceListItem[]>>;
-  setCiOptions: Dispatch<SetStateAction<CI[]>>;
-  setUsers: Dispatch<SetStateAction<UserListItem[]>>;
-  setProblemOptions: Dispatch<SetStateAction<Problem[]>>;
-  setLinkedProblemIds: Dispatch<SetStateAction<string[]>>;
 };
 
 export function useIncidentDetailLoad({
   id,
-  isFulfiller,
   listParams,
   syncFields,
-  setField,
   setLoading,
   setLoadError,
   setInc,
@@ -55,12 +28,6 @@ export function useIncidentDetailLoad({
   setJournalLoading,
   setPrevId,
   setNextId,
-  setAssignmentGroups,
-  setServices,
-  setCiOptions,
-  setUsers,
-  setProblemOptions,
-  setLinkedProblemIds,
 }: LoadParams) {
   useEffect(() => {
     if (!id) return;
@@ -106,74 +73,7 @@ export function useIncidentDetailLoad({
       setJournal([]);
       setPrevId(null);
       setNextId(null);
-      setAssignmentGroups([]);
-      setServices([]);
-      setCiOptions([]);
-      setUsers([]);
-      setProblemOptions([]);
-      setLinkedProblemIds([]);
     };
-
-    setAssignmentGroups([]);
-    setServices([]);
-    setCiOptions([]);
-    setUsers([]);
-    setProblemOptions([]);
-    setLinkedProblemIds([]);
-
-    if (isFulfiller) {
-      void adminApi
-        .assignmentGroups()
-        .then((res) => {
-          if (!cancelled) setAssignmentGroups(res.assignment_groups);
-        })
-        .catch(() => {
-          if (!cancelled) setAssignmentGroups([]);
-        });
-      void incidentsApi
-        .services()
-        .then((res) => {
-          if (!cancelled) setServices(res.services);
-        })
-        .catch(() => {
-          if (!cancelled) setServices([]);
-        });
-      void cmdbApi
-        .items({ status: 'active' }, 1, 100)
-        .then((res) => {
-          if (!cancelled) setCiOptions(res.items);
-        })
-        .catch(() => {
-          if (!cancelled) setCiOptions([]);
-        });
-      void authApi
-        .users()
-        .then((res) => {
-          if (!cancelled) setUsers(res.users);
-        })
-        .catch(() => {
-          if (!cancelled) setUsers([]);
-        });
-      void problemsApi
-        .list({}, 1, 100)
-        .then((res) => {
-          if (!cancelled) setProblemOptions(res.problems);
-        })
-        .catch(() => {
-          if (!cancelled) setProblemOptions([]);
-        });
-      void incidentsApi
-        .linkedProblems(id)
-        .then((res) => {
-          if (cancelled) return;
-          const linkedIds = res.problems.map((p) => p.problem_id);
-          setLinkedProblemIds(linkedIds);
-          setField('relatedProblemId', linkedIds[0] || '');
-        })
-        .catch(() => {
-          if (!cancelled) setLinkedProblemIds([]);
-        });
-    }
 
     incidentPromise
       .then((incRes) => {
@@ -194,8 +94,6 @@ export function useIncidentDetailLoad({
     return () => {
       cancelled = true;
     };
-    // setField/syncFields/setState dispatchers are intentionally omitted — setField was unstable
-    // and including it re-runs this effect every render, flooding the API.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load only when route/filter context changes
-  }, [id, isFulfiller, listParams]);
+  }, [id, listParams]);
 }

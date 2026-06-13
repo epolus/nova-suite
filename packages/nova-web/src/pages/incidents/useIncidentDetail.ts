@@ -1,19 +1,21 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { incidents as incidentsApi } from '../../api/client';
-import type {
-  Incident,
-  JournalEntry,
-  AssignmentGroupItem,
-  ServiceListItem,
-  UserListItem,
-  CI,
-  Problem,
-} from '../../api/client';
+import type { Incident, JournalEntry } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { isFulfillerRole } from '../../utils/roles';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
+import {
+  queryKeys,
+  useIncidentLinkedProblems,
+  useReferenceAssignmentGroups,
+  useReferenceCmdbItems,
+  useReferenceIncidentServices,
+  useReferenceProblemPicker,
+  useReferenceUsers,
+} from '../../hooks/queries';
 import {
   EMPTY_FIELDS,
   SIDEBAR_STORAGE_KEY,
@@ -29,11 +31,14 @@ export function useIncidentDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   const listParams = useMemo<Record<string, string>>(
     () => (location.state as { listParams?: Record<string, string> })?.listParams || {},
     [location.state],
   );
+
+  const isFulfiller = isFulfillerRole(user?.roles);
 
   // Core data
   const [inc, setInc] = useState<Incident | null>(null);
@@ -44,13 +49,17 @@ export function useIncidentDetail() {
   const [prevId, setPrevId] = useState<string | null>(null);
   const [nextId, setNextId] = useState<string | null>(null);
 
-  // Reference data (fulfiller only)
-  const [assignmentGroups, setAssignmentGroups] = useState<AssignmentGroupItem[]>([]);
-  const [services, setServices] = useState<ServiceListItem[]>([]);
-  const [ciOptions, setCiOptions] = useState<CI[]>([]);
-  const [users, setUsers] = useState<UserListItem[]>([]);
-  const [problemOptions, setProblemOptions] = useState<Problem[]>([]);
-  const [linkedProblemIds, setLinkedProblemIds] = useState<string[]>([]);
+  // Reference data (fulfiller only, cached via React Query)
+  const { data: assignmentGroups = [] } = useReferenceAssignmentGroups(isFulfiller);
+  const { data: services = [] } = useReferenceIncidentServices(isFulfiller);
+  const { data: ciOptions = [] } = useReferenceCmdbItems({ status: 'active' }, 1, 100, isFulfiller);
+  const { data: users = [] } = useReferenceUsers(isFulfiller);
+  const { data: problemOptions = [] } = useReferenceProblemPicker(isFulfiller);
+  const { data: linkedProblems = [] } = useIncidentLinkedProblems(id, isFulfiller);
+  const linkedProblemIds = useMemo(
+    () => linkedProblems.map((p) => p.problem_id),
+    [linkedProblems],
+  );
 
   // Edit fields — all grouped
   const [fields, setFields] = useState(EMPTY_FIELDS);
@@ -99,8 +108,6 @@ export function useIncidentDetail() {
   // Resolve with KB modal
   const [kbResolveOpen, setKbResolveOpen] = useState(false);
 
-  // Derived permissions
-  const isFulfiller = isFulfillerRole(user?.roles);
   const isClosed = inc?.status === 'closed' || inc?.status === 'cancelled';
   const isResolved = inc?.status === 'resolved';
   const isCaller = inc?.caller_id === user?.id;
@@ -109,6 +116,11 @@ export function useIncidentDetail() {
   const syncFields = useCallback((i: Incident) => {
     setFields(buildFieldsFromIncident(i));
   }, []);
+
+  useEffect(() => {
+    if (!id || !isFulfiller) return;
+    setField('relatedProblemId', linkedProblemIds[0] || '');
+  }, [id, isFulfiller, linkedProblemIds, setField]);
 
   const loadJournal = useCallback(async (incidentId: string) => {
     setJournalLoading(true);
@@ -124,17 +136,12 @@ export function useIncidentDetail() {
 
   const refresh = useCallback(async () => {
     if (!id) return;
-    const [full, linkedProblemsRes] = await Promise.all([
-      incidentsApi.get(id),
-      incidentsApi.linkedProblems(id).catch(() => ({ problems: [] })),
-    ]);
+    const full = await incidentsApi.get(id);
     setInc(full);
     syncFields(full);
-    const linkedIds = linkedProblemsRes.problems.map((p) => p.problem_id);
-    setLinkedProblemIds(linkedIds);
-    setField('relatedProblemId', linkedIds[0] || '');
+    await queryClient.invalidateQueries({ queryKey: queryKeys.incidents.linkedProblems(id) });
     void loadJournal(id);
-  }, [id, loadJournal, syncFields, setField]);
+  }, [id, loadJournal, queryClient, syncFields]);
 
   const withSave = useCallback(async (fn: () => Promise<void>) => {
     setSaving(true);
@@ -147,10 +154,8 @@ export function useIncidentDetail() {
 
   useIncidentDetailLoad({
     id,
-    isFulfiller,
     listParams,
     syncFields,
-    setField,
     setLoading,
     setLoadError,
     setInc,
@@ -158,12 +163,6 @@ export function useIncidentDetail() {
     setJournalLoading,
     setPrevId,
     setNextId,
-    setAssignmentGroups,
-    setServices,
-    setCiOptions,
-    setUsers,
-    setProblemOptions,
-    setLinkedProblemIds,
   });
 
   const goTo = useCallback(

@@ -2,12 +2,17 @@
 import { useCallback, useMemo } from 'react';
 import { useTranslations } from 'use-intl';
 import { admin, type ServiceAdminItem } from '../../api/client';
+import { useInvalidateReferenceData } from '../../hooks/queries';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
 
 export default function ServicesPage() {
   const t = useTranslations('pages.admin.services');
   const tFields = useTranslations('common.fields');
   const tTable = useTranslations('common.table');
+  const invalidateReference = useInvalidateReferenceData();
+  const onAfterMutate = useCallback(() => {
+    void invalidateReference.incidentServices();
+  }, [invalidateReference]);
 
   const columns = useMemo((): ColumnDef<ServiceAdminItem>[] => [
     {
@@ -53,6 +58,7 @@ export default function ServicesPage() {
         item.name.toLowerCase().includes(q) ||
         (item.description?.toLowerCase().includes(q) ?? false)
       }
+      onAfterMutate={onAfterMutate}
     />
   );
 }

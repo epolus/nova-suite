@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { attachments as attachmentsApi, cmdb, problems as problemsApi } from '@/api/client';
 import type { AssignmentGroupItem, Attachment, CI, KnownError, Problem, ProblemIncidentLink, ProblemTask } from '@/api/client';
-import { useProblem, useInvalidateProblems } from '@/hooks/queries';
+import { useProblem, useInvalidateProblems, useInvalidateReferenceData } from '@/hooks/queries';
 
 export const EMPTY_PROBLEM_FORM = {
   title: '',
@@ -31,6 +31,7 @@ export function useProblemDetail() {
   );
   const isNew = id === 'new';
   const invalidateProblems = useInvalidateProblems();
+  const invalidateReference = useInvalidateReferenceData();
 
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_PROBLEM_FORM);
@@ -143,12 +144,14 @@ export function useProblemDetail() {
 
       if (isNew || !id) {
         const created = await problemsApi.create(payload);
+        invalidateReference.problemPicker();
         navigate(`/problems/${created.id}`, { replace: true, state: { listParams } });
       } else {
         await problemsApi.update(id, payload);
         await refetchProblem();
         await loadReferenceData();
         invalidateProblems();
+        invalidateReference.problemPicker();
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save problem');

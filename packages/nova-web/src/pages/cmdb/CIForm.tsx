@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { cmdb, auth, admin } from '../../api/client';
 import type { CI, CIClass, AssignmentGroupItem, LocationItem } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { useInvalidateReferenceData } from '../../hooks/queries';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
@@ -22,6 +23,7 @@ export default function CIForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const invalidateReference = useInvalidateReferenceData();
   const isEdit = !!id;
   const tCmdb = useTranslations('pages.cmdb');
   const tActions = useTranslations('common.actions');
@@ -169,6 +171,7 @@ export default function CIForm() {
       } else {
         saved = await cmdb.createItem(payload as Partial<CI>);
       }
+      invalidateReference.cmdbItems();
       navigate(`/cmdb/${saved.id}`);
     } catch (err: any) {
       setError(err?.message || String(err));

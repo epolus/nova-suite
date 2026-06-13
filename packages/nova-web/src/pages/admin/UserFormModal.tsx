@@ -9,6 +9,7 @@ import {
   type CostCenterItem,
   type CompanyItem,
 } from '../../api/client';
+import { useInvalidateReferenceData } from '../../hooks/queries';
 import UserFormModalFields from './UserFormModalFields';
 import { buildDisplayName, toDateOnly } from './userFormHelpers';
 
@@ -33,6 +34,7 @@ export default function UserFormModal({
 }: Props) {
   const t = useTranslations('pages.admin.userDetail');
   const tActions = useTranslations('common.actions');
+  const invalidateReference = useInvalidateReferenceData();
 
   const isNew = !user;
 
@@ -149,6 +151,7 @@ export default function UserFormModal({
           role_ids: form.role_ids,
         });
       }
+      invalidateReference.users();
       onSaved();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('errorOccurred'));
@@ -163,6 +166,7 @@ export default function UserFormModal({
     setError('');
     try {
       await admin.deleteUser(user.id);
+      invalidateReference.users();
       if (onDelete) {
         onDelete(user.id);
       } else {

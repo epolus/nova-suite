@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslations } from 'use-intl';
 import { problems as problemsApi } from '../../api/client';
 import type { Problem } from '../../api/client';
-import { useProblemsList, useInvalidateProblems } from '@/hooks/queries';
+import { useProblemsList, useInvalidateProblems, useInvalidateReferenceData } from '@/hooks/queries';
 import PageHeader from '../../components/PageHeader';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
@@ -94,6 +94,7 @@ export default function ProblemsPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const invalidateProblems = useInvalidateProblems();
+  const invalidateReference = useInvalidateReferenceData();
   const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
     `presets:${PRESETS_KEY}`,
     [],
@@ -177,6 +178,7 @@ export default function ProblemsPage() {
       setSelectedIds([]);
       setConfirmClose(false);
       invalidateProblems();
+      invalidateReference.problemPicker();
     } finally {
       setBulkLoading(false);
     }

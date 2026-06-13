@@ -1,34 +1,11 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslations } from 'use-intl';
-import { majorIncidents as majorIncidentsApi } from '../api/client';
+import { useMajorIncidentsActiveBanner } from '../hooks/queries';
 
 export default function MajorIncidentBanner() {
   const t = useTranslations('components.majorIncidentBanner');
-  const [items, setItems] = useState<Array<{ id: string; number: string; title: string; status: string; priority: number }>>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const { items: rows } = await majorIncidentsApi.activeBanner();
-        if (!cancelled) {
-          setItems(
-            (rows as Array<{ id: string; number: string; title: string; status: string; priority: number }>).filter(Boolean),
-          );
-        }
-      } catch {
-        if (!cancelled) setItems([]);
-      }
-    };
-    void load();
-    const timer = setInterval(load, 60_000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
+  const { data: items = [] } = useMajorIncidentsActiveBanner();
 
   if (items.length === 0) return null;
 

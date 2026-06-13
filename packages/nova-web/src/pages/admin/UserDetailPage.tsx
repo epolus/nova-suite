@@ -10,6 +10,7 @@ import {
   type CostCenterItem,
   type CompanyItem,
 } from '../../api/client';
+import { useInvalidateReferenceData } from '../../hooks/queries';
 import PageHeader from '../../components/PageHeader';
 import Spinner from '../../components/Spinner';
 import UserDetailForm from './UserDetailForm';
@@ -30,6 +31,7 @@ export default function UserDetailPage() {
   const isNew = !id || id === 'new';
   const navigate = useNavigate();
   const location = useLocation();
+  const invalidateReference = useInvalidateReferenceData();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<RoleItem[]>([]);
@@ -234,6 +236,7 @@ export default function UserDetailPage() {
           role_ids: form.role_ids,
         });
         await loadData();
+        invalidateReference.users();
         navigate('/admin/users');
       } else if (currentUser) {
         await admin.updateUser(currentUser.id, {
@@ -262,6 +265,7 @@ export default function UserDetailPage() {
           role_ids: form.role_ids,
         });
         await loadData();
+        invalidateReference.users();
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('errorOccurred'));
@@ -278,6 +282,7 @@ export default function UserDetailPage() {
     setError('');
     try {
       await admin.deleteUser(currentUser.id);
+      invalidateReference.users();
       navigate('/admin/users');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('errorOccurred'));

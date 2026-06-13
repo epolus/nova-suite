@@ -25,6 +25,7 @@ interface MasterDataPageProps<T extends { id: string; is_active: boolean }> {
   updateItem: (id: string, data: Record<string, unknown>) => Promise<unknown>;
   getDefaults: (item: T | null) => Record<string, string>;
   searchFilter: (item: T, query: string) => boolean;
+  onAfterMutate?: () => void;
 }
 
 export default function MasterDataPage<T extends { id: string; is_active: boolean }>({
@@ -39,6 +40,7 @@ export default function MasterDataPage<T extends { id: string; is_active: boolea
   updateItem,
   getDefaults,
   searchFilter,
+  onAfterMutate,
 }: MasterDataPageProps<T>) {
   const navigate = useNavigate();
   const tMaster = useTranslations('common.masterData');
@@ -278,6 +280,7 @@ export default function MasterDataPage<T extends { id: string; is_active: boolea
           nextItemId={navInfo.next}
           onClose={() => setModalItem(null)}
           onSaved={handleSaved}
+          onAfterMutate={onAfterMutate}
           entityLabel={entityLabel}
         />
       )}

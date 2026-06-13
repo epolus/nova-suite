@@ -40,6 +40,15 @@ export function useIncidentAssignmentGroups() {
   });
 }
 
+export function useIncidentLinkedProblems(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.incidents.linkedProblems(id ?? ''),
+    queryFn: () => incidentsApi.linkedProblems(id!).then((r) => r.problems),
+    enabled: !!id && enabled,
+    staleTime: 30_000,
+  });
+}
+
 export function useInvalidateIncidents() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: queryKeys.incidents.all });

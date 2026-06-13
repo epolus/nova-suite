@@ -14,6 +14,7 @@ interface FormModalProps<T extends { id: string; is_active: boolean }> {
   nextItemId?: string | null;
   onClose: () => void;
   onSaved: () => void;
+  onAfterMutate?: () => void;
   entityLabel: string;
 }
 
@@ -28,6 +29,7 @@ export default function MasterDataFormModal<T extends { id: string; is_active: b
   nextItemId,
   onClose,
   onSaved,
+  onAfterMutate,
   entityLabel,
 }: FormModalProps<T>) {
   const tMaster = useTranslations('common.masterData');
@@ -62,6 +64,7 @@ export default function MasterDataFormModal<T extends { id: string; is_active: b
       } else {
         await updateItem(item.id, { ...form, is_active: isActive });
       }
+      onAfterMutate?.();
       onSaved();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : tErrors('generic'));

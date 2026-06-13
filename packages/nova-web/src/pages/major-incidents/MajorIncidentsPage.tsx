@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
@@ -7,7 +7,7 @@ import SearchBar from '../../components/SearchBar';
 import DataTable, { type DataColumnDef } from '../../components/DataTable';
 import Spinner from '../../components/Spinner';
 import Badge from '../../components/Badge';
-import { majorIncidents as majorIncidentsApi } from '../../api/client';
+import { useMajorIncidentsList } from '../../hooks/queries';
 import { useListParams } from '../../hooks/useListParams';
 import { formatDate } from '../../utils/dateTime';
 import { useStatusLabel } from '@/i18n/hooks';
@@ -135,14 +135,31 @@ export default function MajorIncidentsPage() {
     storageKey: 'major_incidents',
   });
 
-  const [data, setData] = useState<MajorIncidentListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState('');
   const navigate = useNavigate();
 
   const rawStatusFilter = params.filters.status || '';
   const statusFilter = rawStatusFilter || 'active';
+
+  const apiParams = useMemo(
+    () =>
+      createMajorIncidentListParams({
+        statusFilter,
+        search: params.search,
+        sort: params.sort,
+        dir: params.dir,
+      }),
+    [statusFilter, params.search, params.sort, params.dir],
+  );
+
+  const { data: listResult, isLoading: loading, error: listError } = useMajorIncidentsList(
+    apiParams,
+    params.page,
+    20,
+  );
+
+  const data = (listResult?.major_incidents ?? []) as unknown as MajorIncidentListItem[];
+  const total = listResult?.total ?? 0;
+  const err = listError instanceof Error ? listError.message : listError ? t('loadFailed') : '';
 
   const getListParams = useCallback((): Record<string, string> => {
     return createMajorIncidentListParams({
@@ -157,34 +174,6 @@ export default function MajorIncidentsPage() {
     () => buildColumns(getListParams(), tFields, tTable),
     [getListParams, tFields, tTable],
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    const apiParams = createMajorIncidentListParams({
-      statusFilter,
-      search: params.search,
-      sort: params.sort,
-      dir: params.dir,
-    });
-    majorIncidentsApi
-      .list(apiParams, params.page, 20)
-      .then((res) => {
-        if (cancelled) return;
-        setData(res.major_incidents as unknown as MajorIncidentListItem[]);
-        setTotal(res.total);
-        setErr('');
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setErr(e instanceof Error ? e.message : t('loadFailed'));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [params.page, statusFilter, params.search, params.sort, params.dir, t]);
 
   const pages = Math.max(1, Math.ceil(total / 20));
 
