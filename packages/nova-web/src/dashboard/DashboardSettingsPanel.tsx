@@ -1,18 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useTranslations } from 'use-intl';
 import { Button } from '@/components/ui/button';
+import { autoRefreshOptionLabel } from './autoRefreshLabels';
 import { DASHBOARD_AUTO_REFRESH_OPTIONS } from './constants';
-
-export function autoRefreshOptionLabel(
-  seconds: number,
-  t: ReturnType<typeof useTranslations<'pages.dashboard.customize'>>,
-): string {
-  if (seconds === 0) return t('autoRefreshOff');
-  if (seconds === 60) return t('autoRefresh1m');
-  if (seconds === 300) return t('autoRefresh5m');
-  if (seconds === 900) return t('autoRefresh15m');
-  return `${seconds}s`;
-}
 
 interface Props {
   open: boolean;
@@ -65,7 +55,7 @@ export default function DashboardSettingsPanel({
             >
               {DASHBOARD_AUTO_REFRESH_OPTIONS.map((seconds) => (
                 <option key={seconds} value={seconds}>
-                  {autoRefreshOptionLabel(seconds, t)}
+                  {autoRefreshOptionLabel(seconds, (key) => t(key))}
                 </option>
               ))}
             </select>
