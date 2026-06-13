@@ -54,8 +54,9 @@ export function useIncidentDetail() {
 
   // Edit fields — all grouped
   const [fields, setFields] = useState(EMPTY_FIELDS);
-  const setField = <K extends keyof typeof EMPTY_FIELDS>(key: K, val: string) =>
+  const setField = useCallback((key: keyof typeof EMPTY_FIELDS, val: string) => {
     setFields((prev) => ({ ...prev, [key]: val }));
+  }, []);
 
   // UI state
   const [saving, setSaving] = useState(false);
@@ -133,7 +134,7 @@ export function useIncidentDetail() {
     setLinkedProblemIds(linkedIds);
     setField('relatedProblemId', linkedIds[0] || '');
     void loadJournal(id);
-  }, [id, loadJournal, syncFields]);
+  }, [id, loadJournal, syncFields, setField]);
 
   const withSave = useCallback(async (fn: () => Promise<void>) => {
     setSaving(true);

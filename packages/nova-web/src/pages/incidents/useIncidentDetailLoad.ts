@@ -194,24 +194,8 @@ export function useIncidentDetailLoad({
     return () => {
       cancelled = true;
     };
-  }, [
-    id,
-    isFulfiller,
-    listParams,
-    syncFields,
-    setField,
-    setLoading,
-    setLoadError,
-    setInc,
-    setJournal,
-    setJournalLoading,
-    setPrevId,
-    setNextId,
-    setAssignmentGroups,
-    setServices,
-    setCiOptions,
-    setUsers,
-    setProblemOptions,
-    setLinkedProblemIds,
-  ]);
+    // setField/syncFields/setState dispatchers are intentionally omitted — setField was unstable
+    // and including it re-runs this effect every render, flooding the API.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load only when route/filter context changes
+  }, [id, isFulfiller, listParams]);
 }
