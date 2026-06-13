@@ -230,6 +230,90 @@
         "changes": "Änderungen",
         "requests": "Anfragen",
         "myQueue": "Meine Warteschlange"
+      },
+      "stats": {
+        "openIncidents": "Offene Vorfälle",
+        "slaBreached": "SLA verletzt",
+        "openChanges": "Offene Änderungen",
+        "openRequests": "Offene Anfragen",
+        "assignedToMe": "Mir zugewiesen",
+        "assignedHint": "Ohne gelöste, geschlossene, stornierte"
+      },
+      "majorIncidents": {
+        "activeTitle": "Aktive schwerwiegende Vorfälle",
+        "viewAll": "Alle anzeigen"
+      },
+      "priority": {
+        "title": "Offene Vorfälle nach Priorität"
+      },
+      "queue": {
+        "title": "Meine Warteschlange",
+        "empty": "Keine Ihnen zugewiesenen Vorfälle",
+        "slaBreached": "SLA VERLETZT",
+        "due": "fällig {date}"
+      },
+      "changesPending": {
+        "title": "Änderungen zur Genehmigung",
+        "empty": "Keine ausstehenden Änderungen",
+        "risk": "{level} Risiko"
+      },
+      "recentRequests": {
+        "title": "Aktuelle Anfragen",
+        "empty": "Noch keine Anfragen",
+        "browseCatalog": "Servicekatalog durchsuchen →",
+        "newFromCatalog": "+ Neue Anfrage aus Katalog"
+      },
+      "viewAll": "Alle anzeigen",
+      "customize": {
+        "editLayout": "Anpassen",
+        "doneEditing": "Fertig",
+        "editHint": "Widgets am Kopfbalken ziehen, an de Ecke skaliere oder Panels hinzufüge und entferne. Fertig klicke, wenn du fertig bisch.",
+        "settingsTitle": "Dashboard-Einstellungen",
+        "autoRefresh": "Auto-Aktualisierung",
+        "autoRefreshHint": "Wie oft Widget-Date automatisch aktualisiert werded.",
+        "autoRefreshOff": "Aus",
+        "autoRefresh1m": "1 Min.",
+        "autoRefresh5m": "5 Min.",
+        "autoRefresh15m": "15 Min.",
+        "layoutSection": "Layout",
+        "layoutSectionHint": "Widgets aordne oder Standard-Dashboard wiederherstelle.",
+        "addWidget": "Widget hinzufügen",
+        "removeWidget": "Entfernen",
+        "resetLayout": "Layout zurücksetzen",
+        "resetLayoutConfirm": "Standard-Dashboard wiederherstellen? Ihre aktuelle Anordnung wird ersetzt.",
+        "emptyDashboard": "Ihr Dashboard ist leer. Fügen Sie Widgets hinzu, um die Kennzahlen und Listen zu sehen, die Sie interessieren.",
+        "addFirstWidget": "Erstes Widget hinzufügen",
+        "closePanel": "Schließen",
+        "add": "Hinzufügen",
+        "alreadyAdded": "Hinzugefügt",
+        "listLimit": "Anzahl Zeilen",
+        "noActiveMajorIncidents": "Keine aktiven schwerwiegenden Vorfälle",
+        "categories": {
+          "stats": "Statistiken",
+          "lists": "Listen",
+          "alerts": "Warnungen",
+          "breakdown": "Aufschlüsselungen"
+        },
+        "widgets": {
+          "stat": {
+            "open_incidents": "Offene Vorfälle",
+            "sla_breached": "SLA verletzt",
+            "open_changes": "Offene Änderungen",
+            "open_requests": "Offene Anfragen",
+            "assigned_to_me": "Mir zugewiesen"
+          },
+          "alert": {
+            "major_incidents": "Aktive schwerwiegende Vorfälle"
+          },
+          "breakdown": {
+            "incident_priority": "Vorfälle nach Priorität"
+          },
+          "list": {
+            "my_queue": "Meine Warteschlange",
+            "changes_pending": "Änderungen zur Genehmigung",
+            "recent_requests": "Aktuelle Anfragen"
+          }
+        }
       }
     },
     "incidents": {

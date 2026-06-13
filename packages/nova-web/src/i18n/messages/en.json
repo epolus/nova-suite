@@ -400,8 +400,7 @@
         "viewAll": "View all"
       },
       "priority": {
-        "title": "Open Incidents by Priority",
-        "clickToFilter": "— click to filter"
+        "title": "Open Incidents by Priority"
       },
       "queue": {
         "title": "My Queue",
@@ -420,7 +419,58 @@
         "browseCatalog": "Browse the service catalog →",
         "newFromCatalog": "+ New request from catalog"
       },
-      "viewAll": "View all"
+      "viewAll": "View all",
+      "customize": {
+        "editLayout": "Customize",
+        "doneEditing": "Done",
+        "editHint": "Drag widgets by their header bar, resize from corners, or add and remove panels. Click Done when finished.",
+        "settingsTitle": "Dashboard settings",
+        "autoRefresh": "Auto-refresh",
+        "autoRefreshHint": "How often widget data is refreshed automatically.",
+        "autoRefreshOff": "Off",
+        "autoRefresh1m": "1 min",
+        "autoRefresh5m": "5 min",
+        "autoRefresh15m": "15 min",
+        "layoutSection": "Layout",
+        "layoutSectionHint": "Rearrange widgets or restore the default dashboard.",
+        "addWidget": "Add widget",
+        "removeWidget": "Remove",
+        "resetLayout": "Reset layout",
+        "resetLayoutConfirm": "Restore the default dashboard layout? Your current arrangement will be replaced.",
+        "emptyDashboard": "Your dashboard is empty. Add widgets to see the metrics and lists you care about.",
+        "addFirstWidget": "Add your first widget",
+        "closePanel": "Close",
+        "add": "Add",
+        "alreadyAdded": "Added",
+        "listLimit": "Rows to show",
+        "noActiveMajorIncidents": "No active major incidents",
+        "categories": {
+          "stats": "Statistics",
+          "lists": "Lists",
+          "alerts": "Alerts",
+          "breakdown": "Breakdowns"
+        },
+        "widgets": {
+          "stat": {
+            "open_incidents": "Open incidents",
+            "sla_breached": "SLA breached",
+            "open_changes": "Open changes",
+            "open_requests": "Open requests",
+            "assigned_to_me": "Assigned to me"
+          },
+          "alert": {
+            "major_incidents": "Active major incidents"
+          },
+          "breakdown": {
+            "incident_priority": "Incidents by priority"
+          },
+          "list": {
+            "my_queue": "My queue",
+            "changes_pending": "Changes pending approval",
+            "recent_requests": "Recent requests"
+          }
+        }
+      }
     },
     "incidents": {
       "title": "Incidents",

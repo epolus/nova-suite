@@ -230,6 +230,90 @@
         "changes": "Cambiamenti",
         "requests": "Richieste",
         "myQueue": "La mia coda"
+      },
+      "stats": {
+        "openIncidents": "Incidenti aperti",
+        "slaBreached": "SLA violato",
+        "openChanges": "Cambiamenti aperti",
+        "openRequests": "Richieste aperte",
+        "assignedToMe": "Assegnati a me",
+        "assignedHint": "Esclusi risolti, chiusi, annullati"
+      },
+      "majorIncidents": {
+        "activeTitle": "Incidenti maggiori attivi",
+        "viewAll": "Vedi tutti"
+      },
+      "priority": {
+        "title": "Incidenti aperti per priorità"
+      },
+      "queue": {
+        "title": "La mia coda",
+        "empty": "Nessun incidente assegnato",
+        "slaBreached": "SLA VIOLATO",
+        "due": "scadenza {date}"
+      },
+      "changesPending": {
+        "title": "Cambiamenti in attesa di approvazione",
+        "empty": "Nessun cambiamento in attesa",
+        "risk": "rischio {level}"
+      },
+      "recentRequests": {
+        "title": "Richieste recenti",
+        "empty": "Nessuna richiesta",
+        "browseCatalog": "Sfoglia il catalogo →",
+        "newFromCatalog": "+ Nuova richiesta dal catalogo"
+      },
+      "viewAll": "Vedi tutti",
+      "customize": {
+        "editLayout": "Personalizza",
+        "doneEditing": "Fine",
+        "editHint": "Trascina i widget dalla barra del titolo, ridimensiona dagli angoli o aggiungi e rimuovi pannelli. Clicca Fine quando hai finito.",
+        "settingsTitle": "Impostazioni dashboard",
+        "autoRefresh": "Aggiornamento auto",
+        "autoRefreshHint": "Frequenza di aggiornamento automatico dei widget.",
+        "autoRefreshOff": "Off",
+        "autoRefresh1m": "1 min",
+        "autoRefresh5m": "5 min",
+        "autoRefresh15m": "15 min",
+        "layoutSection": "Layout",
+        "layoutSectionHint": "Riordina i widget o ripristina la dashboard predefinita.",
+        "addWidget": "Aggiungi widget",
+        "removeWidget": "Rimuovi",
+        "resetLayout": "Ripristina layout",
+        "resetLayoutConfirm": "Ripristinare il layout predefinito? La disposizione attuale verrà sostituita.",
+        "emptyDashboard": "La dashboard è vuota. Aggiungi widget per vedere metriche e liste di tuo interesse.",
+        "addFirstWidget": "Aggiungi il primo widget",
+        "closePanel": "Chiudi",
+        "add": "Aggiungi",
+        "alreadyAdded": "Aggiunto",
+        "listLimit": "Righe da mostrare",
+        "noActiveMajorIncidents": "Nessun incidente maggiore attivo",
+        "categories": {
+          "stats": "Statistiche",
+          "lists": "Liste",
+          "alerts": "Avvisi",
+          "breakdown": "Ripartizioni"
+        },
+        "widgets": {
+          "stat": {
+            "open_incidents": "Incidenti aperti",
+            "sla_breached": "SLA violato",
+            "open_changes": "Cambiamenti aperti",
+            "open_requests": "Richieste aperte",
+            "assigned_to_me": "Assegnati a me"
+          },
+          "alert": {
+            "major_incidents": "Incidenti maggiori attivi"
+          },
+          "breakdown": {
+            "incident_priority": "Incidenti per priorità"
+          },
+          "list": {
+            "my_queue": "La mia coda",
+            "changes_pending": "Cambiamenti in attesa",
+            "recent_requests": "Richieste recenti"
+          }
+        }
       }
     },
     "incidents": {

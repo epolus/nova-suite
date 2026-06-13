@@ -230,6 +230,90 @@
         "changes": "Changements",
         "requests": "Demandes",
         "myQueue": "Ma file d'attente"
+      },
+      "stats": {
+        "openIncidents": "Incidents ouverts",
+        "slaBreached": "SLA dépassé",
+        "openChanges": "Changements ouverts",
+        "openRequests": "Demandes ouvertes",
+        "assignedToMe": "Assignés à moi",
+        "assignedHint": "Hors résolus, fermés, annulés"
+      },
+      "majorIncidents": {
+        "activeTitle": "Incidents majeurs actifs",
+        "viewAll": "Tout voir"
+      },
+      "priority": {
+        "title": "Incidents ouverts par priorité"
+      },
+      "queue": {
+        "title": "Ma file d'attente",
+        "empty": "Aucun incident assigné",
+        "slaBreached": "SLA DÉPASSÉ",
+        "due": "échéance {date}"
+      },
+      "changesPending": {
+        "title": "Changements en attente d'approbation",
+        "empty": "Aucun changement en attente",
+        "risk": "risque {level}"
+      },
+      "recentRequests": {
+        "title": "Demandes récentes",
+        "empty": "Aucune demande",
+        "browseCatalog": "Parcourir le catalogue →",
+        "newFromCatalog": "+ Nouvelle demande depuis le catalogue"
+      },
+      "viewAll": "Tout voir",
+      "customize": {
+        "editLayout": "Personnaliser",
+        "doneEditing": "Terminé",
+        "editHint": "Faites glisser les widgets par leur en-tête, redimensionnez-les aux coins, ou ajoutez et supprimez des panneaux. Cliquez sur Terminé quand vous avez fini.",
+        "settingsTitle": "Paramètres du tableau de bord",
+        "autoRefresh": "Actualisation auto",
+        "autoRefreshHint": "Fréquence de rafraîchissement automatique des widgets.",
+        "autoRefreshOff": "Désactivé",
+        "autoRefresh1m": "1 min",
+        "autoRefresh5m": "5 min",
+        "autoRefresh15m": "15 min",
+        "layoutSection": "Disposition",
+        "layoutSectionHint": "Réorganiser les widgets ou restaurer la disposition par défaut.",
+        "addWidget": "Ajouter un widget",
+        "removeWidget": "Supprimer",
+        "resetLayout": "Réinitialiser la disposition",
+        "resetLayoutConfirm": "Restaurer la disposition par défaut ? Votre arrangement actuel sera remplacé.",
+        "emptyDashboard": "Votre tableau de bord est vide. Ajoutez des widgets pour voir les indicateurs et listes qui vous intéressent.",
+        "addFirstWidget": "Ajouter votre premier widget",
+        "closePanel": "Fermer",
+        "add": "Ajouter",
+        "alreadyAdded": "Ajouté",
+        "listLimit": "Lignes à afficher",
+        "noActiveMajorIncidents": "Aucun incident majeur actif",
+        "categories": {
+          "stats": "Statistiques",
+          "lists": "Listes",
+          "alerts": "Alertes",
+          "breakdown": "Répartitions"
+        },
+        "widgets": {
+          "stat": {
+            "open_incidents": "Incidents ouverts",
+            "sla_breached": "SLA dépassé",
+            "open_changes": "Changements ouverts",
+            "open_requests": "Demandes ouvertes",
+            "assigned_to_me": "Assignés à moi"
+          },
+          "alert": {
+            "major_incidents": "Incidents majeurs actifs"
+          },
+          "breakdown": {
+            "incident_priority": "Incidents par priorité"
+          },
+          "list": {
+            "my_queue": "Ma file d'attente",
+            "changes_pending": "Changements en attente",
+            "recent_requests": "Demandes récentes"
+          }
+        }
       }
     },
     "incidents": {
