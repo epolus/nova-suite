@@ -270,6 +270,28 @@ CREATE INDEX idx_user_preferences_scope ON user_preferences(tenant_id, scope);
 CREATE INDEX idx_user_preferences_value_gin ON user_preferences USING gin (value);
 
 -- ============================================================
+-- USER DASHBOARDS
+-- ============================================================
+CREATE TABLE user_dashboards (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name        text NOT NULL CHECK (char_length(trim(name)) > 0 AND char_length(name) <= 80),
+  layout      jsonb NOT NULL DEFAULT '{"version":1,"widgets":[]}'::jsonb,
+  is_default  boolean NOT NULL DEFAULT false,
+  sort_order  integer NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, user_id, name)
+);
+
+CREATE UNIQUE INDEX idx_user_dashboards_default
+  ON user_dashboards (tenant_id, user_id)
+  WHERE is_default = true;
+
+CREATE INDEX idx_user_dashboards_tenant_user ON user_dashboards(tenant_id, user_id);
+
+-- ============================================================
 -- USER ROLES
 -- ============================================================
 CREATE TABLE user_roles (
@@ -954,7 +976,8 @@ CREATE TABLE schema_migrations (
 );
 
 INSERT INTO schema_migrations (version, name) VALUES
-  ('v00.01.00', '001_initial_schema');
+  ('v00.01.00', '001_initial_schema'),
+  ('v00.02.00', '002_user_dashboards');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -974,7 +997,7 @@ BEGIN
   FOR tbl IN
     SELECT unnest(ARRAY[
       'tenants', 'departments', 'cost_centers', 'roles', 'processes',
-      'users', 'companies', 'locations', 'user_preferences', 'assignment_groups', 'services',
+      'users', 'companies', 'locations', 'user_preferences', 'user_dashboards', 'assignment_groups', 'services',
       'service_categories', 'service_items',
       'requests', 'workflow_start_jobs', 'ai_conversations', 'incidents', 'major_incidents', 'postmortems', 'ci_classes', 'configuration_items'
     ])

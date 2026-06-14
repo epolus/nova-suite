@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 
 export const DASHBOARD_PREFERENCE_SCOPE = 'ui:dashboard';
+export const DASHBOARD_ACTIVE_ID_SCOPE = 'ui:dashboard_active_id';
 export const DASHBOARD_LEGACY_STORAGE_KEY = 'nova_dashboard_layout';
+export const MAX_USER_DASHBOARDS = 10;
 export const MAX_DASHBOARD_WIDGETS = 30;
 export const DASHBOARD_ROW_HEIGHT = 48;
 export const DASHBOARD_COLS = 12;

@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { Layout, LayoutItem } from 'react-grid-layout';
 import { hasAnyRole } from '@/utils/roles';
+import { createStableId } from '@/utils/id';
 import { MAX_DASHBOARD_WIDGETS } from './constants';
 import { getWidgetDefinition, isKnownWidgetType } from './registry';
 import type { DashboardLayout, DashboardWidgetInstance, DashboardWidgetType } from './types';
 
 export function createWidgetId(): string {
-  return crypto.randomUUID();
+  return createStableId('widget');
 }
 
 export function defaultWidgetId(type: DashboardWidgetType): string {

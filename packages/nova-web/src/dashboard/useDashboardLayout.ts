@@ -1,11 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useUserPreferenceState } from '@/hooks/useUserPreferenceState';
 import { buildDefaultDashboardLayout } from './defaults';
 import {
-  DASHBOARD_LEGACY_STORAGE_KEY,
   DASHBOARD_LAYOUT_SAVE_DEBOUNCE_MS,
-  DASHBOARD_PREFERENCE_SCOPE,
   MAX_DASHBOARD_WIDGETS,
 } from './constants';
 import {
@@ -18,36 +15,67 @@ import {
 import type { Layout } from 'react-grid-layout';
 import type { DashboardLayout, DashboardWidgetType } from './types';
 
-export function useDashboardLayout(roles: string[] | undefined) {
+interface Options {
+  dashboardId: string | null;
+  roles: string[] | undefined;
+  serverLayout: DashboardLayout | undefined;
+  isLayoutLoading: boolean;
+  onSaveLayout: (layout: DashboardLayout) => void;
+}
+
+export function useDashboardLayout({
+  dashboardId,
+  roles,
+  serverLayout,
+  isLayoutLoading,
+  onSaveLayout,
+}: Options) {
   const defaultLayout = useMemo(() => buildDefaultDashboardLayout(roles), [roles]);
-  const [savedLayout, setSavedLayout] = useUserPreferenceState<DashboardLayout>(
-    DASHBOARD_PREFERENCE_SCOPE,
-    defaultLayout,
-    DASHBOARD_LEGACY_STORAGE_KEY,
+
+  const sanitizedServerLayout = useMemo(
+    () => (serverLayout ? sanitizeDashboardLayout(serverLayout, roles) : undefined),
+    [serverLayout, roles],
   );
 
-  const sanitizedSaved = useMemo(
-    () => sanitizeDashboardLayout(savedLayout, roles),
-    [savedLayout, roles],
-  );
-
-  const [layout, setLayout] = useState<DashboardLayout>(sanitizedSaved);
+  const [layout, setLayout] = useState<DashboardLayout>(defaultLayout);
   const [editMode, setEditMode] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingRef = useRef(false);
+  const loadedDashboardIdRef = useRef<string | null>(null);
+  const onSaveLayoutRef = useRef(onSaveLayout);
+  const dashboardIdRef = useRef(dashboardId);
+  onSaveLayoutRef.current = onSaveLayout;
+  dashboardIdRef.current = dashboardId;
 
   useEffect(() => {
-    if (!isDraggingRef.current) {
-      setLayout(sanitizedSaved);
+    if (isLayoutLoading || !dashboardId || !sanitizedServerLayout) return;
+    if (loadedDashboardIdRef.current === dashboardId) return;
+
+    loadedDashboardIdRef.current = dashboardId;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
     }
-  }, [sanitizedSaved]);
+    isDraggingRef.current = false;
+    setEditMode(false);
+    setLayout(sanitizedServerLayout);
+  }, [dashboardId, isLayoutLoading, sanitizedServerLayout]);
+
+  useEffect(() => {
+    if (isLayoutLoading || !dashboardId || !sanitizedServerLayout) return;
+    if (editMode || isDraggingRef.current) return;
+    setLayout(sanitizedServerLayout);
+  }, [dashboardId, editMode, isLayoutLoading, sanitizedServerLayout]);
 
   const persistLayout = useCallback((next: DashboardLayout) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    const saveForDashboardId = dashboardIdRef.current;
     debounceRef.current = setTimeout(() => {
-      setSavedLayout(next);
+      if (saveForDashboardId === dashboardIdRef.current) {
+        onSaveLayoutRef.current(next);
+      }
     }, DASHBOARD_LAYOUT_SAVE_DEBOUNCE_MS);
-  }, [setSavedLayout]);
+  }, []);
 
   const updateLayout = useCallback((next: DashboardLayout) => {
     const sanitized = sanitizeDashboardLayout(next, roles);
@@ -101,8 +129,9 @@ export function useDashboardLayout(roles: string[] | undefined) {
   const resetLayout = useCallback(() => {
     const next = sanitizeDashboardLayout(defaultLayout, roles);
     setLayout(next);
-    setSavedLayout(next);
-  }, [defaultLayout, roles, setSavedLayout]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    onSaveLayoutRef.current(next);
+  }, [defaultLayout, roles]);
 
   useEffect(() => () => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

@@ -10,6 +10,7 @@ ALTER TABLE cost_centers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_dashboards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE processes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
@@ -95,6 +96,13 @@ CREATE POLICY tenant_isolation_users ON users
 
 -- ─── User Preferences ───
 CREATE POLICY tenant_isolation_user_preferences ON user_preferences
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND user_id = current_user_id()
+  );
+
+-- ─── User Dashboards ───
+CREATE POLICY tenant_isolation_user_dashboards ON user_dashboards
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND user_id = current_user_id()
@@ -572,6 +580,7 @@ ALTER TABLE cost_centers FORCE ROW LEVEL SECURITY;
 ALTER TABLE roles FORCE ROW LEVEL SECURITY;
 ALTER TABLE users FORCE ROW LEVEL SECURITY;
 ALTER TABLE user_preferences FORCE ROW LEVEL SECURITY;
+ALTER TABLE user_dashboards FORCE ROW LEVEL SECURITY;
 ALTER TABLE user_roles FORCE ROW LEVEL SECURITY;
 ALTER TABLE processes FORCE ROW LEVEL SECURITY;
 ALTER TABLE companies FORCE ROW LEVEL SECURITY;
