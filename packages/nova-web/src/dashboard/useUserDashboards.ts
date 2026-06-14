@@ -9,6 +9,7 @@ import { DASHBOARD_ACTIVE_ID_SCOPE, MAX_USER_DASHBOARDS } from './constants';
 import type { DashboardLayout } from './types';
 
 const DASHBOARDS_QUERY_KEY = ['dashboards'] as const;
+const EMPTY_DASHBOARDS: UserDashboard[] = [];
 
 export function useUserDashboards(roles: string[] | undefined) {
   const queryClient = useQueryClient();
@@ -20,7 +21,10 @@ export function useUserDashboards(roles: string[] | undefined) {
     queryFn: () => dashboardsApi.list(),
   });
 
-  const dashboardsList = data?.dashboards ?? [];
+  const dashboardsList = useMemo(
+    () => data?.dashboards ?? EMPTY_DASHBOARDS,
+    [data?.dashboards],
+  );
 
   const effectiveActiveId = useMemo(() => {
     if (activeId && dashboardsList.some((d) => d.id === activeId)) return activeId;
