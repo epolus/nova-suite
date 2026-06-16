@@ -59,6 +59,7 @@ ALTER TABLE ai_audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE config_deployment_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_metrics_db_size_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE metric_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_exports ENABLE ROW LEVEL SECURITY;
@@ -455,6 +456,10 @@ CREATE POLICY tenant_isolation_audit_events ON audit_events
 CREATE POLICY tenant_isolation_system_metrics_db_size_snapshots ON system_metrics_db_size_snapshots
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Metric Snapshots ───
+CREATE POLICY tenant_isolation_metric_snapshots ON metric_snapshots
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Assets ───
 CREATE POLICY tenant_isolation_assets ON assets
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -629,6 +634,7 @@ ALTER TABLE ai_audit_log FORCE ROW LEVEL SECURITY;
 ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE config_deployment_runs FORCE ROW LEVEL SECURITY;
 ALTER TABLE system_metrics_db_size_snapshots FORCE ROW LEVEL SECURITY;
+ALTER TABLE metric_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE assets FORCE ROW LEVEL SECURITY;
 ALTER TABLE releases FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_exports FORCE ROW LEVEL SECURITY;

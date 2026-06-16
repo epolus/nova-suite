@@ -309,6 +309,30 @@ export async function startNotificationDispatch(params: {
 }
 
 /** Default: once daily at 02:00 UTC (same convention as data source sync default). */
+export async function startMetricSnapshotSchedule(cronSchedule = '0 2 * * *'): Promise<string> {
+  const workflowId = 'metric-snapshots-daily-schedule';
+  try {
+    const cl = await getClient();
+    const handle = await cl.workflow.start('metricSnapshotsDaily', {
+      taskQueue: TASK_QUEUE,
+      workflowId,
+      args: [],
+      cronSchedule,
+      workflowExecutionTimeout: '365 days',
+    });
+    logger.info({ workflowId: handle.workflowId, cronSchedule }, 'Started metric snapshot schedule workflow');
+    return handle.workflowId;
+  } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, cronSchedule }, 'Metric snapshot schedule workflow already running');
+      return workflowId;
+    }
+    logger.warn({ err, workflowId }, 'Failed to start metric snapshot schedule workflow');
+    throw err;
+  }
+}
+
+/** Default: once daily at 02:00 UTC (same convention as data source sync default). */
 export async function startDbSizeSnapshotSchedule(cronSchedule = '0 2 * * *'): Promise<string> {
   const workflowId = 'system-metrics-db-size-snapshot-schedule';
   try {

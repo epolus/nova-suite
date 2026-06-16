@@ -96,10 +96,10 @@ export function useDashboardLayout({
     isDraggingRef.current = false;
   }, []);
 
-  const addWidget = useCallback((type: DashboardWidgetType) => {
+  const addWidget = useCallback((type: DashboardWidgetType, initialConfig?: Record<string, unknown>) => {
     setLayout((prev) => {
       if (prev.widgets.length >= MAX_DASHBOARD_WIDGETS) return prev;
-      const instance = createWidgetInstance(type, prev.widgets);
+      const instance = createWidgetInstance(type, prev.widgets, initialConfig);
       if (!instance) return prev;
       const next = sanitizeDashboardLayout(
         { version: 1, widgets: [...prev.widgets, instance] },

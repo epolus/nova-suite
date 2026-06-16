@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import MajorIncidentBanner from '@/components/MajorIncidentBanner';
 import PageHeader from '@/components/PageHeader';
@@ -59,10 +59,9 @@ export default function Dashboard() {
   });
   const { autoRefreshSeconds, setAutoRefreshSeconds } = useDashboardAutoRefresh();
 
-  const existingTypes = useMemo(
-    () => new Set(layout.widgets.map((w) => w.type)),
-    [layout.widgets],
-  );
+  const handleAddWidget = (type: DashboardWidgetType, defaultConfig?: Record<string, unknown>) => {
+    addWidget(type, defaultConfig);
+  };
 
   const handleCustomizeDashboard = (dashboardId: string) => {
     if (dashboardId === activeId) {
@@ -159,9 +158,9 @@ export default function Dashboard() {
       <AddWidgetPanel
         open={addPanelOpen}
         roles={user?.roles}
-        existingTypes={existingTypes}
+        widgets={layout.widgets}
         onClose={() => setAddPanelOpen(false)}
-        onAdd={(type: DashboardWidgetType) => addWidget(type)}
+        onAdd={handleAddWidget}
       />
 
       <ConfirmDialog

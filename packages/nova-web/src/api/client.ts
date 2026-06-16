@@ -28,3 +28,4 @@ export { dataSources } from './domains/dataSources';
 export { ai } from './domains/ai';
 export { cart } from './domains/cart';
 export { dashboards } from './domains/dashboards';
+export { analytics } from './domains/analytics';

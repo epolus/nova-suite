@@ -7,3 +7,4 @@ export {
   useRecentRequests,
   useActiveMajorIncidents,
 } from './useRequestDashboard';
+export { useTrendCatalog, useTrendSeries } from './useTrendSeries';

@@ -51,3 +51,7 @@ export {
 export {
   snapshotDbSizeForAllTenants,
 } from './system-metrics-activities';
+
+export {
+  snapshotTrendMetricsForAllTenants,
+} from './analytics-snapshot-activities';

@@ -930,6 +930,21 @@ CREATE INDEX idx_system_metrics_db_size_snapshots_lookup
   ON system_metrics_db_size_snapshots(tenant_id, snapshot_at DESC);
 
 -- ============================================================
+-- METRIC SNAPSHOTS (dashboard trend backlog series)
+-- ============================================================
+CREATE TABLE metric_snapshots (
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  dataset      text NOT NULL,
+  metric       text NOT NULL,
+  snapshot_at  timestamptz NOT NULL,
+  value        numeric NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, dataset, metric, snapshot_at)
+);
+CREATE INDEX idx_metric_snapshots_lookup
+  ON metric_snapshots(tenant_id, dataset, metric, snapshot_at DESC);
+
+-- ============================================================
 -- AUDIT & OPERATIONAL
 -- ============================================================
 

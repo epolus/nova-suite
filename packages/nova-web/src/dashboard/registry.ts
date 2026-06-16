@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { lazy } from 'react';
 import { hasAnyRole } from '@/utils/roles';
-import type { DashboardWidgetDefinition, DashboardWidgetType } from './types';
+import type { DashboardWidgetCatalogEntry, DashboardWidgetDefinition, DashboardWidgetType } from './types';
 
 /**
  * Dashboard widget registry.
@@ -110,6 +110,70 @@ const WIDGET_DEFINITIONS: DashboardWidgetDefinition[] = [
     viewAllLink: '/requests?active=true',
     component: lazy(() => import('./widgets/RecentRequestsWidget')),
   },
+  {
+    type: 'trend.chart',
+    titleKey: 'widgets.trend.chart',
+    category: 'trends',
+    minW: 4, maxW: 12, minH: 3, maxH: 8,
+    defaultSize: { w: 6, h: 4 },
+    requiredRoles: ['admin', 'fulfiller'],
+    component: lazy(() => import('./widgets/TrendChartWidget')),
+  },
+];
+
+const TREND_CATALOG_PRESETS: DashboardWidgetCatalogEntry[] = [
+  {
+    catalogKey: 'trend.incidents_opened',
+    type: 'trend.chart',
+    titleKey: 'widgets.trend.incidents_opened',
+    category: 'trends',
+    defaultSize: { w: 6, h: 4 },
+    defaultConfig: { dataset: 'incidents', metric: 'opened', days: 30 },
+    requiredRoles: ['admin', 'fulfiller'],
+  },
+  {
+    catalogKey: 'trend.changes_opened',
+    type: 'trend.chart',
+    titleKey: 'widgets.trend.changes_opened',
+    category: 'trends',
+    defaultSize: { w: 6, h: 4 },
+    defaultConfig: { dataset: 'changes', metric: 'opened', days: 30 },
+    requiredRoles: ['admin', 'fulfiller', 'change_manager'],
+  },
+  {
+    catalogKey: 'trend.requests_opened',
+    type: 'trend.chart',
+    titleKey: 'widgets.trend.requests_opened',
+    category: 'trends',
+    defaultSize: { w: 6, h: 4 },
+    defaultConfig: { dataset: 'requests', metric: 'opened', days: 30 },
+  },
+  {
+    catalogKey: 'trend.incidents_open_backlog',
+    type: 'trend.chart',
+    titleKey: 'widgets.trend.incidents_open_backlog',
+    category: 'trends',
+    defaultSize: { w: 6, h: 4 },
+    defaultConfig: { dataset: 'incidents', metric: 'open_backlog', days: 30 },
+    requiredRoles: ['admin', 'fulfiller'],
+  },
+  {
+    catalogKey: 'trend.changes_open_backlog',
+    type: 'trend.chart',
+    titleKey: 'widgets.trend.changes_open_backlog',
+    category: 'trends',
+    defaultSize: { w: 6, h: 4 },
+    defaultConfig: { dataset: 'changes', metric: 'open_backlog', days: 30 },
+    requiredRoles: ['admin', 'fulfiller', 'change_manager'],
+  },
+  {
+    catalogKey: 'trend.requests_open_backlog',
+    type: 'trend.chart',
+    titleKey: 'widgets.trend.requests_open_backlog',
+    category: 'trends',
+    defaultSize: { w: 6, h: 4 },
+    defaultConfig: { dataset: 'requests', metric: 'open_backlog', days: 30 },
+  },
 ];
 
 const REGISTRY_MAP = new Map<DashboardWidgetType, DashboardWidgetDefinition>(
@@ -144,5 +208,44 @@ export function getWidgetsByCategory(
     lists: available.filter((w) => w.category === 'lists'),
     alerts: available.filter((w) => w.category === 'alerts'),
     breakdown: available.filter((w) => w.category === 'breakdown'),
+    trends: available.filter((w) => w.category === 'trends'),
+  };
+}
+
+function canAccessCatalogEntry(entry: DashboardWidgetCatalogEntry, roles: string[] | undefined): boolean {
+  if (!entry.requiredRoles || entry.requiredRoles.length === 0) return true;
+  return hasAnyRole(roles, entry.requiredRoles);
+}
+
+export function getWidgetCatalogEntries(roles: string[] | undefined): DashboardWidgetCatalogEntry[] {
+  const baseEntries: DashboardWidgetCatalogEntry[] = WIDGET_DEFINITIONS
+    .filter((def) => def.category !== 'trends')
+    .map((def) => ({
+      catalogKey: def.catalogKey ?? def.type,
+      type: def.type,
+      titleKey: def.titleKey,
+      category: def.category,
+      defaultSize: def.defaultSize,
+      defaultConfig: def.defaultConfig,
+      requiredRoles: def.requiredRoles,
+    }));
+
+  const trendEntries = TREND_CATALOG_PRESETS.filter((entry) => canAccessCatalogEntry(entry, roles));
+  return [...baseEntries, ...trendEntries].filter((entry) => canAccessCatalogEntry(entry, roles));
+}
+
+export function getCatalogEntry(catalogKey: string): DashboardWidgetCatalogEntry | undefined {
+  const fromPreset = TREND_CATALOG_PRESETS.find((entry) => entry.catalogKey === catalogKey);
+  if (fromPreset) return fromPreset;
+  const def = WIDGET_DEFINITIONS.find((item) => (item.catalogKey ?? item.type) === catalogKey);
+  if (!def) return undefined;
+  return {
+    catalogKey: def.catalogKey ?? def.type,
+    type: def.type,
+    titleKey: def.titleKey,
+    category: def.category,
+    defaultSize: def.defaultSize,
+    defaultConfig: def.defaultConfig,
+    requiredRoles: def.requiredRoles,
   };
 }

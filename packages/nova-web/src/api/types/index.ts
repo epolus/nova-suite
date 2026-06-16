@@ -18,3 +18,4 @@ export * from './requests';
 export * from './credentials';
 export * from './dataSources';
 export * from './ai';
+export * from './analytics';

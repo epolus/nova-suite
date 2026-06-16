@@ -152,10 +152,12 @@ export function findNextPlacement(
 export function createWidgetInstance(
   type: DashboardWidgetType,
   existing: DashboardWidgetInstance[],
+  initialConfig?: Record<string, unknown>,
 ): DashboardWidgetInstance | null {
   const def = getWidgetDefinition(type);
   if (!def) return null;
   const { x, y } = findNextPlacement(existing, def.defaultSize.w, def.defaultSize.h);
+  const config = initialConfig ?? (def.defaultConfig ? { ...def.defaultConfig } : undefined);
   return {
     id: createWidgetId(),
     type,
@@ -163,6 +165,7 @@ export function createWidgetInstance(
     y,
     w: def.defaultSize.w,
     h: def.defaultSize.h,
+    config,
   };
 }
 

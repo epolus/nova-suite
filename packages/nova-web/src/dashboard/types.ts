@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { ComponentType, LazyExoticComponent } from 'react';
 
-export type DashboardWidgetCategory = 'stats' | 'lists' | 'alerts' | 'breakdown';
+export type DashboardWidgetCategory = 'stats' | 'lists' | 'alerts' | 'breakdown' | 'trends';
 
 export type DashboardWidgetType =
   | 'stat.open_incidents'
@@ -13,7 +13,8 @@ export type DashboardWidgetType =
   | 'breakdown.incident_priority'
   | 'list.my_queue'
   | 'list.changes_pending'
-  | 'list.recent_requests';
+  | 'list.recent_requests'
+  | 'trend.chart';
 
 export interface DashboardWidgetInstance {
   id: string;
@@ -40,6 +41,8 @@ export type DashboardStatAccent = 'indigo' | 'red' | 'violet' | 'blue' | 'emeral
 
 export interface DashboardWidgetDefinition {
   type: DashboardWidgetType;
+  /** Unique catalog id when multiple presets share the same type. */
+  catalogKey?: string;
   titleKey: string;
   category: DashboardWidgetCategory;
   minW: number;
@@ -47,10 +50,21 @@ export interface DashboardWidgetDefinition {
   minH: number;
   maxH: number;
   defaultSize: { w: number; h: number };
+  defaultConfig?: Record<string, unknown>;
   requiredRoles?: string[];
   viewAllLink?: string;
   statAccent?: DashboardStatAccent;
   component: LazyExoticComponent<ComponentType<DashboardWidgetProps>>;
+}
+
+export interface DashboardWidgetCatalogEntry {
+  catalogKey: string;
+  type: DashboardWidgetType;
+  titleKey: string;
+  category: DashboardWidgetCategory;
+  defaultSize: { w: number; h: number };
+  defaultConfig?: Record<string, unknown>;
+  requiredRoles?: string[];
 }
 
 export interface ListWidgetConfig {

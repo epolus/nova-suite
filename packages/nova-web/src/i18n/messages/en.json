@@ -422,6 +422,27 @@
         "newFromCatalog": "+ New request from catalog"
       },
       "viewAll": "View all",
+      "analytics": {
+        "metric": "Metric",
+        "range": "Range",
+        "lastDays": "Last {count} days",
+        "current": "current",
+        "total": "total",
+        "metrics": {
+          "incidents": {
+            "opened": "Incidents opened per day",
+            "open_backlog": "Open incidents over time"
+          },
+          "changes": {
+            "opened": "Changes opened per day",
+            "open_backlog": "Open changes over time"
+          },
+          "requests": {
+            "opened": "Requests opened per day",
+            "open_backlog": "Open requests over time"
+          }
+        }
+      },
       "customize": {
         "editLayout": "Customize",
         "doneEditing": "Done",
@@ -463,6 +484,7 @@
         "noActiveMajorIncidents": "No active major incidents",
         "categories": {
           "stats": "Statistics",
+          "trends": "Trends",
           "lists": "Lists",
           "alerts": "Alerts",
           "breakdown": "Breakdowns"
@@ -485,6 +507,15 @@
             "my_queue": "My queue",
             "changes_pending": "Changes pending approval",
             "recent_requests": "Recent requests"
+          },
+          "trend": {
+            "chart": "Trend chart",
+            "incidents_opened": "Incidents opened (30 days)",
+            "changes_opened": "Changes opened (30 days)",
+            "requests_opened": "Requests opened (30 days)",
+            "incidents_open_backlog": "Open incidents (30 days)",
+            "changes_open_backlog": "Open changes (30 days)",
+            "requests_open_backlog": "Open requests (30 days)"
           }
         }
       }

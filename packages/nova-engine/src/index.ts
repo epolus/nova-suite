@@ -19,7 +19,7 @@ import {
   startWorkflowStartQueueDispatcher,
   stopWorkflowStartQueueDispatcher,
 } from './temporal/workflow-start-queue';
-import { checkTemporalHealth, startDbSizeSnapshotSchedule } from './temporal/workflows';
+import { checkTemporalHealth, startDbSizeSnapshotSchedule, startMetricSnapshotSchedule } from './temporal/workflows';
 import { metricsHandler, metricsMiddleware } from './observability/metrics';
 
 type SchemaRuntimeStatus = {
@@ -36,7 +36,8 @@ const schemaRuntimeStatus: SchemaRuntimeStatus = {
   reason: 'not_checked',
 };
 let dbSizeSnapshotScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
-let dbSizeSnapshotScheduleRetryTimer: NodeJS.Timeout | null = null;
+let metricSnapshotScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
+let snapshotScheduleRetryTimer: NodeJS.Timeout | null = null;
 let workflowDispatcherStarted = false;
 let server: ReturnType<typeof app.listen> | null = null;
 
@@ -116,6 +117,7 @@ app.get('/health', async (_req, res) => {
       workflow_start_queue_pending: queueStats.pending,
       workflow_start_queue_failed: queueStats.failed,
       db_size_snapshot_schedule: dbSizeSnapshotScheduleStatus,
+      metric_snapshot_schedule: metricSnapshotScheduleStatus,
     },
   });
 });
@@ -144,13 +146,33 @@ async function ensureDbSizeSnapshotScheduleStarted(): Promise<void> {
   try {
     await startDbSizeSnapshotSchedule();
     dbSizeSnapshotScheduleStatus = 'running';
-    if (dbSizeSnapshotScheduleRetryTimer) {
-      clearInterval(dbSizeSnapshotScheduleRetryTimer);
-      dbSizeSnapshotScheduleRetryTimer = null;
-    }
   } catch (err) {
     dbSizeSnapshotScheduleStatus = 'failed';
     logger.warn({ err }, 'DB size snapshot schedule startup failed; will retry in background');
+  }
+}
+
+async function ensureMetricSnapshotScheduleStarted(): Promise<void> {
+  try {
+    await startMetricSnapshotSchedule();
+    metricSnapshotScheduleStatus = 'running';
+  } catch (err) {
+    metricSnapshotScheduleStatus = 'failed';
+    logger.warn({ err }, 'Metric snapshot schedule startup failed; will retry in background');
+  }
+}
+
+async function ensureSnapshotSchedulesStarted(): Promise<void> {
+  await Promise.all([
+    ensureDbSizeSnapshotScheduleStarted(),
+    ensureMetricSnapshotScheduleStarted(),
+  ]);
+
+  if (dbSizeSnapshotScheduleStatus === 'running' && metricSnapshotScheduleStatus === 'running') {
+    if (snapshotScheduleRetryTimer) {
+      clearInterval(snapshotScheduleRetryTimer);
+      snapshotScheduleRetryTimer = null;
+    }
   }
 }
 
@@ -187,14 +209,15 @@ async function bootstrap(): Promise<void> {
   if (schemaCheck.ok) {
     startWorkflowStartQueueDispatcher();
     workflowDispatcherStarted = true;
-    await ensureDbSizeSnapshotScheduleStarted();
-    if (dbSizeSnapshotScheduleStatus !== 'running') {
-      dbSizeSnapshotScheduleRetryTimer = setInterval(() => {
-        void ensureDbSizeSnapshotScheduleStarted();
+    await ensureSnapshotSchedulesStarted();
+    if (dbSizeSnapshotScheduleStatus !== 'running' || metricSnapshotScheduleStatus !== 'running') {
+      snapshotScheduleRetryTimer = setInterval(() => {
+        void ensureSnapshotSchedulesStarted();
       }, 30_000);
     }
   } else {
     dbSizeSnapshotScheduleStatus = 'not_started';
+    metricSnapshotScheduleStatus = 'not_started';
     logger.warn('Workflow start queue dispatcher disabled due to schema incompatibility');
   }
 }
@@ -202,9 +225,9 @@ async function bootstrap(): Promise<void> {
 // ─── Graceful Shutdown ───
 async function shutdown(signal: string) {
   logger.info({ signal }, 'Shutting down...');
-  if (dbSizeSnapshotScheduleRetryTimer) {
-    clearInterval(dbSizeSnapshotScheduleRetryTimer);
-    dbSizeSnapshotScheduleRetryTimer = null;
+  if (snapshotScheduleRetryTimer) {
+    clearInterval(snapshotScheduleRetryTimer);
+    snapshotScheduleRetryTimer = null;
   }
   if (workflowDispatcherStarted) stopWorkflowStartQueueDispatcher();
   if (server) {

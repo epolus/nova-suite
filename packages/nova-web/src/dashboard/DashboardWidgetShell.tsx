@@ -3,9 +3,10 @@ import { Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslations } from 'use-intl';
 import { Button } from '@/components/ui/button';
-import { useChangeStats } from './hooks';
+import { useChangeStats, useTrendCatalog } from './hooks';
 import { DashboardIcons } from './icons';
 import { getWidgetDefinition } from './registry';
+import { parseTrendWidgetConfig, TREND_DAY_OPTIONS } from './trendConfig';
 import type { DashboardWidgetInstance } from './types';
 import { LIST_LIMIT_OPTIONS } from './types';
 
@@ -26,12 +27,20 @@ export default function DashboardWidgetShell({
 }: Props) {
   const t = useTranslations('pages.dashboard.customize');
   const tDash = useTranslations('pages.dashboard');
+  const tAnalytics = useTranslations('pages.dashboard.analytics');
   const def = getWidgetDefinition(instance.type);
+  const isTrend = instance.type === 'trend.chart';
+  const trendConfig = isTrend ? parseTrendWidgetConfig(instance) : null;
+  const { data: trendCatalog } = useTrendCatalog(editMode && isTrend);
   const titleKey = def?.titleKey ?? instance.type;
-  const title = t(titleKey as Parameters<typeof t>[0]);
+  let title = t(titleKey as Parameters<typeof t>[0]);
+  if (isTrend && trendConfig) {
+    title = tAnalytics(`metrics.${trendConfig.dataset}.${trendConfig.metric}` as 'metrics.incidents.opened');
+  }
   const isStat = instance.type.startsWith('stat.');
   const isList = instance.type.startsWith('list.');
   const currentLimit = typeof instance.config?.limit === 'number' ? instance.config.limit : 5;
+  const currentDays = trendConfig?.days ?? 30;
   const { data: changeStats } = useChangeStats(instance.type === 'list.changes_pending');
 
   const accentClass = def?.statAccent ? `dashboard-widget-stat-accent-${def.statAccent}` : 'dashboard-widget-stat-accent-indigo';
@@ -80,6 +89,37 @@ export default function DashboardWidgetShell({
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>
+            )}
+            {editMode && isTrend && trendCatalog && (
+              <>
+                <select
+                  value={`${trendConfig?.dataset}:${trendConfig?.metric}`}
+                  onChange={(e) => {
+                    const [dataset, metric] = e.target.value.split(':');
+                    onConfigChange(instance.id, { dataset, metric });
+                  }}
+                  className="text-xs border border-gray-200 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800 max-w-[9rem]"
+                  aria-label={tAnalytics('metric')}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  {trendCatalog.metrics.map((metric) => (
+                    <option key={`${metric.dataset}:${metric.metric}`} value={`${metric.dataset}:${metric.metric}`}>
+                      {tAnalytics(`metrics.${metric.dataset}.${metric.metric}` as 'metrics.incidents.opened')}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={currentDays}
+                  onChange={(e) => onConfigChange(instance.id, { days: Number(e.target.value) })}
+                  className="text-xs border border-gray-200 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800"
+                  aria-label={tAnalytics('range')}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  {TREND_DAY_OPTIONS.map((days) => (
+                    <option key={days} value={days}>{tAnalytics('lastDays', { count: days })}</option>
+                  ))}
+                </select>
+              </>
             )}
             {editMode && (
               <Button

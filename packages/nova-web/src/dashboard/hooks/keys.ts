@@ -9,4 +9,7 @@ export const dashboardQueryKeys = {
   recentRequests: (limit: number) => [...dashboardQueryKeys.all, 'recent-requests', limit] as const,
   majorIncidents: () => [...dashboardQueryKeys.all, 'major-incidents'] as const,
   openRequestsCount: () => [...dashboardQueryKeys.all, 'open-requests-count'] as const,
+  trendCatalog: () => [...dashboardQueryKeys.all, 'trend-catalog'] as const,
+  trendSeries: (dataset: string, metric: string, days: number) =>
+    [...dashboardQueryKeys.all, 'trend-series', dataset, metric, days] as const,
 };
