@@ -976,8 +976,7 @@ CREATE TABLE schema_migrations (
 );
 
 INSERT INTO schema_migrations (version, name) VALUES
-  ('v00.01.00', '001_initial_schema'),
-  ('v00.02.00', '002_user_dashboards');
+  ('v00.01.00', '001_initial_schema');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
