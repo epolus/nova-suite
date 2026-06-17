@@ -2,7 +2,7 @@
 import type { Layout, LayoutItem } from 'react-grid-layout';
 import { hasAnyRole } from '@/utils/roles';
 import { createStableId } from '@/utils/id';
-import { MAX_DASHBOARD_WIDGETS } from './constants';
+import { DASHBOARD_COLS_BY_BREAKPOINT, MAX_DASHBOARD_WIDGETS } from './constants';
 import { getWidgetDefinition, isKnownWidgetType } from './registry';
 import type { DashboardLayout, DashboardWidgetInstance, DashboardWidgetType } from './types';
 
@@ -116,6 +116,41 @@ export function toGridLayout(widgets: DashboardWidgetInstance[]): Layout {
       maxH: def?.maxH,
     } satisfies LayoutItem;
   });
+}
+
+/** View-only layouts for smaller breakpoints; never persisted. */
+export function buildResponsiveDisplayLayouts(widgets: DashboardWidgetInstance[]) {
+  const lg = toGridLayout(widgets);
+  const sorted = [...widgets].sort((a, b) => a.y - b.y || a.x - b.x);
+
+  const stackForCols = (cols: number): Layout => {
+    let y = 0;
+    return sorted.map((widget) => {
+      const def = getWidgetDefinition(widget.type);
+      const size = clampWidgetSize(widget.type, widget.w, widget.h);
+      const item = {
+        i: widget.id,
+        x: 0,
+        y,
+        w: cols,
+        h: size.h,
+        minW: def?.minW,
+        minH: def?.minH,
+        maxW: def?.maxW,
+        maxH: def?.maxH,
+      } satisfies LayoutItem;
+      y += size.h;
+      return item;
+    });
+  };
+
+  return {
+    lg,
+    md: stackForCols(DASHBOARD_COLS_BY_BREAKPOINT.md),
+    sm: stackForCols(DASHBOARD_COLS_BY_BREAKPOINT.sm),
+    xs: stackForCols(DASHBOARD_COLS_BY_BREAKPOINT.xs),
+    xxs: stackForCols(DASHBOARD_COLS_BY_BREAKPOINT.xxs),
+  };
 }
 
 export function applyGridLayout(

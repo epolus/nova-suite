@@ -42,8 +42,12 @@ export function useDashboardLayout({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingRef = useRef(false);
   const loadedDashboardIdRef = useRef<string | null>(null);
+  const layoutRef = useRef(layout);
+  const editModeRef = useRef(editMode);
   const onSaveLayoutRef = useRef(onSaveLayout);
   const dashboardIdRef = useRef(dashboardId);
+  layoutRef.current = layout;
+  editModeRef.current = editMode;
   onSaveLayoutRef.current = onSaveLayout;
   dashboardIdRef.current = dashboardId;
 
@@ -84,17 +88,17 @@ export function useDashboardLayout({
   }, [persistLayout, roles]);
 
   const handleGridLayoutChange = useCallback((grid: Layout) => {
+    if (!editModeRef.current) return;
+
     isDraggingRef.current = true;
-    setLayout((prev) => {
-      const next = applyGridLayout(prev, grid);
-      persistLayout(next);
-      return next;
-    });
-  }, [persistLayout]);
+    setLayout((prev) => applyGridLayout(prev, grid));
+  }, []);
 
   const handleDragStop = useCallback(() => {
     isDraggingRef.current = false;
-  }, []);
+    if (!editModeRef.current) return;
+    persistLayout(layoutRef.current);
+  }, [persistLayout]);
 
   const addWidget = useCallback((type: DashboardWidgetType, initialConfig?: Record<string, unknown>) => {
     setLayout((prev) => {

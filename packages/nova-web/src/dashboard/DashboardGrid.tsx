@@ -12,7 +12,7 @@ import {
 } from './constants';
 import DashboardWidgetShell from './DashboardWidgetShell';
 import { getWidgetDefinition } from './registry';
-import { toGridLayout } from './layoutUtils';
+import { toGridLayout, buildResponsiveDisplayLayouts } from './layoutUtils';
 import type { DashboardLayout } from './types';
 import type { DashboardWidgetProps } from './types';
 import './dashboard-grid.css';
@@ -41,11 +41,13 @@ export default function DashboardGrid({
   const t = useTranslations('pages.dashboard.customize');
   const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true });
 
-  const gridLayout = useMemo(() => toGridLayout(layout.widgets), [layout.widgets]);
-  const layouts = useMemo(
-    () => ({ lg: gridLayout, md: gridLayout, sm: gridLayout, xs: gridLayout, xxs: gridLayout }),
-    [gridLayout],
-  );
+  const layouts = useMemo(() => {
+    if (editMode) {
+      const gridLayout = toGridLayout(layout.widgets);
+      return { lg: gridLayout, md: gridLayout, sm: gridLayout, xs: gridLayout, xxs: gridLayout };
+    }
+    return buildResponsiveDisplayLayouts(layout.widgets);
+  }, [editMode, layout.widgets]);
 
   if (layout.widgets.length === 0) {
     return (
@@ -79,9 +81,9 @@ export default function DashboardGrid({
             cancel: 'button, select, a, input, textarea',
           }}
           resizeConfig={{ enabled: editMode }}
-          onLayoutChange={(currentLayout) => onLayoutChange(currentLayout)}
-          onDragStop={onDragStop}
-          onResizeStop={onDragStop}
+          onLayoutChange={editMode ? onLayoutChange : undefined}
+          onDragStop={editMode ? onDragStop : undefined}
+          onResizeStop={editMode ? onDragStop : undefined}
         >
           {layout.widgets.map((widget) => {
             const def = getWidgetDefinition(widget.type);
