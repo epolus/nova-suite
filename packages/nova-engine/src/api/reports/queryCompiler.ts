@@ -2,7 +2,6 @@
 
 import { AppError } from '../../middleware/errorHandler';
 import {
-  ANALYTICS_DATASETS,
   ensureDataset,
   type DatasetSpec,
   type ReportDatasetKey,
@@ -15,8 +14,6 @@ export type ReportComponentType = 'table' | 'kpi' | 'bar_chart' | 'pie_chart';
 export type ReportFilterOperator = 'eq' | 'neq' | 'contains' | 'in' | 'gte' | 'lte';
 export type ReportSortDirection = 'asc' | 'desc';
 export type ReportKpiMetric = 'count' | 'avg' | 'sum';
-
-type FieldType = 'text' | 'number' | 'boolean' | 'timestamp';
 
 export interface ReportFilter {
   field: string;
@@ -62,8 +59,6 @@ type CompiledQuery = {
   text: string;
   values: unknown[];
 };
-
-const DATASETS = ANALYTICS_DATASETS;
 
 function isScalar(value: unknown): value is Scalar {
   return ['string', 'number', 'boolean'].includes(typeof value);
