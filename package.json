@@ -1,0 +1,31 @@
+{
+  "name": "nova-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open-source Service Management System",
+  "license": "AGPL-3.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=packages/nova-engine",
+    "build": "npm run --ws --if-present build",
+    "start": "npm run start --workspace=packages/nova-engine",
+    "test": "npm run --ws --if-present test",
+    "lint": "npm run --ws --if-present lint",
+    "typecheck": "npm run build --workspace=packages/nova-shared && npm run --ws --if-present typecheck",
+    "ci:verify": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:reset": "docker compose down -v && docker compose up -d"
+  },
+  "overrides": {
+    "picomatch": "4.0.4",
+    "protobufjs": "7.6.5",
+    "serialize-javascript": "7.0.5"
+    }
+}

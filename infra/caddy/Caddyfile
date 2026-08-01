@@ -1,0 +1,32 @@
+# ─── Nova Suite – Caddy Reverse Proxy ───
+# In production, replace :80 with your domain (e.g. nova.example.com)
+# and Caddy will auto-provision TLS via Let's Encrypt.
+
+:80 {
+	# API
+	handle /api/* {
+		reverse_proxy nova-engine:4000
+	}
+
+	# Health endpoint
+	handle /health {
+		reverse_proxy nova-engine:4000
+	}
+
+	# OpenAPI docs
+	handle /docs* {
+		reverse_proxy nova-engine:4000
+	}
+
+	# Temporal UI (optional – remove in production)
+	handle /temporal/* {
+		uri strip_prefix /temporal
+		reverse_proxy temporal-ui:8080
+	}
+
+	# Frontend – serve the React admin dashboard
+	handle {
+		reverse_proxy nova-web:3000
+	}
+}
+

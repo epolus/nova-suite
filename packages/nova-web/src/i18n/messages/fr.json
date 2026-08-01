@@ -1,0 +1,437 @@
+{
+  "common": {
+    "language": {
+      "label": "Langue",
+      "en": "Anglais",
+      "de": "Allemand",
+      "de-ch": "Allemand Suisse",
+      "fr": "Français",
+      "it": "italien"
+    },
+    "actions": {
+      "save": "Sauvegarder",
+      "saving": "Économie...",
+      "cancel": "Annuler",
+      "close": "Fermer",
+      "search": "Recherche",
+      "clear": "Clair",
+      "reset": "Réinitialiser",
+      "refresh": "Rafraîchir",
+      "back": "Dos",
+      "next": "Suivant",
+      "previous": "Précédent",
+      "create": "Créer",
+      "update": "Mise à jour",
+      "delete": "Supprimer",
+      "edit": "Modifier",
+      "view": "Voir",
+      "open": "Ouvrir",
+      "submit": "Soumettre",
+      "approve": "Approuver",
+      "reject": "Rejeter",
+      "reopen": "Rouvrir",
+      "resolve": "Résoudre",
+      "upload": "Télécharger",
+      "remove": "Retirer",
+      "download": "Télécharger"
+    },
+    "states": {
+      "yes": "Oui",
+      "no": "Non",
+      "none": "Aucun",
+      "unknown": "Inconnu",
+      "enabled": "Activé",
+      "disabled": "Désactivé",
+      "active": "Actif",
+      "inactive": "Inactif",
+      "all": "Tous",
+      "optional": "Facultatif",
+      "required": "Requis",
+      "loading": "Chargement...",
+      "noData": "Aucune donnée trouvée.",
+      "noResults": "Aucun résultat trouvé."
+    },
+    "roles": {
+      "admin": "Administrateur",
+      "fulfiller": "Accomplisseur",
+      "user": "Utilisateur"
+    },
+    "fields": {
+      "name": "Nom",
+      "title": "Titre",
+      "description": "Description",
+      "email": "E-mail",
+      "phone": "Téléphone",
+      "location": "Emplacement",
+      "status": "Statut",
+      "priority": "Priorité",
+      "impact": "Impact",
+      "urgency": "Urgence",
+      "category": "Catégorie",
+      "service": "Service",
+      "assignmentGroup": "Groupe d'affectation",
+      "assignedTo": "Attribué à",
+      "createdAt": "Créé à",
+      "updatedAt": "Mis à jour à",
+      "search": "Recherche"
+    },
+    "table": {
+      "number": "Nombre",
+      "actions": "Actes",
+      "selectAll": "Tout sélectionner",
+      "rowsPerPage": "Lignes par page",
+      "showing": "Affichage de {from}-{to} sur {total}",
+      "nextPage": "Page suivante",
+      "previousPage": "Page précédente"
+    },
+    "filters": {
+      "title": "Filtres",
+      "searchPlaceholder": "Recherche...",
+      "saved": "Enregistré:",
+      "saveCurrent": "Enregistrer le filtre actuel",
+      "filterNamePlaceholder": "Nom du filtre..."
+    },
+    "messages": {
+      "changesSaved": "Modifications enregistrées et appliquées!",
+      "somethingWentWrong": "Quelque chose s'est mal passé.",
+      "tryAgain": "Veuillez réessayer.",
+      "confirmDelete": "Êtes-vous sûr de vouloir supprimer cet élément?",
+      "unsavedChanges": "Vous avez des modifications non enregistrées."
+    },
+    "userMenu": {
+      "profileSettings": "Paramètres du profil",
+      "logout": "Déconnexion"
+    },
+    "sidebar": {
+      "expandNavigation": "Développer la navigation",
+      "collapseNavigation": "Réduire la navigation"
+    },
+    "cart": {
+      "label": "Panier",
+      "empty": "Votre panier est vide.",
+      "checkout": "Vérifier"
+    },
+    "date": {
+      "futureOnly": "Choisissez aujourd'hui ou une date ultérieure."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "markAllRead": "Marquer tout comme lu",
+      "deleteAll": "Supprimer tout",
+      "empty": "Aucune notification",
+      "loadFailed": "Échec du chargement des notifications.",
+      "markReadFailed": "Échec du marquage de la notification comme lue.",
+      "markAllFailed": "Échec du marquage de toutes les notifications comme lues."
+    },
+    "ai": {
+      "title": "Assistant Nova",
+      "openAriaLabel": "Ouvrir l'assistant Nova",
+      "closeAriaLabel": "Fermer",
+      "greetingEss": "Bonjour ! Je peux vous aider à parcourir le catalogue de services (par ex. un nouvel ordinateur portable), rechercher des articles de la base de connaissances ou ouvrir un incident si nécessaire.",
+      "greetingAgent": "Bonjour ! Je peux résumer les incidents, suggérer des articles de la base de connaissances, rédiger des notes de travail et proposer l'automatisation du catalogue.",
+      "placeholder": "Posez une question…",
+      "send": "Envoyer",
+      "initFailed": "Impossible de démarrer l'assistant.",
+      "workNoteAdded": "Note de travail ajoutée à l'incident.",
+      "actionFailed": "Échec de l'action.",
+      "catalogOpenLink": "Ouvrir dans le catalogue"
+    }
+  },
+  "navigation": {
+    "agent": {
+      "dashboard": "Tableau de bord",
+      "myTodo": "Ma tâche",
+      "myGroups": "Mes groupes",
+      "catalog": "Catalogue",
+      "knowledge": "Connaissance",
+      "requests": "Demandes",
+      "requestTasks": "Demander des tâches",
+      "incidents": "Incidents",
+      "majorIncidents": "Incidents majeurs",
+      "problems": "Problèmes",
+      "changes": "Changements",
+      "reports": "Rapports",
+      "cmdb": "CMDB",
+      "catalogDesigner": "Concepteur de catalogue"
+    },
+    "ess": {
+      "home": "Accueil",
+      "catalog": "Catalogue",
+      "myRequests": "Mes demandes",
+      "myIncidents": "Mes incidents",
+      "knowledge": "Connaissance",
+      "approvals": "Approbations"
+    },
+    "adminSections": {
+      "administration": "Administration",
+      "organization": "Organisation",
+      "serviceCatalog": "Catalogue de services",
+      "processAutomation": "Processus et automatisation",
+      "cmdb": "CMDB",
+      "dataIntegration": "Données et intégration",
+      "system": "Système"
+    },
+    "admin": {
+      "users": "Utilisateurs",
+      "departments": "Départements",
+      "costCenters": "Centres de coûts",
+      "companies": "Entreprises",
+      "locations": "Emplacements",
+      "roles": "Rôles",
+      "assignmentGroups": "Groupes d'affectation",
+      "services": "Services",
+      "serviceItems": "Articles de service",
+      "catalogTasks": "Tâches de catalogue",
+      "processes": "Processus",
+      "slaConfiguration": "Configuration du SLA",
+      "notificationWorkflows": "Flux de travail de notification",
+      "notificationDeliveries": "Livraisons de notifications",
+      "changeManagement": "Gestion du changement",
+      "knowledgeWorkflows": "Flux de travail de connaissances",
+      "workflows": "Flux de travail",
+      "workflowEditor": "Éditeur de workflow",
+      "ciClasses": "Classes CI",
+      "dataSources": "Sources de données",
+      "credentials": "Identifiants",
+      "configPackages": "Paquets de configuration",
+      "importData": "Importer des données",
+      "theming": "Thématisation",
+      "status": "Statut"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Se connecter",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "submit": "Se connecter",
+      "signingIn": "Connexion...",
+      "signInWith": "Connectez-vous avec {provider}",
+      "orContinueWithPassword": "ou continuez avec le mot de passe",
+      "demoCredentials": "Identifiants de démonstration",
+      "invalidCredentials": "E-mail ou mot de passe invalide. Veuillez réessayer.",
+      "loginFailed": "La connexion a échoué. Veuillez réessayer.",
+      "serviceManagementPlatform": "Plateforme de gestion de services",
+      "localDisabledSsoMissing": "La connexion locale est désactivée et SSO n'est pas configuré."
+    },
+    "errors": {
+      "loginFailed": "La connexion a échoué",
+      "unauthorized": "Non autorisé",
+      "sessionExpired": "Votre session a expiré. "
+    }
+  },
+  "pages": {
+    "dashboard": {
+      "title": "Tableau de bord",
+      "welcomeBack": "Bon retour, {nom}",
+      "description": "Voici ce qui se passe dans votre organisation.",
+      "sections": {
+        "incidents": "Incidents",
+        "changes": "Changements",
+        "requests": "Demandes",
+        "myQueue": "Ma file d'attente"
+      },
+      "stats": {
+        "openIncidents": "Incidents ouverts",
+        "slaBreached": "SLA dépassé",
+        "openChanges": "Changements ouverts",
+        "openRequests": "Demandes ouvertes",
+        "assignedToMe": "Assignés à moi",
+        "assignedHint": "Hors résolus, fermés, annulés"
+      },
+      "majorIncidents": {
+        "activeTitle": "Incidents majeurs actifs",
+        "viewAll": "Tout voir"
+      },
+      "priority": {
+        "title": "Incidents ouverts par priorité"
+      },
+      "queue": {
+        "title": "Ma file d'attente",
+        "empty": "Aucun incident assigné",
+        "slaBreached": "SLA DÉPASSÉ",
+        "due": "échéance {date}"
+      },
+      "changesPending": {
+        "title": "Changements en attente d'approbation",
+        "empty": "Aucun changement en attente",
+        "risk": "risque {level}"
+      },
+      "recentRequests": {
+        "title": "Demandes récentes",
+        "empty": "Aucune demande",
+        "browseCatalog": "Parcourir le catalogue →",
+        "newFromCatalog": "+ Nouvelle demande depuis le catalogue"
+      },
+      "viewAll": "Tout voir",
+      "customize": {
+        "editLayout": "Personnaliser",
+        "doneEditing": "Terminé",
+        "editHint": "Faites glisser les widgets par leur en-tête, redimensionnez-les aux coins, ou ajoutez et supprimez des panneaux. Cliquez sur Terminé quand vous avez fini.",
+        "settingsTitle": "Paramètres du tableau de bord",
+        "autoRefresh": "Actualisation auto",
+        "autoRefreshHint": "Fréquence de rafraîchissement automatique des widgets.",
+        "autoRefreshOff": "Désactivé",
+        "autoRefresh1m": "1 min",
+        "autoRefresh5m": "5 min",
+        "autoRefresh15m": "15 min",
+        "layoutSection": "Disposition",
+        "layoutSectionHint": "Choisissez un tableau de bord, puis personnalisez ou réinitialisez sa disposition.",
+        "layoutDashboard": "Tableau de bord à personnaliser",
+        "viewingBadge": "Affiché",
+        "dashboardsSection": "Tableaux de bord",
+        "dashboardsSectionHint": "Créez plusieurs dispositions et choisissez celle ouverte par défaut.",
+        "switchDashboard": "Changer de tableau de bord",
+        "defaultBadge": "Par défaut",
+        "setDefault": "Définir par défaut",
+        "createDashboard": "Créer",
+        "newDashboardName": "Nom du nouveau tableau de bord",
+        "newDashboardPlaceholder": "p. ex. Vue opérations",
+        "dashboardNameRequired": "Saisissez un nom de tableau de bord.",
+        "createDashboardFailed": "Impossible de créer le tableau de bord. Essayez un autre nom.",
+        "deleteDashboard": "Supprimer",
+        "deleteDashboardConfirm": "Supprimer ce tableau de bord ? Sa disposition ne pourra pas être récupérée.",
+        "maxDashboardsReached": "Nombre maximal de tableaux de bord atteint.",
+        "addWidget": "Ajouter un widget",
+        "removeWidget": "Supprimer",
+        "resetLayout": "Réinitialiser la disposition",
+        "resetLayoutConfirm": "Restaurer la disposition par défaut ? Votre arrangement actuel sera remplacé.",
+        "emptyDashboard": "Votre tableau de bord est vide. Ajoutez des widgets pour voir les indicateurs et listes qui vous intéressent.",
+        "addFirstWidget": "Ajouter votre premier widget",
+        "closePanel": "Fermer",
+        "add": "Ajouter",
+        "alreadyAdded": "Ajouté",
+        "listLimit": "Lignes à afficher",
+        "noActiveMajorIncidents": "Aucun incident majeur actif",
+        "categories": {
+          "stats": "Statistiques",
+          "lists": "Listes",
+          "alerts": "Alertes",
+          "breakdown": "Répartitions"
+        },
+        "widgets": {
+          "stat": {
+            "open_incidents": "Incidents ouverts",
+            "sla_breached": "SLA dépassé",
+            "open_changes": "Changements ouverts",
+            "open_requests": "Demandes ouvertes",
+            "assigned_to_me": "Assignés à moi"
+          },
+          "alert": {
+            "major_incidents": "Incidents majeurs actifs"
+          },
+          "breakdown": {
+            "incident_priority": "Incidents par priorité"
+          },
+          "list": {
+            "my_queue": "Ma file d'attente",
+            "changes_pending": "Changements en attente",
+            "recent_requests": "Demandes récentes"
+          }
+        }
+      }
+    },
+    "incidents": {
+      "title": "Incidents",
+      "description": "Gérer et suivre les incidents.",
+      "newIncident": "Nouvel incident",
+      "detailTitle": "Détails de l'incident",
+      "summary": "Résumé",
+      "callerProfile": "Profil de l'appelant",
+      "journal": "Journal",
+      "attachments": "Pièces jointes",
+      "insights": "Connaissances",
+      "showInsights": "Afficher les informations",
+      "hideInsights": "Masquer les informations"
+    },
+    "requests": {
+      "title": "Demandes",
+      "description": "Suivez et répondez aux demandes de service.",
+      "newRequest": "Nouvelle demande",
+      "myRequests": "Mes demandes",
+      "tasks": "Demander des tâches",
+      "detailTitle": "Demander des détails"
+    },
+    "changes": {
+      "title": "Changements",
+      "description": "Planifiez, évaluez et suivez les changements.",
+      "newChange": "Nouveau changement",
+      "calendar": "Changer de calendrier",
+      "detailTitle": "Modifier les détails"
+    },
+    "problems": {
+      "title": "Problèmes",
+      "description": "Recherchez les causes profondes et gérez les erreurs connues.",
+      "newProblem": "Nouveau problème",
+      "detailTitle": "Détails du problème"
+    },
+    "knowledge": {
+      "title": "Connaissance",
+      "description": "Parcourez et gérez les articles de connaissances.",
+      "newArticle": "Nouvel article",
+      "publish": "Publier",
+      "retire": "Se retirer"
+    },
+    "cmdb": {
+      "title": "CMDB",
+      "description": "Gérez les éléments de configuration et les relations.",
+      "newCi": "Nouvel élément de configuration",
+      "editCi": "Modifier l'élément de configuration",
+      "ciClasses": "Classes CI"
+    },
+    "catalog": {
+      "title": "Catalogue de services",
+      "description": "Parcourez et demandez les services disponibles.",
+      "addToCart": "Ajouter au panier",
+      "removeFromCart": "Supprimer du panier"
+    },
+    "profile": {
+      "title": "Paramètres du profil",
+      "description": "Préférences personnelles pour l'affichage de la date, de l'heure et de la langue.",
+      "timeFormat": "Format de l'heure",
+      "dateFormat": "Format des dates",
+      "language": "Langue",
+      "preview": "Aperçu"
+    },
+    "search": {
+      "title": "Résultats de la recherche",
+      "description": "Résultats regroupés dans tous les enregistrements pris en charge.",
+      "resultsFor": "Résultats pour \"{query}\""
+    },
+    "admin": {
+      "title": "Administration",
+      "users": "Gérez les utilisateurs, les rôles et la structure organisationnelle.",
+      "assignmentGroups": "Gérez les groupes d'affectation et les adhésions.",
+      "theming": "Personnalisez la marque, les couleurs du thème clair et du thème sombre.",
+      "imports": "Importez et synchronisez des données externes."
+    }
+  },
+  "status": {
+    "new": "Nouveau",
+    "open": "Ouvrir",
+    "inProgress": "En cours",
+    "pending": "En attente",
+    "resolved": "Résolu",
+    "closed": "Fermé",
+    "cancelled": "Annulé",
+    "approved": "Approuvé",
+    "rejected": "Rejeté",
+    "draft": "Brouillon",
+    "published": "Publié",
+    "retired": "À la retraite"
+  },
+  "priority": {
+    "p1": "P1 Critique",
+    "p2": "P2 Élevé",
+    "p3": "P3 modéré",
+    "p4": "P4 Faible",
+    "p5": "Planification P5"
+  },
+  "errors": {
+    "generic": "Une erreur inattendue s'est produite.",
+    "network": "Erreur réseau. ",
+    "forbidden": "Vous n'êtes pas autorisé à effectuer cette action.",
+    "notFound": "La ressource demandée n'a pas été trouvée.",
+    "validation": "Veuillez consulter les champs en surbrillance."
+  }
+}

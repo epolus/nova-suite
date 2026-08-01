@@ -1,0 +1,91 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+.dashboard-grid-container {
+  min-height: 200px;
+}
+
+.dashboard-grid-container .react-grid-layout {
+  position: relative;
+}
+
+.dashboard-grid-container .react-grid-item {
+  transition: box-shadow 150ms ease, transform 200ms ease;
+}
+
+.dashboard-grid-container .react-grid-item.react-draggable-dragging {
+  z-index: 20;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);
+}
+
+.dashboard-grid-container .react-grid-item.react-grid-placeholder {
+  background: rgb(99 102 241);
+  opacity: 0.12;
+  border-radius: 0.75rem;
+}
+
+/* Hide resize handles unless actively customizing */
+.dashboard-grid-container:not(.dashboard-grid-container--editing) .react-resizable-handle {
+  display: none !important;
+}
+
+.dashboard-grid-container--editing .react-grid-item > .react-resizable-handle {
+  opacity: 0;
+}
+
+.dashboard-grid-container--editing .react-grid-item:hover > .react-resizable-handle {
+  opacity: 1;
+}
+
+.dashboard-grid-container--editing .react-grid-item > .react-resizable-handle::after {
+  border-color: rgb(99 102 241);
+}
+
+html.dark .dashboard-grid-container .react-grid-item.react-draggable-dragging {
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Stat KPI tiles */
+.dashboard-widget-stat {
+  border: 1px solid rgb(226 232 240);
+  background: linear-gradient(135deg, rgb(255 255 255) 0%, rgb(248 250 252) 100%);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+html.dark .dashboard-widget-stat {
+  border: 1px solid var(--color-dark-border, #475569);
+  background: linear-gradient(135deg, var(--color-dark-muted-bg, #111827) 0%, var(--color-dark-surface-bg, #1e293b) 100%);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.04),
+    0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+.dashboard-widget-stat-accent-indigo { border-top-width: 3px; border-top-color: rgb(99 102 241); }
+.dashboard-widget-stat-accent-red { border-top-width: 3px; border-top-color: rgb(239 68 68); }
+.dashboard-widget-stat-accent-violet { border-top-width: 3px; border-top-color: rgb(139 92 246); }
+.dashboard-widget-stat-accent-blue { border-top-width: 3px; border-top-color: rgb(59 130 246); }
+.dashboard-widget-stat-accent-emerald { border-top-width: 3px; border-top-color: rgb(16 185 129); }
+
+html.dark .dashboard-widget-stat-accent-indigo { border-top-color: rgb(129 140 248); }
+html.dark .dashboard-widget-stat-accent-red { border-top-color: rgb(248 113 113); }
+html.dark .dashboard-widget-stat-accent-violet { border-top-color: rgb(167 139 250); }
+html.dark .dashboard-widget-stat-accent-blue { border-top-color: rgb(96 165 250); }
+html.dark .dashboard-widget-stat-accent-emerald { border-top-color: rgb(52 211 153); }
+
+.dashboard-widget-panel {
+  border: 1px solid rgb(226 232 240);
+  background: rgb(255 255 255);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+html.dark .dashboard-widget-panel {
+  border: 1px solid var(--color-dark-border, #475569);
+  background: var(--color-dark-surface-bg, #1e293b);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.04),
+    0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+.dashboard-widget-panel [class*='overflow-y-auto'] {
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
