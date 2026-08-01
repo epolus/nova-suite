@@ -24,8 +24,10 @@
     "docker:reset": "docker compose down -v && docker compose up -d"
   },
   "overrides": {
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
     "picomatch": "4.0.4",
     "protobufjs": "7.6.5",
     "serialize-javascript": "7.0.5"
-    }
+  }
 }

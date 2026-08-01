@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, type NavigateOptions, type To } from 'react-router-dom';
+import { useNavigate, type NavigateOptions, type To } from 'react-router-dom';
 
 type PendingNavigation =
   | { kind: 'to'; to: To; options?: NavigateOptions }
@@ -12,13 +12,16 @@ type UseUnsavedChangesGuardOptions = {
   onSave?: () => Promise<boolean>;
 };
 
+/**
+ * Guards programmatic navigation (guardNavigate) and browser refresh/close.
+ * Does not intercept Link/NavLink clicks — that caused URL/router desync.
+ */
 export function useUnsavedChangesGuard({
   isDirty,
   enabled = true,
   onSave,
 }: UseUnsavedChangesGuardOptions) {
   const navigate = useNavigate();
-  const location = useLocation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const pendingNavigation = useRef<PendingNavigation | null>(null);
@@ -98,40 +101,6 @@ export function useUnsavedChangesGuard({
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [shouldGuard]);
-
-  useEffect(() => {
-    if (!shouldGuard) return undefined;
-
-    const onDocumentClick = (event: MouseEvent) => {
-      if (dialogOpen || skipGuardRef.current) return;
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-
-      const anchor = target.closest('a[href]');
-      if (!(anchor instanceof HTMLAnchorElement)) return;
-      if (anchor.target === '_blank' || anchor.hasAttribute('download')) return;
-
-      const href = anchor.getAttribute('href');
-      if (!href || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:')) {
-        return;
-      }
-
-      const nextPath = href.startsWith('/')
-        ? href
-        : new URL(href, window.location.origin).pathname
-          + new URL(href, window.location.origin).search
-          + new URL(href, window.location.origin).hash;
-      const currentPath = location.pathname + location.search + location.hash;
-      if (nextPath === currentPath) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      queueNavigation({ kind: 'to', to: nextPath });
-    };
-
-    document.addEventListener('click', onDocumentClick, true);
-    return () => document.removeEventListener('click', onDocumentClick, true);
-  }, [dialogOpen, location.hash, location.pathname, location.search, queueNavigation, shouldGuard]);
 
   const allowNextNavigation = useCallback(() => {
     skipGuardRef.current = true;

@@ -13,7 +13,7 @@ import AppRoutes from '@/routes/AppRoutes';
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter useTransitions={false}>
         <ThemeProvider>
           <LocaleProvider>
             <AuthProvider>
