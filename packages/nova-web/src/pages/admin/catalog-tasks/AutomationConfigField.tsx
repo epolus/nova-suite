@@ -3,6 +3,8 @@ import type { Ref } from 'react';
 import { useTranslations } from 'use-intl';
 import type { TenantCredentialListItem } from '../../../api/client';
 import UnifiedAutomationDesigner from '../../../components/workflow/UnifiedAutomationDesigner';
+import AutomationDryRunPanel from '../../../components/workflow/AutomationDryRunPanel';
+import { validateAutomationConfig } from '@nova-suite/shared';
 import {
   AUTOMATION_SNIPPET_IDS,
   AUTOMATION_SNIPPET_JSON,
@@ -116,6 +118,26 @@ export default function AutomationConfigField({
         spellCheck={false}
         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
       />
+      <div className="mt-3">
+        <AutomationDryRunPanel
+          getConfig={() => {
+            try {
+              const parsed = JSON.parse(value || '{}') as unknown;
+              if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                return { config: null, error: t('automationMustBeObject') };
+              }
+              const cfg = parsed as Record<string, unknown>;
+              const errors = validateAutomationConfig(cfg);
+              if (errors.length > 0) {
+                return { config: null, error: t('automationInvalid', { errors: errors.join('; ') }) };
+              }
+              return { config: cfg };
+            } catch {
+              return { config: null, error: t('automationNotJson') };
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -433,5 +433,24 @@
     "forbidden": "Sie haben keine Berechtigung, diese Aktion auszuführen.",
     "notFound": "Die angeforderte Ressource wurde nicht gefunden.",
     "validation": "Bitte überprüfen Sie die hervorgehobenen Felder."
+  },
+  "components": {
+    "automationDryRun": {
+      "title": "Test run",
+      "description": "Execute the current state machine with real HTTP calls. Form data is not persisted.",
+      "play": "Play",
+      "running": "Running…",
+      "formDataLabel": "Mock request.form_data (JSON)",
+      "invalidConfig": "Automation config is invalid.",
+      "formDataMustBeObject": "form_data must be a JSON object.",
+      "formDataInvalidJson": "form_data is not valid JSON.",
+      "runFailed": "Dry-run failed.",
+      "resultOk": "Success",
+      "resultFailed": "Failed",
+      "warnings": "Warnings",
+      "trace": "Execution trace",
+      "mergePatch": "Would merge into form_data",
+      "stateResults": "State results"
+    }
   }
 }

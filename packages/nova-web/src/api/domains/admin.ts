@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
 import type { AdminUser, AssignmentGroupItem, AuditEvent, CompanyItem, ConfigDeploymentRun, ConfigPackageApplyResponse, ConfigPackageBundle, ConfigPackageExportResponse, ConfigPackageValidateResponse, CostCenterItem, CreateAssignmentGroupPayload, CreateUserPayload, DepartmentItem, LocationItem, NotificationEmailDelivery, NotificationEmailDeliverySummary, NotificationRule, ProcessItem, RoleItem, RuntimeHealth, ServiceAdminItem, SlaDefinition, SystemMetrics, UpdateAssignmentGroupPayload, UpdateUserPayload, WorkflowDefinition } from '../types';
+import type { AutomationDryRunRequestContext, AutomationDryRunResult } from '../types/automationDryRun';
 
 export const admin = {
   // Users
@@ -143,6 +144,14 @@ export const admin = {
     request<{ id: string }>(`/admin/workflow-definitions/${id}/duplicate`, {
       method: 'POST',
       body: JSON.stringify({}),
+    }),
+  dryRunAutomation: (data: {
+    automation_config: Record<string, unknown>;
+    request_context?: AutomationDryRunRequestContext;
+  }) =>
+    request<AutomationDryRunResult>('/admin/automation/dry-run', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
   auditEvents: (limit = 200) =>
     request<{ events: AuditEvent[] }>(`/admin/audit-events?limit=${limit}`),

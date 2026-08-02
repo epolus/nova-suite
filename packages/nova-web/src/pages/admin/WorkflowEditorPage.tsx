@@ -3,9 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import UnifiedAutomationDesigner from '../../components/workflow/UnifiedAutomationDesigner';
+import AutomationDryRunPanel from '../../components/workflow/AutomationDryRunPanel';
 import { admin, type WorkflowDefinition } from '../../api/client';
 import { formatDateTime } from '../../utils/dateTime';
 import { diffObjects, formatDiffValue } from './workflow-editor/diff';
+import { validateAutomationConfig } from '@nova-suite/shared';
 
 type PersistedUnifiedDefinition = {
   kind: 'unified_automation_designer_v1';
@@ -271,17 +273,32 @@ export default function WorkflowEditorPage() {
           initialConfigJson={automationConfigJson}
           onApply={(cfg) => setAutomationConfigJson(JSON.stringify(cfg, null, 2))}
         />
-        <div className="bg-white rounded-xl border border-gray-200 p-3">
-          <p className="text-sm font-semibold text-gray-900 mb-2">{t('unifiedJson')}</p>
-          <textarea
-            rows={26}
-            value={automationConfigJson}
-            onChange={(e) => setAutomationConfigJson(e.target.value)}
-            className="w-full px-2.5 py-2 rounded border border-gray-200 text-sm font-mono"
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-3">
+            <p className="text-sm font-semibold text-gray-900 mb-2">{t('unifiedJson')}</p>
+            <textarea
+              rows={18}
+              value={automationConfigJson}
+              onChange={(e) => setAutomationConfigJson(e.target.value)}
+              className="w-full px-2.5 py-2 rounded border border-gray-200 text-sm font-mono"
+            />
+            {!parsedAutomationConfig.valid && (
+              <p className="mt-2 text-xs text-red-700">{t('jsonInvalid')}</p>
+            )}
+          </div>
+          <AutomationDryRunPanel
+            disabled={busy || !parsedAutomationConfig.valid}
+            getConfig={() => {
+              if (!parsedAutomationConfig.valid) {
+                return { config: null, error: t('invalidJson') };
+              }
+              const errors = validateAutomationConfig(parsedAutomationConfig.value);
+              if (errors.length > 0) {
+                return { config: null, error: errors.join('; ') };
+              }
+              return { config: parsedAutomationConfig.value };
+            }}
           />
-          {!parsedAutomationConfig.valid && (
-            <p className="mt-2 text-xs text-red-700">{t('jsonInvalid')}</p>
-          )}
         </div>
       </div>
     </>

@@ -433,5 +433,24 @@
     "forbidden": "Vous n'êtes pas autorisé à effectuer cette action.",
     "notFound": "La ressource demandée n'a pas été trouvée.",
     "validation": "Veuillez consulter les champs en surbrillance."
+  },
+  "components": {
+    "automationDryRun": {
+      "title": "Test run",
+      "description": "Execute the current state machine with real HTTP calls. Form data is not persisted.",
+      "play": "Play",
+      "running": "Running…",
+      "formDataLabel": "Mock request.form_data (JSON)",
+      "invalidConfig": "Automation config is invalid.",
+      "formDataMustBeObject": "form_data must be a JSON object.",
+      "formDataInvalidJson": "form_data is not valid JSON.",
+      "runFailed": "Dry-run failed.",
+      "resultOk": "Success",
+      "resultFailed": "Failed",
+      "warnings": "Warnings",
+      "trace": "Execution trace",
+      "mergePatch": "Would merge into form_data",
+      "stateResults": "State results"
+    }
   }
 }

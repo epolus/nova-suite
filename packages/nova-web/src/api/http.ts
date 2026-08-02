@@ -13,10 +13,12 @@ export function clearToken() {
   localStorage.removeItem('nova_token');
 }
 
-function parseErrorBody(body: { error?: string; details?: Array<{ path?: string; message?: string }> }, status: number): string {
-  const details = Array.isArray(body?.details)
-    ? body.details
+function parseErrorBody(body: { error?: string; details?: Array<{ path?: string; message?: string }> | string[] }, status: number): string {
+  const rawDetails = body?.details;
+  const details = Array.isArray(rawDetails)
+    ? rawDetails
         .map((detail) => {
+          if (typeof detail === 'string') return detail;
           const p = typeof detail?.path === 'string' && detail.path ? `${detail.path}: ` : '';
           const message = typeof detail?.message === 'string' ? detail.message : 'Invalid value';
           return `${p}${message}`;

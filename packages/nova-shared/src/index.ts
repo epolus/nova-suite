@@ -2,5 +2,6 @@
 export * from './automation-config';
 export * from './automation-fixtures';
 export * from './automation-builder-defaults';
+export * from './automation-runtime';
 export * from './catalog-links';
 export * from './analytics-snapshot-metrics';
