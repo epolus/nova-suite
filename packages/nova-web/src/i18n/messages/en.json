@@ -1258,7 +1258,98 @@
       "title": "Administration",
       "users": "Manage users, roles, and organizational structure.",
       "assignmentGroups": "Manage assignment groups and memberships.",
-      "theming": "Customize branding, light theme, and dark theme colors.",
+      "theming": {
+        "title": "Theming & Branding",
+        "description": "Customize the look and feel of your Nova Suite instance.",
+        "applicationIdentity": "Application Identity",
+        "appName": "Application Name",
+        "appNameHint": "Shown in the sidebar header and login page",
+        "appNamePlaceholder": "Nova Suite",
+        "subtitle": "Subtitle",
+        "subtitleHint": "Displayed below the app name",
+        "subtitlePlaceholder": "Service Management",
+        "catalogCurrency": "Catalog Currency",
+        "catalogCurrencyHint": "Currency code used to display service item prices (for example: USD, EUR, CHF)",
+        "catalogCurrencyPlaceholder": "USD",
+        "logo": "Logo",
+        "logoAlt": "Logo",
+        "logoHint": "Upload a logo (PNG, JPG, SVG). Recommended size: 200x200px or larger.",
+        "uploadLogo": "Upload Logo",
+        "removeLogo": "Remove",
+        "uploading": "Uploading...",
+        "colorsTitle": "Colors",
+        "darkModeColors": "Dark Mode Colors",
+        "darkModeHint": "These colors are used when users enable dark mode with the toggle switch.",
+        "resetDarkDefaults": "Reset dark defaults",
+        "defaultAppName": "Nova Suite",
+        "defaultSubtitle": "Service Management",
+        "preview": "Preview",
+        "loginPageBackground": "Login page background",
+        "buttonPreview": "Button preview",
+        "primaryButton": "Primary Button",
+        "darkModePreview": "Dark mode preview",
+        "incidentInsights": "Incident Insights",
+        "similarIncidents": "Similar incidents and knowledge suggestions in dark mode.",
+        "exampleInputSurface": "Example input surface",
+        "previewNav": {
+          "dashboard": "Dashboard",
+          "myTodo": "My Todo",
+          "incidents": "Incidents"
+        },
+        "colors": {
+          "primaryColor": {
+            "label": "Primary Color",
+            "description": "Buttons, active nav items, links, and accents"
+          },
+          "sidebarBg": {
+            "label": "Sidebar Background",
+            "description": "Main sidebar background color"
+          },
+          "sidebarActiveBg": {
+            "label": "Sidebar Active Item",
+            "description": "Background for the active navigation item"
+          },
+          "contentBg": {
+            "label": "Page Background",
+            "description": "Main content area background color"
+          },
+          "loginBgFrom": {
+            "label": "Login Background (Start)",
+            "description": "Gradient start color for the login page"
+          },
+          "loginBgTo": {
+            "label": "Login Background (End)",
+            "description": "Gradient end color for the login page"
+          },
+          "darkContentBg": {
+            "label": "Dark Content Background",
+            "description": "Main application background in dark mode"
+          },
+          "darkSurfaceBg": {
+            "label": "Dark Surface",
+            "description": "Cards, modals, and white panels in dark mode"
+          },
+          "darkMutedBg": {
+            "label": "Dark Muted Background",
+            "description": "Inputs and neutral subtle backgrounds"
+          },
+          "darkBorderColor": {
+            "label": "Dark Border Color",
+            "description": "Borders and dividers in dark mode"
+          },
+          "darkTextPrimary": {
+            "label": "Dark Primary Text",
+            "description": "Main text color in dark mode"
+          },
+          "darkTextMuted": {
+            "label": "Dark Muted Text",
+            "description": "Secondary labels and helper text"
+          }
+        },
+        "saved": "Changes saved and applied!",
+        "saveFailed": "Failed to save theme settings",
+        "resetDefaults": "Reset to defaults"
+      },
       "imports": "Import and synchronize external data.",
       "companies": {
         "title": "Companies",
@@ -1862,16 +1953,40 @@
           "p5": "P5 – Planning"
         },
         "warningActions": {
-          "notifyAssignee": { "label": "Notify Assignee", "description": "Send notification to the assigned person" },
-          "notifyGroupManager": { "label": "Notify Group Manager", "description": "Alert the assignment group manager" },
-          "autoAssign": { "label": "Auto-Assign", "description": "Automatically assign to an available agent if unassigned" }
+          "notifyAssignee": {
+            "label": "Notify Assignee",
+            "description": "Send notification to the assigned person"
+          },
+          "notifyGroupManager": {
+            "label": "Notify Group Manager",
+            "description": "Alert the assignment group manager"
+          },
+          "autoAssign": {
+            "label": "Auto-Assign",
+            "description": "Automatically assign to an available agent if unassigned"
+          }
         },
         "breachActions": {
-          "escalatePriority": { "label": "Escalate Priority", "description": "Increase priority by one level (e.g. P3 → P2)" },
-          "notifyAssignee": { "label": "Notify Assignee", "description": "Send breach notification to the assigned person" },
-          "notifyGroupManager": { "label": "Notify Group Manager", "description": "Alert the assignment group manager about the breach" },
-          "reassign": { "label": "Reassign", "description": "Reassign to a different agent or group" },
-          "notifyRequester": { "label": "Notify Requester", "description": "Inform the requester about the SLA breach" }
+          "escalatePriority": {
+            "label": "Escalate Priority",
+            "description": "Increase priority by one level (e.g. P3 → P2)"
+          },
+          "notifyAssignee": {
+            "label": "Notify Assignee",
+            "description": "Send breach notification to the assigned person"
+          },
+          "notifyGroupManager": {
+            "label": "Notify Group Manager",
+            "description": "Alert the assignment group manager about the breach"
+          },
+          "reassign": {
+            "label": "Reassign",
+            "description": "Reassign to a different agent or group"
+          },
+          "notifyRequester": {
+            "label": "Notify Requester",
+            "description": "Inform the requester about the SLA breach"
+          }
         },
         "form": {
           "newTitle": "New SLA Definition",
@@ -2342,62 +2457,6 @@
           "ipAddress": "IP address",
           "action": "Action"
         }
-      },
-      "theming": {
-        "title": "Theming & Branding",
-        "description": "Customize the look and feel of your Nova Suite instance.",
-        "applicationIdentity": "Application Identity",
-        "appName": "Application Name",
-        "appNameHint": "Shown in the sidebar header and login page",
-        "appNamePlaceholder": "Nova Suite",
-        "subtitle": "Subtitle",
-        "subtitleHint": "Displayed below the app name",
-        "subtitlePlaceholder": "Service Management",
-        "catalogCurrency": "Catalog Currency",
-        "catalogCurrencyHint": "Currency code used to display service item prices (for example: USD, EUR, CHF)",
-        "catalogCurrencyPlaceholder": "USD",
-        "logo": "Logo",
-        "logoAlt": "Logo",
-        "logoHint": "Upload a logo (PNG, JPG, SVG). Recommended size: 200x200px or larger.",
-        "uploadLogo": "Upload Logo",
-        "removeLogo": "Remove",
-        "uploading": "Uploading...",
-        "colorsTitle": "Colors",
-        "darkModeColors": "Dark Mode Colors",
-        "darkModeHint": "These colors are used when users enable dark mode with the toggle switch.",
-        "resetDarkDefaults": "Reset dark defaults",
-        "defaultAppName": "Nova Suite",
-        "defaultSubtitle": "Service Management",
-        "preview": "Preview",
-        "loginPageBackground": "Login page background",
-        "buttonPreview": "Button preview",
-        "primaryButton": "Primary Button",
-        "darkModePreview": "Dark mode preview",
-        "incidentInsights": "Incident Insights",
-        "similarIncidents": "Similar incidents and knowledge suggestions in dark mode.",
-        "exampleInputSurface": "Example input surface",
-        "previewNav": {
-          "dashboard": "Dashboard",
-          "myTodo": "My Todo",
-          "incidents": "Incidents"
-        },
-        "colors": {
-          "primaryColor": { "label": "Primary Color", "description": "Buttons, active nav items, links, and accents" },
-          "sidebarBg": { "label": "Sidebar Background", "description": "Main sidebar background color" },
-          "sidebarActiveBg": { "label": "Sidebar Active Item", "description": "Background for the active navigation item" },
-          "contentBg": { "label": "Page Background", "description": "Main content area background color" },
-          "loginBgFrom": { "label": "Login Background (Start)", "description": "Gradient start color for the login page" },
-          "loginBgTo": { "label": "Login Background (End)", "description": "Gradient end color for the login page" },
-          "darkContentBg": { "label": "Dark Content Background", "description": "Main application background in dark mode" },
-          "darkSurfaceBg": { "label": "Dark Surface", "description": "Cards, modals, and white panels in dark mode" },
-          "darkMutedBg": { "label": "Dark Muted Background", "description": "Inputs and neutral subtle backgrounds" },
-          "darkBorderColor": { "label": "Dark Border Color", "description": "Borders and dividers in dark mode" },
-          "darkTextPrimary": { "label": "Dark Primary Text", "description": "Main text color in dark mode" },
-          "darkTextMuted": { "label": "Dark Muted Text", "description": "Secondary labels and helper text" }
-        },
-        "saved": "Changes saved and applied!",
-        "saveFailed": "Failed to save theme settings",
-        "resetDefaults": "Reset to defaults"
       },
       "userDetail": {
         "createTitle": "Create User",
@@ -3071,6 +3130,7 @@
       "removeNode": "Remove node",
       "removeEdge": "Remove edge",
       "jsonSyncAutomatic": "JSON sync: automatic",
+      "centerView": "Center",
       "selectNodeOrEdge": "Select a node or edge to edit.",
       "edgeLabelCondition": "Edge label / condition",
       "edgeLabelPlaceholder": "e.g. true, false, success, failure",
@@ -3113,7 +3173,8 @@
         "activityRequiresUrl": "Activity \"{label}\" requires url.",
         "decisionInvalidExpression": "Decision \"{label}\" has invalid expression JSON.",
         "actionInvalidAttributes": "Action \"{label}\" has invalid attributes JSON."
-      }
+      },
+      "fitToScreen": "Fit to screen"
     },
     "majorIncidentBanner": {
       "label": "Major incident"
@@ -3155,37 +3216,124 @@
         "record": "Record"
       },
       "commandDefs": {
-        "inc": { "label": "Incidents", "description": "Search only incidents" },
-        "chg": { "label": "Changes", "description": "Search only changes" },
-        "prb": { "label": "Problems", "description": "Search only problems" },
-        "kb": { "label": "Knowledge", "description": "Search only knowledge articles" },
-        "ci": { "label": "CMDB", "description": "Search only configuration items" },
-        "help": { "label": "Help", "description": "Show all available commands" }
+        "inc": {
+          "label": "Incidents",
+          "description": "Search only incidents"
+        },
+        "chg": {
+          "label": "Changes",
+          "description": "Search only changes"
+        },
+        "prb": {
+          "label": "Problems",
+          "description": "Search only problems"
+        },
+        "kb": {
+          "label": "Knowledge",
+          "description": "Search only knowledge articles"
+        },
+        "ci": {
+          "label": "CMDB",
+          "description": "Search only configuration items"
+        },
+        "help": {
+          "label": "Help",
+          "description": "Show all available commands"
+        }
       },
       "nav": {
-        "dashboard": { "title": "Dashboard", "subtitle": "Home overview" },
-        "myTodo": { "title": "My Todo", "subtitle": "Tasks assigned to me" },
-        "myGroups": { "title": "My Groups", "subtitle": "Incidents from my groups" },
-        "incidents": { "title": "Incidents", "subtitle": "All incidents" },
-        "changes": { "title": "Changes", "subtitle": "Change management" },
-        "problems": { "title": "Problems", "subtitle": "Problem management" },
-        "knowledge": { "title": "Knowledge Base", "subtitle": "Browse and author articles" },
-        "cmdb": { "title": "CMDB", "subtitle": "Configuration items" },
-        "catalog": { "title": "Service Catalog", "subtitle": "Browse available services" },
-        "requests": { "title": "Requests", "subtitle": "Service requests" },
-        "adminUsers": { "title": "Manage Users", "subtitle": "Admin · Organization" },
-        "adminDepartments": { "title": "Manage Departments", "subtitle": "Admin · Organization" },
-        "adminCompanies": { "title": "Manage Companies", "subtitle": "Admin · Organization" },
-        "adminLocations": { "title": "Manage Locations", "subtitle": "Admin · Organization" },
-        "adminAssignmentGroups": { "title": "Manage Assignment Groups", "subtitle": "Admin · Organization" },
-        "adminCiClasses": { "title": "Open CMDB Class Manager", "subtitle": "Admin · CMDB" },
-        "adminSlaConfig": { "title": "SLA Configuration", "subtitle": "Admin · Process & Automation" },
-        "adminKnowledgeWorkflows": { "title": "Knowledge Workflows", "subtitle": "Admin · Process & Automation" },
-        "adminChangeManagement": { "title": "Change Management Config", "subtitle": "Admin · Process & Automation" },
-        "adminSystemStatus": { "title": "System Status", "subtitle": "Admin · System" },
-        "adminTheming": { "title": "Theming & Branding", "subtitle": "Admin · System" },
-        "adminImport": { "title": "Import Data", "subtitle": "Admin · Data & Integration" },
-        "adminServiceItems": { "title": "Service Items", "subtitle": "Admin · Service Catalog" }
+        "dashboard": {
+          "title": "Dashboard",
+          "subtitle": "Home overview"
+        },
+        "myTodo": {
+          "title": "My Todo",
+          "subtitle": "Tasks assigned to me"
+        },
+        "myGroups": {
+          "title": "My Groups",
+          "subtitle": "Incidents from my groups"
+        },
+        "incidents": {
+          "title": "Incidents",
+          "subtitle": "All incidents"
+        },
+        "changes": {
+          "title": "Changes",
+          "subtitle": "Change management"
+        },
+        "problems": {
+          "title": "Problems",
+          "subtitle": "Problem management"
+        },
+        "knowledge": {
+          "title": "Knowledge Base",
+          "subtitle": "Browse and author articles"
+        },
+        "cmdb": {
+          "title": "CMDB",
+          "subtitle": "Configuration items"
+        },
+        "catalog": {
+          "title": "Service Catalog",
+          "subtitle": "Browse available services"
+        },
+        "requests": {
+          "title": "Requests",
+          "subtitle": "Service requests"
+        },
+        "adminUsers": {
+          "title": "Manage Users",
+          "subtitle": "Admin · Organization"
+        },
+        "adminDepartments": {
+          "title": "Manage Departments",
+          "subtitle": "Admin · Organization"
+        },
+        "adminCompanies": {
+          "title": "Manage Companies",
+          "subtitle": "Admin · Organization"
+        },
+        "adminLocations": {
+          "title": "Manage Locations",
+          "subtitle": "Admin · Organization"
+        },
+        "adminAssignmentGroups": {
+          "title": "Manage Assignment Groups",
+          "subtitle": "Admin · Organization"
+        },
+        "adminCiClasses": {
+          "title": "Open CMDB Class Manager",
+          "subtitle": "Admin · CMDB"
+        },
+        "adminSlaConfig": {
+          "title": "SLA Configuration",
+          "subtitle": "Admin · Process & Automation"
+        },
+        "adminKnowledgeWorkflows": {
+          "title": "Knowledge Workflows",
+          "subtitle": "Admin · Process & Automation"
+        },
+        "adminChangeManagement": {
+          "title": "Change Management Config",
+          "subtitle": "Admin · Process & Automation"
+        },
+        "adminSystemStatus": {
+          "title": "System Status",
+          "subtitle": "Admin · System"
+        },
+        "adminTheming": {
+          "title": "Theming & Branding",
+          "subtitle": "Admin · System"
+        },
+        "adminImport": {
+          "title": "Import Data",
+          "subtitle": "Admin · Data & Integration"
+        },
+        "adminServiceItems": {
+          "title": "Service Items",
+          "subtitle": "Admin · Service Catalog"
+        }
       }
     }
   },

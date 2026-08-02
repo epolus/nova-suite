@@ -451,6 +451,10 @@
       "trace": "Execution trace",
       "mergePatch": "Would merge into form_data",
       "stateResults": "State results"
+    },
+    "unifiedAutomationDesigner": {
+      "centerView": "Centra",
+      "fitToScreen": "Adatta allo schermo"
     }
   }
 }
