@@ -25,6 +25,6 @@ export const SNAPSHOT_TREND_METRICS: SnapshotTrendMetric[] = [
   {
     dataset: 'problems',
     metric: 'open_backlog',
-    countSql: `SELECT count(*)::int AS value FROM problems WHERE status NOT IN ('resolved','closed','cancelled')`,
+    countSql: `SELECT count(*)::int AS value FROM problems WHERE status NOT IN ('resolved','closed')`,
   },
 ];
