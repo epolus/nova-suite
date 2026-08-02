@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Suspense } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { Button } from '@/components/ui/button';
 import { useChangeStats, useTrendCatalog } from './hooks';

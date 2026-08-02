@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { notifications as notificationsApi, type AppNotification } from '@/api/client';
 import { formatDateTime } from '@/utils/dateTime';

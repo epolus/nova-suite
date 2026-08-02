@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useMemo, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import SearchBar from '../../components/SearchBar';

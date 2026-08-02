@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router';
 import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/Layout';
 import ESSLayout from '@/components/ESSLayout';

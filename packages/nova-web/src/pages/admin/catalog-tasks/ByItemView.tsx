@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { catalog } from '../../../api/client';
 import type { CatalogTask, ServiceItem } from '../../../api/client';
 import Spinner from '../../../components/Spinner';

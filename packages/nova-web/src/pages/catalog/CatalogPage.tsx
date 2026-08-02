@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { catalog } from '../../api/client';
 import type { Category, ServiceItem } from '../../api/client';

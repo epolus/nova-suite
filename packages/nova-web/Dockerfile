@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/nova-web/package.json packages/nova-web/package.json
 COPY packages/nova-shared/package.json packages/nova-shared/package.json
-# Overrides in root package.json pin @types/react to 18.x (React 19 types break the build)
+# Root package.json overrides pin react / @types/react to a single version across workspaces
 RUN npm install --workspaces --include-workspace-root=false
 COPY packages/nova-shared/tsconfig.json packages/nova-shared/tsconfig.json
 COPY packages/nova-shared/tsconfig.esm.json packages/nova-shared/tsconfig.esm.json

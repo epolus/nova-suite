@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslations } from 'use-intl';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { requests as requestsApi } from '../api/client';
 import type { RequestTaskListItem, Pagination } from '../api/client';
 import { useAuth } from '../context/AuthContext';

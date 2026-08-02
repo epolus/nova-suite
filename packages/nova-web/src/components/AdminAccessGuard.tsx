@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import Spinner from './Spinner';
 import { canAccessAdminRoute } from '../utils/adminRouteAccess';

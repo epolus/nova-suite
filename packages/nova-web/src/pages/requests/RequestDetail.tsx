@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useLocation, Link } from 'react-router-dom';
+import { useParams, useLocation, Link } from 'react-router';
 import { requests as requestsApi } from '../../api/client';
 import type { ServiceRequest, RequestTask, FormField } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { attachments as attachmentsApi, cmdb, problems as problemsApi } from '@/api/client';
 import type { AssignmentGroupItem, Attachment, CI, KnownError, Problem, ProblemIncidentLink, ProblemTask } from '@/api/client';
 import { useProblem, useInvalidateProblems, useInvalidateReferenceData } from '@/hooks/queries';

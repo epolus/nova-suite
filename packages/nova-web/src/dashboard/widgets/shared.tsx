@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 const ACCENT_ICON_BG: Record<string, string> = {
   indigo: 'bg-indigo-500/10 text-indigo-600',

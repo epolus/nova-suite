@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { cmdb, auth } from '../../api/client';
 
 export function ResolvedCmdbRef({ ciId }: { ciId: string }) {

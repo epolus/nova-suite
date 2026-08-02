@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslations } from 'use-intl';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { importer } from '../../api/client';
 import type { ImportUploadResult, ImportRow, ImportValidationResult } from '../../api/client';
 import PageHeader from '../../components/PageHeader';

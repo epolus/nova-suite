@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import {
   admin,
   auth,

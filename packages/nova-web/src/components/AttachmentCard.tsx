@@ -10,7 +10,7 @@ interface Props {
   loading?: boolean;
   uploading: boolean;
   dragOver: boolean;
-  fileInputRef: RefObject<HTMLInputElement>;
+  fileInputRef: RefObject<HTMLInputElement | null>;
   previewUrl: string | null;
   previewName: string;
   onDragOver: (e: DragEvent) => void;

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { useStatusLabel } from '@/i18n/hooks';
 import { useActiveMajorIncidents } from '../hooks';

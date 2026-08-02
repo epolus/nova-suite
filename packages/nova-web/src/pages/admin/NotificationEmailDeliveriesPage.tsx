@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { admin as adminApi, type NotificationEmailDelivery, type NotificationEmailDeliverySummary } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { incidents as incidentsApi } from '../../api/client';
 import type { Incident, JournalEntry } from '../../api/client';

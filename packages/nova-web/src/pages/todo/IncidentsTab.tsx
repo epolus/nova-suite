@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { incidents as incidentsApi } from '@/api/client';
 import type { Incident } from '@/api/client';

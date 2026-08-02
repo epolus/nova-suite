@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { useTranslations } from 'use-intl';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { catalog } from '../../api/client';
 import type { ServiceItem, AllCatalogTask } from '../../api/client';
 import PageHeader from '../../components/PageHeader';

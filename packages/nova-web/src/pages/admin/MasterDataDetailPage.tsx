@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';

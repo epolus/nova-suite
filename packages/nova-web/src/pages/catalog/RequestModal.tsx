@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, type FormEvent, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { requests } from '../../api/client';
 import type { ServiceItem, FormField } from '../../api/client';

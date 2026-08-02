@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { usePriorityLabel } from '@/i18n/hooks';
 import { useIncidentStats } from '../hooks';
 import type { DashboardWidgetProps } from '../types';

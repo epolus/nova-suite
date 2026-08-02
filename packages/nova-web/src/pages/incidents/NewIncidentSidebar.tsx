@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState } from 'react';
-import type { NavigateFunction } from 'react-router-dom';
+import type { NavigateFunction } from 'react-router';
 import { attachments as attachmentsApi, knowledge as knowledgeApi } from '../../api/client';
 import type { KnowledgeArticleDetail, SimilarIncident, KnowledgeSuggestion } from '../../api/client';
 import { Card as UiCard, CardContent, CardHeader, CardTitle } from '../../components/ui/card';

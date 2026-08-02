@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { useAuth } from '../../context/AuthContext';
 import { search as searchApi, type SearchResult } from '../../api/client';

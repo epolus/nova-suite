@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import type { ReactNode } from 'react';
 import { useTranslations } from 'use-intl';
 import { formatEnumFallback } from '@/i18n/labels';

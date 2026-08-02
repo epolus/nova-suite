@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { releases } from '@/api/client';
 import type { Release } from '@/api/client';

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { requests as requestsApi } from '../../api/client';
 import type { RequestTaskListItem } from '../../api/client';

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/context/AuthProvider';
 import { CartProvider } from '@/context/CartProvider';

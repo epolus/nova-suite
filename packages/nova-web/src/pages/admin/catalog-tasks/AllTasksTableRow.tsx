@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Fragment } from 'react';
 import { useTranslations } from 'use-intl';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { TYPE_COLORS, type ServiceItemTaskRow } from './types';
 
 export default function AllTasksTableRow({

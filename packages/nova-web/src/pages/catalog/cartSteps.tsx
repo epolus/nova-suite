@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { type CartItem } from '../../context/CartContext';
 import { auth } from '../../api/client';

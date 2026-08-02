@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { incidents as incidentsApi, requests as requestsApi } from '@/api/client';
 import PageHeader from '@/components/PageHeader';

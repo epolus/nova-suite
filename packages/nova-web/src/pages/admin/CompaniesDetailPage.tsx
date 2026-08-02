@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { admin, type CompanyItem } from '../../api/client';
 import type { FieldDef } from './MasterDataPage';

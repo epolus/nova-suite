@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, type NavigateOptions, type To } from 'react-router-dom';
+import { useNavigate, type NavigateOptions, type To } from 'react-router';
 
 type PendingNavigation =
   | { kind: 'to'; to: To; options?: NavigateOptions }

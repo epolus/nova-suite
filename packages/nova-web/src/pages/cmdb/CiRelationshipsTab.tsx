@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import {
   Background,
   Controls,
@@ -10,7 +10,7 @@ import {
   ReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import type { CI } from '../../api/client';
 import Card from '../../components/Card';

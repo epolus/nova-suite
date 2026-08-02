@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import type { SimilarIncident, KnowledgeSuggestion } from '../api/client';
 import Badge from './Badge';

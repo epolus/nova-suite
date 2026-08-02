@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { auth } from '../api/client';
 

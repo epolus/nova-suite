@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'use-intl';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import { temporal as temporalApi } from '../../api/client';
 import type { TemporalOverview, WorkflowExecution } from '../../api/client';
 import PageHeader from '../../components/PageHeader';

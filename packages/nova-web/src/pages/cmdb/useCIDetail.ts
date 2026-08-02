@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router';
 import { cmdb, auth, admin, problems } from '../../api/client';
 import type { CI, CIClass, CIRelationship, CIHistoryEntry, ImpactedCI, Problem } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';

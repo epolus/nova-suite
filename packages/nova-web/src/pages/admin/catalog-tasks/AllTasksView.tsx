@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import type { AllCatalogTask } from '../../../api/client';
 import { useUserPreferenceState } from '../../../hooks/useUserPreferenceState';
 import {

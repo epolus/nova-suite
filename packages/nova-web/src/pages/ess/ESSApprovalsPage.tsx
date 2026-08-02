@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useTranslations, useMessages } from 'use-intl';
 import { approvals as approvalsApi, type PendingApproval } from '../../api/client';
 
