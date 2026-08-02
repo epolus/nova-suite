@@ -13,15 +13,23 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@jsonforms/core": "^3.8.0",
+    "@jsonforms/react": "^3.8.0",
     "@nova-suite/shared": "1.0.0",
     "@tanstack/react-query": "^5.90.2",
+    "@workflowbuilder/sdk": "^2.2.0",
     "@xyflow/react": "^12.10.2",
+    "i18next": "^24.2.3",
+    "i18next-browser-languagedetector": "^8.2.1",
+    "immer": "^10.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-grid-layout": "^2.2.3",
+    "react-i18next": "^15.7.4",
     "react-resizable": "^4.0.1",
     "react-router-dom": "^7.18.2",
-    "use-intl": "^4.9.1"
+    "use-intl": "^4.9.1",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

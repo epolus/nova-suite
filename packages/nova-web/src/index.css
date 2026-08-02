@@ -112,7 +112,18 @@
   }
 }
 
-/* Embedded catalog automation builder (React Flow) */
+/* Contain Workflow Builder SDK viewport styles when embedded in admin pages */
+.workflow-builder-sdk__canvas {
+  --wb-background-color: #f8fafc;
+  isolation: isolate;
+}
+
+.workflow-builder-sdk__canvas .react-flow {
+  width: 100%;
+  height: 100%;
+}
+
+/* Embedded catalog automation builder (React Flow / Workflow Builder SDK) */
 .catalog-automation-builder .react-flow__node {
   background: #ffffff;
   color: #111827;
