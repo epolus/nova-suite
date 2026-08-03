@@ -30,7 +30,9 @@ export const catalogDesignerNav = [
 
 export function isWorkflowEditorPath(pathname: string): boolean {
   return pathname === '/admin/workflows/editor' || pathname.startsWith('/admin/workflows/editor/')
-    || pathname === '/admin/workflows/designer' || pathname.startsWith('/admin/workflows/designer/');
+    || pathname === '/admin/workflows/designer' || pathname.startsWith('/admin/workflows/designer/')
+    || pathname.startsWith('/admin/catalog-tasks/'
+    );
 }
 
 export function isWorkflowExecutionDetailPath(pathname: string): boolean {
@@ -49,6 +51,7 @@ export function isNavItemActive(itemTo: string, pathname: string | undefined, fa
 }
 
 export function useFullWidthContent(pathname: string): boolean {
+  if (isWorkflowEditorPath(pathname)) return true;
   const fullWidthPaths = new Set([
     '/incidents',
     '/requests',
@@ -61,8 +64,14 @@ export function useFullWidthContent(pathname: string): boolean {
     '/admin/catalog-tasks',
     '/admin/service-items',
     '/admin/data-sources',
+    ''
   ]);
   return fullWidthPaths.has(pathname);
+}
+
+/** Pages that should fill the main content pane instead of scrolling the whole page. */
+export function useFillHeightContent(pathname: string): boolean {
+  return isWorkflowEditorPath(pathname);
 }
 
 export const adminSections: RawAdminSection[] = [

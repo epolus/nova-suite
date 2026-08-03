@@ -116,9 +116,11 @@
 .workflow-builder-sdk__canvas {
   --wb-background-color: #f8fafc;
   isolation: isolate;
+  position: relative;
 }
 
-.workflow-builder-sdk__canvas .react-flow {
+.workflow-builder-sdk__canvas .react-flow,
+.workflow-builder-sdk__canvas .workflow-builder-root {
   width: 100%;
   height: 100%;
 }

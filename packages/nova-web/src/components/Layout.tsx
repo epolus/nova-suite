@@ -12,6 +12,7 @@ import {
   adminSections,
   isNavItemActive,
   useFullWidthContent,
+  useFillHeightContent,
   type NavItemDef,
   type AdminSection,
 } from './layout/agentNavConfig';
@@ -190,6 +191,7 @@ export default function Layout() {
 
   const hasAdministrationNav = filteredAdminSections.length > 0;
   const isFullWidthPage = useFullWidthContent(location.pathname);
+  const isFillHeightPage = useFillHeightContent(location.pathname);
   const contentContainerClass = isFullWidthPage ? 'w-full max-w-none' : 'max-w-7xl mx-auto';
 
   // Auto-expand the section that contains the current route
@@ -358,10 +360,20 @@ export default function Layout() {
 
       {/* Main content */}
       <main
-        className={`flex-1 overflow-auto ${isFullWidthPage ? 'border-x border-gray-200' : ''}`}
+        className={`flex-1 min-h-0 ${
+          isFillHeightPage
+            ? 'overflow-auto xl:overflow-hidden xl:flex xl:flex-col'
+            : 'overflow-auto'
+        } ${isFullWidthPage ? 'border-x border-gray-200' : ''}`}
         style={{ backgroundColor: 'var(--color-content-bg)' }}
       >
-        <div className={`p-6 lg:p-8 ${contentContainerClass}`}>
+        <div
+          className={`${
+            isFillHeightPage
+              ? 'p-4 lg:p-5 xl:flex-1 xl:min-h-0 xl:flex xl:flex-col'
+              : 'p-6 lg:p-8'
+          } ${contentContainerClass}`}
+        >
           <Outlet />
         </div>
       </main>

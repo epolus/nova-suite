@@ -182,9 +182,11 @@ function FitViewBridge({
 function UnifiedAutomationDesignerInner({
   initialConfigJson,
   onApply,
+  fillAvailableSpace = false,
 }: {
   initialConfigJson: string;
   onApply: (cfg: Record<string, unknown>) => void;
+  fillAvailableSpace?: boolean;
 }) {
   const t = useTranslations('components.unifiedAutomationDesigner');
   const tErrors = useTranslations('components.unifiedAutomationDesigner.errors');
@@ -268,8 +270,12 @@ function UnifiedAutomationDesignerInner({
   const nodeCount = loaded.error ? 0 : loaded.nodes.length;
 
   return (
-    <div className="catalog-automation-builder workflow-builder-sdk border border-gray-200 rounded-lg p-3 bg-white">
-      <div className="flex flex-wrap items-center gap-2 mb-2 justify-between">
+    <div
+      className={`catalog-automation-builder workflow-builder-sdk border border-gray-200 rounded-lg p-3 bg-white ${
+        fillAvailableSpace ? 'h-full min-h-0 flex flex-col' : ''
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-2 mb-2 justify-between flex-shrink-0">
         <span className="text-[11px] text-gray-500">{t('jsonSyncAutomatic')}</span>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
@@ -291,11 +297,13 @@ function UnifiedAutomationDesignerInner({
         </div>
       </div>
       {builderError && (
-        <div className="mb-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-200">{builderError}</div>
+        <div className="mb-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-200 flex-shrink-0">{builderError}</div>
       )}
       <div
         ref={canvasRootRef}
-        className="h-[520px] border border-gray-200 rounded-md overflow-hidden relative workflow-builder-sdk__canvas"
+        className={`border border-gray-200 rounded-md overflow-hidden relative workflow-builder-sdk__canvas ${
+          fillAvailableSpace ? 'flex-1 min-h-[280px]' : 'h-[520px]'
+        }`}
       >
         <WorkflowBuilder.Root
           key={editorKey}
@@ -331,6 +339,7 @@ function UnifiedAutomationDesignerInner({
 export default function UnifiedAutomationDesigner(props: {
   initialConfigJson: string;
   onApply: (cfg: Record<string, unknown>) => void;
+  fillAvailableSpace?: boolean;
 }) {
   return <UnifiedAutomationDesignerInner {...props} />;
 }

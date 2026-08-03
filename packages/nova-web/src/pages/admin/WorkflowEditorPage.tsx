@@ -200,23 +200,25 @@ export default function WorkflowEditorPage() {
   };
 
   return (
-    <>
-      <PageHeader
-        title={t('title')}
-        description={t('description')}
-        action={
-          <div className="flex items-center gap-2">
-            <button onClick={saveDraft} disabled={busy} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60">
-              {t('saveDraft')}
-            </button>
-            <button onClick={publishDefinition} disabled={busy || !definitionId || !parsedAutomationConfig.valid} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
-              {t('publish')}
-            </button>
-          </div>
-        }
-      />
+    <div className="flex flex-col gap-3 xl:flex-1 xl:min-h-0">
+      <div className="flex-shrink-0 [&>div]:mb-0">
+        <PageHeader
+          title={t('title')}
+          description={t('description')}
+          action={
+            <div className="flex items-center gap-2">
+              <button onClick={saveDraft} disabled={busy} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60">
+                {t('saveDraft')}
+              </button>
+              <button onClick={publishDefinition} disabled={busy || !definitionId || !parsedAutomationConfig.valid} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
+                {t('publish')}
+              </button>
+            </div>
+          }
+        />
+      </div>
 
-      <div className="mb-4 bg-white rounded-xl border border-gray-200 p-3">
+      <div className="flex-shrink-0 max-h-[34vh] overflow-y-auto bg-white rounded-xl border border-gray-200 p-3">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 items-end">
           <div className="lg:col-span-2">
             <label className="block text-xs font-medium text-gray-600 mb-1">{t('definitionName')}</label>
@@ -251,7 +253,7 @@ export default function WorkflowEditorPage() {
               <p className="text-xs text-gray-600 mb-2">{t('publishedVersion', { version: loadedVersion, date: loadedPublishedAt ? formatDateTime(loadedPublishedAt) : '' })}</p>
               <p className="text-xs text-gray-700 mb-2">{diffChanges.length === 0 ? t('draftMatches') : t('fieldChanges', { count: diffChanges.length })}</p>
               {diffChanges.length > 0 && (
-                <div className="max-h-40 overflow-auto bg-white border border-gray-200 rounded p-2">
+                <div className="max-h-28 overflow-auto bg-white border border-gray-200 rounded p-2">
                   <ul className="text-xs text-gray-700 space-y-2">
                     {diffChanges.slice(0, 40).map((change, idx) => (
                       <li key={`${change.path}-${idx}`}>
@@ -268,39 +270,43 @@ export default function WorkflowEditorPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-4">
-        <UnifiedAutomationDesigner
-          initialConfigJson={automationConfigJson}
-          onApply={(cfg) => setAutomationConfigJson(JSON.stringify(cfg, null, 2))}
-        />
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-3">
-            <p className="text-sm font-semibold text-gray-900 mb-2">{t('unifiedJson')}</p>
-            <textarea
-              rows={18}
-              value={automationConfigJson}
-              onChange={(e) => setAutomationConfigJson(e.target.value)}
-              className="w-full px-2.5 py-2 rounded border border-gray-200 text-sm font-mono"
-            />
-            {!parsedAutomationConfig.valid && (
-              <p className="mt-2 text-xs text-red-700">{t('jsonInvalid')}</p>
-            )}
-          </div>
-          <AutomationDryRunPanel
-            disabled={busy || !parsedAutomationConfig.valid}
-            getConfig={() => {
-              if (!parsedAutomationConfig.valid) {
-                return { config: null, error: t('invalidJson') };
-              }
-              const errors = validateAutomationConfig(parsedAutomationConfig.value);
-              if (errors.length > 0) {
-                return { config: null, error: errors.join('; ') };
-              }
-              return { config: parsedAutomationConfig.value };
-            }}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] gap-4 xl:flex-1 xl:min-h-0">
+        <div className="min-h-[420px] xl:min-h-0 xl:h-full">
+          <UnifiedAutomationDesigner
+            fillAvailableSpace
+            initialConfigJson={automationConfigJson}
+            onApply={(cfg) => setAutomationConfigJson(JSON.stringify(cfg, null, 2))}
           />
         </div>
+        <div className="min-h-0 flex flex-col gap-3 xl:overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col min-h-0 xl:flex-1">
+            <p className="text-sm font-semibold text-gray-900 mb-2 flex-shrink-0">{t('unifiedJson')}</p>
+            <textarea
+              value={automationConfigJson}
+              onChange={(e) => setAutomationConfigJson(e.target.value)}
+              className="w-full flex-1 min-h-[160px] px-2.5 py-2 rounded border border-gray-200 text-sm font-mono resize-y xl:resize-none"
+            />
+            {!parsedAutomationConfig.valid && (
+              <p className="mt-2 text-xs text-red-700 flex-shrink-0">{t('jsonInvalid')}</p>
+            )}
+          </div>
+          <div className="flex-shrink-0">
+            <AutomationDryRunPanel
+              disabled={busy || !parsedAutomationConfig.valid}
+              getConfig={() => {
+                if (!parsedAutomationConfig.valid) {
+                  return { config: null, error: t('invalidJson') };
+                }
+                const errors = validateAutomationConfig(parsedAutomationConfig.value);
+                if (errors.length > 0) {
+                  return { config: null, error: errors.join('; ') };
+                }
+                return { config: parsedAutomationConfig.value };
+              }}
+            />
+          </div>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
