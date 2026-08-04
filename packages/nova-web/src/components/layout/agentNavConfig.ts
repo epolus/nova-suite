@@ -53,8 +53,12 @@ export function isNavItemActive(itemTo: string, pathname: string | undefined, fa
 export function useFullWidthContent(pathname: string): boolean {
   if (isWorkflowEditorPath(pathname)) return true;
   const fullWidthPaths = new Set([
+    '/my-todo',
+    '/my-groups',
     '/incidents',
+    '/major-incidents',
     '/requests',
+    '/request-tasks',
     '/changes',
     '/assets',
     '/releases',
