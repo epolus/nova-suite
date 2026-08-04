@@ -30,9 +30,7 @@ export const catalogDesignerNav = [
 
 export function isWorkflowEditorPath(pathname: string): boolean {
   return pathname === '/admin/workflows/editor' || pathname.startsWith('/admin/workflows/editor/')
-    || pathname === '/admin/workflows/designer' || pathname.startsWith('/admin/workflows/designer/')
-    || pathname.startsWith('/admin/catalog-tasks/'
-    );
+    || pathname === '/admin/workflows/designer' || pathname.startsWith('/admin/workflows/designer/');
 }
 
 export function isWorkflowExecutionDetailPath(pathname: string): boolean {
@@ -52,6 +50,7 @@ export function isNavItemActive(itemTo: string, pathname: string | undefined, fa
 
 export function useFullWidthContent(pathname: string): boolean {
   if (isWorkflowEditorPath(pathname)) return true;
+  if (pathname === '/admin/catalog-tasks' || pathname.startsWith('/admin/catalog-tasks/')) return true;
   const fullWidthPaths = new Set([
     '/my-todo',
     '/my-groups',
@@ -65,10 +64,8 @@ export function useFullWidthContent(pathname: string): boolean {
     '/problems',
     '/cmdb',
     '/admin/workflows',
-    '/admin/catalog-tasks',
     '/admin/service-items',
     '/admin/data-sources',
-    ''
   ]);
   return fullWidthPaths.has(pathname);
 }

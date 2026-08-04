@@ -5,12 +5,14 @@ import {
   getStoreDataForIntegration,
   useChangesTrackerStore,
   useStore,
+  useWorkflowBuilderActions,
   WorkflowBuilder,
   type IntegrationDataFormat,
   type WorkflowBuilderIsValidConnection,
 } from '@workflowbuilder/sdk';
 import { getNodesBounds } from '@xyflow/react';
 import '@workflowbuilder/sdk/style.css';
+import { useTheme } from '../../context/ThemeContext';
 import {
   loadSdkGraphFromConfig,
   serializeSdkGraphToConfig,
@@ -133,6 +135,18 @@ function SyncBridge({
     }, 200);
     return () => window.clearTimeout(timer);
   }, [timestamp, onApply, onError, formatError, lastEmittedJsonRef]);
+
+  return null;
+}
+
+/** Keep Workflow Builder theme in sync with Nova Suite's dark-mode toggle. */
+function SdkThemeSync() {
+  const { isDark } = useTheme();
+  const { setTheme } = useWorkflowBuilderActions();
+
+  useEffect(() => {
+    setTheme(isDark ? 'dark' : 'light');
+  }, [isDark, setTheme]);
 
   return null;
 }
@@ -319,6 +333,7 @@ function UnifiedAutomationDesignerInner({
           }}
         >
           <WorkflowBuilder.DefaultLayout />
+          <SdkThemeSync />
           <SyncBridge
             onApply={handleApplyFromSync}
             onError={setBuilderError}

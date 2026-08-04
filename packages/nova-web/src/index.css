@@ -189,6 +189,11 @@
   height: 100%;
 }
 
+/* Hide SDK app bar — theme is driven by Nova Suite's dark-mode toggle instead. */
+.workflow-builder-sdk__canvas .workflow-builder-root > div:first-child {
+  display: none;
+}
+
 /* Embedded catalog automation builder (React Flow / Workflow Builder SDK) */
 .catalog-automation-builder .react-flow__node {
   background: #ffffff;
