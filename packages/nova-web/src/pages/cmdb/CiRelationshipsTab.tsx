@@ -178,7 +178,7 @@ export default function CiRelationshipsTab({
               <select
                 value={relForm.direction}
                 onChange={(e) => setRelForm({ ...relForm, direction: e.target.value as 'outgoing' | 'incoming' })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="outgoing">{tCmdb('outgoingDirection', { name: ci.name })}</option>
                 <option value="incoming">{tCmdb('incomingDirection', { name: ci.name })}</option>
@@ -189,7 +189,7 @@ export default function CiRelationshipsTab({
               <select
                 value={relForm.type}
                 onChange={(e) => setRelForm({ ...relForm, type: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
               >
                 {RELATIONSHIP_VALUES.map((value) => (
                   <option key={value} value={value}>{statusLabel(value)}</option>
@@ -218,7 +218,7 @@ export default function CiRelationshipsTab({
                     value={ciSearch}
                     onChange={(e) => setCiSearch(e.target.value)}
                     placeholder={tCmdb('searchCiPlaceholder')}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
                   {ciSearch.length >= 2 && (
                     <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -250,7 +250,7 @@ export default function CiRelationshipsTab({
                 type="text"
                 value={relForm.notes}
                 onChange={(e) => setRelForm({ ...relForm, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                 placeholder={tCmdb('relationshipNotesPlaceholder')}
               />
             </div>

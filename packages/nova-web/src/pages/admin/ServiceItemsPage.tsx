@@ -118,7 +118,7 @@ export default function ServiceItemsPage() {
                   <p className="text-xs text-indigo-500 mt-0.5">{item.category_name}</p>
                 </div>
                 {item.price != null && (
-                  <span className="text-sm font-semibold text-green-700 flex-shrink-0 ml-2">
+                  <span className="text-sm font-semibold text-green-700 shrink-0 ml-2">
                     {formatCurrency(Number(item.price), theme.catalog_currency)}
                   </span>
                 )}
@@ -130,7 +130,7 @@ export default function ServiceItemsPage() {
               {item.custom_attributes && Object.keys(item.custom_attributes as Record<string, unknown>).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {Object.entries(item.custom_attributes as Record<string, unknown>).slice(0, 3).map(([k, v]) => (
-                    <span key={k} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                    <span key={k} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">
                       {k}: {String(v)}
                     </span>
                   ))}

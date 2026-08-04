@@ -38,7 +38,7 @@ export default function ActionCheckboxes({
               type="checkbox"
               checked={selected.includes(action.id)}
               onChange={() => toggle(action.id)}
-              className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="mt-0.5 rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
             />
             <div>
               <span className="text-sm font-medium text-gray-900">{action.label}</span>

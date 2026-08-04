@@ -163,7 +163,7 @@ export default function ServiceItemForm({
                 <input
                   value={(form.name as string) || ''}
                   onChange={(e) => set('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   placeholder={tForm('namePlaceholder')}
                 />
               </div>
@@ -172,7 +172,7 @@ export default function ServiceItemForm({
                 <select
                   value={(form.category_id as string) || ''}
                   onChange={(e) => set('category_id', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">{tForm('selectCategory')}</option>
                   {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -183,7 +183,7 @@ export default function ServiceItemForm({
                 <input
                   value={(form.icon as string) || ''}
                   onChange={(e) => set('icon', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   placeholder={tForm('iconPlaceholder')}
                 />
               </div>
@@ -192,7 +192,7 @@ export default function ServiceItemForm({
                 <input
                   value={(form.short_description as string) || ''}
                   onChange={(e) => set('short_description', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   placeholder={tForm('shortDescriptionPlaceholder')}
                   maxLength={500}
                 />
@@ -203,7 +203,7 @@ export default function ServiceItemForm({
                   value={(form.description as string) || ''}
                   onChange={(e) => set('description', e.target.value)}
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none"
                   placeholder={tForm('descriptionPlaceholder')}
                 />
               </div>
@@ -262,15 +262,15 @@ export default function ServiceItemForm({
                     value={key}
                     onChange={(e) => updateAttr(idx, 0, e.target.value)}
                     placeholder={tForm('attributeNamePlaceholder')}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
                   <input
                     value={val}
                     onChange={(e) => updateAttr(idx, 1, e.target.value)}
                     placeholder={tFields('value')}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
-                  <button onClick={() => removeAttr(idx)} className="text-red-400 hover:text-red-600 text-sm flex-shrink-0 px-1">&times;</button>
+                  <button onClick={() => removeAttr(idx)} className="text-red-400 hover:text-red-600 text-sm shrink-0 px-1">&times;</button>
                 </div>
               ))}
               {customAttrs.length === 0 && (
@@ -317,7 +317,7 @@ export default function ServiceItemForm({
                     min="0"
                     value={form.price != null && form.price !== '' ? String(form.price) : ''}
                     onChange={(e) => set('price', e.target.value === '' ? null : e.target.value)}
-                    className="w-full pl-16 pr-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-16 pr-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                     placeholder={tForm('pricePlaceholder')}
                   />
                 </div>
@@ -329,7 +329,7 @@ export default function ServiceItemForm({
                   min="1"
                   value={form.sla_hours ? String(form.sla_hours) : ''}
                   onChange={(e) => set('sla_hours', parseInt(e.target.value, 10) || 72)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div className="space-y-1">
@@ -338,7 +338,7 @@ export default function ServiceItemForm({
                     type="checkbox"
                     checked={!!form.approval_required}
                     onChange={(e) => set('approval_required', e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                    className="w-4 h-4 text-indigo-600 rounded-sm border-gray-300 focus:ring-indigo-500"
                     id="approval_required"
                   />
                   <label htmlFor="approval_required" className="text-sm text-gray-700">{t('managerApproval')}</label>
@@ -352,7 +352,7 @@ export default function ServiceItemForm({
                   type="checkbox"
                   checked={form.is_active !== false}
                   onChange={(e) => set('is_active', e.target.checked)}
-                  className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                  className="w-4 h-4 text-indigo-600 rounded-sm border-gray-300 focus:ring-indigo-500"
                   id="is_active"
                 />
                 <label htmlFor="is_active" className="text-sm text-gray-700">{tStates('active')}</label>

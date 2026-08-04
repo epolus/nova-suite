@@ -63,7 +63,7 @@ export default function ProfileSettingsPage() {
                 value={user.time_format}
                 onChange={(e) => onChangeTime(e.target.value === '12h' ? '12h' : '24h')}
                 disabled={saving}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="24h">{tProfile('timeFormat24h')}</option>
                 <option value="12h">{tProfile('timeFormat12h')}</option>
@@ -76,7 +76,7 @@ export default function ProfileSettingsPage() {
                 value={user.date_format}
                 onChange={(e) => onChangeDate((e.target.value as 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD') || 'YYYY-MM-DD')}
                 disabled={saving}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                 <option value="DD.MM.YYYY">DD.MM.YYYY</option>

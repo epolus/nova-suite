@@ -188,7 +188,7 @@ export default function DashboardSettingsPanel({
                         setNewName(event.target.value);
                         if (createError) setCreateError(null);
                       }}
-                      className="flex-1 h-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="flex-1 h-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200 shadow-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                     />
                     <Button type="button" size="sm" disabled={isCreating} onClick={() => void handleCreate()}>
                       {t('createDashboard')}
@@ -212,7 +212,7 @@ export default function DashboardSettingsPanel({
                 id="dashboard-auto-refresh"
                 value={String(autoRefreshSeconds)}
                 onChange={(event) => onAutoRefreshChange(Number.parseInt(event.target.value, 10) || 0)}
-                className="mt-3 w-full h-10 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-3 w-full h-10 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200 shadow-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
               >
                 {DASHBOARD_AUTO_REFRESH_OPTIONS.map((seconds) => (
                   <option key={seconds} value={seconds}>
@@ -232,7 +232,7 @@ export default function DashboardSettingsPanel({
                 id="layout-dashboard-select"
                 value={layoutDashboardId}
                 onChange={(event) => handleSelectForLayout(event.target.value)}
-                className="mt-2 w-full h-10 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-2 w-full h-10 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200 shadow-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
               >
                 {dashboards.map((dashboard) => (
                   <option key={dashboard.id} value={dashboard.id}>

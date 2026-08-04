@@ -262,10 +262,10 @@ export default function ChangeCalendarPage() {
                         <div
                           key={c.id}
                           onClick={(e) => { e.stopPropagation(); navigate(`/changes/${c.id}`); }}
-                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium truncate border cursor-pointer hover:opacity-80 ${RISK_BG[c.risk_level] || 'bg-gray-50 border-gray-200'}`}
+                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-medium truncate border cursor-pointer hover:opacity-80 ${RISK_BG[c.risk_level] || 'bg-gray-50 border-gray-200'}`}
                           title={`${c.number} — ${c.title}`}
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${RISK_COLOR[c.risk_level] || 'bg-gray-400'}`} />
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${RISK_COLOR[c.risk_level] || 'bg-gray-400'}`} />
                           <span className={`truncate ${RISK_TEXT[c.risk_level] || 'text-gray-700'}`}>{c.number}</span>
                         </div>
                       ))}
@@ -288,14 +288,14 @@ export default function ChangeCalendarPage() {
               </div>
             ))}
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-red-100 border border-red-200" />
+              <span className="w-2.5 h-2.5 rounded-sm bg-red-100 border border-red-200" />
               <span className="text-xs text-gray-500">{tChanges('blackout')}</span>
             </div>
           </div>
         </div>
 
         {/* ── Side panel ── */}
-        <div className="w-72 flex-shrink-0 space-y-4">
+        <div className="w-72 shrink-0 space-y-4">
 
           {/* Selected day details */}
           {selectedKey && (
@@ -330,7 +330,7 @@ export default function ChangeCalendarPage() {
                       className="block px-4 py-3 hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${RISK_COLOR[c.risk_level] || 'bg-gray-400'}`} />
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${RISK_COLOR[c.risk_level] || 'bg-gray-400'}`} />
                         <span className="text-xs font-mono text-gray-500">{c.number}</span>
                         <Badge value={c.status} className="ml-auto" />
                       </div>

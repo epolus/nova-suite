@@ -236,7 +236,7 @@ export function IncidentsTab({ config }: { config: TodoScopeConfig }) {
                 onChange={(e) => setSavePresetName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') { setShowSaveInput(false); setSavePresetName(''); } }}
                 placeholder={tFilters('filterNamePlaceholder')}
-                className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-none focus:ring-1 focus:ring-indigo-400 w-36"
+                className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-hidden focus:ring-1 focus:ring-indigo-400 w-36"
               />
               <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">{tActions('save')}</button>
               <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">{tActions('cancel')}</button>
@@ -289,7 +289,7 @@ export function IncidentsTab({ config }: { config: TodoScopeConfig }) {
             <select
               value={bulkGroupId}
               onChange={(e) => setBulkGroupId(e.target.value)}
-              className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-hidden"
             >
               <option value="">{tMaster('assignToGroup')}</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}

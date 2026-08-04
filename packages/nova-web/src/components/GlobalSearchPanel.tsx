@@ -69,12 +69,12 @@ export default function GlobalSearchPanel({
               onClick={() => selectCommand(cmd)}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
             >
-              <span className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-sm flex-shrink-0">
+              <span className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-sm shrink-0">
                 <AppIcon name={CMD_ICON[cmd.name] || 'help'} />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <kbd className="text-[10px] font-mono bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">
+                  <kbd className="text-[10px] font-mono bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-sm">
                     /{cmd.name}
                   </kbd>
                   <span className="text-sm font-medium text-gray-800">{cmd.label}</span>
@@ -106,7 +106,7 @@ export default function GlobalSearchPanel({
                 selectedIndex === i ? 'bg-indigo-50' : 'bg-white'
               }`}
             >
-              <span className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-sm flex-shrink-0">
+              <span className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-sm shrink-0">
                 <AppIcon name={CMD_ICON[cmd.name] || 'help'} />
               </span>
               <div className="min-w-0 flex-1">
@@ -123,7 +123,7 @@ export default function GlobalSearchPanel({
                 <p className="text-xs text-gray-400 mt-0.5">{cmd.description}</p>
               </div>
               {selectedIndex === i && (
-                <span className="ml-auto text-[10px] text-indigo-400 flex-shrink-0">{t('enterHint')}</span>
+                <span className="ml-auto text-[10px] text-indigo-400 shrink-0">{t('enterHint')}</span>
               )}
             </button>
           )) : (
@@ -149,7 +149,7 @@ export default function GlobalSearchPanel({
                 selectedIndex === i ? 'bg-indigo-50' : 'bg-white'
               }`}
             >
-              <span className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-sm flex-shrink-0">
+              <span className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-sm shrink-0">
                 <AppIcon name={item.icon} />
               </span>
               <div className="min-w-0">
@@ -159,7 +159,7 @@ export default function GlobalSearchPanel({
                 <p className="text-xs text-gray-400 truncate">{item.subtitle}</p>
               </div>
               {selectedIndex === i && (
-                <span className="ml-auto text-[10px] text-indigo-400 flex-shrink-0">{t('enterHint')}</span>
+                <span className="ml-auto text-[10px] text-indigo-400 shrink-0">{t('enterHint')}</span>
               )}
             </button>
           ))}
@@ -184,7 +184,7 @@ export default function GlobalSearchPanel({
                   selectedIndex === idx ? 'bg-indigo-50' : 'bg-white'
                 }`}
               >
-                <span className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-sm flex-shrink-0">
+                <span className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-sm shrink-0">
                   <AppIcon name={TYPE_ICON[resultType] ?? 'record'} />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -202,7 +202,7 @@ export default function GlobalSearchPanel({
                   )}
                 </div>
                 {selectedIndex === idx && (
-                  <span className="ml-auto text-[10px] text-indigo-400 flex-shrink-0">{t('enterHint')}</span>
+                  <span className="ml-auto text-[10px] text-indigo-400 shrink-0">{t('enterHint')}</span>
                 )}
               </button>
             );

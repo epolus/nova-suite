@@ -10,7 +10,7 @@ export function ColorInput({ label, description, value, onChange }: {
   return (
     <div className="flex items-center gap-4">
       <div
-        className="w-10 h-10 rounded-lg border-2 border-gray-200 flex-shrink-0 cursor-pointer relative overflow-hidden"
+        className="w-10 h-10 rounded-lg border-2 border-gray-200 shrink-0 cursor-pointer relative overflow-hidden"
         style={{ backgroundColor: value }}
       >
         <input
@@ -27,7 +27,7 @@ export function ColorInput({ label, description, value, onChange }: {
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-24 px-2 py-1 border border-gray-200 rounded text-xs font-mono text-gray-600 focus:ring-1 focus:ring-indigo-500 outline-none"
+            className="w-24 px-2 py-1 border border-gray-200 rounded-sm text-xs font-mono text-gray-600 focus:ring-1 focus:ring-indigo-500 outline-hidden"
           />
         </div>
         <p className="text-xs text-gray-400 mt-0.5">{description}</p>

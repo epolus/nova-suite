@@ -25,7 +25,7 @@ function NewReportCard({ onCreate, creating }: { onCreate: (name: string) => Pro
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder={t('reportNamePlaceholder')}
-          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
         />
         <button
           disabled={!name.trim() || creating}

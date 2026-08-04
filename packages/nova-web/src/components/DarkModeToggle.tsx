@@ -23,7 +23,7 @@ export default function DarkModeToggle({ variant = 'on-light-header' }: Props) {
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       onClick={toggleDark}
       title={isDark ? 'Light mode' : 'Dark mode'}
-      className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+      className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 ${
         variant === 'on-dark-header' ? 'focus-visible:ring-white/50 focus-visible:ring-offset-slate-900' : 'focus-visible:ring-indigo-500 focus-visible:ring-offset-white'
       } ${isDark ? `${trackOn}` : trackOff}`}
       style={

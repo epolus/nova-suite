@@ -247,7 +247,7 @@ export default function SystemStatusPage() {
         <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
           <h3 className="font-semibold text-gray-900">{t('systemTelemetry')}</h3>
           <div className="flex items-center gap-2">
-            <span className={`inline-flex rounded px-2 py-0.5 text-[11px] font-medium ${overallStatus.className}`}>
+            <span className={`inline-flex rounded-sm px-2 py-0.5 text-[11px] font-medium ${overallStatus.className}`}>
               {overallStatus.label}
             </span>
             {systemMetrics?.timestamp && (
@@ -263,7 +263,7 @@ export default function SystemStatusPage() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="text-gray-500">{t('database')}</p>
-                  <span className={`inline-flex rounded px-1.5 py-0.5 text-[10px] ${statusClass(systemMetrics.database.status)}`}>
+                  <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-[10px] ${statusClass(systemMetrics.database.status)}`}>
                     {systemMetrics.database.status}
                   </span>
                 </div>
@@ -275,7 +275,7 @@ export default function SystemStatusPage() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="text-gray-500">{t('apiLatency')}</p>
-                  <span className={`inline-flex rounded px-1.5 py-0.5 text-[10px] ${statusClass(systemMetrics.api.status)}`}>
+                  <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-[10px] ${statusClass(systemMetrics.api.status)}`}>
                     {systemMetrics.api.status}
                   </span>
                 </div>
@@ -286,7 +286,7 @@ export default function SystemStatusPage() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="text-gray-500">{t('trafficWindow')}</p>
-                  <span className="inline-flex rounded px-1.5 py-0.5 text-[10px] bg-gray-200 text-gray-700">
+                  <span className="inline-flex rounded-sm px-1.5 py-0.5 text-[10px] bg-gray-200 text-gray-700">
                     {systemMetrics.api.sourceWindowMinutes}m
                   </span>
                 </div>
@@ -297,7 +297,7 @@ export default function SystemStatusPage() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="text-gray-500">{t('queueWorkers')}</p>
-                  <span className={`inline-flex rounded px-1.5 py-0.5 text-[10px] ${statusClass(systemMetrics.queue.status)}`}>
+                  <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-[10px] ${statusClass(systemMetrics.queue.status)}`}>
                     {systemMetrics.queue.status}
                   </span>
                 </div>
@@ -349,7 +349,7 @@ export default function SystemStatusPage() {
             </button>
           </div>
           {showRawRuntime ? (
-            <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+            <pre className="text-xs bg-gray-50 border border-gray-200 rounded-sm p-3 overflow-auto">
               {JSON.stringify(runtimeHealth.checks || {}, null, 2)}
             </pre>
           ) : (

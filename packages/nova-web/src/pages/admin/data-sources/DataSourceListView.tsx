@@ -65,12 +65,12 @@ export default function DataSourceListView({
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpen(ds)}>
                   <div className="flex items-center gap-3">
                     <h3 className="font-medium text-gray-900 hover:text-indigo-600 transition-colors">{ds.name}</h3>
-                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{ds.entity_type}</span>
-                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{ds.source_type}</span>
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-sm text-xs">{ds.entity_type}</span>
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-sm text-xs">{ds.source_type}</span>
                     {ds.schedule_enabled ? (
-                      <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">{ds.schedule_cron}</span>
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-sm text-xs">{ds.schedule_cron}</span>
                     ) : (
-                      <span className="px-2 py-0.5 bg-gray-100 text-gray-400 rounded text-xs">{t('manualOnly')}</span>
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-400 rounded-sm text-xs">{t('manualOnly')}</span>
                     )}
                   </div>
                   {ds.description && <p className="text-sm text-gray-500 mt-0.5">{ds.description}</p>}
@@ -81,7 +81,7 @@ export default function DataSourceListView({
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                <div className="flex items-center gap-2 ml-4 shrink-0">
                   <button
                     onClick={() => onRun(ds)}
                     disabled={runningId === ds.id}

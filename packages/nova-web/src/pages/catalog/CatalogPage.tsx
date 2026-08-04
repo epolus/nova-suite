@@ -144,7 +144,7 @@ export default function CatalogPage() {
                     <h3 className="font-semibold text-gray-900">{item.name}</h3>
                     <p className="text-xs text-indigo-500 mt-0.5">{item.category_name}</p>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
                     {item.price != null && (
                       <span className="text-sm font-semibold text-green-700">
                         {formatCurrency(Number(item.price), theme.catalog_currency)}

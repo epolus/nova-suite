@@ -49,7 +49,7 @@ export default function ImportMappingStep({
                   <select
                     value={mapping[col] || ''}
                     onChange={(e) => setMapping({ ...mapping, [col]: e.target.value })}
-                    className="w-full max-w-xs px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full max-w-xs px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   >
                     <option value="">{t('skip')}</option>
                     {uploadResult.fields.map((f) => (
@@ -90,7 +90,7 @@ export default function ImportMappingStep({
                       value={fixedValues[f.key] || ''}
                       onChange={(e) => setFixedValues({ ...fixedValues, [f.key]: e.target.value })}
                       placeholder={t('optionalDefaultValue')}
-                      className="w-full max-w-xs px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                      className="w-full max-w-xs px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     />
                   </td>
                   <td className="px-4 py-2 text-xs text-gray-500">

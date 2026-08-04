@@ -188,7 +188,7 @@ export default function KnowledgeWorkflowsPage() {
           </div>
           <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
             {categories.map((c) => (
-              <div key={c.id} className={`p-2.5 rounded border ${editingCategoryId === c.id ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200'}`}>
+              <div key={c.id} className={`p-2.5 rounded-sm border ${editingCategoryId === c.id ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200'}`}>
                 <button className="w-full text-left" onClick={() => startEditCategory(c.id)}>
                   <p className="text-sm font-medium text-gray-900">{categoryLabelById.get(c.id) || c.name}</p>
                   <p className="text-xs text-gray-500">{c.is_active ? tStates('active') : tStates('inactive')}</p>

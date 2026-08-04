@@ -242,7 +242,7 @@ export function majorIncidentEventToFeedItem(
         accent: 'slate',
         title: formatEnumFallback(eventType),
         meta: metaLine(actor, undefined),
-        body: detail ? <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed break-words">{detail}</p> : undefined,
+        body: detail ? <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed wrap-break-word">{detail}</p> : undefined,
       };
     }
   }

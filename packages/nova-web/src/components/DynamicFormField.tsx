@@ -14,7 +14,7 @@ interface Props {
 
 export default function DynamicFormField({ field, value, onChange }: Props) {
   const t = useTranslations('components.dynamicFormField');
-  const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
+  const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden';
   const fieldControl = useFieldControl(field.name);
   const labelText = field.label || field.name;
 
@@ -84,7 +84,7 @@ export default function DynamicFormField({ field, value, onChange }: Props) {
             type="checkbox"
             checked={value === 'true'}
             onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
-            className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+            className="w-4 h-4 text-indigo-600 rounded-sm border-gray-300 focus:ring-indigo-500"
           />
           {labelText}
           {field.required && <span className="text-red-500 ml-1">*</span>}
@@ -261,7 +261,7 @@ function CmdbRefPicker({ id, name, ariaLabel, value, onChange, ciClass, ciFilter
           onChange={(e) => { setInputText(e.target.value); if (!open) setOpen(true); }}
           onFocus={handleFocus}
           placeholder={placeholder || t('searchCi', { suffix: ciClass ? t('searchCiSuffix', { class: ciClass }) : '' })}
-          className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+          className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
         />
         {value && !open && (
           <button
@@ -296,7 +296,7 @@ function CmdbRefPicker({ id, name, ariaLabel, value, onChange, ciClass, ciFilter
                 <div className="min-w-0">
                   <span className="font-medium text-gray-900 block truncate">{ci.name}</span>
                 </div>
-                <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{ci.class_name}</span>
+                <span className="text-xs text-gray-400 shrink-0 ml-2">{ci.class_name}</span>
               </button>
             ))
           )}
@@ -392,7 +392,7 @@ function UserRefPicker({ id, name, ariaLabel, value, onChange, placeholder }: {
           onChange={(e) => { setInputText(e.target.value); if (!open) setOpen(true); }}
           onFocus={handleFocus}
           placeholder={placeholder || t('searchUser')}
-          className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+          className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
         />
         {value && !open && (
           <button
@@ -420,7 +420,7 @@ function UserRefPicker({ id, name, ariaLabel, value, onChange, placeholder }: {
                 }`}
               >
                 <span className="font-medium text-gray-900 truncate">{u.display_name}</span>
-                <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{u.email}</span>
+                <span className="text-xs text-gray-400 shrink-0 ml-2">{u.email}</span>
               </button>
             ))
           )}

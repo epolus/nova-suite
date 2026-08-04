@@ -14,7 +14,7 @@ export default function LanguageSwitcher({ variant = 'on-light-header', showLabe
   const t = useTranslations('common.language');
   const { locale, setLocale, supportedLocales } = useLocaleContext();
 
-  const base = 'h-7 rounded-md text-xs px-2 border outline-none transition-colors';
+  const base = 'h-7 rounded-md text-xs px-2 border outline-hidden transition-colors';
   const light = 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500';
   const dark = 'bg-white/10 border-white/20 text-white hover:bg-white/15 focus:ring-2 focus:ring-white/50';
 

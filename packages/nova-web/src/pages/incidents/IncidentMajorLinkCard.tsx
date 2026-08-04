@@ -41,7 +41,7 @@ export function IncidentMajorLinkCard({ d }: { d: IncidentDetailState }) {
   };
 
   const linkMajorSelectCls =
-    'min-w-0 flex-1 text-sm py-1.5 px-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none sm:max-w-xs md:max-w-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100';
+    'min-w-0 flex-1 text-sm py-1.5 px-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden sm:max-w-xs md:max-w-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100';
 
   const linkedMajor = inc.linked_major_incidents ?? [];
   const linkedMajorIds = new Set(linkedMajor.map((m) => m.id));
@@ -82,7 +82,7 @@ export function IncidentMajorLinkCard({ d }: { d: IncidentDetailState }) {
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 min-h-[1.25rem]">
+          <div className="flex items-center gap-2 min-h-5">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-900/90 dark:text-indigo-100 shrink-0">
               {tIncidents('majorIncident')}
             </span>
@@ -100,7 +100,7 @@ export function IncidentMajorLinkCard({ d }: { d: IncidentDetailState }) {
                   </Link>
                   <Badge value={m.status} />
                   {m.link_kind === 'primary' && (
-                    <span className="text-[10px] font-semibold uppercase text-amber-900 bg-amber-100/90 dark:text-amber-100 dark:bg-amber-900/55 px-1 py-0.5 rounded">{tIncidents('primary')}</span>
+                    <span className="text-[10px] font-semibold uppercase text-amber-900 bg-amber-100/90 dark:text-amber-100 dark:bg-amber-900/55 px-1 py-0.5 rounded-sm">{tIncidents('primary')}</span>
                   )}
                 </li>
               ))}

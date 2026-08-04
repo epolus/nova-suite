@@ -33,7 +33,7 @@ export default function ActionConfirmCard({
         <label className="block">
           <span className="text-xs text-gray-600">{fieldLabel('title')}</span>
           <input
-            className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+            className="mt-0.5 w-full rounded-sm border border-gray-300 px-2 py-1 text-sm"
             value={String(draft.title ?? '')}
             onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))}
           />
@@ -42,7 +42,7 @@ export default function ActionConfirmCard({
           <span className="text-xs text-gray-600">{fieldLabel('description')}</span>
           <textarea
             rows={3}
-            className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+            className="mt-0.5 w-full rounded-sm border border-gray-300 px-2 py-1 text-sm"
             value={String(draft.description ?? '')}
             onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
           />
@@ -51,7 +51,7 @@ export default function ActionConfirmCard({
           <label className="block">
             <span className="text-xs text-gray-600">{fieldLabel('impact')}</span>
             <select
-              className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+              className="mt-0.5 w-full rounded-sm border border-gray-300 px-2 py-1 text-sm"
               value={String(draft.impact ?? 'medium')}
               onChange={(e) => setDraft((p) => ({ ...p, impact: e.target.value }))}
             >
@@ -63,7 +63,7 @@ export default function ActionConfirmCard({
           <label className="block">
             <span className="text-xs text-gray-600">{fieldLabel('urgency')}</span>
             <select
-              className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+              className="mt-0.5 w-full rounded-sm border border-gray-300 px-2 py-1 text-sm"
               value={String(draft.urgency ?? 'medium')}
               onChange={(e) => setDraft((p) => ({ ...p, urgency: e.target.value }))}
             >
@@ -96,7 +96,7 @@ export default function ActionConfirmCard({
         <p className="font-medium text-amber-900">{t('confirmWorkNote')}</p>
         <textarea
           rows={4}
-          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+          className="w-full rounded-sm border border-gray-300 px-2 py-1 text-sm"
           value={String(draft.content ?? '')}
           onChange={(e) => setDraft((p) => ({ ...p, content: e.target.value }))}
         />
@@ -139,7 +139,7 @@ export default function ActionConfirmCard({
             ))}
           </ul>
         )}
-        <pre className="max-h-40 overflow-auto rounded bg-white border border-gray-200 p-2 text-[10px] font-mono">
+        <pre className="max-h-40 overflow-auto rounded-sm bg-white border border-gray-200 p-2 text-[10px] font-mono">
           {JSON.stringify(automation, null, 2)}
         </pre>
         <div className="flex flex-wrap gap-2">

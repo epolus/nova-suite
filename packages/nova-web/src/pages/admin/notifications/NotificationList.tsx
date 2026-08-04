@@ -57,7 +57,7 @@ export default function NotificationList({ rules, onTest, onEdit, onToggleActive
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => onTest(rule)}
                   className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

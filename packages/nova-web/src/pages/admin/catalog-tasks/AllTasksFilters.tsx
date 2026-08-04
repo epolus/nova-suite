@@ -60,7 +60,7 @@ export default function AllTasksFilters({
     <>
       {/* Filters */}
       <div className="flex flex-col xl:flex-row flex-wrap gap-3 mb-4">
-        <div className="w-full sm:w-72 min-w-[12rem]">
+        <div className="w-full sm:w-72 min-w-48">
           <SearchBar
             value={search}
             onChange={onSearchChange}
@@ -70,7 +70,7 @@ export default function AllTasksFilters({
         <select
           value={groupFilter}
           onChange={(e) => onGroupFilterChange(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[10rem]"
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 min-w-40"
         >
           <option value="">{t('filters.allGroups')}</option>
           {uniqueGroups.map(([id, name]) => (
@@ -81,7 +81,7 @@ export default function AllTasksFilters({
         <select
           value={typeFilter}
           onChange={(e) => onTypeFilterChange(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[9rem]"
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 min-w-36"
         >
           <option value="">{t('filters.allTypes')}</option>
           <option value="approval">{t('filters.types.approval')}</option>
@@ -91,7 +91,7 @@ export default function AllTasksFilters({
         <select
           value={automationFilter}
           onChange={(e) => onAutomationFilterChange(e.target.value as 'all' | 'with' | 'without')}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[12rem]"
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 min-w-48"
         >
           <option value="all">{t('filters.allAutomation')}</option>
           <option value="with">{t('filters.withAutomation')}</option>
@@ -100,7 +100,7 @@ export default function AllTasksFilters({
         <select
           value={itemActivityFilter}
           onChange={(e) => onItemActivityFilterChange(e.target.value as 'all' | 'active' | 'inactive')}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[12rem]"
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 min-w-48"
         >
           <option value="all">{t('filters.allItems')}</option>
           <option value="active">{t('filters.activeItems')}</option>
@@ -109,7 +109,7 @@ export default function AllTasksFilters({
         <select
           value={sortBy}
           onChange={(e) => onSortByChange(e.target.value as AllTasksSort)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[14rem]"
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 min-w-56"
         >
           <option value="taskCountDesc">{t('filters.sortTaskCount')}</option>
           <option value="nameAsc">{t('filters.sortName')}</option>
@@ -122,7 +122,7 @@ export default function AllTasksFilters({
         <select
           value={selectedSavedViewId}
           onChange={(e) => onSelectSavedView(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[16rem]"
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 min-w-[16rem]"
         >
           <option value="">{t('savedViews')}</option>
           {savedViews.map((view) => (
@@ -133,7 +133,7 @@ export default function AllTasksFilters({
           value={savedViewName}
           onChange={(e) => onSavedViewNameChange(e.target.value)}
           placeholder={t('saveFiltersPlaceholder')}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 min-w-[16rem]"
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 min-w-[16rem]"
         />
         <button
           type="button"

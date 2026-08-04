@@ -268,13 +268,13 @@ export default function WorkflowDetailPage() {
                     onClick={() => toggleEvent(evt.eventId)}
                     className="flex items-center gap-2 w-full text-left group"
                   >
-                    <span className="text-xs text-gray-400 w-6 text-right flex-shrink-0">
+                    <span className="text-xs text-gray-400 w-6 text-right shrink-0">
                       {evt.eventId}
                     </span>
                     <span className={`text-xs font-medium ${isImportant ? 'text-gray-900' : 'text-gray-400'}`}>
                       {evt.eventType}
                     </span>
-                    <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
+                    <span className="text-xs text-gray-400 ml-auto shrink-0">
                       {formatTime(evt.timestamp)}
                     </span>
                     {evt.attributes && (
@@ -329,7 +329,7 @@ export default function WorkflowDetailPage() {
                     value={actionReason}
                     onChange={(e) => setActionReason(e.target.value)}
                     placeholder={t('reasonPlaceholder')}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   />
                 </div>
               )}

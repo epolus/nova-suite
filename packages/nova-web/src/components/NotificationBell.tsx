@@ -151,14 +151,14 @@ export default function NotificationBell() {
                   onClick={() => handleMarkRead(n)}
                   className={`w-full text-left px-3 py-2.5 flex gap-2.5 hover:bg-white/10 transition-colors border-b border-white/5 ${n.is_read ? 'opacity-60' : ''}`}
                 >
-                  <span className="text-base flex-shrink-0 mt-0.5">{typeIcon[n.type] ?? '🔔'}</span>
+                  <span className="text-base shrink-0 mt-0.5">{typeIcon[n.type] ?? '🔔'}</span>
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs leading-snug truncate ${n.is_read ? 'text-slate-400' : 'text-white font-medium'}`}>{n.title}</p>
                     {n.body && <p className="text-xs text-slate-400 truncate mt-0.5">{n.body}</p>}
                     <p className="text-[10px] text-slate-500 mt-1">{formatDateTime(n.created_at)}</p>
                   </div>
                   {!n.is_read && (
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: 'var(--color-primary)' }} />
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ backgroundColor: 'var(--color-primary)' }} />
                   )}
                 </button>
               ))

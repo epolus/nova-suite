@@ -98,7 +98,7 @@ export default function CredentialForm(props: CredentialFormProps) {
             <p className="text-xs text-gray-600">
               {t('oauth2Hint')}
               {' '}
-              <code className="rounded bg-gray-100 px-1 py-0.5">{"{{cred.slug.access_token}}"}</code>.
+              <code className="rounded-sm bg-gray-100 px-1 py-0.5">{"{{cred.slug.access_token}}"}</code>.
             </p>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">{tFields('tokenUrl')}</label>
@@ -162,7 +162,7 @@ export default function CredentialForm(props: CredentialFormProps) {
               </div>
             )}
             {tokenTestResult && (
-              <p className="text-xs text-emerald-700 rounded bg-emerald-50 border border-emerald-200 px-2 py-1">
+              <p className="text-xs text-emerald-700 rounded-sm bg-emerald-50 border border-emerald-200 px-2 py-1">
                 {tokenTestResult}
               </p>
             )}

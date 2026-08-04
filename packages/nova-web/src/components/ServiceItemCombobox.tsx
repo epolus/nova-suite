@@ -207,7 +207,7 @@ export default function ServiceItemCombobox({
           setOpen((o) => !o);
           setTimeout(() => inputRef.current?.focus(), 0);
         }}
-        className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm text-gray-900 shadow-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm text-gray-900 shadow-xs hover:border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
@@ -215,7 +215,7 @@ export default function ServiceItemCombobox({
         <span className={selected ? 'truncate font-medium' : 'truncate text-gray-400'}>
           {selected ? displayLabel : resolvedPlaceholder}
         </span>
-        <span className="flex-shrink-0 text-gray-400" aria-hidden>
+        <span className="shrink-0 text-gray-400" aria-hidden>
           {open ? '▲' : '▼'}
         </span>
       </button>
@@ -236,7 +236,7 @@ export default function ServiceItemCombobox({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onInputKeyDown}
               placeholder={t('filterPlaceholder')}
-              className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           {rows.length === 0 ? (
@@ -268,7 +268,7 @@ export default function ServiceItemCombobox({
                   <span className="flex w-full min-w-0 items-center gap-2">
                     <span className="truncate font-medium">{item.name}</span>
                     {!item.is_active && (
-                      <span className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                      <span className="shrink-0 rounded-sm bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
                         inactive
                       </span>
                     )}

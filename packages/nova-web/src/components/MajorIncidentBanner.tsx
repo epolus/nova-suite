@@ -10,7 +10,7 @@ export default function MajorIncidentBanner() {
   if (items.length === 0) return null;
 
   return (
-    <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-sm">
+    <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-xs">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold uppercase tracking-wide text-red-800">{t('label')}</span>
         {items.map((it) => (

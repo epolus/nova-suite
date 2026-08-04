@@ -262,7 +262,7 @@ export default function CredentialsPage() {
         <Card>
           <div className="flex justify-between items-center mb-4">
             <p className="text-sm text-gray-600">
-              {t('slugHint')} <code className="text-xs bg-gray-100 px-1 rounded">^[a-z][a-z0-9_]*$</code>.{' '}
+              {t('slugHint')} <code className="text-xs bg-gray-100 px-1 rounded-sm">^[a-z][a-z0-9_]*$</code>.{' '}
               {t('permissionsHint')}
             </p>
             {canManage && (

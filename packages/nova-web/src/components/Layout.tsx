@@ -233,10 +233,10 @@ export default function Layout() {
     <AiAssistantProvider persona="agent">
     <div className="flex flex-col h-full">
       {/* ── Top header ── */}
-      <header className="flex-shrink-0 h-14 flex items-center justify-between px-4 border-b border-white/10 z-10" style={{ backgroundColor: 'var(--color-sidebar-bg)' }}>
+      <header className="shrink-0 h-14 flex items-center justify-between px-4 border-b border-white/10 z-10" style={{ backgroundColor: 'var(--color-sidebar-bg)' }}>
         {/* Logo + name */}
         <button onClick={() => navigate('/')} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          {logoSrc && <img src={logoSrc} alt="" className="w-7 h-7 object-contain rounded" />}
+          {logoSrc && <img src={logoSrc} alt="" className="w-7 h-7 object-contain rounded-sm" />}
           <span className="text-lg font-bold tracking-tight text-white">
             <span style={{ color: 'var(--color-primary)' }}>{firstName}</span>
             {restName ? ` ${restName}` : ''}
@@ -276,7 +276,7 @@ export default function Layout() {
           </NavLink>
           <DarkModeToggle variant="on-dark-header" />
           <NotificationBell />
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ backgroundColor: 'var(--color-primary)' }}>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0" style={{ backgroundColor: 'var(--color-primary)' }}>
             {user?.display_name?.charAt(0) || '?'}
           </div>
           <div className="hidden sm:block">
@@ -300,7 +300,7 @@ export default function Layout() {
       <div className="flex flex-1 overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`text-white flex flex-col flex-shrink-0 transition-all duration-200 ${
+        className={`text-white flex flex-col shrink-0 transition-all duration-200 ${
           sidebarCollapsed ? 'w-14' : 'w-64'
         }`}
         style={{ backgroundColor: 'var(--color-sidebar-bg)' }}

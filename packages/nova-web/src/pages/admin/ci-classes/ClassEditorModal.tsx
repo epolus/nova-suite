@@ -62,7 +62,7 @@ export default function ClassEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-xs p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">
@@ -82,7 +82,7 @@ export default function ClassEditorModal({
                 value={editing.name}
                 onChange={(e) => onChange({ ...editing, name: e.target.value })}
                 disabled={!!editing.id}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
                 placeholder={t('placeholderSystemName')}
               />
               {!editing.id && (
@@ -94,7 +94,7 @@ export default function ClassEditorModal({
               <input
                 value={editing.display_name}
                 onChange={(e) => onChange({ ...editing, display_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                 placeholder={t('placeholderDisplayName')}
               />
             </div>
@@ -106,7 +106,7 @@ export default function ClassEditorModal({
               value={editing.description}
               onChange={(e) => onChange({ ...editing, description: e.target.value })}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none"
               placeholder={t('placeholderDescription')}
             />
           </div>
@@ -136,7 +136,7 @@ export default function ClassEditorModal({
               <select
                 value={editing.parent_class}
                 onChange={(e) => onChange({ ...editing, parent_class: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">{tStates('none')}</option>
                 {classes.filter((c) => c.id !== editing.id).map((c) => (
@@ -203,13 +203,13 @@ export default function ClassEditorModal({
                     <input
                       value={attr.key}
                       onChange={(e) => updateAttr(idx, 'key', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))}
-                      className="flex-1 min-w-[120px] px-2.5 py-1.5 border border-gray-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="flex-1 min-w-[120px] px-2.5 py-1.5 border border-gray-200 rounded-md text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                       placeholder={t('placeholderAttributeName')}
                     />
                     <select
                       value={attr.type}
                       onChange={(e) => updateAttr(idx, 'type', e.target.value)}
-                      className="w-28 px-2.5 py-1.5 border border-gray-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-28 px-2.5 py-1.5 border border-gray-200 rounded-md text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                     >
                       {ATTR_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
@@ -217,7 +217,7 @@ export default function ClassEditorModal({
                       <select
                         value={attr.reference_table || 'users'}
                         onChange={(e) => updateAttr(idx, 'reference_table', e.target.value)}
-                        className="w-40 px-2.5 py-1.5 border border-indigo-200 bg-indigo-50 rounded-md text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-40 px-2.5 py-1.5 border border-indigo-200 bg-indigo-50 rounded-md text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                       >
                         {REFERENCE_TABLES.map((ref) => (
                           <option key={ref.value} value={ref.value}>{tFields(ref.fieldKey)}</option>

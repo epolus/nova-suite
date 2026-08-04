@@ -41,7 +41,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
               type="text"
               value={form.name}
               onChange={(e) => setField('name', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               placeholder={t('placeholderName')}
             />
           </div>
@@ -51,7 +51,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
               type="text"
               value={form.description}
               onChange={(e) => setField('description', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               placeholder={t('placeholderDescription')}
             />
           </div>
@@ -61,7 +61,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
               <select
                 value={form.entity_type}
                 onChange={(e) => setField('entity_type', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               >
                 <option value="">{t('select')}</option>
                 {entities.map((e) => (
@@ -74,7 +74,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
               <select
                 value={form.import_mode}
                 onChange={(e) => setField('import_mode', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               >
                 {IMPORT_MODES.map((m) => (
                   <option key={m.value} value={m.value}>{m.label}</option>
@@ -91,7 +91,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
               <select
                 value={form.upsert_key}
                 onChange={(e) => setField('upsert_key', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               >
                 <option value="">{t('upsertDefault')}</option>
                 {entityFields.map((f) => (
@@ -121,7 +121,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
             <select
               value={form.source_type}
               onChange={(e) => setField('source_type', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             >
               {SOURCE_TYPES.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
@@ -138,7 +138,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                   type="url"
                   value={form.url}
                   onChange={(e) => setField('url', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   placeholder={t('placeholderUrl')}
                 />
               </div>
@@ -152,7 +152,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                     type="text"
                     value={form.json_path}
                     onChange={(e) => setField('json_path', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     placeholder="data.results"
                   />
                 </div>
@@ -167,7 +167,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                     value={form.headers}
                     onChange={(e) => setField('headers', e.target.value)}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     placeholder='{"X-Custom-Header": "value"}'
                   />
                 </div>
@@ -185,7 +185,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                     type="text"
                     value={form.sftp_host}
                     onChange={(e) => setField('sftp_host', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     placeholder="sftp.example.com"
                   />
                 </div>
@@ -195,7 +195,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                     type="number"
                     value={form.sftp_port}
                     onChange={(e) => setField('sftp_port', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     placeholder="22"
                   />
                 </div>
@@ -206,7 +206,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                   type="text"
                   value={form.sftp_username}
                   onChange={(e) => setField('sftp_username', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   placeholder="sftp_user"
                 />
               </div>
@@ -219,7 +219,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                   type="password"
                   value={form.sftp_password}
                   onChange={(e) => setField('sftp_password', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   placeholder="••••••••"
                 />
               </div>
@@ -232,7 +232,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                   value={form.sftp_private_key}
                   onChange={(e) => setField('sftp_private_key', e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
                 />
               </div>
@@ -243,7 +243,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                     type="text"
                     value={form.sftp_path}
                     onChange={(e) => setField('sftp_path', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     placeholder="/exports/users.csv"
                   />
                 </div>
@@ -252,7 +252,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                   <select
                     value={form.sftp_file_type}
                     onChange={(e) => setField('sftp_file_type', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   >
                     <option value="csv">CSV</option>
                     <option value="json">JSON</option>
@@ -269,7 +269,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                     type="text"
                     value={form.json_path}
                     onChange={(e) => setField('json_path', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     placeholder="data.results"
                   />
                 </div>
@@ -289,7 +289,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
               <select
                 value={form.csv_delimiter}
                 onChange={(e) => setField('csv_delimiter', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               >
                 <option value="auto">{t('delimiters.auto')}</option>
                 <option value=",">{t('delimiters.comma')}</option>
@@ -304,7 +304,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
                   type="checkbox"
                   checked={form.csv_has_headers}
                   onChange={(e) => setField('csv_has_headers', e.target.checked)}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded-sm focus:ring-indigo-500"
                 />
                 <span className="text-sm font-medium text-gray-700">{t('firstRowHeaders')}</span>
               </label>

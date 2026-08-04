@@ -50,7 +50,7 @@ export function KbResolveModal({
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder={tIncidents('kbResolve.searchPlaceholder')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           autoFocus
         />
 
@@ -87,7 +87,7 @@ export function KbResolveModal({
             onChange={(e) => setResolutionNotes(e.target.value)}
             rows={3}
             placeholder={tIncidents('kbResolve.resolveNotesPlaceholder')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
           />
         </div>
 

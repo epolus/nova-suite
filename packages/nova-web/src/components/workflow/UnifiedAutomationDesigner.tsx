@@ -275,7 +275,7 @@ function UnifiedAutomationDesignerInner({
         fillAvailableSpace ? 'h-full min-h-0 flex flex-col' : ''
       }`}
     >
-      <div className="flex flex-wrap items-center gap-2 mb-2 justify-between flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-2 mb-2 justify-between shrink-0">
         <span className="text-[11px] text-gray-500">{t('jsonSyncAutomatic')}</span>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
@@ -297,7 +297,7 @@ function UnifiedAutomationDesignerInner({
         </div>
       </div>
       {builderError && (
-        <div className="mb-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-200 flex-shrink-0">{builderError}</div>
+        <div className="mb-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-200 shrink-0">{builderError}</div>
       )}
       <div
         ref={canvasRootRef}

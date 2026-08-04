@@ -70,27 +70,27 @@ export default function SlaList({ definitions, onEdit, onToggleActive, onDelete 
                 {/* Conditions */}
                 <div className="flex flex-wrap gap-2 mt-3">
                   {def.condition_priority && (
-                    <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">
+                    <span className="text-xs px-2 py-1 rounded-sm bg-gray-100 text-gray-700">
                       {t('list.conditionPriority', { value: priorityLabel(def.condition_priority) })}
                     </span>
                   )}
                   {def.condition_impact && (
-                    <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">
+                    <span className="text-xs px-2 py-1 rounded-sm bg-gray-100 text-gray-700">
                       {t('list.conditionImpact', { value: tImpact(def.condition_impact as 'high') })}
                     </span>
                   )}
                   {def.condition_urgency && (
-                    <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">
+                    <span className="text-xs px-2 py-1 rounded-sm bg-gray-100 text-gray-700">
                       {t('list.conditionUrgency', { value: tUrgency(def.condition_urgency as 'high') })}
                     </span>
                   )}
                   {def.condition_service_name && (
-                    <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">
+                    <span className="text-xs px-2 py-1 rounded-sm bg-gray-100 text-gray-700">
                       {t('list.conditionService', { value: def.condition_service_name })}
                     </span>
                   )}
                   {def.condition_category && (
-                    <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">
+                    <span className="text-xs px-2 py-1 rounded-sm bg-gray-100 text-gray-700">
                       {t('list.conditionCategory', { value: def.condition_category })}
                     </span>
                   )}
@@ -132,7 +132,7 @@ export default function SlaList({ definitions, onEdit, onToggleActive, onDelete 
                     <div className="flex items-center gap-1">
                       <span className="text-xs font-medium text-yellow-700">{t('list.onWarning')}</span>
                       {def.on_warning.map((a) => (
-                        <span key={a} className="text-xs px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
+                        <span key={a} className="text-xs px-1.5 py-0.5 rounded-sm bg-yellow-50 text-yellow-700 border border-yellow-200">
                           {warningActionLabel(a)}
                         </span>
                       ))}
@@ -142,7 +142,7 @@ export default function SlaList({ definitions, onEdit, onToggleActive, onDelete 
                     <div className="flex items-center gap-1">
                       <span className="text-xs font-medium text-red-700">{t('list.onBreach')}</span>
                       {def.on_breach.map((a) => (
-                        <span key={a} className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+                        <span key={a} className="text-xs px-1.5 py-0.5 rounded-sm bg-red-50 text-red-700 border border-red-200">
                           {breachActionLabel(a)}
                         </span>
                       ))}
@@ -152,7 +152,7 @@ export default function SlaList({ definitions, onEdit, onToggleActive, onDelete 
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => onEdit(def)}
                   className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"

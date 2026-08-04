@@ -201,7 +201,7 @@ export default function WorkflowEditorPage() {
 
   return (
     <div className="flex flex-col gap-3 xl:flex-1 xl:min-h-0">
-      <div className="flex-shrink-0 [&>div]:mb-0">
+      <div className="shrink-0 [&>div]:mb-0">
         <PageHeader
           title={t('title')}
           description={t('description')}
@@ -218,15 +218,15 @@ export default function WorkflowEditorPage() {
         />
       </div>
 
-      <div className="flex-shrink-0 max-h-[34vh] overflow-y-auto bg-white rounded-xl border border-gray-200 p-3">
+      <div className="shrink-0 max-h-[34vh] overflow-y-auto bg-white rounded-xl border border-gray-200 p-3">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 items-end">
           <div className="lg:col-span-2">
             <label className="block text-xs font-medium text-gray-600 mb-1">{t('definitionName')}</label>
-            <input value={definitionName} onChange={(e) => setDefinitionName(e.target.value)} className="w-full px-2.5 py-2 rounded border border-gray-200 text-sm" placeholder={t('definitionPlaceholder')} />
+            <input value={definitionName} onChange={(e) => setDefinitionName(e.target.value)} className="w-full px-2.5 py-2 rounded-sm border border-gray-200 text-sm" placeholder={t('definitionPlaceholder')} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">{t('definitions')}</label>
-            <select value={definitionId ?? ''} disabled={loadingDefinitions || busy} onChange={(e) => { const id = e.target.value; if (id) void loadDefinition(id); }} className="w-full px-2.5 py-2 rounded border border-gray-200 text-sm bg-white">
+            <select value={definitionId ?? ''} disabled={loadingDefinitions || busy} onChange={(e) => { const id = e.target.value; if (id) void loadDefinition(id); }} className="w-full px-2.5 py-2 rounded-sm border border-gray-200 text-sm bg-white">
               <option value="">{t('select')}</option>
               {definitions.map((def) => <option key={def.id} value={def.id}>{def.name} ({def.workflow_type}) v{def.version}</option>)}
             </select>
@@ -241,7 +241,7 @@ export default function WorkflowEditorPage() {
         </div>
         <div className="mt-3">
           <label className="block text-xs font-medium text-gray-600 mb-1">{t('workflowType')}</label>
-          <input value={workflowType} onChange={(e) => setWorkflowType(e.target.value)} className="w-full max-w-md px-2.5 py-2 rounded border border-gray-200 text-sm" />
+          <input value={workflowType} onChange={(e) => setWorkflowType(e.target.value)} className="w-full max-w-md px-2.5 py-2 rounded-sm border border-gray-200 text-sm" />
         </div>
         {message && <p className="mt-2 text-xs text-gray-600">{message}</p>}
         <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-2.5">
@@ -253,7 +253,7 @@ export default function WorkflowEditorPage() {
               <p className="text-xs text-gray-600 mb-2">{t('publishedVersion', { version: loadedVersion, date: loadedPublishedAt ? formatDateTime(loadedPublishedAt) : '' })}</p>
               <p className="text-xs text-gray-700 mb-2">{diffChanges.length === 0 ? t('draftMatches') : t('fieldChanges', { count: diffChanges.length })}</p>
               {diffChanges.length > 0 && (
-                <div className="max-h-28 overflow-auto bg-white border border-gray-200 rounded p-2">
+                <div className="max-h-28 overflow-auto bg-white border border-gray-200 rounded-sm p-2">
                   <ul className="text-xs text-gray-700 space-y-2">
                     {diffChanges.slice(0, 40).map((change, idx) => (
                       <li key={`${change.path}-${idx}`}>
@@ -280,17 +280,17 @@ export default function WorkflowEditorPage() {
         </div>
         <div className="min-h-0 flex flex-col gap-3 xl:overflow-hidden">
           <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col min-h-0 xl:flex-1">
-            <p className="text-sm font-semibold text-gray-900 mb-2 flex-shrink-0">{t('unifiedJson')}</p>
+            <p className="text-sm font-semibold text-gray-900 mb-2 shrink-0">{t('unifiedJson')}</p>
             <textarea
               value={automationConfigJson}
               onChange={(e) => setAutomationConfigJson(e.target.value)}
-              className="w-full flex-1 min-h-[160px] px-2.5 py-2 rounded border border-gray-200 text-sm font-mono resize-y xl:resize-none"
+              className="w-full flex-1 min-h-[160px] px-2.5 py-2 rounded-sm border border-gray-200 text-sm font-mono resize-y xl:resize-none"
             />
             {!parsedAutomationConfig.valid && (
-              <p className="mt-2 text-xs text-red-700 flex-shrink-0">{t('jsonInvalid')}</p>
+              <p className="mt-2 text-xs text-red-700 shrink-0">{t('jsonInvalid')}</p>
             )}
           </div>
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <AutomationDryRunPanel
               disabled={busy || !parsedAutomationConfig.valid}
               getConfig={() => {

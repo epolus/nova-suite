@@ -95,7 +95,7 @@ export function parseBuilderFromConfig(raw: Record<string, unknown>): {
 
   const nodes: Node<UnifiedBuilderNodeData>[] = [
     {
-      id: 'start-1',
+      id: 'inset-s-1',
       type: 'default',
       position: { x: 80, y: 240 },
       data: { label: 'Start', nodeType: 'start' },
@@ -106,7 +106,7 @@ export function parseBuilderFromConfig(raw: Record<string, unknown>): {
   if (!byId.has(startAt)) return { nodes: [], edges: [], error: { code: 'startAtMissingState' } };
   edges.push({
     id: `start-1->${startAt}`,
-    source: 'start-1',
+    source: 'inset-s-1',
     target: startAt,
     markerEnd: { type: MarkerType.ArrowClosed },
   });

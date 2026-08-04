@@ -17,7 +17,7 @@ export function NewIncidentForm({ state }: { state: NewIncidentState }) {
   const tIncidents = useTranslations('pages.incidents');
   const fieldLabel = useFieldLabel();
   const { impact: impactLabel, urgency: urgencyLabel } = useImpactUrgencyLabel();
-  const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
+  const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden';
   const selectCls = inputCls;
 
   return (

@@ -42,7 +42,7 @@ export default function RecentRequestsWidget({ instance }: DashboardWidgetProps)
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{req.service_item_name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{req.number} &middot; {req.requester_name}</p>
                 </div>
-                <Badge value={req.status} className="ml-4 flex-shrink-0" />
+                <Badge value={req.status} className="ml-4 shrink-0" />
               </div>
             </Link>
           ))

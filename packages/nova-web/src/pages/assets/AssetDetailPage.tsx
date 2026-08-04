@@ -108,7 +108,7 @@ export default function AssetDetailPage() {
 
   if (loading) return <Spinner />;
 
-  const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500';
+  const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500';
 
   return (
     <>

@@ -37,7 +37,7 @@ export default function ChangesPendingWidget({ instance }: DashboardWidgetProps)
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{ch.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{ch.number} &middot; {t('risk', { level: ch.risk_level })}</p>
                 </div>
-                <Badge value={ch.status} className="ml-4 flex-shrink-0" />
+                <Badge value={ch.status} className="ml-4 shrink-0" />
               </div>
             </Link>
           ))

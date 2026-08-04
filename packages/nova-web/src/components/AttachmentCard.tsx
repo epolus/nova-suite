@@ -36,7 +36,7 @@ function AttachmentRow({ att, onPreview, onDownload, onDelete, formatSize }: {
   const icon = att.mime_type.startsWith('image/') ? '📷' : att.mime_type.includes('pdf') ? '📄' : '📎';
   return (
     <div className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 group">
-      <div className="w-8 h-8 rounded bg-white border border-gray-200 flex items-center justify-center text-base flex-shrink-0">{icon}</div>
+      <div className="w-8 h-8 rounded-sm bg-white border border-gray-200 flex items-center justify-center text-base shrink-0">{icon}</div>
       <div className="flex-1 min-w-0">
         <button onClick={() => onPreview(att)} className="text-sm font-medium text-indigo-600 hover:text-indigo-800 truncate block text-left w-full">
           {att.file_name}

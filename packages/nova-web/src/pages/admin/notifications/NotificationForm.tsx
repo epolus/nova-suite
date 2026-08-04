@@ -96,7 +96,7 @@ export default function NotificationForm({
           <input
             value={form.name || ''}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <div>
@@ -108,7 +108,7 @@ export default function NotificationForm({
               const nextTrigger = triggers.find((trigger) => trigger.entity === entity)?.id || '';
               setForm({ ...form, entity_type: entity, trigger_key: nextTrigger });
             }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
           >
             {ENTITY_OPTIONS.map((entity) => (
               <option key={entity} value={entity}>{t(`entityTypes.${entity}` as Parameters<typeof t>[0])}</option>
@@ -120,7 +120,7 @@ export default function NotificationForm({
           <select
             value={form.trigger_key || availableTriggers[0]?.id || ''}
             onChange={(e) => setForm({ ...form, trigger_key: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
           >
             {availableTriggers.map((trigger) => <option key={trigger.id} value={trigger.id}>{trigger.label}</option>)}
           </select>
@@ -130,7 +130,7 @@ export default function NotificationForm({
           <input
             value={form.description || ''}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <div>
@@ -138,7 +138,7 @@ export default function NotificationForm({
           <select
             value={form.recipient_type || 'assignee'}
             onChange={(e) => setForm({ ...form, recipient_type: e.target.value as NotificationRule['recipient_type'] })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
           >
             {recipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.label}</option>)}
           </select>
@@ -170,7 +170,7 @@ export default function NotificationForm({
             type="number"
             value={form.sort_order ?? 100}
             onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value, 10) || 100 })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
@@ -180,7 +180,7 @@ export default function NotificationForm({
             <select
               value={form.recipient_user_id || ''}
               onChange={(e) => setForm({ ...form, recipient_user_id: e.target.value || null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">{t('selectUser')}</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.display_name}</option>)}
@@ -194,7 +194,7 @@ export default function NotificationForm({
             <select
               value={form.recipient_group_id || ''}
               onChange={(e) => setForm({ ...form, recipient_group_id: e.target.value || null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">{t('selectAssignmentGroup')}</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -244,7 +244,7 @@ export default function NotificationForm({
                     templates[activeTemplateIndex] = { ...currentTemplate, title_template: e.target.value };
                     setForm({ ...form, templates });
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   placeholder={t('subjectPlaceholder')}
                 />
               </div>
@@ -262,7 +262,7 @@ export default function NotificationForm({
                     setForm({ ...form, templates });
                   }}
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none"
                   placeholder={t('bodyPlaceholder')}
                 />
               </div>
@@ -278,7 +278,7 @@ export default function NotificationForm({
                     setForm({ ...form, templates });
                   }}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none font-mono"
                   placeholder={t('htmlPlaceholder')}
                 />
               </div>

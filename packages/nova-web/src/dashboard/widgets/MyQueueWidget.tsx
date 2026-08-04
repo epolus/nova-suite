@@ -39,7 +39,7 @@ export default function MyQueueWidget({ instance }: DashboardWidgetProps) {
               <Link key={inc.id} to={`/incidents/${inc.id}`} className="block py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex items-start gap-2.5">
-                    <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${cfg?.dot ?? 'bg-gray-300'}`} />
+                    <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${cfg?.dot ?? 'bg-gray-300'}`} />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{inc.title}</p>
                       <p className="text-xs text-gray-500 mt-0.5">

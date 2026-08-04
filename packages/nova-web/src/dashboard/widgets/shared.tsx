@@ -39,7 +39,7 @@ export function StatContent({
     : (ACCENT_VALUE[accent] ?? ACCENT_VALUE.indigo);
 
   return (
-    <Link to={link} className="group flex h-full flex-col justify-between rounded-lg hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors">
+    <Link to={link} className="group flex h-full flex-col justify-between rounded-lg hover:bg-black/2 dark:hover:bg-white/3 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
@@ -48,7 +48,7 @@ export function StatContent({
           <p className={`text-3xl font-bold tabular-nums mt-1 ${valueClass}`}>{value.toLocaleString()}</p>
           {hint && <p className="text-[11px] text-gray-400 mt-1 line-clamp-2">{hint}</p>}
         </div>
-        <div className={`flex-shrink-0 rounded-xl p-2.5 ${ACCENT_ICON_BG[accent] ?? ACCENT_ICON_BG.indigo}`}>
+        <div className={`shrink-0 rounded-xl p-2.5 ${ACCENT_ICON_BG[accent] ?? ACCENT_ICON_BG.indigo}`}>
           {icon}
         </div>
       </div>

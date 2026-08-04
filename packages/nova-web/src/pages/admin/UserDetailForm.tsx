@@ -97,7 +97,7 @@ export default function UserDetailForm({
     [t],
   );
 
-  const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
+  const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden';
   const selectCls = `${inputCls} bg-white`;
 
   return (
@@ -354,7 +354,7 @@ export default function UserDetailForm({
                   className="sr-only peer"
                 />
                 <div className="w-10 h-5 bg-gray-200 rounded-full peer-checked:bg-indigo-600 transition-colors" />
-                <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
+                <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform" />
               </div>
               <span className="text-sm text-gray-700">
                 {form.is_active ? t('activeCanLogin') : t('inactiveCannotLogin')}

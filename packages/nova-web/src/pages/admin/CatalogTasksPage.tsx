@@ -68,7 +68,7 @@ export default function CatalogTasksPage() {
         <button
           onClick={() => setViewMode('all')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            viewMode === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            viewMode === 'all' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           {t('tabs.allTasks')}
@@ -76,7 +76,7 @@ export default function CatalogTasksPage() {
         <button
           onClick={() => setViewMode('by-item')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            viewMode === 'by-item' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            viewMode === 'by-item' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           {t('tabs.byServiceItem')}

@@ -18,7 +18,7 @@ export function UserPicker({ users, value, onChange, placeholder }: {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
     >
       <option value="">{placeholder || tStates('none')}</option>
       {users.map((u) => (
@@ -67,7 +67,7 @@ export function CiAttributeFields({ classAttrs, className, attributes, setAttrib
                 <select
                   value={attributes[attrName] || ''}
                   onChange={(e) => setAttributes({ ...attributes, [attrName]: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">{tStates('none')}</option>
                   {(refData[refTable] || []).map((opt) => (
@@ -80,7 +80,7 @@ export function CiAttributeFields({ classAttrs, className, attributes, setAttrib
                     type="checkbox"
                     checked={attributes[attrName] === 'true'}
                     onChange={(e) => setAttributes({ ...attributes, [attrName]: e.target.checked ? 'true' : 'false' })}
-                    className="w-4 h-4 text-indigo-600 rounded border-gray-300"
+                    className="w-4 h-4 text-indigo-600 rounded-sm border-gray-300"
                   />
                   {attrName.replace(/_/g, ' ')}
                 </label>
@@ -89,14 +89,14 @@ export function CiAttributeFields({ classAttrs, className, attributes, setAttrib
                   type="number"
                   value={attributes[attrName] || ''}
                   onChange={(e) => setAttributes({ ...attributes, [attrName]: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                 />
               ) : (
                 <input
                   type="text"
                   value={attributes[attrName] || ''}
                   onChange={(e) => setAttributes({ ...attributes, [attrName]: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   placeholder={tCmdb('enterAttribute', { name: attrName.replace(/_/g, ' ') })}
                 />
               )}

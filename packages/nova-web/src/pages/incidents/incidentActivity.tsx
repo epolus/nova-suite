@@ -116,7 +116,7 @@ function JournalForm({
         onChange={(e) => onContentChange(e.target.value)}
         placeholder={journalPlaceholder}
         rows={2}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden resize-none"
       />
       <div className="flex items-center gap-3 mt-2">
         {isFulfiller ? (
@@ -129,7 +129,7 @@ function JournalForm({
               name={INCIDENT_FIELD.journalType}
               value={type}
               onChange={(e) => onTypeChange(e.target.value)}
-              className="px-2 py-1 border border-gray-200 rounded text-xs"
+              className="px-2 py-1 border border-gray-200 rounded-sm text-xs"
             >
               <option value="comment">{tIncidents('journalForm.comment')}</option>
               <option value="work_note">{tIncidents('journalForm.workNote')}</option>
@@ -141,7 +141,7 @@ function JournalForm({
                 type="checkbox"
                 checked={visible}
                 onChange={(e) => onVisibleChange(e.target.checked)}
-                className="rounded"
+                className="rounded-sm"
               />
               {tIncidents('journalForm.customerVisible')}
             </label>
@@ -149,7 +149,7 @@ function JournalForm({
         ) : (
           <span className="text-xs text-gray-400">{tIncidents('journalForm.comment')}</span>
         )}
-        <button type="submit" disabled={!content.trim()} className="ml-auto px-3 py-1 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 disabled:opacity-40">{tIncidents('journalForm.post')}</button>
+        <button type="submit" disabled={!content.trim()} className="ml-auto px-3 py-1 bg-indigo-600 text-white rounded-sm text-xs font-medium hover:bg-indigo-700 disabled:opacity-40">{tIncidents('journalForm.post')}</button>
       </div>
     </form>
   );

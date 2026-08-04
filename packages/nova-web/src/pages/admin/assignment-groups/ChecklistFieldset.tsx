@@ -19,12 +19,12 @@ export default function ChecklistFieldset({
       <legend className="text-sm font-semibold text-gray-700 mb-3">{legend}</legend>
       <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
         {options.map((opt) => (
-          <label key={opt.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-sm">
+          <label key={opt.id} className="flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-gray-50 cursor-pointer text-sm">
             <input
               type="checkbox"
               checked={selectedIds.includes(opt.id)}
               onChange={() => onToggle(opt.id)}
-              className="rounded text-indigo-600"
+              className="rounded-sm text-indigo-600"
             />
             <span className="text-gray-800">{opt.label}</span>
             {opt.secondary !== undefined && (

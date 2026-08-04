@@ -84,21 +84,21 @@ export function TaskCard({
             onChange={(e) => onNoteChange(e.target.value)}
             placeholder={tRequests('notesOptionalShort')}
             rows={1}
-            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-indigo-500 outline-none resize-none mb-2"
+            className="w-full px-2 py-1.5 border border-gray-200 rounded-sm text-xs focus:ring-1 focus:ring-indigo-500 outline-hidden resize-none mb-2"
           />
           {canApprove ? (
             <div className="flex gap-2">
               <button
                 onClick={() => onComplete(task.id, 'rejected')}
                 disabled={actionLoading}
-                className="flex-1 px-3 py-1.5 border border-red-300 text-red-700 rounded text-xs font-medium hover:bg-red-50 disabled:opacity-50"
+                className="flex-1 px-3 py-1.5 border border-red-300 text-red-700 rounded-sm text-xs font-medium hover:bg-red-50 disabled:opacity-50"
               >
                 {tActions('reject')}
               </button>
               <button
                 onClick={() => onComplete(task.id, 'approved')}
                 disabled={actionLoading}
-                className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+                className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded-sm text-xs font-medium hover:bg-green-700 disabled:opacity-50"
               >
                 {tActions('approve')}
               </button>
@@ -107,7 +107,7 @@ export function TaskCard({
             <button
               onClick={() => onComplete(task.id, 'completed')}
               disabled={actionLoading}
-              className="w-full px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 disabled:opacity-50"
+              className="w-full px-3 py-1.5 bg-indigo-600 text-white rounded-sm text-xs font-medium hover:bg-indigo-700 disabled:opacity-50"
             >
               {tRequests('markComplete')}
             </button>

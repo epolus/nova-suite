@@ -47,7 +47,7 @@ export default function DashboardWidgetShell({
 
   return (
     <div
-      className={`h-full flex flex-col rounded-xl shadow-sm overflow-hidden transition-all duration-150 ${
+      className={`h-full flex flex-col rounded-xl shadow-xs overflow-hidden transition-all duration-150 ${
         isStat ? `dashboard-widget-stat ${accentClass}` : 'dashboard-widget-panel'
       } ${editMode ? 'ring-2 ring-indigo-400/50 shadow-md' : ''}`}
     >
@@ -58,7 +58,7 @@ export default function DashboardWidgetShell({
           }`}
         >
           <div className="flex items-center gap-2 min-w-0">
-            {editMode && DashboardIcons.grip('w-4 h-4 flex-shrink-0 text-gray-400')}
+            {editMode && DashboardIcons.grip('w-4 h-4 shrink-0 text-gray-400')}
             {!isStat && (
               <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{title}</span>
             )}
@@ -66,7 +66,7 @@ export default function DashboardWidgetShell({
               <span className="text-xs font-medium truncate text-gray-500 dark:text-gray-400">{title}</span>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {!editMode && def?.viewAllLink && (
               <Link to={def.viewAllLink} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400">
                 {tDash('viewAll')}
@@ -81,7 +81,7 @@ export default function DashboardWidgetShell({
               <select
                 value={currentLimit}
                 onChange={(e) => onConfigChange(instance.id, { limit: Number(e.target.value) })}
-                className="text-xs border border-gray-200 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800"
+                className="text-xs border border-gray-200 dark:border-gray-600 rounded-sm px-1.5 py-0.5 bg-white dark:bg-gray-800"
                 aria-label={t('listLimit')}
                 onMouseDown={(e) => e.stopPropagation()}
               >
@@ -98,7 +98,7 @@ export default function DashboardWidgetShell({
                     const [dataset, metric] = e.target.value.split(':');
                     onConfigChange(instance.id, { dataset, metric });
                   }}
-                  className="text-xs border border-gray-200 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800 max-w-[9rem]"
+                  className="text-xs border border-gray-200 dark:border-gray-600 rounded-sm px-1.5 py-0.5 bg-white dark:bg-gray-800 max-w-36"
                   aria-label={tAnalytics('metric')}
                   onMouseDown={(e) => e.stopPropagation()}
                 >
@@ -111,7 +111,7 @@ export default function DashboardWidgetShell({
                 <select
                   value={currentDays}
                   onChange={(e) => onConfigChange(instance.id, { days: Number(e.target.value) })}
-                  className="text-xs border border-gray-200 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800"
+                  className="text-xs border border-gray-200 dark:border-gray-600 rounded-sm px-1.5 py-0.5 bg-white dark:bg-gray-800"
                   aria-label={tAnalytics('range')}
                   onMouseDown={(e) => e.stopPropagation()}
                 >

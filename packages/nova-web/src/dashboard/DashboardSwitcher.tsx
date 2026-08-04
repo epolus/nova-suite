@@ -26,7 +26,7 @@ export default function DashboardSwitcher({
       value={activeId ?? ''}
       disabled={disabled || !activeId}
       onChange={(event) => onSelect(event.target.value)}
-      className="h-9 min-w-[10rem] max-w-[14rem] rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+      className="h-9 min-w-40 max-w-56 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200 shadow-xs focus:outline-hidden focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
     >
         {dashboards.map((dashboard) => (
           <option key={dashboard.id} value={dashboard.id}>

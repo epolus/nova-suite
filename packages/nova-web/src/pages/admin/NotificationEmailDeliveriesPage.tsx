@@ -213,7 +213,7 @@ export default function NotificationEmailDeliveriesPage() {
                     <td className="px-3 py-2 text-xs text-gray-600">
                       {t('table.localeValue', { template: delivery.template_locale, recipient: delivery.recipient_locale })}
                     </td>
-                    <td className="px-3 py-2 text-xs text-gray-800 max-w-[26rem] truncate" title={delivery.subject}>
+                    <td className="px-3 py-2 text-xs text-gray-800 max-w-104 truncate" title={delivery.subject}>
                       {delivery.subject}
                     </td>
                     <td className="px-3 py-2 text-xs text-red-600 max-w-[20rem]">

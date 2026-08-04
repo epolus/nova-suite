@@ -71,7 +71,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
             type="text"
             value={form.name || ''}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             placeholder={t('form.namePlaceholder')}
           />
         </div>
@@ -82,7 +82,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
           <select
             value={form.process_type || 'incident'}
             onChange={(e) => setForm({ ...form, process_type: e.target.value as SlaDefinition['process_type'] })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
           >
             {processTypes.map((pt) => (
               <option key={pt.value} value={pt.value}>{pt.label}</option>
@@ -97,7 +97,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
             value={form.description || ''}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden resize-none"
             placeholder={t('form.descriptionPlaceholder')}
           />
         </div>
@@ -118,7 +118,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
             <select
               value={form.condition_priority ?? ''}
               onChange={(e) => setForm({ ...form, condition_priority: e.target.value ? parseInt(e.target.value) : null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             >
               <option value="">{t('form.anyPriority')}</option>
               {[1, 2, 3, 4, 5].map((p) => (
@@ -131,7 +131,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
             <select
               value={form.condition_impact || ''}
               onChange={(e) => setForm({ ...form, condition_impact: e.target.value || null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             >
               <option value="">{t('form.anyImpact')}</option>
               <option value="high">{tImpact('high')}</option>
@@ -144,7 +144,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
             <select
               value={form.condition_urgency || ''}
               onChange={(e) => setForm({ ...form, condition_urgency: e.target.value || null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             >
               <option value="">{t('form.anyUrgency')}</option>
               <option value="high">{tUrgency('high')}</option>
@@ -157,7 +157,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
             <select
               value={form.condition_service_id || ''}
               onChange={(e) => setForm({ ...form, condition_service_id: e.target.value || null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             >
               <option value="">{t('form.anyService')}</option>
               {services.map((s) => (
@@ -171,7 +171,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
               type="text"
               value={form.condition_category || ''}
               onChange={(e) => setForm({ ...form, condition_category: e.target.value || null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               placeholder={t('form.anyCategory')}
             />
           </div>
@@ -181,7 +181,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
               type="number"
               value={form.sort_order ?? 100}
               onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 100 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               placeholder="100"
             />
           </div>
@@ -202,7 +202,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
               min={1}
               value={form.resolution_hours ?? 24}
               onChange={(e) => setForm({ ...form, resolution_hours: parseInt(e.target.value) || 24 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             />
             <p className="text-xs text-gray-400 mt-1">{t('form.resolutionHoursHint')}</p>
           </div>
@@ -213,7 +213,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
               min={1}
               value={form.response_hours ?? ''}
               onChange={(e) => setForm({ ...form, response_hours: e.target.value ? parseInt(e.target.value) : null })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               placeholder={tStates('optional')}
             />
             <p className="text-xs text-gray-400 mt-1">{t('form.responseHoursHint')}</p>
@@ -226,7 +226,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
               max={99}
               value={form.warning_pct ?? 80}
               onChange={(e) => setForm({ ...form, warning_pct: parseInt(e.target.value) || 80 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             />
             <p className="text-xs text-gray-400 mt-1">{t('form.warningPctHint')}</p>
           </div>
@@ -238,7 +238,7 @@ export default function SlaForm({ form, setForm, creating, saving, services, onS
               max={365}
               value={form.auto_close_days ?? 7}
               onChange={(e) => setForm({ ...form, auto_close_days: parseInt(e.target.value) || 7 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             />
             <p className="text-xs text-gray-400 mt-1">{t('form.autoCloseDaysHint')}</p>
           </div>

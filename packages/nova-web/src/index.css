@@ -1,9 +1,25 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
 @layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
   :root {
     --color-dark-content-bg: #0b1220;
     --color-dark-surface-bg: #1e293b;
@@ -29,74 +45,8 @@
   #root {
     @apply h-full;
   }
-}
 
-/* Retrofit common light-only Tailwind utilities when `html.dark` is set */
-@layer utilities {
-  html.dark .bg-white {
-    background-color: var(--color-dark-surface-bg);
-    color: var(--color-dark-text-primary);
-  }
-
-  html.dark .bg-gray-50 {
-    background-color: var(--color-dark-muted-bg);
-  }
-
-  html.dark .bg-slate-50 {
-    background-color: var(--color-dark-content-bg);
-  }
-
-  html.dark .bg-gray-100 {
-    background-color: var(--color-dark-surface-bg);
-  }
-
-  html.dark .bg-indigo-50 {
-    background-color: color-mix(in srgb, var(--color-dark-surface-bg) 80%, transparent);
-  }
-
-  html.dark .border-gray-100,
-  html.dark .border-gray-200 {
-    border-color: var(--color-dark-border);
-  }
-
-  html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
-  html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
-    border-color: var(--color-dark-border);
-  }
-
-  html.dark .text-gray-900 {
-    color: var(--color-dark-text-primary);
-  }
-
-  html.dark .text-gray-800 {
-    color: var(--color-dark-text-primary);
-  }
-
-  html.dark .text-gray-700 {
-    color: color-mix(in srgb, var(--color-dark-text-primary) 90%, black);
-  }
-
-  html.dark .text-gray-600 {
-    color: color-mix(in srgb, var(--color-dark-text-primary) 80%, black);
-  }
-
-  html.dark .text-gray-500 {
-    color: var(--color-dark-text-muted);
-  }
-
-  html.dark .text-indigo-700 {
-    @apply text-indigo-300;
-  }
-
-  html.dark .text-indigo-600 {
-    @apply text-indigo-400;
-  }
-
-  html.dark .placeholder-gray-400::placeholder,
-  html.dark .placeholder-gray-500::placeholder {
-    color: color-mix(in srgb, var(--color-dark-text-muted) 80%, black);
-  }
-
+  /* Native controls default to a light UA background; theme them in dark mode */
   html.dark input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
   html.dark textarea,
   html.dark select {
@@ -109,6 +59,120 @@
   html.dark input[type='radio'] {
     border-color: var(--color-dark-border);
     background-color: var(--color-dark-muted-bg);
+  }
+}
+
+/* Retrofit common light-only Tailwind utilities when `html.dark` is set */
+@utility bg-white {
+  html.dark & {
+    background-color: var(--color-dark-surface-bg);
+    color: var(--color-dark-text-primary);
+  }
+}
+
+@utility bg-gray-50 {
+  html.dark & {
+    background-color: var(--color-dark-muted-bg);
+  }
+}
+
+@utility bg-slate-50 {
+  html.dark & {
+    background-color: var(--color-dark-content-bg);
+  }
+}
+
+@utility bg-gray-100 {
+  html.dark & {
+    background-color: var(--color-dark-surface-bg);
+  }
+}
+
+@utility bg-indigo-50 {
+  html.dark & {
+    background-color: color-mix(
+      in srgb,
+      var(--color-dark-surface-bg) 80%,
+      transparent
+    );
+  }
+}
+
+@utility border-gray-100 {
+  html.dark & {
+    border-color: var(--color-dark-border);
+  }
+}
+
+@utility border-gray-200 {
+  html.dark & {
+    border-color: var(--color-dark-border);
+  }
+}
+
+@utility divide-gray-100 {
+  html.dark & > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--color-dark-border);
+  }
+}
+
+@utility divide-gray-200 {
+  html.dark & > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--color-dark-border);
+  }
+}
+
+@utility text-gray-900 {
+  html.dark & {
+    color: var(--color-dark-text-primary);
+  }
+}
+
+@utility text-gray-800 {
+  html.dark & {
+    color: var(--color-dark-text-primary);
+  }
+}
+
+@utility text-gray-700 {
+  html.dark & {
+    color: color-mix(in srgb, var(--color-dark-text-primary) 90%, black);
+  }
+}
+
+@utility text-gray-600 {
+  html.dark & {
+    color: color-mix(in srgb, var(--color-dark-text-primary) 80%, black);
+  }
+}
+
+@utility text-gray-500 {
+  html.dark & {
+    color: var(--color-dark-text-muted);
+  }
+}
+
+@utility text-indigo-700 {
+  html.dark & {
+    @apply text-indigo-300;
+  }
+}
+
+@utility text-indigo-600 {
+  html.dark & {
+    @apply text-indigo-400;
+  }
+}
+
+@utility placeholder-gray-400 {
+  html.dark &::placeholder {
+    color: color-mix(in srgb, var(--color-dark-text-muted) 80%, black);
+  }
+}
+
+@utility placeholder-gray-500 {
+  html.dark &::placeholder {
+    color: color-mix(in srgb, var(--color-dark-text-muted) 80%, black);
   }
 }
 

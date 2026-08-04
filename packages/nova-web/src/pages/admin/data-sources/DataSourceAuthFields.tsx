@@ -28,7 +28,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
               list="nova-vault-slugs-ds"
               value={form.credential_slug}
               onChange={(e) => setField('credential_slug', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               placeholder="my_integration_secret"
             />
             <datalist id="nova-vault-slugs-ds">
@@ -50,7 +50,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
               <select
                 value={form.auth_type}
                 onChange={(e) => setField('auth_type', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               >
                 <option value="none">{t('authTypes.none')}</option>
                 <option value="bearer">{t('authTypes.bearer')}</option>
@@ -65,7 +65,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                   type="password"
                   value={form.bearer_token}
                   onChange={(e) => setField('bearer_token', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   placeholder="your-api-token"
                 />
               </div>
@@ -79,7 +79,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                     type="url"
                     value={form.oauth2_token_url}
                     onChange={(e) => setField('oauth2_token_url', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     placeholder="https://auth.example.com/oauth/token"
                   />
                 </div>
@@ -90,7 +90,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                       type="text"
                       value={form.oauth2_client_id}
                       onChange={(e) => setField('oauth2_client_id', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                       placeholder="client-id"
                     />
                   </div>
@@ -100,7 +100,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                       type="password"
                       value={form.oauth2_client_secret}
                       onChange={(e) => setField('oauth2_client_secret', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                       placeholder="client-secret"
                     />
                   </div>
@@ -114,7 +114,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                     type="text"
                     value={form.oauth2_scope}
                     onChange={(e) => setField('oauth2_scope', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     placeholder="read:users read:data"
                   />
                 </div>
@@ -136,7 +136,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                 type="checkbox"
                 checked={form.pagination_enabled}
                 onChange={(e) => setField('pagination_enabled', e.target.checked)}
-                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded-sm focus:ring-indigo-500"
               />
               <span className="text-sm font-medium text-gray-700">{t('enablePagination')}</span>
             </label>
@@ -148,7 +148,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                   <select
                     value={form.pagination_mode}
                     onChange={(e) => setField('pagination_mode', e.target.value as 'page' | 'offset')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   >
                     <option value="page">{t('paginationModes.page')}</option>
                     <option value="offset">{t('paginationModes.offset')}</option>
@@ -163,7 +163,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                         type="text"
                         value={form.pagination_page_param}
                         onChange={(e) => setField('pagination_page_param', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                         placeholder="page"
                       />
                     </div>
@@ -173,7 +173,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                         type="number"
                         value={form.pagination_page_start}
                         onChange={(e) => setField('pagination_page_start', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                         placeholder="1"
                       />
                     </div>
@@ -183,7 +183,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                         type="text"
                         value={form.pagination_page_size_param}
                         onChange={(e) => setField('pagination_page_size_param', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                         placeholder="limit"
                       />
                     </div>
@@ -193,7 +193,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                         type="number"
                         value={form.pagination_page_size}
                         onChange={(e) => setField('pagination_page_size', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                         placeholder="100"
                       />
                     </div>
@@ -206,7 +206,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                         type="text"
                         value={form.pagination_offset_param}
                         onChange={(e) => setField('pagination_offset_param', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                         placeholder="offset"
                       />
                     </div>
@@ -216,7 +216,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                         type="number"
                         value={form.pagination_offset_start}
                         onChange={(e) => setField('pagination_offset_start', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                         placeholder="0"
                       />
                     </div>
@@ -226,7 +226,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                         type="text"
                         value={form.pagination_limit_param}
                         onChange={(e) => setField('pagination_limit_param', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                         placeholder="limit"
                       />
                     </div>
@@ -236,7 +236,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                         type="number"
                         value={form.pagination_limit}
                         onChange={(e) => setField('pagination_limit', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                         placeholder="100"
                       />
                     </div>
@@ -249,7 +249,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                     type="number"
                     value={form.pagination_max_pages}
                     onChange={(e) => setField('pagination_max_pages', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     placeholder="20"
                   />
                   <p className="mt-1 text-xs text-gray-400">

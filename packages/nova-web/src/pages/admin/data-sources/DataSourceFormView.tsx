@@ -94,7 +94,7 @@ export default function DataSourceFormView({
             value={form.column_mapping}
             onChange={(e) => setField('column_mapping', e.target.value)}
             rows={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             placeholder='{"email": "email", "full_name": "display_name"}'
           />
         </Card>
@@ -107,7 +107,7 @@ export default function DataSourceFormView({
                 type="checkbox"
                 checked={form.schedule_enabled}
                 onChange={(e) => setField('schedule_enabled', e.target.checked)}
-                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                className="w-4 h-4 text-indigo-600 rounded-sm focus:ring-indigo-500"
               />
               <span className="text-sm font-medium text-gray-700">{t('enableSchedule')}</span>
             </label>
@@ -121,7 +121,7 @@ export default function DataSourceFormView({
                       onChange={(e) => {
                         if (e.target.value !== '__custom') setField('schedule_cron', e.target.value);
                       }}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                     >
                       {CRON_PRESETS.map((p) => (
                         <option key={p.value} value={p.value}>{p.label}</option>
@@ -132,7 +132,7 @@ export default function DataSourceFormView({
                       type="text"
                       value={form.schedule_cron}
                       onChange={(e) => setField('schedule_cron', e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                       placeholder="0 2 * * *"
                     />
                   </div>
@@ -188,14 +188,14 @@ export default function DataSourceFormView({
                   <button
                     onClick={onApplyDetectedColumnsTemplate}
                     disabled={testResult.detected_columns.length === 0}
-                    className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+                    className="px-3 py-1 text-xs border border-gray-300 rounded-sm hover:bg-gray-50 disabled:opacity-50"
                   >
                     {t('useDetectedTemplate')}
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {testResult.detected_columns.length > 0 ? testResult.detected_columns.map((col) => (
-                    <span key={col} className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 font-mono text-xs">
+                    <span key={col} className="px-2 py-0.5 rounded-sm bg-blue-50 text-blue-700 border border-blue-100 font-mono text-xs">
                       {col}
                     </span>
                   )) : <span className="text-gray-400">{t('noColumnsDetected')}</span>}
@@ -207,7 +207,7 @@ export default function DataSourceFormView({
                     <button
                       onClick={onApplySuggestedMapping}
                       disabled={Object.keys(testResult.suggested_mapping).length === 0}
-                      className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+                      className="px-3 py-1 text-xs border border-gray-300 rounded-sm hover:bg-gray-50 disabled:opacity-50"
                     >
                       {t('applySuggestion')}
                     </button>

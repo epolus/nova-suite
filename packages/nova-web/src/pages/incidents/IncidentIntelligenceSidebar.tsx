@@ -91,7 +91,7 @@ export function IncidentIntelligenceSidebar({ d }: { d: IncidentDetailState }) {
                           const alt = img[1] || 'attachment image';
                           const url = previewAttachmentUrls[img[2] || ''];
                           return url
-                            ? <img key={`img-${idx}`} src={url} alt={alt} className="max-w-full rounded border border-indigo-100" />
+                            ? <img key={`img-${idx}`} src={url} alt={alt} className="max-w-full rounded-sm border border-indigo-100" />
                             : <p key={`img-missing-${idx}`} className="text-gray-400">{tIncidents('imageNotAvailable', { alt })}</p>;
                         }
                         const link = line.match(/^\[([^\]]+)\]\(attachment:([^)]+)\)\s*$/);

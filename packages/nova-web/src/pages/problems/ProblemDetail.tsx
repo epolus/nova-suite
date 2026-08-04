@@ -220,7 +220,7 @@ export default function ProblemDetail() {
 
   if (loading) return <Spinner />;
 
-  const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
+  const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden';
   const selectCls = `${inputCls} bg-white`;
   const textareaCls = `${inputCls} resize-none`;
   const pageTitle = isNew

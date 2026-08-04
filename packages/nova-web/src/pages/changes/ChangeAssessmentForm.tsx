@@ -70,7 +70,7 @@ export function ChangeAssessmentForm({
             </div>
             <div>
               <label className="flex items-center gap-2 text-xs font-medium text-gray-500 cursor-pointer">
-                <input type="checkbox" checked={form.downtime_required} onChange={(e) => setForm((p) => ({ ...p, downtime_required: e.target.checked }))} className="rounded" />
+                <input type="checkbox" checked={form.downtime_required} onChange={(e) => setForm((p) => ({ ...p, downtime_required: e.target.checked }))} className="rounded-sm" />
                 {tChanges('downtimeRequired')}
               </label>
             </div>

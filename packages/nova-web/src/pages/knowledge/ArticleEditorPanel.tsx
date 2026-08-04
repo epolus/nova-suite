@@ -17,7 +17,7 @@ import { renderMarkdown } from './knowledgeMarkdown';
 import { RatingsWidget } from './RatingsWidget';
 import type { KnowledgeForm } from './knowledgeSections';
 
-const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white';
+const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden bg-white';
 const labelCls = 'block text-xs font-medium text-gray-500 mb-1';
 const toolbarBtnCls = 'px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-50 transition-colors font-mono text-gray-700';
 
@@ -121,7 +121,7 @@ export function ArticleEditorPanel({
                 {form.title || t('untitled')}
               </h2>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               {!isReadOnlyView && selectedId !== 'new' && isPublished && (
                 <Button
                   variant="outline"
@@ -264,7 +264,7 @@ export function ArticleEditorPanel({
                     value={form.content}
                     onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))}
                     rows={20}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono resize-none"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono resize-none"
                     placeholder={t('markdownPlaceholder')}
                   />
                   <div className="hidden lg:block">

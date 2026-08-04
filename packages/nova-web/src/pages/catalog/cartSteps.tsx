@@ -61,9 +61,9 @@ function CartItemImage({ itemId, hasPicture }: { itemId: string; hasPicture: boo
       .catch(() => {});
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [itemId, hasPicture]);
-  if (!src) return <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xl flex-shrink-0">&#128722;</div>;
+  if (!src) return <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xl shrink-0">&#128722;</div>;
   return (
-    <div className={`w-16 h-16 rounded-lg flex-shrink-0 ${catalogPictureFrameBaseClass}`}>
+    <div className={`w-16 h-16 rounded-lg shrink-0 ${catalogPictureFrameBaseClass}`}>
       <img src={src} className="max-w-full max-h-full object-contain" alt="" />
     </div>
   );
@@ -98,7 +98,7 @@ export function ReviewStep({ items, onRemove, onUpdate, currencyCode }: {
                 <h3 className="font-semibold text-gray-900">{item.serviceItem.name}</h3>
                 <p className="text-xs text-gray-500 mt-0.5">{item.serviceItem.category_name}</p>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 {item.serviceItem.price != null && (
                   <span className="text-sm font-semibold text-green-700">
                     {formatCurrency(Number(item.serviceItem.price), currencyCode)}
@@ -130,7 +130,7 @@ export function ReviewStep({ items, onRemove, onUpdate, currencyCode }: {
               <select
                 value={item.priority}
                 onChange={(e) => onUpdate(item.id, { priority: e.target.value as CartItem['priority'] })}
-                className="text-xs border border-gray-200 rounded-md px-2 py-1 focus:ring-1 focus:ring-indigo-500 outline-none"
+                className="text-xs border border-gray-200 rounded-md px-2 py-1 focus:ring-1 focus:ring-indigo-500 outline-hidden"
               >
                 {(['low', 'medium', 'high', 'critical'] as const).map((value) => (
                   <option key={value} value={value}>{statusLabel(value)}</option>
@@ -215,7 +215,7 @@ export function DeliveryStep({ delivery, setDelivery, orderForSelf, setOrderForS
               value={userSearch}
               onChange={(e) => setUserSearch(e.target.value)}
               placeholder={t('searchUsers')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none mb-2"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden mb-2"
             />
             <div className="max-h-48 overflow-auto border border-gray-200 rounded-lg">
               {filteredUsers.map((u) => (
@@ -248,7 +248,7 @@ export function DeliveryStep({ delivery, setDelivery, orderForSelf, setOrderForS
               value={delivery.location}
               onChange={(e) => setDelivery({ ...delivery, location: e.target.value })}
               placeholder={t('deliveryLocationPlaceholder')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             />
           </div>
           <div>
@@ -256,7 +256,7 @@ export function DeliveryStep({ delivery, setDelivery, orderForSelf, setOrderForS
             <UserDateInput
               value={delivery.date_needed}
               onChange={(next) => setDelivery({ ...delivery, date_needed: next })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               disallowPast
             />
           </div>
@@ -267,7 +267,7 @@ export function DeliveryStep({ delivery, setDelivery, orderForSelf, setOrderForS
               onChange={(e) => setDelivery({ ...delivery, instructions: e.target.value })}
               rows={3}
               placeholder={t('specialInstructionsPlaceholder')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden resize-none"
             />
           </div>
         </div>

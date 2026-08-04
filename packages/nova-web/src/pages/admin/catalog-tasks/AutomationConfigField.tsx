@@ -76,7 +76,7 @@ export default function AutomationConfigField({
         </button>
         {vaultCreds.length > 0 && (
           <select
-            className="text-xs border border-gray-200 rounded px-2 py-1 max-w-[220px] bg-white"
+            className="text-xs border border-gray-200 rounded-sm px-2 py-1 max-w-[220px] bg-white"
             defaultValue=""
             onChange={(e) => {
               const v = e.target.value;
@@ -116,7 +116,7 @@ export default function AutomationConfigField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}
-        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono outline-hidden focus:ring-2 focus:ring-indigo-500 resize-y"
       />
       <div className="mt-3">
         <AutomationDryRunPanel

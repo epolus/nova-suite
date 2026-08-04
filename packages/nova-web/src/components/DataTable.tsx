@@ -137,7 +137,7 @@ export default function DataTable<T extends { id: string }>({
                       aria-label={tTable('selectAll')}
                       checked={!!allSelected}
                       onChange={toggleAll}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      className="rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                     />
                   </th>
                 )}
@@ -157,7 +157,7 @@ export default function DataTable<T extends { id: string }>({
                     onClick={col.sortable ? () => onSort(col.key) : undefined}
                   >
                     <span className="inline-flex items-center gap-1">
-                      <svg className="w-3 h-3 text-gray-300 flex-shrink-0 mr-0.5" viewBox="0 0 12 12" fill="currentColor">
+                      <svg className="w-3 h-3 text-gray-300 shrink-0 mr-0.5" viewBox="0 0 12 12" fill="currentColor">
                         <circle cx="4" cy="3" r="1" /><circle cx="8" cy="3" r="1" />
                         <circle cx="4" cy="6" r="1" /><circle cx="8" cy="6" r="1" />
                         <circle cx="4" cy="9" r="1" /><circle cx="8" cy="9" r="1" />
@@ -222,7 +222,7 @@ export default function DataTable<T extends { id: string }>({
                           aria-label={tTable('selectRow')}
                           checked={selectedIds.includes(item.id)}
                           onChange={() => toggleRow(item.id)}
-                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          className="rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                         />
                       </td>
                     )}
@@ -309,7 +309,7 @@ function ColumnFilterInput({
         }
       }}
       onClick={(e) => e.stopPropagation()}
-      className="w-full px-2 py-1 text-xs border border-gray-200 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 placeholder-gray-300"
+      className="w-full px-2 py-1 text-xs border border-gray-200 rounded-sm bg-white outline-hidden focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 placeholder-gray-300"
       placeholder={tTable('filterPlaceholder')}
     />
   );
@@ -367,7 +367,7 @@ function ColumnPicker<T>({
     <div className="relative" ref={ref}>
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="text-gray-400 hover:text-gray-600 p-0.5 rounded"
+        className="text-gray-400 hover:text-gray-600 p-0.5 rounded-sm"
         title={tTable('configureColumns')}
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -390,7 +390,7 @@ function ColumnPicker<T>({
                 aria-label={col.label}
                 checked={visibleColumns.includes(col.key)}
                 onChange={() => toggle(col.key)}
-                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="rounded-sm border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               {col.label}
             </label>

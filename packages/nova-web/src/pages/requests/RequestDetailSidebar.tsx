@@ -35,7 +35,7 @@ export function RequestDetailSidebar({
             value={notes}
             onChange={(e) => onNotesChange(e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none mb-3"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden resize-none mb-3"
           />
           <div className="flex gap-2">
             <button
@@ -60,7 +60,7 @@ export function RequestDetailSidebar({
         <h3 className="font-semibold text-gray-900 mb-3">{tRequests('timeline')}</h3>
         <div className="space-y-3 text-sm">
           <div className="flex gap-3">
-            <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+            <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 shrink-0" />
             <div>
               <p className="text-gray-900">{tRequests('requestSubmitted')}</p>
               <p className="text-gray-400 text-xs">{formatDateTime(req.created_at)}</p>
@@ -68,7 +68,7 @@ export function RequestDetailSidebar({
           </div>
           {req.approved_at && (
             <div className="flex gap-3">
-              <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${req.status === 'rejected' ? 'bg-red-500' : 'bg-green-500'}`} />
+              <div className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${req.status === 'rejected' ? 'bg-red-500' : 'bg-green-500'}`} />
               <div>
                 <p className="text-gray-900">
                   {req.status === 'rejected'
@@ -82,7 +82,7 @@ export function RequestDetailSidebar({
           {/* Task completions */}
           {tasks.filter((t) => t.completed_at).map((t) => (
             <div key={t.id} className="flex gap-3">
-              <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${t.outcome === 'rejected' ? 'bg-red-500' : 'bg-green-500'}`} />
+              <div className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${t.outcome === 'rejected' ? 'bg-red-500' : 'bg-green-500'}`} />
               <div>
                 <p className="text-gray-900">
                   {t.outcome === 'rejected'
@@ -95,7 +95,7 @@ export function RequestDetailSidebar({
           ))}
           {req.status === 'fulfilled' && (
             <div className="flex gap-3">
-              <div className="w-2 h-2 mt-1.5 rounded-full bg-green-600 flex-shrink-0" />
+              <div className="w-2 h-2 mt-1.5 rounded-full bg-green-600 shrink-0" />
               <div>
                 <p className="text-gray-900 font-medium">{tRequests('requestFulfilled')}</p>
                 <p className="text-gray-400 text-xs">{formatDateTime(req.updated_at)}</p>

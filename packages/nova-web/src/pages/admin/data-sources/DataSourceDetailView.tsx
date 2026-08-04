@@ -160,7 +160,7 @@ export default function DataSourceDetailView({
                                 <span className="font-semibold text-blue-800">{t('detectedColumns')}</span>
                                 <div className="mt-1 flex flex-wrap gap-1">
                                   {run.run_meta.detected_columns.map((col) => (
-                                    <span key={col} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-mono">{col}</span>
+                                    <span key={col} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-sm font-mono">{col}</span>
                                   ))}
                                 </div>
                                 {run.run_meta.mapping_used && Object.keys(run.run_meta.mapping_used).length > 0 && (
@@ -170,7 +170,7 @@ export default function DataSourceDetailView({
                                       {Object.entries(run.run_meta.mapping_used).map(([src, tgt]) => {
                                         const found = run.run_meta?.detected_columns?.includes(src);
                                         return (
-                                          <span key={src} className={`px-1.5 py-0.5 rounded font-mono ${found ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                          <span key={src} className={`px-1.5 py-0.5 rounded-sm font-mono ${found ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                             {src} → {tgt} {!found && t('notFound')}
                                           </span>
                                         );
@@ -189,13 +189,13 @@ export default function DataSourceDetailView({
                                   {run.error_samples.map((sample, i) => (
                                     <div key={i} className="p-2 bg-white border border-red-200 rounded-lg text-xs">
                                       <div className="flex items-start gap-2">
-                                        <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-mono flex-shrink-0">
+                                        <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded-sm font-mono shrink-0">
                                           {t('row', { index: sample.row_index })}
                                         </span>
                                         <span className="text-red-700 font-medium">{sample.error}</span>
                                       </div>
                                       {sample.mapped_data && (
-                                        <div className="mt-1.5 p-1.5 bg-amber-50 border border-amber-200 rounded font-mono text-amber-800 overflow-x-auto">
+                                        <div className="mt-1.5 p-1.5 bg-amber-50 border border-amber-200 rounded-sm font-mono text-amber-800 overflow-x-auto">
                                           <span className="text-amber-500 text-[10px] uppercase font-semibold">{t('mapped')}</span>{' '}
                                           {Object.entries(sample.mapped_data).slice(0, 8).map(([k, v]) => (
                                             <span key={k} className="inline-block mr-3">
@@ -204,7 +204,7 @@ export default function DataSourceDetailView({
                                           ))}
                                         </div>
                                       )}
-                                      <div className="mt-1.5 p-1.5 bg-gray-50 rounded font-mono text-gray-600 overflow-x-auto">
+                                      <div className="mt-1.5 p-1.5 bg-gray-50 rounded-sm font-mono text-gray-600 overflow-x-auto">
                                         <span className="text-gray-400 text-[10px] uppercase font-semibold">{t('raw')}</span>{' '}
                                         {Object.entries(sample.data).slice(0, 8).map(([k, v]) => (
                                           <span key={k} className="inline-block mr-3">

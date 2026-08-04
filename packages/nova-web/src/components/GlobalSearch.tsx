@@ -266,11 +266,11 @@ export default function GlobalSearch() {
         className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-slate-400 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors min-w-[200px]"
         title={t('title')}
       >
-        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
         <span className="flex-1 text-left">{t('placeholder')}</span>
-        <kbd className="text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded text-slate-500">Ctrl K</kbd>
+        <kbd className="text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded-sm text-slate-500">Ctrl K</kbd>
       </button>
     );
   }
@@ -279,7 +279,7 @@ export default function GlobalSearch() {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+        className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50"
         onClick={() => setOpen(false)}
       />
 
@@ -290,11 +290,11 @@ export default function GlobalSearch() {
           {/* Input */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
             {isActiveFilter ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 text-xs font-semibold flex-shrink-0">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 text-xs font-semibold shrink-0">
                 <AppIcon name={CMD_ICON[matchedCmd!.name] || 'help'} className="w-3.5 h-3.5" /> {matchedCmd!.label}
               </span>
             ) : (
-              <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             )}
@@ -307,16 +307,16 @@ export default function GlobalSearch() {
               onChange={(e) => handleQueryChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
-              className="flex-1 text-sm text-gray-900 placeholder-gray-400 outline-none"
+              className="flex-1 text-sm text-gray-900 placeholder-gray-400 outline-hidden"
             />
             {loading && (
-              <svg className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-gray-400 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             )}
             <kbd
-              className="hidden sm:inline text-[10px] font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded cursor-pointer"
+              className="hidden sm:inline text-[10px] font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-sm cursor-pointer"
               onClick={() => setOpen(false)}
             >
               ESC
@@ -344,9 +344,9 @@ export default function GlobalSearch() {
 
           {/* Footer */}
           <div className="px-4 py-2 border-t border-gray-100 flex items-center gap-4 text-[10px] text-gray-400">
-            <span><kbd className="font-mono bg-gray-100 px-1 py-0.5 rounded">↑↓</kbd> {t('footerNavigate')}</span>
-            <span><kbd className="font-mono bg-gray-100 px-1 py-0.5 rounded">↵</kbd> {t('footerSelect')}</span>
-            <span><kbd className="font-mono bg-gray-100 px-1 py-0.5 rounded">ESC</kbd> {t('footerClose')}</span>
+            <span><kbd className="font-mono bg-gray-100 px-1 py-0.5 rounded-sm">↑↓</kbd> {t('footerNavigate')}</span>
+            <span><kbd className="font-mono bg-gray-100 px-1 py-0.5 rounded-sm">↵</kbd> {t('footerSelect')}</span>
+            <span><kbd className="font-mono bg-gray-100 px-1 py-0.5 rounded-sm">ESC</kbd> {t('footerClose')}</span>
             <span className="ml-auto">
               {t('footerCommands', { slash: '/' })}
             </span>

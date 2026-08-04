@@ -139,14 +139,14 @@ export default function ImportReviewStep({
                 <button
                   disabled={rowPage <= 1}
                   onClick={() => setRowPage(rowPage - 1)}
-                  className="px-3 py-1 border border-gray-200 rounded text-xs disabled:opacity-50"
+                  className="px-3 py-1 border border-gray-200 rounded-sm text-xs disabled:opacity-50"
                 >
                   {tTable('prev')}
                 </button>
                 <button
                   disabled={rowPage * 50 >= rowTotal}
                   onClick={() => setRowPage(rowPage + 1)}
-                  className="px-3 py-1 border border-gray-200 rounded text-xs disabled:opacity-50"
+                  className="px-3 py-1 border border-gray-200 rounded-sm text-xs disabled:opacity-50"
                 >
                   {tTable('next')}
                 </button>

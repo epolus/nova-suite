@@ -33,9 +33,9 @@ export default function IncidentPriorityWidget(_props: DashboardWidgetProps) {
             <Link
               key={p.priority}
               to={`/incidents?cf.priority=${p.priority}`}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-all ${cfg.bg} ${cfg.color} ${p.count === 0 ? 'opacity-40 pointer-events-none' : 'hover:scale-[1.02] hover:shadow-sm'}`}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-all ${cfg.bg} ${cfg.color} ${p.count === 0 ? 'opacity-40 pointer-events-none' : 'hover:scale-[1.02] hover:shadow-xs'}`}
             >
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+              <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
               {priorityLabel(p.priority)}
               <span className="font-bold tabular-nums">{p.count}</span>
             </Link>

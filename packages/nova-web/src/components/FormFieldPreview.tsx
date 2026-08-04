@@ -22,7 +22,7 @@ export default function FormFieldPreview({ fields }: { fields: FormField[] }) {
               </div>
             ) : f.type === 'checkbox' ? (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border border-gray-300 rounded" />
+                <div className="w-4 h-4 border border-gray-300 rounded-sm" />
                 <span className="text-sm text-gray-500">{f.label || f.name}</span>
               </div>
             ) : f.type === 'cmdb_ref' ? (
@@ -31,7 +31,7 @@ export default function FormFieldPreview({ fields }: { fields: FormField[] }) {
                 {f.ci_filter && Object.keys(f.ci_filter).length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {Object.entries(f.ci_filter).map(([k, v]) => (
-                      <span key={k} className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">{k}={v}</span>
+                      <span key={k} className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-sm">{k}={v}</span>
                     ))}
                   </div>
                 )}

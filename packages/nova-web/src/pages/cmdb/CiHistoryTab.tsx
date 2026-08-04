@@ -16,7 +16,7 @@ export default function CiHistoryTab({ history }: { history: CIHistoryEntry[] })
         <div className="space-y-3">
           {history.map((entry) => (
             <div key={entry.id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
-              <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${
+              <div className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${
                 entry.change_type === 'create' ? 'bg-green-500' :
                 entry.change_type === 'update' ? 'bg-blue-500' : 'bg-red-500'
               }`} />

@@ -163,7 +163,7 @@ export default function CIClassesPage() {
                           <p className="text-xs font-medium text-gray-500 mb-1">{t('ownAttributes')}</p>
                           <div className="flex flex-wrap gap-1.5">
                             {own.map(([key, val]) => (
-                              <span key={key} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
+                              <span key={key} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded-sm text-xs text-gray-600">
                                 <span className="font-medium">{key}</span>
                                 <span className="text-gray-400">({formatAttrType({ key, type: val.type, reference_table: val.reference_table }, t, tFields)})</span>
                               </span>
@@ -176,7 +176,7 @@ export default function CIClassesPage() {
                           <p className="text-xs font-medium text-gray-500 mb-1 mt-2">{t('inherited')}</p>
                           <div className="flex flex-wrap gap-1.5">
                             {inherited.map((a) => (
-                              <span key={a.key} className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-100 rounded text-xs text-amber-700">
+                              <span key={a.key} className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-100 rounded-sm text-xs text-amber-700">
                                 <span className="font-medium">{a.key}</span>
                                 <span className="text-amber-400">({formatAttrType(a, t, tFields)})</span>
                               </span>

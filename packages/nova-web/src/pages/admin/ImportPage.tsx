@@ -190,7 +190,7 @@ export default function ImportPage() {
               <select
                 value={entityType}
                 onChange={(e) => setEntityType(e.target.value)}
-                className="w-full max-w-sm px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full max-w-sm px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               >
                 <option value="">{t('selectPlaceholder')}</option>
                 {entityOptions.map((o) => (

@@ -116,7 +116,7 @@ export default function ThemingPage() {
                   type="text"
                   value={form.app_name || ''}
                   onChange={(e) => setField('app_name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   placeholder={t('appNamePlaceholder')}
                 />
                 <p className="text-xs text-gray-400 mt-1">{t('appNameHint')}</p>
@@ -127,7 +127,7 @@ export default function ThemingPage() {
                   type="text"
                   value={form.app_subtitle || ''}
                   onChange={(e) => setField('app_subtitle', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   placeholder={t('subtitlePlaceholder')}
                 />
                 <p className="text-xs text-gray-400 mt-1">{t('subtitleHint')}</p>
@@ -138,7 +138,7 @@ export default function ThemingPage() {
                   type="text"
                   value={form.catalog_currency || 'USD'}
                   onChange={(e) => setField('catalog_currency', normalizeCurrencyCode(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none uppercase"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden uppercase"
                   placeholder={t('catalogCurrencyPlaceholder')}
                   maxLength={8}
                 />
@@ -151,7 +151,7 @@ export default function ThemingPage() {
           <Card>
             <h3 className="font-semibold text-gray-900 mb-4">{t('logo')}</h3>
             <div className="flex items-start gap-6">
-              <div className="w-24 h-24 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 flex-shrink-0">
+              <div className="w-24 h-24 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 shrink-0">
                 {logoPreview ? (
                   <img src={logoPreview} alt={t('logoAlt')} className="w-full h-full object-contain p-2" />
                 ) : (
@@ -267,7 +267,7 @@ export default function ThemingPage() {
               <div className="px-4 py-3 border-b" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
                 <div className="flex items-center gap-2">
                   {logoPreview && (
-                    <img src={logoPreview} alt="" className="w-6 h-6 object-contain rounded" />
+                    <img src={logoPreview} alt="" className="w-6 h-6 object-contain rounded-sm" />
                   )}
                   <div>
                     <h4 className="text-sm font-bold text-white">
@@ -360,7 +360,7 @@ export default function ThemingPage() {
                     {t('similarIncidents')}
                   </p>
                   <div
-                    className="mt-3 rounded px-2 py-1 text-xs"
+                    className="mt-3 rounded-sm px-2 py-1 text-xs"
                     style={{
                       backgroundColor: form.dark_muted_bg || '#111827',
                       color: form.dark_text_primary || '#f1f5f9',

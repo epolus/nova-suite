@@ -267,7 +267,7 @@ export default function CatalogTaskDetailPage() {
             <select
               value={form.task_type}
               onChange={(e) => setForm((prev) => ({ ...prev, task_type: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
             >
               {TASK_TYPE_VALUES.map((type) => <option key={type} value={type}>{tCatalog(`filters.types.${type}`)}</option>)}
             </select>
@@ -277,7 +277,7 @@ export default function CatalogTaskDetailPage() {
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
@@ -287,7 +287,7 @@ export default function CatalogTaskDetailPage() {
               min={1}
               value={form.task_order}
               onChange={(e) => setForm({ ...form, task_order: parseInt(e.target.value, 10) || 1 })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
@@ -295,7 +295,7 @@ export default function CatalogTaskDetailPage() {
             <select
               value={form.assigned_group_id}
               onChange={(e) => setForm({ ...form, assigned_group_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">{t('noneOption')}</option>
               {groups.filter((g) => g.is_active).map((g) => (
@@ -310,7 +310,7 @@ export default function CatalogTaskDetailPage() {
               min={0}
               value={form.sla_hours}
               onChange={(e) => setForm({ ...form, sla_hours: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
               placeholder={tStates('optional')}
             />
           </div>
@@ -319,7 +319,7 @@ export default function CatalogTaskDetailPage() {
             <input
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div className="md:col-span-2">
@@ -328,7 +328,7 @@ export default function CatalogTaskDetailPage() {
               rows={4}
               value={form.instructions}
               onChange={(e) => setForm({ ...form, instructions: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none"
             />
           </div>
           {form.task_type === 'automated' && (

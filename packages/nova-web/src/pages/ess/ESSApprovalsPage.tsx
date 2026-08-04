@@ -53,7 +53,7 @@ function ConfirmModal({
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           placeholder={isReject ? t('rejectReasonPlaceholder') : t('optionalNotesPlaceholder')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden resize-none"
         />
         <div className="flex justify-end gap-2 mt-4">
           <button
@@ -207,8 +207,8 @@ export default function ESSApprovalsPage() {
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse">
-              <div className="h-4 bg-gray-100 rounded w-1/4 mb-2" />
-              <div className="h-5 bg-gray-100 rounded w-3/4" />
+              <div className="h-4 bg-gray-100 rounded-sm w-1/4 mb-2" />
+              <div className="h-5 bg-gray-100 rounded-sm w-3/4" />
             </div>
           ))}
         </div>
@@ -227,7 +227,7 @@ export default function ESSApprovalsPage() {
               key={item.approval_id}
               className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4"
             >
-              <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0 mt-0.5">
+              <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 shrink-0 mt-0.5">
                 {typeIcon(item.type)}
               </div>
 
@@ -248,7 +248,7 @@ export default function ESSApprovalsPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => {
                     const path = item.type === 'change'

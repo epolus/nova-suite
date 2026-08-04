@@ -74,7 +74,7 @@ export function SearchableDropdown<T>({
       : (fallbackDisplayText ?? '');
 
   const inputCls =
-    'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none';
+    'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden';
 
   return (
     <div ref={ref} className={`relative ${className ?? ''}`}>

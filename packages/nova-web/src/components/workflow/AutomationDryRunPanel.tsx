@@ -77,7 +77,7 @@ export default function AutomationDryRunPanel({
           value={formDataJson}
           onChange={(e) => setFormDataJson(e.target.value)}
           spellCheck={false}
-          className="w-full px-2.5 py-2 rounded border border-gray-200 text-xs font-mono"
+          className="w-full px-2.5 py-2 rounded-sm border border-gray-200 text-xs font-mono"
         />
       </div>
 
@@ -115,14 +115,14 @@ export default function AutomationDryRunPanel({
           {Object.keys(result.mergePatch).length > 0 && (
             <div>
               <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">{t('mergePatch')}</p>
-              <pre className="overflow-auto max-h-40 bg-gray-50 border border-gray-200 rounded p-2 font-mono text-[11px] text-gray-800 dark:bg-black/30 dark:border-gray-600 dark:text-gray-200">
+              <pre className="overflow-auto max-h-40 bg-gray-50 border border-gray-200 rounded-sm p-2 font-mono text-[11px] text-gray-800 dark:bg-black/30 dark:border-gray-600 dark:text-gray-200">
                 {JSON.stringify(result.mergePatch, null, 2)}
               </pre>
             </div>
           )}
           <div>
             <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">{t('stateResults')}</p>
-            <pre className="overflow-auto max-h-48 bg-gray-50 border border-gray-200 rounded p-2 font-mono text-[11px] text-gray-800 dark:bg-black/30 dark:border-gray-600 dark:text-gray-200">
+            <pre className="overflow-auto max-h-48 bg-gray-50 border border-gray-200 rounded-sm p-2 font-mono text-[11px] text-gray-800 dark:bg-black/30 dark:border-gray-600 dark:text-gray-200">
               {JSON.stringify(result.stateResults, null, 2)}
             </pre>
           </div>

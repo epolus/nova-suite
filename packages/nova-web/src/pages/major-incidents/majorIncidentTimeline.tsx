@@ -23,11 +23,11 @@ export function MajorIncidentTimelineList({ items }: { items: MajorIncidentFeedI
   }
 
   return (
-    <ul className="space-y-2.5 max-h-[36rem] overflow-y-auto pr-1">
+    <ul className="space-y-2.5 max-h-144 overflow-y-auto pr-1">
       {items.map((row) => (
         <li
           key={row.id}
-          className={`rounded-lg border border-gray-100/80 dark:border-gray-700/80 border-l-[3px] pl-4 pr-3 py-3 shadow-sm dark:shadow-none ${ACCENT_RING[row.accent]}`}
+          className={`rounded-lg border border-gray-100/80 dark:border-gray-700/80 border-l-[3px] pl-4 pr-3 py-3 shadow-xs dark:shadow-none ${ACCENT_RING[row.accent]}`}
         >
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
             <span className="font-semibold text-gray-900 dark:text-gray-100">{row.title}</span>

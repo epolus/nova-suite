@@ -164,7 +164,7 @@ export default function CIForm() {
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                     placeholder={tCmdb('namePlaceholder')}
                   />
                 </div>
@@ -173,7 +173,7 @@ export default function CIForm() {
                   <input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                     placeholder={tCmdb('displayNamePlaceholder')}
                   />
                 </div>
@@ -182,7 +182,7 @@ export default function CIForm() {
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="active">{tStates('active')}</option>
                     <option value="planned">{statusLabel('planned')}</option>
@@ -195,7 +195,7 @@ export default function CIForm() {
                   <select
                     value={environment}
                     onChange={(e) => setEnvironment(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="production">{statusLabel('production')}</option>
                     <option value="staging">{statusLabel('staging')}</option>
@@ -208,7 +208,7 @@ export default function CIForm() {
                   <select
                     value={locationId}
                     onChange={(e) => setLocationId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">{tStates('none')}</option>
                     {locations.map((loc) => (
@@ -224,7 +224,7 @@ export default function CIForm() {
                     <select
                       value={classId}
                       onChange={(e) => handleClassChange(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                     >
                       {classes.map((c) => <option key={c.id} value={c.id}>{c.display_name}</option>)}
                     </select>
@@ -249,7 +249,7 @@ export default function CIForm() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none"
                 placeholder={tCmdb('notesPlaceholder')}
               />
             </Card>
@@ -272,7 +272,7 @@ export default function CIForm() {
                   <select
                     value={supportedBy}
                     onChange={(e) => setSupportedBy(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">{tStates('none')}</option>
                     {groups.map((g) => (

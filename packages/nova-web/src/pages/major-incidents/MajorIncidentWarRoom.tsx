@@ -216,7 +216,7 @@ export default function MajorIncidentWarRoom() {
             {!isPendingAcceptance && canManage && (
               <Link
                 to={`/major-incidents/${id}/postmortem`}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-xs hover:bg-gray-50"
               >
                 {tPostmortem('title')}
               </Link>
@@ -333,7 +333,7 @@ export default function MajorIncidentWarRoom() {
                         {String(r.incident_number)} — {String(r.incident_title)}
                       </Link>
                       {isPrimary && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-sm">
                           {t('primary')}
                         </span>
                       )}

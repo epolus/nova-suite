@@ -183,7 +183,7 @@ export default function WorkflowsPage() {
             value={searchQuery}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('searchPlaceholder')}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
           />
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -246,7 +246,7 @@ export default function WorkflowsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-xs font-mono">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-gray-100 text-gray-700 text-xs font-mono">
                           {wf.type}
                         </span>
                       </td>

@@ -266,15 +266,15 @@ export default function ESSLayout() {
     <AiAssistantProvider persona="ess">
     <div className="flex flex-col min-h-screen bg-slate-50 border-x border-gray-200">
       {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-200 flex-shrink-0 z-20">
+      <header className="bg-white border-b border-gray-200 shrink-0 z-20">
         <div className="w-full px-4 sm:px-6 h-16 flex items-center gap-6">
 
           {/* Logo */}
           <button
             onClick={() => navigate('/ess')}
-            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity flex-shrink-0"
+            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity shrink-0"
           >
-            {logoSrc && <img src={logoSrc} alt="" className="w-7 h-7 object-contain rounded" />}
+            {logoSrc && <img src={logoSrc} alt="" className="w-7 h-7 object-contain rounded-sm" />}
             <span className="text-lg font-bold tracking-tight text-gray-900">
               <span style={{ color: 'var(--color-primary)' }}>{firstName}</span>
               {restName ? ` ${restName}` : ''}
@@ -318,7 +318,7 @@ export default function ESSLayout() {
           </nav>
 
           {/* Right side */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <DarkModeToggle variant="on-light-header" />
             <NotificationBell />
             {/* Cart */}
@@ -342,7 +342,7 @@ export default function ESSLayout() {
 
             {/* Avatar + name */}
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 cursor-pointer"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 cursor-pointer"
               style={{ backgroundColor: 'var(--color-primary)' }}
               onClick={() => navigate('/profile/settings')}
               title={tCommon('userMenu.profileSettings')}
