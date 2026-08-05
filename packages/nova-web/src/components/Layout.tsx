@@ -17,6 +17,7 @@ import {
   type AdminSection,
 } from './layout/agentNavConfig';
 import DarkModeToggle from './DarkModeToggle';
+import { AppIcon } from './globalSearchIcons';
 import { hasReportingViewRole, isAdminRole } from '../utils/roles';
 import { canAccessAdminRoute } from '../utils/adminRouteAccess';
 import { useUserPreferenceState } from '../hooks/useUserPreferenceState';
@@ -50,7 +51,7 @@ function CollapsibleNavItem({ item, collapsed, currentPath }: { item: NavItemDef
         return active ? { backgroundColor: 'var(--color-sidebar-active)' } : {};
       }}
     >
-      <span className="text-lg">{item.icon}</span>
+      <AppIcon name={item.icon} className="w-[18px] h-[18px] shrink-0" />
       {!collapsed && item.label}
     </NavLink>
   );
@@ -79,7 +80,7 @@ function AdminSubMenu({ section, expanded, onToggle, collapsed = false, currentP
         onClick={onToggle}
         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
       >
-        <span className="text-base">{section.icon}</span>
+        <AppIcon name={section.icon} className="w-4 h-4 shrink-0" />
         <span className="flex-1 text-left">{section.label}</span>
         <svg
           className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
@@ -116,7 +117,7 @@ function AdminSubMenu({ section, expanded, onToggle, collapsed = false, currentP
                 return active ? { backgroundColor: 'var(--color-sidebar-active)' } : {};
               }}
             >
-              <span className="text-sm">{item.icon}</span>
+              <AppIcon name={item.icon} className="w-3.5 h-3.5 shrink-0" />
               {item.label}
             </NavLink>
           ))}

@@ -1,31 +1,32 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type { IconName } from '../globalSearchConfig';
 
-export type NavItemDef = { to: string; label: string; icon: string };
-export type RawNavItemDef = { to: string; labelKey: string; icon: string };
-export type AdminSection = { key: string; label: string; icon: string; items: NavItemDef[] };
-export type RawAdminSection = { key: string; labelKey: string; icon: string; items: RawNavItemDef[] };
+export type NavItemDef = { to: string; label: string; icon: IconName };
+export type RawNavItemDef = { to: string; labelKey: string; icon: IconName };
+export type AdminSection = { key: string; label: string; icon: IconName; items: NavItemDef[] };
+export type RawAdminSection = { key: string; labelKey: string; icon: IconName; items: RawNavItemDef[] };
 
-export const agentNav = [
-  { to: '/', labelKey: 'agent.dashboard', icon: '📊' },
-  { to: '/my-todo', labelKey: 'agent.myTodo', icon: '✅' },
-  { to: '/my-groups', labelKey: 'agent.myGroups', icon: '👥' },
-  { to: '/catalog', labelKey: 'agent.catalog', icon: '📦' },
-  { to: '/knowledge', labelKey: 'agent.knowledge', icon: '📚' },
-  { to: '/requests', labelKey: 'agent.requests', icon: '📋' },
-  { to: '/request-tasks', labelKey: 'agent.requestTasks', icon: '🗂️' },
-  { to: '/incidents', labelKey: 'agent.incidents', icon: '🔥' },
-  { to: '/major-incidents', labelKey: 'agent.majorIncidents', icon: '🚨' },
-  { to: '/problems', labelKey: 'agent.problems', icon: '🧩' },
-  { to: '/changes', labelKey: 'agent.changes', icon: '🛠️' },
-  { to: '/assets', labelKey: 'agent.assets', icon: '💻' },
-  { to: '/releases', labelKey: 'agent.releases', icon: '🚀' },
-  { to: '/reports', labelKey: 'agent.reports', icon: '📈' },
-  { to: '/cmdb', labelKey: 'agent.cmdb', icon: '🖥️' },
+export const agentNav: RawNavItemDef[] = [
+  { to: '/', labelKey: 'agent.dashboard', icon: 'home' },
+  { to: '/my-todo', labelKey: 'agent.myTodo', icon: 'check' },
+  { to: '/my-groups', labelKey: 'agent.myGroups', icon: 'users' },
+  { to: '/catalog', labelKey: 'agent.catalog', icon: 'catalog' },
+  { to: '/knowledge', labelKey: 'agent.knowledge', icon: 'knowledge' },
+  { to: '/requests', labelKey: 'agent.requests', icon: 'request' },
+  { to: '/request-tasks', labelKey: 'agent.requestTasks', icon: 'request_tasks' },
+  { to: '/incidents', labelKey: 'agent.incidents', icon: 'incident' },
+  { to: '/major-incidents', labelKey: 'agent.majorIncidents', icon: 'major_incident' },
+  { to: '/problems', labelKey: 'agent.problems', icon: 'problem' },
+  { to: '/changes', labelKey: 'agent.changes', icon: 'change' },
+  { to: '/assets', labelKey: 'agent.assets', icon: 'assets' },
+  { to: '/releases', labelKey: 'agent.releases', icon: 'releases' },
+  { to: '/reports', labelKey: 'agent.reports', icon: 'reports' },
+  { to: '/cmdb', labelKey: 'agent.cmdb', icon: 'ci' },
 ];
 
-export const catalogDesignerNav = [
-  { to: '/admin/service-items', labelKey: 'admin.serviceItems', icon: '🎨' },
-  { to: '/admin/catalog-tasks', labelKey: 'admin.catalogTasks', icon: '📋' },
+export const catalogDesignerNav: RawNavItemDef[] = [
+  { to: '/admin/service-items', labelKey: 'admin.serviceItems', icon: 'service_item' },
+  { to: '/admin/catalog-tasks', labelKey: 'admin.catalogTasks', icon: 'request_tasks' },
 ];
 
 export function isWorkflowEditorPath(pathname: string): boolean {
@@ -79,68 +80,68 @@ export const adminSections: RawAdminSection[] = [
   {
     key: 'org',
     labelKey: 'adminSections.organization',
-    icon: '🏢',
+    icon: 'department',
     items: [
-      { to: '/admin/users', labelKey: 'admin.users', icon: '👤' },
-      { to: '/admin/departments', labelKey: 'admin.departments', icon: '🏢' },
-      { to: '/admin/cost-centers', labelKey: 'admin.costCenters', icon: '💰' },
-      { to: '/admin/companies', labelKey: 'admin.companies', icon: '🏛️' },
-      { to: '/admin/locations', labelKey: 'admin.locations', icon: '📍' },
-      { to: '/admin/roles', labelKey: 'admin.roles', icon: '🔑' },
-      { to: '/admin/assignment-groups', labelKey: 'admin.assignmentGroups', icon: '👥' },
+      { to: '/admin/users', labelKey: 'admin.users', icon: 'user' },
+      { to: '/admin/departments', labelKey: 'admin.departments', icon: 'department' },
+      { to: '/admin/cost-centers', labelKey: 'admin.costCenters', icon: 'cost_center' },
+      { to: '/admin/companies', labelKey: 'admin.companies', icon: 'company' },
+      { to: '/admin/locations', labelKey: 'admin.locations', icon: 'location' },
+      { to: '/admin/roles', labelKey: 'admin.roles', icon: 'roles' },
+      { to: '/admin/assignment-groups', labelKey: 'admin.assignmentGroups', icon: 'users' },
     ],
   },
   {
     key: 'catalog',
     labelKey: 'adminSections.serviceCatalog',
-    icon: '📦',
+    icon: 'catalog',
     items: [
-      { to: '/admin/services', labelKey: 'admin.services', icon: '🔧' },
-      { to: '/admin/service-items', labelKey: 'admin.serviceItems', icon: '🎨' },
-      { to: '/admin/catalog-tasks', labelKey: 'admin.catalogTasks', icon: '📋' },
+      { to: '/admin/services', labelKey: 'admin.services', icon: 'services' },
+      { to: '/admin/service-items', labelKey: 'admin.serviceItems', icon: 'service_item' },
+      { to: '/admin/catalog-tasks', labelKey: 'admin.catalogTasks', icon: 'request_tasks' },
     ],
   },
   {
     key: 'process',
     labelKey: 'adminSections.processAutomation',
-    icon: '⚙️',
+    icon: 'settings',
     items: [
-      { to: '/admin/processes', labelKey: 'admin.processes', icon: '⚙️' },
-      { to: '/admin/sla-config', labelKey: 'admin.slaConfiguration', icon: '⏱️' },
-      { to: '/admin/notification-config', labelKey: 'admin.notificationWorkflows', icon: '🔔' },
-      { to: '/admin/notification-deliveries', labelKey: 'admin.notificationDeliveries', icon: '📨' },
-      { to: '/admin/change-management', labelKey: 'admin.changeManagement', icon: '🛠️' },
-      { to: '/admin/knowledge-workflows', labelKey: 'admin.knowledgeWorkflows', icon: '📚' },
-      { to: '/admin/workflows', labelKey: 'admin.workflows', icon: '🔄' },
-      { to: '/admin/workflows/editor', labelKey: 'admin.workflowEditor', icon: '🧩' },
+      { to: '/admin/processes', labelKey: 'admin.processes', icon: 'processes' },
+      { to: '/admin/sla-config', labelKey: 'admin.slaConfiguration', icon: 'sla' },
+      { to: '/admin/notification-config', labelKey: 'admin.notificationWorkflows', icon: 'notifications' },
+      { to: '/admin/notification-deliveries', labelKey: 'admin.notificationDeliveries', icon: 'notification_deliveries' },
+      { to: '/admin/change-management', labelKey: 'admin.changeManagement', icon: 'change' },
+      { to: '/admin/knowledge-workflows', labelKey: 'admin.knowledgeWorkflows', icon: 'knowledge' },
+      { to: '/admin/workflows', labelKey: 'admin.workflows', icon: 'workflow' },
+      { to: '/admin/workflows/editor', labelKey: 'admin.workflowEditor', icon: 'workflow' },
     ],
   },
   {
     key: 'cmdb',
     labelKey: 'adminSections.cmdb',
-    icon: '🖥️',
+    icon: 'ci',
     items: [
-      { to: '/admin/ci-classes', labelKey: 'admin.ciClasses', icon: '🏗️' },
+      { to: '/admin/ci-classes', labelKey: 'admin.ciClasses', icon: 'classes' },
     ],
   },
   {
     key: 'data',
     labelKey: 'adminSections.dataIntegration',
-    icon: '🔗',
+    icon: 'data_sources',
     items: [
-      { to: '/admin/data-sources', labelKey: 'admin.dataSources', icon: '🔗' },
-      { to: '/admin/credentials', labelKey: 'admin.credentials', icon: '🔐' },
-      { to: '/admin/config-packages', labelKey: 'admin.configPackages', icon: '📦' },
-      { to: '/admin/import', labelKey: 'admin.importData', icon: '📥' },
+      { to: '/admin/data-sources', labelKey: 'admin.dataSources', icon: 'data_sources' },
+      { to: '/admin/credentials', labelKey: 'admin.credentials', icon: 'credentials' },
+      { to: '/admin/config-packages', labelKey: 'admin.configPackages', icon: 'config_packages' },
+      { to: '/admin/import', labelKey: 'admin.importData', icon: 'import' },
     ],
   },
   {
     key: 'system',
     labelKey: 'adminSections.system',
-    icon: '🛠️',
+    icon: 'settings',
     items: [
-      { to: '/admin/system-status', labelKey: 'admin.status', icon: '🟢' },
-      { to: '/admin/theming', labelKey: 'admin.theming', icon: '🎨' },
+      { to: '/admin/system-status', labelKey: 'admin.status', icon: 'status' },
+      { to: '/admin/theming', labelKey: 'admin.theming', icon: 'theme' },
     ],
   },
 ];

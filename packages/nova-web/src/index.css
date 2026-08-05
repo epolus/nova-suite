@@ -60,6 +60,12 @@
     border-color: var(--color-dark-border);
     background-color: var(--color-dark-muted-bg);
   }
+
+  /* Tailwind v4 preflight uses the UA default cursor for buttons; keep pointer for clickable controls */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /* Retrofit common light-only Tailwind utilities when `html.dark` is set */
