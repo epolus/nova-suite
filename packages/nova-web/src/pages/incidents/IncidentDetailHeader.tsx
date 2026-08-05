@@ -91,7 +91,15 @@ export function IncidentDetailHeader({ d }: { d: IncidentDetailState }) {
             {!readonly && !isClosed && !isResolved && (
               <Button
                 variant="outline"
-                onClick={() => setField('status', fields.status === 'pending' ? inc.status : 'pending')}
+                onClick={() => {
+                  if (fields.status === 'pending') {
+                    // If pending was already saved, restore to in_progress (not back to pending).
+                    setField('status', inc.status === 'pending' ? 'in_progress' : inc.status);
+                    setField('pendingReason', '');
+                  } else {
+                    setField('status', 'pending');
+                  }
+                }}
               >
                 {fields.status === 'pending' ? tIncidents('undoPending') : tIncidents('setPending')}
               </Button>

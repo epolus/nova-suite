@@ -82,14 +82,14 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
           <span className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('openTime')}</span>
           <div className="flex items-center gap-2">
             <p className="text-sm text-gray-900 mt-0.5">{formatDateTime(inc.created_at)}</p>
-            <Badge value={inc.status} />
+            <Badge value={fields.status || inc.status} />
           </div>
         </div>
         <div>
           <span className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('slaDueDate')}</span>
           <p className="text-sm text-gray-900 mt-0.5">{inc.sla_due_at ? formatDateTime(inc.sla_due_at) : tTable('emDash')}</p>
         </div>
-        {(fields.status === 'pending' || inc.status === 'pending') && (
+        {fields.status === 'pending' && (
           <div>
             <label htmlFor={INCIDENT_FIELD.pendingReason} className="block text-xs font-medium text-gray-500 mb-1">
               {tIncidents('pendingReason')} <span className="text-red-500">*</span>
