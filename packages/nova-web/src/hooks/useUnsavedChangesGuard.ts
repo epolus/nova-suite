@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, type NavigateOptions, type To } from 'react-router';
+import { useLocation, useNavigate, type NavigateOptions, type To } from 'react-router';
 
 type PendingNavigation =
   | { kind: 'to'; to: To; options?: NavigateOptions }
@@ -12,9 +12,29 @@ type UseUnsavedChangesGuardOptions = {
   onSave?: () => Promise<boolean>;
 };
 
+function resolveInternalHref(href: string): string | null {
+  if (
+    !href ||
+    href.startsWith('#') ||
+    href.startsWith('mailto:') ||
+    href.startsWith('tel:') ||
+    href.startsWith('javascript:')
+  ) {
+    return null;
+  }
+
+  try {
+    const url = new URL(href, window.location.href);
+    if (url.origin !== window.location.origin) return null;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Guards programmatic navigation (guardNavigate) and browser refresh/close.
- * Does not intercept Link/NavLink clicks — that caused URL/router desync.
+ * Guards programmatic navigation (guardNavigate), in-app Link/NavLink clicks,
+ * and browser refresh/close.
  */
 export function useUnsavedChangesGuard({
   isDirty,
@@ -22,12 +42,15 @@ export function useUnsavedChangesGuard({
   onSave,
 }: UseUnsavedChangesGuardOptions) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const pendingNavigation = useRef<PendingNavigation | null>(null);
   const skipGuardRef = useRef(false);
+  const shouldGuardRef = useRef(false);
 
   const shouldGuard = enabled && isDirty;
+  shouldGuardRef.current = shouldGuard;
 
   const completeNavigation = useCallback(() => {
     const pending = pendingNavigation.current;
@@ -101,6 +124,39 @@ export function useUnsavedChangesGuard({
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [shouldGuard]);
+
+  // Intercept in-app <a>/NavLink clicks (capture) so sidebar/menu navigation
+  // hits the same dialog as guardNavigate. With BrowserRouter, useBlocker is
+  // unavailable; capture + preventDefault keeps history in sync.
+  useEffect(() => {
+    const onDocumentClick = (event: MouseEvent) => {
+      if (!shouldGuardRef.current || skipGuardRef.current) return;
+      if (event.defaultPrevented) return;
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const anchor = target.closest('a[href]');
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+
+      const nextPath = resolveInternalHref(anchor.getAttribute('href') ?? '');
+      if (!nextPath) return;
+
+      const currentPath = `${location.pathname}${location.search}${location.hash}`;
+      if (nextPath === currentPath) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      queueNavigation({ kind: 'to', to: nextPath });
+    };
+
+    document.addEventListener('click', onDocumentClick, true);
+    return () => document.removeEventListener('click', onDocumentClick, true);
+  }, [location.hash, location.pathname, location.search, queueNavigation]);
 
   const allowNextNavigation = useCallback(() => {
     skipGuardRef.current = true;
