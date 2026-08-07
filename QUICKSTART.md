@@ -10,13 +10,25 @@ Get Nova Suite running in under 5 minutes.
 
 ## Step 1: Configure
 
+Run the interactive setup script (copies `.env.example`, generates secrets and JWT keys):
+
 ```bash
-cp .env.example .env
+./scripts/setup.sh
 ```
 
-Edit `.env` and change at minimum:
-- `POSTGRES_PASSWORD` — a strong random password
-- `JWT_SECRET` — at least 32 characters of randomness
+Non-interactive (defaults: Docker Compose, generate all secrets):
+
+```bash
+./scripts/setup.sh -y
+```
+
+Manual alternative:
+
+```bash
+cp .env.example .env
+# Edit .env — change POSTGRES_PASSWORD
+./scripts/generate-jwt-keys.sh
+```
 
 ## Step 2: Start
 
@@ -188,7 +200,7 @@ The interactive Swagger UI lets you try every endpoint.
 |------------------------|--------------------------------------------------|
 | Health check fails     | `docker compose logs postgres` — wait for init   |
 | Port 5432 in use       | Change port mapping in `docker-compose.yml`      |
-| Auth errors            | Check `JWT_SECRET` matches in `.env`             |
+| Auth errors            | Regenerate JWT keys (`./scripts/generate-jwt-keys.sh`) and restart; users must re-login |
 | Database reset needed  | `docker compose down -v && docker compose up -d` |
 
 ## Next Steps

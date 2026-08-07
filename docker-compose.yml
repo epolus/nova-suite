@@ -39,7 +39,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nova}
       POSTGRES_USER: ${POSTGRES_USER:-nova_app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-/secrets/jwt-private.pem}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/secrets/jwt-public.pem}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       AUTH_LOCAL_LOGIN_ENABLED: ${AUTH_LOCAL_LOGIN_ENABLED:-true}
       API_PORT: 4000
@@ -83,6 +86,7 @@ services:
       - "4000:4000"
     volumes:
       - uploads_data:/data/uploads
+      - ./secrets:/secrets:ro
 
   # ─── Temporal (Workflow Engine) ───
   temporal:

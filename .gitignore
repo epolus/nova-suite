@@ -9,6 +9,9 @@ dist/
 .env.local
 .env.*.local
 
+# JWT RSA keys (readable by Docker engine user uid 1001)
+secrets/*.pem
+
 # IDE
 .vscode/
 .idea/

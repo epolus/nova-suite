@@ -88,9 +88,9 @@ Every table has:
 
 1. User sends `POST /api/auth/login` with email + password
 2. Server verifies against bcrypt hash
-3. Server returns JWT containing `{id, tenant_id, email, display_name, role}`
+3. Server returns an **RS256** JWT containing `{id, tenant_id, email, display_name, roles}`
 4. Client sends JWT in `Authorization: Bearer <token>` header
-5. Middleware verifies JWT, attaches user to request
+5. Middleware verifies the JWT with the RSA public key, attaches user to request
 6. RLS middleware sets tenant context on the database connection
 
 ### OIDC Provider Config

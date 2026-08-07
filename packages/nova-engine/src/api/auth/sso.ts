@@ -6,13 +6,13 @@
 
 import { Router, Request, Response as ExpressResponse, NextFunction } from 'express';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 import { config } from '../../config';
 import { db } from '../../data/db';
 import { logger } from '../../logger';
 import { AuthUser } from '../../middleware/auth';
+import { signAccessToken } from '../../auth/jwt';
 import { recordAuditEvent } from '../../audit/events';
 import { getClientIp } from '../../middleware/client-ip';
 
@@ -357,9 +357,7 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       roles: roles.length > 0 ? roles : ['user'],
     };
 
-    const token = jwt.sign(payload, config.jwt.secret, {
-      expiresIn: config.jwt.expiresIn,
-    } as jwt.SignOptions);
+    const token = signAccessToken(payload);
 
     logger.info({ userId: user.id, roles }, 'SSO login successful');
     void recordAuditEvent({

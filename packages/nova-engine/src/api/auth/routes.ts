@@ -6,12 +6,12 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import { config } from '../../config';
 import { db } from '../../data/db';
 import { loginSchema, registerSchema } from '../../domain/schemas';
 import { validateBody } from '../../middleware/validate';
 import { authenticate, requireRole, AuthUser } from '../../middleware/auth';
+import { signAccessToken } from '../../auth/jwt';
 import { AppError } from '../../middleware/errorHandler';
 import { recordAuditEvent } from '../../audit/events';
 import { getClientIp } from '../../middleware/client-ip';
@@ -107,9 +107,7 @@ router.post(
         roles: roles.length > 0 ? roles : ['user'],
       };
 
-      const token = jwt.sign(payload, config.jwt.secret, {
-        expiresIn: config.jwt.expiresIn,
-      } as jwt.SignOptions);
+      const token = signAccessToken(payload);
 
       res.json({
         token,

@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
+# Validate required secrets in .env and JWT key files on the host.
 set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${ROOT_DIR}/.env"
 
 errors=0
 
@@ -38,9 +42,86 @@ check_min_length() {
   echo "[OK] ${name} length is >= ${min_len}"
 }
 
-check_required JWT_SECRET
-check_not_default JWT_SECRET "dev-secret-change-me"
-check_min_length JWT_SECRET 32
+check_file_readable() {
+  local label="$1"
+  local path="$2"
+  if [[ -z "${path}" ]]; then
+    echo "[ERROR] ${label} path is empty"
+    errors=$((errors + 1))
+    return
+  fi
+  if [[ ! -r "${path}" ]]; then
+    echo "[ERROR] ${label} file is missing or unreadable: ${path}"
+    errors=$((errors + 1))
+    return
+  fi
+  echo "[OK] ${label} file is readable (${path})"
+}
+
+resolve_jwt_path() {
+  local path="$1"
+  case "${path}" in
+    /secrets/*)
+      echo "${ROOT_DIR}/secrets/${path#/secrets/}"
+      ;;
+    ./secrets/*|./secrets/*)
+      echo "${ROOT_DIR}/${path#./}"
+      ;;
+    secrets/*)
+      echo "${ROOT_DIR}/${path}"
+      ;;
+    /*)
+      echo "${path}"
+      ;;
+    *)
+      echo "${ROOT_DIR}/${path}"
+      ;;
+  esac
+}
+
+load_env_file() {
+  if [[ ! -f "${ENV_FILE}" ]]; then
+    echo "[ERROR] ${ENV_FILE} not found. Run: ./scripts/setup.sh"
+    exit 1
+  fi
+
+  # Export KEY=value pairs from .env without shell-expanding values.
+  eval "$(
+    python3 - "${ENV_FILE}" <<'PY'
+import re
+import shlex
+import sys
+
+path = sys.argv[1]
+pattern = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+for raw in open(path, encoding="utf-8"):
+    line = raw.strip()
+    if not line or line.startswith("#"):
+        continue
+    match = pattern.match(line)
+    if not match:
+        continue
+    key, value = match.group(1), match.group(2)
+    print(f"export {key}={shlex.quote(value)}")
+PY
+  )"
+}
+
+load_env_file
+
+if [[ -n "${JWT_PRIVATE_KEY:-}" && -n "${JWT_PUBLIC_KEY:-}" ]]; then
+  echo "[OK] JWT_PRIVATE_KEY and JWT_PUBLIC_KEY are set"
+elif [[ -n "${JWT_PRIVATE_KEY_PATH:-}" || -n "${JWT_PUBLIC_KEY_PATH:-}" ]]; then
+  check_required JWT_PRIVATE_KEY_PATH
+  check_required JWT_PUBLIC_KEY_PATH
+  jwt_private_path="$(resolve_jwt_path "${JWT_PRIVATE_KEY_PATH}")"
+  jwt_public_path="$(resolve_jwt_path "${JWT_PUBLIC_KEY_PATH}")"
+  check_file_readable JWT_PRIVATE_KEY_PATH "${jwt_private_path}"
+  check_file_readable JWT_PUBLIC_KEY_PATH "${jwt_public_path}"
+else
+  echo "[ERROR] Configure RS256 keys via JWT_PRIVATE_KEY/JWT_PUBLIC_KEY or JWT_PRIVATE_KEY_PATH/JWT_PUBLIC_KEY_PATH"
+  errors=$((errors + 1))
+fi
 
 check_required CREDENTIALS_MASTER_KEY
 check_min_length CREDENTIALS_MASTER_KEY 24
@@ -48,8 +129,12 @@ check_min_length CREDENTIALS_MASTER_KEY 24
 check_required CATALOG_AUTOMATION_SHARED_KEY
 check_min_length CATALOG_AUTOMATION_SHARED_KEY 24
 
+check_not_default POSTGRES_PASSWORD "CHANGE_ME_TO_RANDOM_SECRET"
+
 if [[ ${errors} -gt 0 ]]; then
+  echo
   echo "Secret validation failed with ${errors} error(s)."
+  echo "Run ./scripts/setup.sh to generate secrets and JWT keys from .env.example."
   exit 1
 fi
 

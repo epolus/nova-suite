@@ -79,8 +79,7 @@ Nova Suite provides a complete service management solution — service catalog, 
 # 1. Clone and configure
 git clone <your-repo-url> nova-suite
 cd nova-suite
-cp .env.example .env
-# Edit .env — change POSTGRES_PASSWORD and JWT_SECRET
+./scripts/setup.sh
 
 # 2. Start everything
 docker compose up -d

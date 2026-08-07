@@ -65,9 +65,11 @@ services:
         condition: on-failure
     environment:
       POSTGRES_HOST: postgres
-      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      JWT_PRIVATE_KEY_PATH: /run/secrets/jwt_private_key
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt_public_key
     secrets:
-      - jwt_secret
+      - jwt_private_key
+      - jwt_public_key
 
   caddy:
     image: caddy:2-alpine
@@ -82,7 +84,9 @@ services:
 secrets:
   pg_password:
     external: true
-  jwt_secret:
+  jwt_private_key:
+    external: true
+  jwt_public_key:
     external: true
 
 volumes:
@@ -93,7 +97,8 @@ volumes:
 ```bash
 # Create secrets
 echo "your-strong-password" | docker secret create pg_password -
-echo "your-jwt-secret-32chars" | docker secret create jwt_secret -
+docker secret create jwt_private_key ./secrets/jwt-private.pem
+docker secret create jwt_public_key ./secrets/jwt-public.pem
 
 # Deploy
 docker stack deploy -c docker-stack.yml nova
@@ -128,7 +133,14 @@ metadata:
 type: Opaque
 stringData:
   POSTGRES_PASSWORD: "your-strong-password"
-  JWT_SECRET: "your-jwt-secret-at-least-32-chars"
+  JWT_PRIVATE_KEY: |
+    -----BEGIN PRIVATE KEY-----
+    ...
+    -----END PRIVATE KEY-----
+  JWT_PUBLIC_KEY: |
+    -----BEGIN PUBLIC KEY-----
+    ...
+    -----END PUBLIC KEY-----
 ```
 
 ### PostgreSQL StatefulSet
@@ -219,11 +231,16 @@ spec:
                 secretKeyRef:
                   name: nova-secrets
                   key: POSTGRES_PASSWORD
-            - name: JWT_SECRET
+            - name: JWT_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
                   name: nova-secrets
-                  key: JWT_SECRET
+                  key: JWT_PRIVATE_KEY
+            - name: JWT_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nova-secrets
+                  key: JWT_PUBLIC_KEY
           readinessProbe:
             httpGet:
               path: /health

@@ -23,9 +23,9 @@ This runbook covers production backup/restore and secret rotation validation for
 
 ## 3. Secret Rotation
 
-### JWT signing secret
-- Generate a new random value (>=32 chars).
-- Roll out `JWT_SECRET` on API nodes.
+### JWT signing keys (RS256)
+- Generate a new RSA key pair (`./scripts/generate-jwt-keys.sh`, or openssl).
+- Roll out `JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY` (or `*_PATH`) on API nodes.
 - Restart API instances with rolling strategy.
 - Existing sessions are expected to require re-authentication.
 

@@ -3,20 +3,12 @@
 // JWT verification + RLS tenant context injection.
 
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { config } from '../config';
+import { verifyAccessToken } from '../auth/jwt';
+import type { AuthUser } from '../auth/types';
 import { db } from '../data/db';
 import { logger } from '../logger';
 
-export interface AuthUser {
-  id: string;
-  tenant_id: string;
-  email: string;
-  display_name: string;
-  time_format: '12h' | '24h';
-  date_format: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
-  roles: string[];
-}
+export type { AuthUser } from '../auth/types';
 
 // Extend Express Request
 declare global {
@@ -39,7 +31,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   const token = header.slice(7);
 
   try {
-    const payload = jwt.verify(token, config.jwt.secret) as AuthUser & { role?: string };
+    const payload = verifyAccessToken(token);
 
     // Normalise legacy tokens that carry a single `role` string instead of `roles[]`
     if (!Array.isArray(payload.roles)) {

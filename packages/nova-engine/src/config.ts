@@ -24,12 +24,20 @@ function envTrustProxy(name: string, fallback: number | boolean): number | boole
   return fallback;
 }
 
+function hasJwtKeyConfig(): boolean {
+  const hasInline = !!(process.env.JWT_PRIVATE_KEY && process.env.JWT_PUBLIC_KEY);
+  const hasPaths = !!(process.env.JWT_PRIVATE_KEY_PATH && process.env.JWT_PUBLIC_KEY_PATH);
+  return hasInline || hasPaths;
+}
+
 function assertProductionSecurityConfig(nodeEnv: string): void {
   if (nodeEnv !== 'production') return;
 
-  const jwtSecret = process.env.JWT_SECRET || '';
-  if (!jwtSecret || jwtSecret === 'dev-secret-change-me' || jwtSecret.length < 32) {
-    throw new Error('JWT_SECRET must be set to a strong value (>=32 chars) in production');
+  if (!hasJwtKeyConfig()) {
+    throw new Error(
+      'JWT RS256 keys must be configured in production '
+      + '(JWT_PRIVATE_KEY + JWT_PUBLIC_KEY, or JWT_PRIVATE_KEY_PATH + JWT_PUBLIC_KEY_PATH)',
+    );
   }
 }
 
@@ -51,7 +59,6 @@ export const config = {
   },
 
   jwt: {
-    secret: env('JWT_SECRET', 'dev-secret-change-me'),
     expiresIn: env('JWT_EXPIRES_IN', '8h'),
   },
 
