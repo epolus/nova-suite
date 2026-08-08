@@ -11,6 +11,7 @@ import {
 } from '@nova-suite/shared';
 import { withTenantContext } from '../db';
 import { loadCredentialSecretsBySlugs } from '../credentials/vault';
+import { getEmailProvider } from './email-provider';
 
 export interface ExecuteAutomatedCatalogTaskInput {
   requestTaskId: string;
@@ -82,7 +83,7 @@ export async function executeAutomatedCatalogTask(
     }
 
     const reqRes = await client.query(
-      `SELECT id, number, status, form_data, delivery_info FROM requests WHERE id = $1`,
+      `SELECT id, number, status, form_data, delivery_info, requester_id, requested_for FROM requests WHERE id = $1`,
       [requestId],
     );
     if (reqRes.rows.length === 0) return { ok: false, message: 'Request not found' };
@@ -95,13 +96,20 @@ export async function executeAutomatedCatalogTask(
         log.info(msg, meta),
       );
 
+      const emailProvider = getEmailProvider();
       const result = await executeAutomationGraph({
         cfg,
         request,
         credMap,
         requestId,
+        requestTaskId,
+        tenantId,
         client,
         automationSharedKey: process.env.CATALOG_AUTOMATION_SHARED_KEY,
+        sendEmail: async (input) => {
+          const sent = await emailProvider.send({ ...input, html: null });
+          return { ok: sent.accepted, error: sent.error };
+        },
         onLog: (msg, meta) => log.info(msg, meta),
       });
 

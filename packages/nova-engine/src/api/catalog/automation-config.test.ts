@@ -33,4 +33,29 @@ describe('validateAutomationConfig', () => {
     expect(result.config).not.toBeNull();
     expect(result.config?.schemaVersion).toBe(1);
   });
+
+  it('accepts stub library node types', () => {
+    const cfg = getAutomationConfigFixture('stubLibraryNodes');
+    expect(validateAutomationConfig(cfg)).toEqual([]);
+    const result = validateAndParseAutomationConfig(cfg);
+    expect(result.errors).toEqual([]);
+    expect(result.config?.states.map((s) => s.type)).toEqual([
+      'action.notification',
+      'action.ticket',
+      'action.assign',
+      'action.script',
+      'call.workflow',
+      'end',
+    ]);
+  });
+
+  it('rejects script without code', () => {
+    const cfg = getAutomationConfigFixture('invalidScriptMissingCode');
+    expect(validateAutomationConfig(cfg)).toContain('State "script" requires code');
+  });
+
+  it('rejects sub-workflow without workflowType or definitionId', () => {
+    const cfg = getAutomationConfigFixture('invalidCallWorkflowMissingTarget');
+    expect(validateAutomationConfig(cfg)).toContain('State "sub" requires workflowType or definitionId');
+  });
 });

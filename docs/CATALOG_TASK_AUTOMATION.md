@@ -32,6 +32,13 @@ Supported state types:
 - **`action.ci.lookup`** — built-in CI lookup action (calls automation CI lookup endpoint).
 - **`action.ci.create`** — built-in CI creation action (calls automation CI create endpoint).
 - **`decision.advanced`** — structured expression branch (`and/or/not/eq/ne/gt/gte/lt/lte/contains/in`).
+- **`action.notification`** — in-app or email notification (`channel`, `recipientType`, `titleTemplate`, `bodyTemplate`). Recipients must resolve to tenant users (`assignee` / `requester` / `requested_for`, a user UUID, or an email). Email needs SMTP (`MAIL_NOTIFICATIONS_ENABLED`, `SMTP_HOST`).
+- **`action.ticket`** — incident create/update/close/work_note, or request update/close (`entity`, `operation`, `fields`). Incident create links `request_id` when the request id is a UUID.
+- **`action.assign`** — assign the **current catalog request task** to a user or group (`target`, `assigneeTemplate`, `groupIdTemplate`). Play has no request task id, so this step fails there unless a live fulfillment run provides one.
+- **`action.script`** — JavaScript (`runtime: js`, `code`) with a 250ms timeout and no `require`/`process`. Not a security sandbox; prefer `action.rest` for anything sensitive.
+- **`call.workflow`** — runs a published `workflow_definitions` state machine (`definitionId` or `workflow_type`), depth-limited. Does not start a second Temporal `catalogFulfillment`.
+
+Play uses the same executors as the worker (real HTTP and real DB/email side effects). Form data is still not persisted.
 
 Common branch effects (supported on activity success/failure branches and end branches):
 

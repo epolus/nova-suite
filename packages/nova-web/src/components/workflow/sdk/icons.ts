@@ -12,4 +12,9 @@ export const NODE_TYPE_ICONS: Record<UnifiedBuilderNodeType, IconType> = {
   'action.ci.lookup': 'MagnifyingGlass',
   'action.ci.create': 'PlusCircle',
   'decision.advanced': 'TreeStructure',
+  'action.notification': 'Bell',
+  'action.ticket': 'Ticket',
+  'action.assign': 'UserPlus',
+  'action.script': 'Code',
+  'call.workflow': 'ShareNetwork',
 };

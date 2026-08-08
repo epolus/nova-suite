@@ -1,13 +1,32 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import UnifiedAutomationDesigner from '../../components/workflow/UnifiedAutomationDesigner';
 import AutomationDryRunPanel from '../../components/workflow/AutomationDryRunPanel';
+import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { admin, type WorkflowDefinition } from '../../api/client';
 import { formatDateTime } from '../../utils/dateTime';
 import { diffObjects, formatDiffValue } from './workflow-editor/diff';
 import { validateAutomationConfig } from '@nova-suite/shared';
+
+type EditorSnapshot = {
+  definitionId: string | null;
+  definitionName: string;
+  workflowType: string;
+  config: string;
+};
+
+function stableConfigJson(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw || '{}') as unknown;
+    if (!parsed || typeof parsed !== 'object') return raw.trim();
+    return JSON.stringify(parsed);
+  } catch {
+    return raw;
+  }
+}
 
 type PersistedUnifiedDefinition = {
   kind: 'unified_automation_designer_v1';
@@ -36,7 +55,7 @@ function normalizeLoadedDefinition(
 export default function WorkflowEditorPage() {
   const t = useTranslations('pages.admin.workflows.editor');
   const [definitionId, setDefinitionId] = useState<string | null>(null);
-  const [definitionName, setDefinitionName] = useState('');
+  const [definitionName, setDefinitionName] = useState(() => t('newDefinition'));
   const [definitions, setDefinitions] = useState<WorkflowDefinition[]>([]);
   const [loadingDefinitions, setLoadingDefinitions] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -46,6 +65,11 @@ export default function WorkflowEditorPage() {
   const [loadedPublishedAt, setLoadedPublishedAt] = useState<string | null>(null);
   const [workflowType, setWorkflowType] = useState('ticket-triage-workflow');
   const [automationConfigJson, setAutomationConfigJson] = useState('{\n  \n}');
+  const [baseline, setBaseline] = useState<EditorSnapshot | null>(null);
+  const [localDialogOpen, setLocalDialogOpen] = useState(false);
+  const absorbNextConfigRef = useRef(true);
+  const pendingLocalAction = useRef<(() => void) | null>(null);
+  const saveRef = useRef<() => Promise<boolean>>(async () => false);
 
   const refreshDefinitions = useCallback(async () => {
     setLoadingDefinitions(true);
@@ -60,10 +84,6 @@ export default function WorkflowEditorPage() {
   useEffect(() => {
     void refreshDefinitions();
   }, [refreshDefinitions]);
-
-  useEffect(() => {
-    if (!definitionName) setDefinitionName(t('newDefinition'));
-  }, [definitionName, t]);
 
   const parsedAutomationConfig = useMemo(() => {
     try {
@@ -88,48 +108,34 @@ export default function WorkflowEditorPage() {
 
   const hasPublished = loadedPublishedDefinition !== null;
 
-  const resetEditor = () => {
-    setDefinitionId(null);
-    setDefinitionName(t('newDefinition'));
-    setWorkflowType('ticket-triage-workflow');
-    setAutomationConfigJson('{\n  \n}');
-    setLoadedPublishedDefinition(null);
-    setLoadedVersion(0);
-    setLoadedPublishedAt(null);
-    setMessage(t('startedNewDraft'));
-  };
+  const currentSnapshot = useMemo<EditorSnapshot>(() => ({
+    definitionId,
+    definitionName,
+    workflowType,
+    config: stableConfigJson(automationConfigJson),
+  }), [automationConfigJson, definitionId, definitionName, workflowType]);
 
-  const loadDefinition = async (id: string) => {
-    setBusy(true);
-    try {
-      const result = await admin.workflowDefinition(id);
-      const def = result.workflow_definition;
-      const normalized = normalizeLoadedDefinition(def.draft_definition, def.workflow_type);
-      setDefinitionId(def.id);
-      setDefinitionName(def.name);
-      setWorkflowType(normalized.workflowType);
-      setAutomationConfigJson(normalized.automationConfigJson);
-      setLoadedPublishedDefinition(def.published_definition);
-      setLoadedVersion(def.version);
-      setLoadedPublishedAt(def.published_at);
-      setMessage(t('loaded', { name: def.name }));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const isDirty = Boolean(
+    baseline && (
+      baseline.definitionId !== currentSnapshot.definitionId ||
+      baseline.definitionName !== currentSnapshot.definitionName ||
+      baseline.workflowType !== currentSnapshot.workflowType ||
+      baseline.config !== currentSnapshot.config
+    ),
+  );
 
-  const saveDraft = async () => {
+  const saveDraft = useCallback(async (): Promise<boolean> => {
     if (!definitionName.trim()) {
       setMessage(t('nameRequired'));
-      return;
+      return false;
     }
     if (!workflowType.trim()) {
       setMessage(t('workflowTypeRequired'));
-      return;
+      return false;
     }
     if (!parsedAutomationConfig.valid) {
       setMessage(t('invalidJson'));
-      return;
+      return false;
     }
     setBusy(true);
     try {
@@ -140,15 +146,144 @@ export default function WorkflowEditorPage() {
           draft_definition: serializedDraft as unknown as Record<string, unknown>,
         });
         setDefinitionId(created.id);
+        setBaseline({
+          definitionId: created.id,
+          definitionName: definitionName.trim(),
+          workflowType: workflowType.trim(),
+          config: stableConfigJson(automationConfigJson),
+        });
       } else {
         await admin.updateWorkflowDefinition(definitionId, {
           name: definitionName.trim(),
           workflow_type: workflowType.trim(),
           draft_definition: serializedDraft as unknown as Record<string, unknown>,
         });
+        setBaseline({
+          definitionId,
+          definitionName: definitionName.trim(),
+          workflowType: workflowType.trim(),
+          config: stableConfigJson(automationConfigJson),
+        });
       }
       await refreshDefinitions();
       setMessage(t('saved'));
+      return true;
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : t('invalidJson'));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [
+    automationConfigJson,
+    definitionId,
+    definitionName,
+    parsedAutomationConfig.valid,
+    refreshDefinitions,
+    serializedDraft,
+    t,
+    workflowType,
+  ]);
+
+  saveRef.current = saveDraft;
+
+  const {
+    dialogOpen: unsavedDialogOpen,
+    saving: unsavedDialogSaving,
+    stayOnPage,
+    leaveWithoutSaving,
+    saveAndLeave,
+  } = useUnsavedChangesGuard({
+    isDirty,
+    onSave: useCallback(() => saveRef.current(), []),
+  });
+
+  const confirmIfDirty = useCallback((action: () => void) => {
+    if (!isDirty) {
+      action();
+      return;
+    }
+    pendingLocalAction.current = action;
+    setLocalDialogOpen(true);
+  }, [isDirty]);
+
+  const handleStay = useCallback(() => {
+    pendingLocalAction.current = null;
+    setLocalDialogOpen(false);
+    stayOnPage();
+  }, [stayOnPage]);
+
+  const handleLeave = useCallback(() => {
+    if (localDialogOpen) {
+      const action = pendingLocalAction.current;
+      pendingLocalAction.current = null;
+      setLocalDialogOpen(false);
+      action?.();
+      return;
+    }
+    leaveWithoutSaving();
+  }, [leaveWithoutSaving, localDialogOpen]);
+
+  const handleSaveAndLeave = useCallback(async () => {
+    if (localDialogOpen) {
+      const saved = await saveRef.current();
+      if (!saved) return;
+      const action = pendingLocalAction.current;
+      pendingLocalAction.current = null;
+      setLocalDialogOpen(false);
+      action?.();
+      return;
+    }
+    await saveAndLeave?.();
+  }, [localDialogOpen, saveAndLeave]);
+
+  const handleDesignerApply = useCallback((cfg: Record<string, unknown>) => {
+    setAutomationConfigJson(JSON.stringify(cfg, null, 2));
+    if (absorbNextConfigRef.current) {
+      absorbNextConfigRef.current = false;
+      setBaseline({
+        definitionId,
+        definitionName,
+        workflowType,
+        config: JSON.stringify(cfg),
+      });
+    }
+  }, [definitionId, definitionName, workflowType]);
+
+  const resetEditor = () => {
+    absorbNextConfigRef.current = true;
+    setDefinitionId(null);
+    setDefinitionName(t('newDefinition'));
+    setWorkflowType('ticket-triage-workflow');
+    setAutomationConfigJson('{\n  \n}');
+    setLoadedPublishedDefinition(null);
+    setLoadedVersion(0);
+    setLoadedPublishedAt(null);
+    setBaseline(null);
+    setMessage(t('startedNewDraft'));
+  };
+
+  const loadDefinition = async (id: string) => {
+    setBusy(true);
+    try {
+      const result = await admin.workflowDefinition(id);
+      const def = result.workflow_definition;
+      const normalized = normalizeLoadedDefinition(def.draft_definition, def.workflow_type);
+      absorbNextConfigRef.current = true;
+      setDefinitionId(def.id);
+      setDefinitionName(def.name);
+      setWorkflowType(normalized.workflowType);
+      setAutomationConfigJson(normalized.automationConfigJson);
+      setLoadedPublishedDefinition(def.published_definition);
+      setLoadedVersion(def.version);
+      setLoadedPublishedAt(def.published_at);
+      setBaseline({
+        definitionId: def.id,
+        definitionName: def.name,
+        workflowType: normalized.workflowType,
+        config: stableConfigJson(normalized.automationConfigJson),
+      });
+      setMessage(t('loaded', { name: def.name }));
     } finally {
       setBusy(false);
     }
@@ -201,13 +336,20 @@ export default function WorkflowEditorPage() {
 
   return (
     <div className="flex flex-col gap-3 xl:flex-1 xl:min-h-0">
+      <UnsavedChangesDialog
+        open={unsavedDialogOpen || localDialogOpen}
+        saving={unsavedDialogSaving || busy}
+        onStay={handleStay}
+        onLeave={handleLeave}
+        onSaveAndLeave={handleSaveAndLeave}
+      />
       <div className="shrink-0 [&>div]:mb-0">
         <PageHeader
           title={t('title')}
           description={t('description')}
           action={
             <div className="flex items-center gap-2">
-              <button onClick={saveDraft} disabled={busy} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60">
+              <button onClick={() => { void saveDraft(); }} disabled={busy} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60">
                 {t('saveDraft')}
               </button>
               <button onClick={publishDefinition} disabled={busy || !definitionId || !parsedAutomationConfig.valid} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
@@ -226,14 +368,14 @@ export default function WorkflowEditorPage() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">{t('definitions')}</label>
-            <select value={definitionId ?? ''} disabled={loadingDefinitions || busy} onChange={(e) => { const id = e.target.value; if (id) void loadDefinition(id); }} className="w-full px-2.5 py-2 rounded-sm border border-gray-200 text-sm bg-white">
+            <select value={definitionId ?? ''} disabled={loadingDefinitions || busy} onChange={(e) => { const id = e.target.value; if (id) confirmIfDirty(() => { void loadDefinition(id); }); }} className="w-full px-2.5 py-2 rounded-sm border border-gray-200 text-sm bg-white">
               <option value="">{t('select')}</option>
               {definitions.map((def) => <option key={def.id} value={def.id}>{def.name} ({def.workflow_type}) v{def.version}</option>)}
             </select>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={resetEditor} disabled={busy} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">{t('new')}</button>
-            <button onClick={duplicateDefinition} disabled={busy || !definitionId} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">{t('duplicate')}</button>
+            <button onClick={() => confirmIfDirty(resetEditor)} disabled={busy} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">{t('new')}</button>
+            <button onClick={() => confirmIfDirty(() => { void duplicateDefinition(); })} disabled={busy || !definitionId} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">{t('duplicate')}</button>
           </div>
           <div className="flex justify-end">
             <button onClick={copyJson} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">{t('copyJson')}</button>
@@ -275,7 +417,7 @@ export default function WorkflowEditorPage() {
           <UnifiedAutomationDesigner
             fillAvailableSpace
             initialConfigJson={automationConfigJson}
-            onApply={(cfg) => setAutomationConfigJson(JSON.stringify(cfg, null, 2))}
+            onApply={handleDesignerApply}
           />
         </div>
         <div className="min-h-0 flex flex-col gap-3 xl:overflow-hidden">

@@ -1,15 +1,19 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import type {
-  AdvancedCondition,
-  AutomationActivityState,
-  AutomationBranch,
-  AutomationCiCreateActionState,
-  AutomationCiLookupActionState,
-  AutomationConfig,
-  AutomationRestActionState,
-  AutomationState,
-  AutomationTransition,
+import {
+  type AdvancedCondition,
+  type AutomationActivityState,
+  type AutomationBranch,
+  type AutomationCiCreateActionState,
+  type AutomationCiLookupActionState,
+  type AutomationConfig,
+  type AutomationRestActionState,
+  type AutomationState,
+  type AutomationTransition,
 } from './automation-config';
+import {
+  executeNativeLibraryState,
+  type AutomationSendEmail,
+} from './automation-native';
 
 const MAX_EXECUTION_STEPS = 120;
 const OAUTH_TOKEN_SAFETY_MS = 60_000;
@@ -41,6 +45,11 @@ export type ExecuteAutomationGraphParams = {
   maxDelayMs?: number; // cap each delay step (dry-run can pass 2000)
   automationSharedKey?: string; // for X-Automation-Key; fall back to process.env.CATALOG_AUTOMATION_SHARED_KEY
   onLog?: (msg: string, meta?: object) => void;
+  dryRun?: boolean;
+  tenantId?: string;
+  requestTaskId?: string;
+  callDepth?: number;
+  sendEmail?: AutomationSendEmail;
 };
 
 export type ExecuteAutomationGraphResult = {
@@ -83,6 +92,9 @@ function buildTemplateContext(params: {
       status: request.status,
       form_data: formData,
       delivery_info: deliveryInfo,
+      requester_id: request.requester_id,
+      requested_for: request.requested_for,
+      assigned_to: request.assigned_to,
     },
     response: response
       ? {
@@ -268,6 +280,24 @@ export function collectCredSlugsFromAutomation(cfg: AutomationConfig): string[] 
       }
     }
     if (s.type === 'decision') collectCredSlugsFromText(s.condition, slugs);
+    if (s.type === 'action.notification') {
+      collectCredSlugsFromText(s.titleTemplate || '', slugs);
+      collectCredSlugsFromText(s.bodyTemplate || '', slugs);
+      collectCredSlugsFromText(s.recipientType || '', slugs);
+    }
+    if (s.type === 'action.ticket' && s.fields) {
+      collectCredSlugsFromText(JSON.stringify(s.fields), slugs);
+    }
+    if (s.type === 'action.assign') {
+      collectCredSlugsFromText(s.assigneeTemplate || '', slugs);
+      collectCredSlugsFromText(s.groupIdTemplate || '', slugs);
+    }
+    if (s.type === 'action.script') collectCredSlugsFromText(s.code || '', slugs);
+    if (s.type === 'call.workflow') {
+      collectCredSlugsFromText(s.workflowType || '', slugs);
+      collectCredSlugsFromText(s.definitionId || '', slugs);
+      if (s.input) collectCredSlugsFromText(JSON.stringify(s.input), slugs);
+    }
     if (s.type === 'end') {
       for (const b of [s.onSuccess, s.onFailure]) {
         for (const v of Object.values(b?.mergeFormData || {})) collectCredSlugsFromText(v, slugs);
@@ -483,7 +513,10 @@ export async function executeAutomationGraph(
     client,
     maxDelayMs,
     automationSharedKey,
+    requestTaskId,
+    sendEmail,
   } = params;
+  const callDepth = params.callDepth ?? 0;
   const persistFormData =
     params.persistFormData ?? Boolean(client && requestId);
   const skipOrders = new Set<number>();
@@ -566,6 +599,98 @@ export async function executeAutomationGraph(
       continue;
     }
 
+    if (
+      state.type === 'action.notification' ||
+      state.type === 'action.ticket' ||
+      state.type === 'action.assign' ||
+      state.type === 'action.script' ||
+      state.type === 'call.workflow'
+    ) {
+      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
+      let native = {
+        ok: false,
+        message: `Unsupported action state type: ${state.type}`,
+        result: undefined as unknown,
+      };
+      try {
+        const executed = await executeNativeLibraryState({
+          state,
+          ctx,
+          request,
+          client,
+          requestId,
+          requestTaskId,
+          sendEmail,
+          callDepth,
+          runSubgraph: async (nestedCfg, nestedRequest) => {
+            const nested = await executeAutomationGraph({
+              ...params,
+              cfg: nestedCfg,
+              request: nestedRequest,
+              persistFormData: false,
+              callDepth: callDepth + 1,
+            });
+            return {
+              ok: nested.ok,
+              message: nested.message,
+              result: {
+                trace: nested.trace,
+                stateResults: nested.stateResults,
+                mergePatch: nested.mergePatch,
+                warnings: nested.warnings,
+              },
+            };
+          },
+        });
+        if (executed) native = { ok: executed.ok, message: executed.message, result: executed.result };
+      } catch (err) {
+        native = {
+          ok: false,
+          message: err instanceof Error ? err.message : String(err),
+          result: undefined,
+        };
+      }
+
+      lastResponse = {
+        status: native.ok ? 200 : 500,
+        bodyText: native.message,
+        bodyJson: native.result,
+      };
+      stateResults[state.id] = {
+        ok: native.ok,
+        status: lastResponse.status,
+        body: native.result !== undefined ? native.result : native.message,
+        text: native.message,
+      };
+      mergePatch[`automation_${state.id}_ok`] = native.ok;
+      mergePatch[`automation_${state.id}_status`] = lastResponse.status;
+
+      if (native.ok) {
+        current = selectTransition(state.transitions, 'success') || selectTransition(state.transitions, null);
+        if (!current) {
+          terminal = { ok: true, message: native.message, rejectRequest: false };
+          break;
+        }
+        continue;
+      }
+
+      current = selectTransition(state.transitions, 'failure');
+      if (!current) {
+        terminal = { ok: false, message: native.message, rejectRequest: false };
+        break;
+      }
+      continue;
+    }
+
+    if (
+      state.type !== 'activity' &&
+      state.type !== 'action.rest' &&
+      state.type !== 'action.ci.create' &&
+      state.type !== 'action.ci.lookup'
+    ) {
+      throw new Error(`Unsupported action state type: ${(state as AutomationState).type}`);
+    }
+
     const activity = state;
     const attempts = Math.max(1, Math.min(Number(activity.retryAttempts || 1), 10));
     const backoffMs = Math.max(0, Math.min(Number(activity.retryBackoffSec || 0), 300)) * 1000;
@@ -575,17 +700,8 @@ export async function executeAutomationGraph(
 
     for (let i = 1; i <= attempts; i += 1) {
       const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
-      const resolvedActivity =
-        activity.type === 'activity' ||
-        activity.type === 'action.rest' ||
-        activity.type === 'action.ci.create' ||
-        activity.type === 'action.ci.lookup'
-          ? toHttpActivityState(activity, ctx)
-          : null;
+      const resolvedActivity = toHttpActivityState(activity, ctx);
       try {
-        if (!resolvedActivity) {
-          throw new Error(`Unsupported action state type: ${(activity as AutomationState).type}`);
-        }
         http = await runHttpStep(resolvedActivity, ctx, automationSharedKey);
         if (http.ok) break;
         lastErr = `HTTP ${http.status}`;

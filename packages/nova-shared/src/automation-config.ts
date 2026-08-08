@@ -17,6 +17,11 @@ export const AUTOMATION_STATE_TYPES = [
   'action.ci.create',
   'action.ci.lookup',
   'decision.advanced',
+  'action.notification',
+  'action.ticket',
+  'action.assign',
+  'action.script',
+  'call.workflow',
 ] as const;
 
 export type AutomationStateType = (typeof AUTOMATION_STATE_TYPES)[number];
@@ -38,6 +43,11 @@ export const UNIFIED_BUILDER_NODE_LABELS: Record<UnifiedBuilderNodeType, string>
   'action.ci.lookup': 'Action CI Lookup',
   'action.ci.create': 'Action CI Create',
   'decision.advanced': 'Decision Advanced',
+  'action.notification': 'Notification',
+  'action.ticket': 'Ticket',
+  'action.assign': 'Assignment',
+  'action.script': 'Script',
+  'call.workflow': 'Sub-workflow',
 };
 
 export function isUnifiedBuilderNodeType(raw: string): raw is UnifiedBuilderNodeType {
@@ -116,6 +126,41 @@ export type AutomationEndState = AutomationStateBase & {
   onFailure?: AutomationBranch;
 };
 
+export type AutomationNotificationActionState = AutomationStateBase & {
+  type: 'action.notification';
+  channel?: 'in_app' | 'email';
+  recipientType?: string;
+  titleTemplate?: string;
+  bodyTemplate?: string;
+};
+
+export type AutomationTicketActionState = AutomationStateBase & {
+  type: 'action.ticket';
+  entity?: 'incident' | 'request';
+  operation?: 'create' | 'update' | 'close' | 'work_note';
+  fields?: Record<string, unknown>;
+};
+
+export type AutomationAssignActionState = AutomationStateBase & {
+  type: 'action.assign';
+  target?: 'user' | 'group';
+  assigneeTemplate?: string;
+  groupIdTemplate?: string;
+};
+
+export type AutomationScriptActionState = AutomationStateBase & {
+  type: 'action.script';
+  runtime?: 'js';
+  code: string;
+};
+
+export type AutomationCallWorkflowState = AutomationStateBase & {
+  type: 'call.workflow';
+  workflowType?: string;
+  definitionId?: string;
+  input?: Record<string, unknown>;
+};
+
 export type AutomationState =
   | AutomationActivityState
   | AutomationRestActionState
@@ -124,7 +169,12 @@ export type AutomationState =
   | AutomationDecisionState
   | AutomationAdvancedDecisionState
   | AutomationDelayState
-  | AutomationEndState;
+  | AutomationEndState
+  | AutomationNotificationActionState
+  | AutomationTicketActionState
+  | AutomationAssignActionState
+  | AutomationScriptActionState
+  | AutomationCallWorkflowState;
 
 export type AutomationConfig = {
   kind: 'state_machine';
@@ -148,6 +198,19 @@ type AutomationValidationState = {
   fallbackNodeId?: string;
   className?: string;
   name?: string;
+  channel?: string;
+  recipientType?: string;
+  titleTemplate?: string;
+  bodyTemplate?: string;
+  entity?: string;
+  operation?: string;
+  target?: string;
+  assigneeTemplate?: string;
+  groupIdTemplate?: string;
+  runtime?: string;
+  code?: string;
+  workflowType?: string;
+  definitionId?: string;
 };
 
 function collectCredentialSlugsFromString(raw: string, out: Set<string>): void {
@@ -164,8 +227,27 @@ export function collectCredentialSlugsFromAutomationConfig(raw: unknown): string
   for (const s of states) {
     if (!s || typeof s !== 'object' || Array.isArray(s)) continue;
     const state = s as Record<string, unknown>;
-    for (const key of ['url', 'body', 'condition'] as const) {
+    for (const key of [
+      'url',
+      'body',
+      'condition',
+      'titleTemplate',
+      'bodyTemplate',
+      'assigneeTemplate',
+      'groupIdTemplate',
+      'code',
+      'workflowType',
+      'definitionId',
+      'recipientType',
+    ] as const) {
       const val = state[key];
+      if (typeof val === 'string') collectCredentialSlugsFromString(val, out);
+    }
+    for (const objKey of ['fields', 'input', 'attributes'] as const) {
+      const val = state[objKey];
+      if (val && typeof val === 'object') {
+        collectCredentialSlugsFromString(JSON.stringify(val), out);
+      }
       if (typeof val === 'string') collectCredentialSlugsFromString(val, out);
     }
     const headers = state.headers;
@@ -290,6 +372,38 @@ export function validateAutomationConfig(raw: unknown): string[] {
       }
     } else if (st.type === 'end' && transitions.length > 0) {
       errors.push(`End state "${st.id}" cannot define transitions`);
+    } else if (st.type === 'action.notification') {
+      if (st.channel && st.channel !== 'in_app' && st.channel !== 'email') {
+        errors.push(`State "${st.id}" channel must be in_app or email`);
+      }
+    } else if (st.type === 'action.ticket') {
+      if (st.entity && st.entity !== 'incident' && st.entity !== 'request') {
+        errors.push(`State "${st.id}" entity must be incident or request`);
+      }
+      if (
+        st.operation &&
+        st.operation !== 'create' &&
+        st.operation !== 'update' &&
+        st.operation !== 'close' &&
+        st.operation !== 'work_note'
+      ) {
+        errors.push(`State "${st.id}" operation must be create, update, close, or work_note`);
+      }
+    } else if (st.type === 'action.assign') {
+      if (st.target && st.target !== 'user' && st.target !== 'group') {
+        errors.push(`State "${st.id}" target must be user or group`);
+      }
+    } else if (st.type === 'action.script') {
+      if (typeof st.code !== 'string' || !st.code.trim()) {
+        errors.push(`State "${st.id}" requires code`);
+      }
+      if (st.runtime && st.runtime !== 'js') {
+        errors.push(`State "${st.id}" runtime must be js`);
+      }
+    } else if (st.type === 'call.workflow') {
+      if (!String(st.workflowType || '').trim() && !String(st.definitionId || '').trim()) {
+        errors.push(`State "${st.id}" requires workflowType or definitionId`);
+      }
     }
 
     for (const t of transitions) {

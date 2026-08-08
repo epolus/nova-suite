@@ -18,6 +18,21 @@ export type UnifiedBuilderNodeDefaults = {
   displayName?: string;
   attributesJson?: string;
   expressionJson?: string;
+  channel?: string;
+  recipientType?: string;
+  titleTemplate?: string;
+  bodyTemplate?: string;
+  entity?: string;
+  operation?: string;
+  fieldsJson?: string;
+  target?: string;
+  assigneeTemplate?: string;
+  groupIdTemplate?: string;
+  runtime?: string;
+  code?: string;
+  workflowType?: string;
+  definitionId?: string;
+  inputJson?: string;
 };
 
 export const UNIFIED_BUILDER_EMPTY_ATTRIBUTES_JSON = '{\n  \n}';
@@ -77,5 +92,40 @@ export const UNIFIED_BUILDER_NODE_DEFAULTS: Record<UnifiedBuilderNodeType, Unifi
     label: 'advanced-decision',
     nodeType: 'decision.advanced',
     expressionJson: '{\n  "op": "gt",\n  "left": { "var": "state.lookup.body.count" },\n  "right": 0\n}',
+  },
+  'action.notification': {
+    label: 'notification',
+    nodeType: 'action.notification',
+    channel: 'in_app',
+    recipientType: 'assignee',
+    titleTemplate: 'Update on {{request.number}}',
+    bodyTemplate: 'Catalog automation needs your attention.',
+  },
+  'action.ticket': {
+    label: 'ticket',
+    nodeType: 'action.ticket',
+    entity: 'incident',
+    operation: 'work_note',
+    fieldsJson: '{\n  "work_note": "Automation update for {{request.number}}"\n}',
+  },
+  'action.assign': {
+    label: 'assignment',
+    nodeType: 'action.assign',
+    target: 'group',
+    assigneeTemplate: '',
+    groupIdTemplate: '{{request.form_data.assignment_group_id}}',
+  },
+  'action.script': {
+    label: 'script',
+    nodeType: 'action.script',
+    runtime: 'js',
+    code: 'return { ok: true };\n',
+  },
+  'call.workflow': {
+    label: 'sub-workflow',
+    nodeType: 'call.workflow',
+    workflowType: 'catalog-fulfillment',
+    definitionId: '',
+    inputJson: '{\n  "requestId": "{{request.id}}"\n}',
   },
 };

@@ -178,7 +178,7 @@ CREATE POLICY tenant_isolation_requests ON requests
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller')
+      current_user_has_role('admin', 'fulfiller', 'system')
       OR requester_id = current_user_id()
     )
   );

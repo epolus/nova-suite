@@ -32,6 +32,32 @@ const endResultOptions = [
   { label: 'Failure', value: 'failure' },
 ];
 
+const notificationChannelOptions = [
+  { label: 'In-app', value: 'in_app' },
+  { label: 'Email', value: 'email' },
+];
+
+const ticketEntityOptions = [
+  { label: 'Incident', value: 'incident' },
+  { label: 'Request', value: 'request' },
+];
+
+const ticketOperationOptions = [
+  { label: 'Create', value: 'create' },
+  { label: 'Update', value: 'update' },
+  { label: 'Close', value: 'close' },
+  { label: 'Work note', value: 'work_note' },
+];
+
+const assignTargetOptions = [
+  { label: 'User', value: 'user' },
+  { label: 'Group', value: 'group' },
+];
+
+const scriptRuntimeOptions = [
+  { label: 'JavaScript', value: 'js' },
+];
+
 function baseUi(extra: UISchema[]): UISchema {
   return {
     type: 'VerticalLayout',
@@ -235,6 +261,101 @@ const decisionAdvancedNode = defineNode('decision.advanced', {
   },
 });
 
+const actionNotificationNode = defineNode('action.notification', {
+  description: 'Send an in-app or email notification',
+  schemaProperties: {
+    channel: { type: 'string', options: notificationChannelOptions },
+    recipientType: { type: 'string' },
+    titleTemplate: { type: 'string' },
+    bodyTemplate: { type: 'string' },
+  },
+  uischemaElements: [
+    { type: 'Select', scope: scope('properties.channel'), label: 'Channel' },
+    { type: 'Text', scope: scope('properties.recipientType'), label: 'Recipient type' },
+    { type: 'Text', scope: scope('properties.titleTemplate'), label: 'Title template' },
+    { type: 'TextArea', scope: scope('properties.bodyTemplate'), label: 'Body template' },
+  ],
+  defaults: {
+    channel: 'in_app',
+    recipientType: 'assignee',
+    titleTemplate: 'Update on {{request.number}}',
+    bodyTemplate: 'Catalog automation needs your attention.',
+  },
+});
+
+const actionTicketNode = defineNode('action.ticket', {
+  description: 'Create or update an incident or request',
+  schemaProperties: {
+    entity: { type: 'string', options: ticketEntityOptions },
+    operation: { type: 'string', options: ticketOperationOptions },
+    fieldsJson: { type: 'string' },
+  },
+  uischemaElements: [
+    { type: 'Select', scope: scope('properties.entity'), label: 'Entity' },
+    { type: 'Select', scope: scope('properties.operation'), label: 'Operation' },
+    { type: 'TextArea', scope: scope('properties.fieldsJson'), label: 'Fields JSON' },
+  ],
+  defaults: {
+    entity: 'incident',
+    operation: 'work_note',
+    fieldsJson: '{\n  "work_note": "Automation update for {{request.number}}"\n}',
+  },
+});
+
+const actionAssignNode = defineNode('action.assign', {
+  description: 'Assign the current catalog task to a user or group',
+  schemaProperties: {
+    target: { type: 'string', options: assignTargetOptions },
+    assigneeTemplate: { type: 'string' },
+    groupIdTemplate: { type: 'string' },
+  },
+  uischemaElements: [
+    { type: 'Select', scope: scope('properties.target'), label: 'Target' },
+    { type: 'Text', scope: scope('properties.assigneeTemplate'), label: 'Assignee template' },
+    { type: 'Text', scope: scope('properties.groupIdTemplate'), label: 'Group id template' },
+  ],
+  defaults: {
+    target: 'group',
+    assigneeTemplate: '',
+    groupIdTemplate: '{{request.form_data.assignment_group_id}}',
+  },
+});
+
+const actionScriptNode = defineNode('action.script', {
+  description: 'Run a short JavaScript step',
+  schemaProperties: {
+    runtime: { type: 'string', options: scriptRuntimeOptions },
+    code: { type: 'string' },
+  },
+  uischemaElements: [
+    { type: 'Select', scope: scope('properties.runtime'), label: 'Runtime' },
+    { type: 'TextArea', scope: scope('properties.code'), label: 'Code' },
+  ],
+  defaults: {
+    runtime: 'js',
+    code: 'return { ok: true };\n',
+  },
+});
+
+const callWorkflowNode = defineNode('call.workflow', {
+  description: 'Run a published workflow definition',
+  schemaProperties: {
+    workflowType: { type: 'string' },
+    definitionId: { type: 'string' },
+    inputJson: { type: 'string' },
+  },
+  uischemaElements: [
+    { type: 'Text', scope: scope('properties.workflowType'), label: 'Workflow type' },
+    { type: 'Text', scope: scope('properties.definitionId'), label: 'Definition id' },
+    { type: 'TextArea', scope: scope('properties.inputJson'), label: 'Input JSON' },
+  ],
+  defaults: {
+    workflowType: 'catalog-fulfillment',
+    definitionId: '',
+    inputJson: '{\n  "requestId": "{{request.id}}"\n}',
+  },
+});
+
 export const workflowNodeTypes: PaletteItemOrGroup[] = [
   {
     label: 'Flow',
@@ -242,6 +363,10 @@ export const workflowNodeTypes: PaletteItemOrGroup[] = [
   },
   {
     label: 'Actions',
-    groupItems: [actionRestNode, actionCiLookupNode, actionCiCreateNode],
+    groupItems: [actionRestNode, actionCiLookupNode, actionCiCreateNode, actionNotificationNode, actionTicketNode, actionAssignNode],
+  },
+  {
+    label: 'Advanced',
+    groupItems: [actionScriptNode, callWorkflowNode],
   },
 ];

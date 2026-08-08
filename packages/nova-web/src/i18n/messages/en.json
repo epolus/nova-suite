@@ -1809,7 +1809,7 @@
           "slaHours": "SLA (hours)",
           "instructions": "Instructions",
           "automationJson": "Automation (JSON)",
-          "automationHelp": "Use state-machine format: kind: \"state_machine\", startAt, and states[]. Supported state types: activity, decision, delay, end, action.rest, action.ci.lookup, action.ci.create, decision.advanced. For secrets, use {{cred.slug}} with Admin → Credentials.",
+          "automationHelp": "Use state-machine format: kind: \"state_machine\", startAt, and states[]. Supported state types: activity, decision, delay, end, action.rest, action.ci.lookup, action.ci.create, decision.advanced, action.notification, action.ticket, action.assign, action.script, call.workflow. For secrets, use {{cred.slug}} with Admin → Credentials.",
           "automationHandoff": "Task-to-task handoff: write values in Task 1 via mergeFormData, then read them in Task 2 with {{request.form_data.your_key}}. Set Task 2 to a higher task_order so it runs after Task 1.",
           "insertExample": "Insert example",
           "insertAtCursor": "Insert at cursor",
@@ -3051,7 +3051,7 @@
     },
     "automationDryRun": {
       "title": "Test run",
-      "description": "Execute the current state machine with real HTTP calls. Form data is not persisted.",
+      "description": "Runs the current state machine with real side effects (HTTP, notifications, tickets, assignment, script, sub-workflow). Form data is not persisted.",
       "play": "Play",
       "running": "Running…",
       "formDataLabel": "Mock request.form_data (JSON)",
@@ -3096,7 +3096,12 @@
         "actionRest": "REST Action",
         "actionCiLookup": "CI Lookup",
         "actionCiCreate": "CI Create",
-        "decisionAdvanced": "Advanced Decision"
+        "decisionAdvanced": "Advanced Decision",
+        "actionNotification": "Notification",
+        "actionTicket": "Ticket",
+        "actionAssign": "Assignment",
+        "actionScript": "Script",
+        "callWorkflow": "Sub-workflow"
       },
       "errors": {
         "kindMustBeStateMachine": "kind must be \"state_machine\".",

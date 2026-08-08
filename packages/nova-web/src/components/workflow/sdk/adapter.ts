@@ -27,7 +27,9 @@ function asNodeType(raw: string | undefined): UnifiedBuilderNodeType {
 /** xyflow `type` must match the SDK template registry (not React Flow's `default`). */
 function sdkCanvasType(nodeType: UnifiedBuilderNodeType): NodeType {
   if (nodeType === 'start') return SDK_CANVAS_TYPE.StartNode;
-  if (nodeType === 'decision' || nodeType === 'decision.advanced') return SDK_CANVAS_TYPE.DecisionNode;
+  if (nodeType === 'decision' || nodeType === 'decision.advanced') {
+    return SDK_CANVAS_TYPE.DecisionNode;
+  }
   return SDK_CANVAS_TYPE.Node;
 }
 
@@ -51,6 +53,16 @@ function nodeDescription(nodeType: UnifiedBuilderNodeType): string {
       return 'Create a configuration item';
     case 'decision.advanced':
       return 'Branch on an advanced expression';
+    case 'action.notification':
+      return 'Send an in-app or email notification';
+    case 'action.ticket':
+      return 'Create or update an incident or request';
+    case 'action.assign':
+      return 'Assign the current catalog task to a user or group';
+    case 'action.script':
+      return 'Run a short JavaScript step';
+    case 'call.workflow':
+      return 'Run a published workflow definition';
     default:
       return UNIFIED_BUILDER_NODE_LABELS[nodeType] ?? nodeType;
   }
@@ -80,6 +92,21 @@ export function toSdkNodes(nodes: Node<UnifiedBuilderNodeData>[]): WorkflowBuild
       ['displayName', node.data.displayName],
       ['attributesJson', node.data.attributesJson],
       ['expressionJson', node.data.expressionJson],
+      ['channel', node.data.channel],
+      ['recipientType', node.data.recipientType],
+      ['titleTemplate', node.data.titleTemplate],
+      ['bodyTemplate', node.data.bodyTemplate],
+      ['entity', node.data.entity],
+      ['operation', node.data.operation],
+      ['fieldsJson', node.data.fieldsJson],
+      ['target', node.data.target],
+      ['assigneeTemplate', node.data.assigneeTemplate],
+      ['groupIdTemplate', node.data.groupIdTemplate],
+      ['runtime', node.data.runtime],
+      ['code', node.data.code],
+      ['workflowType', node.data.workflowType],
+      ['definitionId', node.data.definitionId],
+      ['inputJson', node.data.inputJson],
     ];
     for (const [key, value] of optional) {
       if (value !== undefined) props[key] = value;
@@ -139,6 +166,21 @@ export function fromSdkNodes(nodes: WorkflowBuilderNode[]): Node<UnifiedBuilderN
         displayName: typeof props.displayName === 'string' ? props.displayName : undefined,
         attributesJson: typeof props.attributesJson === 'string' ? props.attributesJson : undefined,
         expressionJson: typeof props.expressionJson === 'string' ? props.expressionJson : undefined,
+        channel: typeof props.channel === 'string' ? props.channel : undefined,
+        recipientType: typeof props.recipientType === 'string' ? props.recipientType : undefined,
+        titleTemplate: typeof props.titleTemplate === 'string' ? props.titleTemplate : undefined,
+        bodyTemplate: typeof props.bodyTemplate === 'string' ? props.bodyTemplate : undefined,
+        entity: typeof props.entity === 'string' ? props.entity : undefined,
+        operation: typeof props.operation === 'string' ? props.operation : undefined,
+        fieldsJson: typeof props.fieldsJson === 'string' ? props.fieldsJson : undefined,
+        target: typeof props.target === 'string' ? props.target : undefined,
+        assigneeTemplate: typeof props.assigneeTemplate === 'string' ? props.assigneeTemplate : undefined,
+        groupIdTemplate: typeof props.groupIdTemplate === 'string' ? props.groupIdTemplate : undefined,
+        runtime: typeof props.runtime === 'string' ? props.runtime : undefined,
+        code: typeof props.code === 'string' ? props.code : undefined,
+        workflowType: typeof props.workflowType === 'string' ? props.workflowType : undefined,
+        definitionId: typeof props.definitionId === 'string' ? props.definitionId : undefined,
+        inputJson: typeof props.inputJson === 'string' ? props.inputJson : undefined,
       },
     };
   });

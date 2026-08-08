@@ -75,10 +75,80 @@ const INVALID_CI_CREATE_MISSING_REQUIRED_FIELDS: AutomationConfigFixture = {
   ],
 };
 
+const STUB_LIBRARY_NODES: AutomationConfigFixture = {
+  kind: 'state_machine',
+  schemaVersion: AUTOMATION_SCHEMA_VERSION,
+  startAt: 'notify',
+  states: [
+    {
+      id: 'notify',
+      type: 'action.notification',
+      channel: 'in_app',
+      recipientType: 'assignee',
+      titleTemplate: 'Update on {{request.number}}',
+      bodyTemplate: 'Please review this request.',
+      transitions: [{ to: 'ticket' }],
+    },
+    {
+      id: 'ticket',
+      type: 'action.ticket',
+      entity: 'incident',
+      operation: 'work_note',
+      fields: { work_note: 'Automation update' },
+      transitions: [{ to: 'assign' }],
+    },
+    {
+      id: 'assign',
+      type: 'action.assign',
+      target: 'group',
+      groupIdTemplate: '{{request.form_data.assignment_group_id}}',
+      transitions: [{ to: 'script' }],
+    },
+    {
+      id: 'script',
+      type: 'action.script',
+      runtime: 'js',
+      code: 'return { ok: true };',
+      transitions: [{ to: 'sub' }],
+    },
+    {
+      id: 'sub',
+      type: 'call.workflow',
+      workflowType: 'catalog-fulfillment',
+      input: { requestId: '{{request.id}}' },
+      transitions: [{ to: 'done' }],
+    },
+    { id: 'done', type: 'end', result: 'success' },
+  ],
+};
+
+const INVALID_SCRIPT_MISSING_CODE: AutomationConfigFixture = {
+  kind: 'state_machine',
+  schemaVersion: AUTOMATION_SCHEMA_VERSION,
+  startAt: 'script',
+  states: [
+    { id: 'script', type: 'action.script', transitions: [{ to: 'done' }] },
+    { id: 'done', type: 'end', result: 'success' },
+  ],
+};
+
+const INVALID_CALL_WORKFLOW_MISSING_TARGET: AutomationConfigFixture = {
+  kind: 'state_machine',
+  schemaVersion: AUTOMATION_SCHEMA_VERSION,
+  startAt: 'sub',
+  states: [
+    { id: 'sub', type: 'call.workflow', input: {}, transitions: [{ to: 'done' }] },
+    { id: 'done', type: 'end', result: 'success' },
+  ],
+};
+
 export const AUTOMATION_CONFIG_FIXTURES = {
   legacyV1StateMachine: LEGACY_V1_STATE_MACHINE,
   reusableCiFlow: REUSABLE_CI_FLOW,
   invalidCiCreateMissingRequiredFields: INVALID_CI_CREATE_MISSING_REQUIRED_FIELDS,
+  stubLibraryNodes: STUB_LIBRARY_NODES,
+  invalidScriptMissingCode: INVALID_SCRIPT_MISSING_CODE,
+  invalidCallWorkflowMissingTarget: INVALID_CALL_WORKFLOW_MISSING_TARGET,
 } as const;
 
 export type AutomationConfigFixtureName = keyof typeof AUTOMATION_CONFIG_FIXTURES;

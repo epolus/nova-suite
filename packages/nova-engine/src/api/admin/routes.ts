@@ -24,6 +24,7 @@ import {
 } from '@nova-suite/shared';
 import { loadCredentialSecretsBySlugs } from '../../credentials/vault';
 import { logger } from '../../logger';
+import { sendAutomationEmail } from './automation-send-email';
 
 const router = Router();
 const processStartedAtMs = Date.now();
@@ -1991,9 +1992,13 @@ router.post('/automation/dry-run', async (req: Request, res: Response, next: Nex
         cfg,
         request,
         credMap,
+        client,
+        tenantId,
         persistFormData: false,
+        dryRun: true,
         maxDelayMs: DRY_RUN_MAX_DELAY_MS,
         automationSharedKey: config.catalogAutomation.sharedKey || undefined,
+        sendEmail: sendAutomationEmail,
         onLog: (msg, meta) => logger.info({ ...meta, tenantId }, `[automation-dry-run] ${msg}`),
       });
 

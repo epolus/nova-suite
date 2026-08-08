@@ -25,6 +25,11 @@ export const UNIFIED_PALETTE_TYPES: UnifiedBuilderNodeType[] = [
   'action.ci.lookup',
   'action.ci.create',
   'decision.advanced',
+  'action.notification',
+  'action.ticket',
+  'action.assign',
+  'action.script',
+  'call.workflow',
 ];
 
 /** i18n keys under `components.unifiedAutomationDesigner.nodeTypes` (dots in type ids are not valid message paths). */
@@ -38,6 +43,11 @@ export const UNIFIED_NODE_TYPE_MESSAGE_KEYS: Record<UnifiedBuilderNodeType, stri
   'action.ci.lookup': 'actionCiLookup',
   'action.ci.create': 'actionCiCreate',
   'decision.advanced': 'decisionAdvanced',
+  'action.notification': 'actionNotification',
+  'action.ticket': 'actionTicket',
+  'action.assign': 'actionAssign',
+  'action.script': 'actionScript',
+  'call.workflow': 'callWorkflow',
 };
 
 export type UnifiedBuilderNodeData = {
@@ -57,7 +67,50 @@ export type UnifiedBuilderNodeData = {
   displayName?: string;
   attributesJson?: string;
   expressionJson?: string;
+  channel?: string;
+  recipientType?: string;
+  titleTemplate?: string;
+  bodyTemplate?: string;
+  entity?: string;
+  operation?: string;
+  fieldsJson?: string;
+  target?: string;
+  assigneeTemplate?: string;
+  groupIdTemplate?: string;
+  runtime?: string;
+  code?: string;
+  workflowType?: string;
+  definitionId?: string;
+  inputJson?: string;
 };
+
+function stringifyJsonField(raw: unknown): string | undefined {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return JSON.stringify(raw, null, 2);
+  }
+  if (typeof raw === 'string') return raw;
+  return undefined;
+}
+
+function parseOptionalJsonObject(
+  raw: string | undefined,
+  errors: BuilderError[],
+  label: string,
+): Record<string, unknown> | undefined {
+  const text = (raw || '').trim();
+  if (!text) return undefined;
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      errors.push({ code: 'actionInvalidAttributes', params: { label } });
+      return undefined;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    errors.push({ code: 'actionInvalidAttributes', params: { label } });
+    return undefined;
+  }
+}
 
 export function resolveBuilderNodeType(node: Node<UnifiedBuilderNodeData>): UnifiedBuilderNodeType {
   if (node.data.nodeType) return node.data.nodeType;
@@ -148,6 +201,21 @@ export function parseBuilderFromConfig(raw: Record<string, unknown>): {
           null,
           2,
         ),
+        channel: typeof s.channel === 'string' ? s.channel : undefined,
+        recipientType: typeof s.recipientType === 'string' ? s.recipientType : undefined,
+        titleTemplate: typeof s.titleTemplate === 'string' ? s.titleTemplate : undefined,
+        bodyTemplate: typeof s.bodyTemplate === 'string' ? s.bodyTemplate : undefined,
+        entity: typeof s.entity === 'string' ? s.entity : undefined,
+        operation: typeof s.operation === 'string' ? s.operation : undefined,
+        fieldsJson: stringifyJsonField(s.fields),
+        target: typeof s.target === 'string' ? s.target : undefined,
+        assigneeTemplate: typeof s.assigneeTemplate === 'string' ? s.assigneeTemplate : undefined,
+        groupIdTemplate: typeof s.groupIdTemplate === 'string' ? s.groupIdTemplate : undefined,
+        runtime: typeof s.runtime === 'string' ? s.runtime : undefined,
+        code: typeof s.code === 'string' ? s.code : undefined,
+        workflowType: typeof s.workflowType === 'string' ? s.workflowType : undefined,
+        definitionId: typeof s.definitionId === 'string' ? s.definitionId : undefined,
+        inputJson: stringifyJsonField(s.input),
       },
     });
     idx += 1;
@@ -282,6 +350,53 @@ export function serializeBuilderToConfig(
         name: n.data.ciName || '',
         displayName: n.data.displayName || undefined,
         attributes,
+        transitions,
+      });
+    } else if (t === 'action.notification') {
+      states.push({
+        id: n.id,
+        type: 'action.notification',
+        channel: n.data.channel || 'in_app',
+        recipientType: n.data.recipientType || 'assignee',
+        titleTemplate: n.data.titleTemplate || '',
+        bodyTemplate: n.data.bodyTemplate || '',
+        transitions,
+      });
+    } else if (t === 'action.ticket') {
+      const fields = parseOptionalJsonObject(n.data.fieldsJson, errors, n.data.label);
+      states.push({
+        id: n.id,
+        type: 'action.ticket',
+        entity: n.data.entity || 'incident',
+        operation: n.data.operation || 'work_note',
+        ...(fields ? { fields } : {}),
+        transitions,
+      });
+    } else if (t === 'action.assign') {
+      states.push({
+        id: n.id,
+        type: 'action.assign',
+        target: n.data.target || 'group',
+        ...(n.data.assigneeTemplate ? { assigneeTemplate: n.data.assigneeTemplate } : {}),
+        ...(n.data.groupIdTemplate ? { groupIdTemplate: n.data.groupIdTemplate } : {}),
+        transitions,
+      });
+    } else if (t === 'action.script') {
+      states.push({
+        id: n.id,
+        type: 'action.script',
+        runtime: n.data.runtime || 'js',
+        code: n.data.code || '',
+        transitions,
+      });
+    } else if (t === 'call.workflow') {
+      const input = parseOptionalJsonObject(n.data.inputJson, errors, n.data.label);
+      states.push({
+        id: n.id,
+        type: 'call.workflow',
+        ...(n.data.workflowType ? { workflowType: n.data.workflowType } : {}),
+        ...(n.data.definitionId ? { definitionId: n.data.definitionId } : {}),
+        ...(input ? { input } : {}),
         transitions,
       });
     }

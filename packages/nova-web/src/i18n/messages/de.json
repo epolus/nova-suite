@@ -492,7 +492,7 @@
   "components": {
     "automationDryRun": {
       "title": "Test run",
-      "description": "Execute the current state machine with real HTTP calls. Form data is not persisted.",
+      "description": "Führt die Zustandsmaschine mit echten Nebenwirkungen aus (HTTP, Benachrichtigungen, Tickets, Zuweisung, Skript, Unter-Workflow). Formulardaten werden nicht gespeichert.",
       "play": "Play",
       "running": "Running…",
       "formDataLabel": "Mock request.form_data (JSON)",
@@ -509,7 +509,14 @@
     },
     "unifiedAutomationDesigner": {
       "centerView": "Zentrieren",
-      "fitToScreen": "An Fenster anpassen"
+      "fitToScreen": "An Fenster anpassen",
+      "nodeTypes": {
+        "actionNotification": "Benachrichtigung",
+        "actionTicket": "Ticket",
+        "actionAssign": "Zuweisung",
+        "actionScript": "Skript",
+        "callWorkflow": "Unter-Workflow"
+      }
     }
   }
 }

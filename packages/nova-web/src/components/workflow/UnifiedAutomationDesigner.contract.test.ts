@@ -37,4 +37,23 @@ describe('UnifiedAutomationDesigner contract', () => {
     expect(serialized.config).not.toBeNull();
     expect(validateAutomationConfig(serialized.config)).toEqual([]);
   });
+
+  it('round-trips stub library nodes through SDK adapter', () => {
+    const fixture = getAutomationConfigFixture('stubLibraryNodes');
+    const loaded = loadSdkGraphFromConfig(fixture);
+    expect(loaded.error).toBeUndefined();
+
+    const serialized = serializeSdkGraphToConfig(loaded.nodes, loaded.edges);
+    expect(serialized.errors).toEqual([]);
+    expect(serialized.config).not.toBeNull();
+    expect(validateAutomationConfig(serialized.config)).toEqual([]);
+    const types = (serialized.config?.states as Array<{ type: string }>).map((s) => s.type);
+    expect(types).toEqual(expect.arrayContaining([
+      'action.notification',
+      'action.ticket',
+      'action.assign',
+      'action.script',
+      'call.workflow',
+    ]));
+  });
 });
