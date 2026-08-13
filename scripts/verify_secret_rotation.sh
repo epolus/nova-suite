@@ -130,6 +130,20 @@ check_required CATALOG_AUTOMATION_SHARED_KEY
 check_min_length CATALOG_AUTOMATION_SHARED_KEY 24
 
 check_not_default POSTGRES_PASSWORD "CHANGE_ME_TO_RANDOM_SECRET"
+POSTGRES_APP_USER="${POSTGRES_APP_USER:-nova_runtime}"
+if [[ "${POSTGRES_APP_USER}" == "${POSTGRES_USER:-nova_app}" ]]; then
+  echo "[ERROR] POSTGRES_APP_USER must not be the bootstrap superuser (${POSTGRES_USER:-nova_app})"
+  errors=$((errors + 1))
+else
+  echo "[OK] POSTGRES_APP_USER (${POSTGRES_APP_USER}) is distinct from POSTGRES_USER"
+fi
+APP_PASSWORD="${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD:-}}"
+if [[ "${APP_PASSWORD}" == "CHANGE_ME_TO_RANDOM_SECRET" || -z "${APP_PASSWORD}" ]]; then
+  echo "[ERROR] POSTGRES_APP_PASSWORD (or POSTGRES_PASSWORD fallback) is missing or default"
+  errors=$((errors + 1))
+else
+  echo "[OK] application DB password is set"
+fi
 
 if [[ ${errors} -gt 0 ]]; then
   echo

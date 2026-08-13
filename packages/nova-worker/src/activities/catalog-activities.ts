@@ -293,7 +293,9 @@ export async function updateRequestStatus(
     return result.rows[0] || null;
   });
 
-  if (!transition) return;
+  if (!transition) {
+    throw new Error(`Request ${requestId} was not updated to ${status} (no visible row under RLS)`);
+  }
   if (transition.previous_status === transition.current_status) return;
 
   if (status === 'fulfilled' || status === 'cancelled') {

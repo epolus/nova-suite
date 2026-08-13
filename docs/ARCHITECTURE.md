@@ -20,7 +20,9 @@ Nova Suite follows a monolithic-but-modular architecture. A single Express serve
 
 ### Row-Level Security (RLS)
 
-Every tenant-scoped table has RLS policies enabled and forced. The application sets session-level GUC variables at the start of each request:
+Every tenant-scoped table has RLS policies enabled and forced. **FORCE ROW LEVEL SECURITY does not apply to superusers.** The Postgres bootstrap role (`POSTGRES_USER`, typically `nova_app`) is a superuser so it can run init scripts and Temporal `CREATEDB`. `nova-engine` and `nova-worker` must connect as `POSTGRES_APP_USER` (`nova_runtime`): `NOSUPERUSER NOBYPASSRLS`. Both processes refuse to start if the connected role can bypass RLS.
+
+The application sets session-level GUC variables at the start of each request:
 
 ```sql
 SELECT set_tenant_context(tenant_id, user_id, user_role);

@@ -3,6 +3,13 @@
 This document is the single source of truth for environment-variable defaults and behavior.
 For the complete baseline list, see `.env.example`.
 
+## PostgreSQL roles
+
+| Variable | Who uses it | Notes |
+|----------|-------------|--------|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` | Postgres image init, Temporal auto-setup, backups | Bootstrap **superuser**. Never point the API or worker at this role. |
+| `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | `nova-engine`, `nova-worker` | Default `nova_runtime`. Must be `NOSUPERUSER NOBYPASSRLS`. Created by `infra/postgres/00-runtime-role.sh`. |
+
 ## Core Variables
 
 ```bash

@@ -2,6 +2,13 @@
 
 This runbook covers production backup/restore and secret rotation validation for Nova Suite.
 
+## 0. Runtime database role (RLS)
+
+`nova-engine` and `nova-worker` must connect as `nova_runtime` (`POSTGRES_APP_USER`), not as the Postgres bootstrap superuser (`POSTGRES_USER`). Superusers silently bypass `FORCE ROW LEVEL SECURITY`.
+
+- Created on first Postgres init by `infra/postgres/00-runtime-role.sh` and `04-runtime-grants.sql`.
+- Both processes exit on boot if the connected role is superuser or `BYPASSRLS`.
+
 ## 1. Database Backup
 
 - Create a full logical backup with:

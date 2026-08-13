@@ -66,10 +66,12 @@ export async function executeAutomatedCatalogTask(
        WHERE rt.id = $1 AND rt.request_id = $2`,
       [requestTaskId, requestId],
     );
-    if (taskRow.rows.length === 0) return { ok: false, message: 'Request task not found' };
+    if (taskRow.rows.length === 0) {
+      return { ok: false, message: 'Request task not found', rejectRequest: true };
+    }
 
     const row = taskRow.rows[0] as Record<string, unknown>;
-    if (row.task_type !== 'automated') return { ok: false, message: 'Not an automated task' };
+    if (row.task_type !== 'automated') return { ok: false, message: 'Not an automated task', rejectRequest: true };
     if (row.status !== 'in_progress' && row.status !== 'pending') return { ok: true, message: 'Task already finalized' };
 
     const cfg = parseAutomationConfig(row.automation_config);
@@ -86,7 +88,14 @@ export async function executeAutomatedCatalogTask(
       `SELECT id, number, status, form_data, delivery_info, requester_id, requested_for FROM requests WHERE id = $1`,
       [requestId],
     );
-    if (reqRes.rows.length === 0) return { ok: false, message: 'Request not found' };
+    if (reqRes.rows.length === 0) {
+      const msg = 'Request not found (RLS or missing row)';
+      await client.query(
+        `UPDATE request_tasks SET status = 'failed', completed_at = now(), notes = $1 WHERE id = $2`,
+        [msg, requestTaskId],
+      );
+      return { ok: false, message: msg, rejectRequest: true };
+    }
 
     const request = reqRes.rows[0] as Record<string, unknown>;
     try {

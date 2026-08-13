@@ -46,26 +46,32 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     delete payload.role;
 
     // Always resolve roles from DB so role changes apply immediately
-    // without requiring a new login/token issuance.
-    const roleRows = await db.getMany<{ name: string }>(
-      `SELECT DISTINCT r.name
-       FROM roles r
-       JOIN (
-         SELECT ur.role_id
-         FROM user_roles ur
-         WHERE ur.user_id = $1
-           AND ur.tenant_id = $2
-         UNION
-         SELECT agr.role_id
-         FROM assignment_group_members agm
-         JOIN assignment_group_roles agr ON agr.group_id = agm.group_id
-         WHERE agm.user_id = $1
-           AND agm.tenant_id = $2
-           AND agr.tenant_id = $2
-       ) src ON src.role_id = r.id
-       WHERE r.tenant_id = $2
-       ORDER BY r.name`,
-      [payload.id, payload.tenant_id],
+    // without requiring a new login/token issuance. Must run with tenant
+    // context: roles/user_roles are FORCE RLS and the pool has none.
+    const roleRows = await db.withTenantContext(
+      payload.tenant_id,
+      payload.id,
+      'user',
+      () => db.getMany<{ name: string }>(
+        `SELECT DISTINCT r.name
+         FROM roles r
+         JOIN (
+           SELECT ur.role_id
+           FROM user_roles ur
+           WHERE ur.user_id = $1
+             AND ur.tenant_id = $2
+           UNION
+           SELECT agr.role_id
+           FROM assignment_group_members agm
+           JOIN assignment_group_roles agr ON agr.group_id = agm.group_id
+           WHERE agm.user_id = $1
+             AND agm.tenant_id = $2
+             AND agr.tenant_id = $2
+         ) src ON src.role_id = r.id
+         WHERE r.tenant_id = $2
+         ORDER BY r.name`,
+        [payload.id, payload.tenant_id],
+      ),
     );
     payload.roles = roleRows.length > 0 ? roleRows.map((r) => r.name) : ['user'];
 
@@ -111,7 +117,7 @@ export async function setTenantRLS(req: Request, _res: Response, next: NextFunct
       // Attach client to request for downstream use
       (req as any)._dbClient = client;
       (req as any)._dbClientAcquiredAt = Date.now();
-      next();
+      db.bindRequestClient(client, () => next());
     } catch (err) {
       client.release();
       throw err;
@@ -129,13 +135,16 @@ export function releaseTenantClient(req: Request, _res: Response, next: NextFunc
   const client = (req as any)._dbClient;
   if (client) {
     // Clear tenant context and release when the response finishes
-    _res.on('finish', () => {
-      client.query(
-        `SELECT set_config('app.current_tenant_id', '', false),
-                set_config('app.current_user_id', '', false),
-                set_config('app.current_user_roles', '', false)`,
-      ).finally(() => client.release());
-    });
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      db.clearTenantContext(client).finally(() => client.release());
+    };
+    // `close` fires on abort; `finish` does not. Guard so a normal
+    // response (which emits both) only releases once.
+    _res.once('close', release);
+    _res.once('finish', release);
   }
   next();
 }

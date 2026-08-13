@@ -35,8 +35,10 @@ import analyticsRoutes from './analytics/routes';
 const router = Router();
 
 router.use('/settings', settingsRoutes);
-router.use('/auth', authRoutes);
+// SSO must be mounted before /auth: that router now authenticates remaining paths,
+// and /auth is a prefix of /auth/sso.
 router.use('/auth/sso', ssoRoutes);
+router.use('/auth', authRoutes);
 router.use('/admin/config-packages', configPackageRoutes);
 router.use('/admin', adminRoutes);
 router.use('/catalog', catalogRoutes);

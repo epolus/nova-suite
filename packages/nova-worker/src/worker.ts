@@ -2,9 +2,10 @@
 import { NativeConnection, Worker } from '@temporalio/worker';
 import * as activities from './activities';
 import { config } from './config';
-import { checkSchemaCompatibility, heartbeat, shutdown as dbShutdown } from './db';
+import { assertRuntimeRoleCannotBypassRls, checkSchemaCompatibility, heartbeat, shutdown as dbShutdown } from './db';
 
 async function run() {
+  await assertRuntimeRoleCannotBypassRls();
   const schemaCheck = await checkSchemaCompatibility(config.db.expectedSchemaVersion);
   if (!schemaCheck.ok) {
     console.warn(

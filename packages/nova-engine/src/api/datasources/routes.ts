@@ -2,14 +2,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../../data/db';
 import { config } from '../../config';
-import { authenticate, requireRole } from '../../middleware/auth';
+import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { ENTITY_DEFS } from '../import/entity-defs';
 import { startDataSourceSync, cancelDataSourceSchedule } from '../../temporal/workflows';
 import { enqueueDataSourceScheduleStartJob } from '../../temporal/workflow-start-queue';
 import SftpClient from 'ssh2-sftp-client';
 
 const router = Router();
-router.use(authenticate, requireRole('admin'));
+router.use(authenticate, requireRole('admin'), setTenantRLS, releaseTenantClient);
 
 type SourceType = 'csv_url' | 'json_url' | 'rest_api' | 'sftp';
 type SourceConfig = {

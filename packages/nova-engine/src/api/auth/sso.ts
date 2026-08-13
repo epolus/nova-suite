@@ -128,6 +128,7 @@ function cleanupSsoCodes() {
 
 // ─── Default tenant for auto-provisioned users ───
 const DEFAULT_TENANT = 'a0000000-0000-0000-0000-000000000001';
+const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 // ─── GET /sso/config ───
 router.get('/config', (_req: Request, res: ExpressResponse) => {
@@ -258,9 +259,10 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       res.redirect('/login?sso_error=No+email+in+SSO+response');
       return;
     }
+    const ssoEmail = claims.email;
+    const ssoSubject = claims.sub;
 
-    // Find or create user
-    let user = await db.getOne<{
+    type SsoUser = {
       id: string;
       tenant_id: string;
       email: string;
@@ -268,68 +270,67 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       time_format: '12h' | '24h';
       date_format: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
       is_active: boolean;
-    }>(
-      'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM users WHERE sso_provider_id = $1',
-      [claims.sub],
+    };
+
+    // Pre-auth subject lookup must bypass RLS (no tenant context yet).
+    let user = await db.getOne<SsoUser>(
+      'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM lookup_user_for_sso($1)',
+      [ssoSubject],
     );
 
     if (!user) {
-      // Try matching by email
-      user = await db.getOne(
-        'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM users WHERE email = $1 AND tenant_id = $2',
-        [claims.email, DEFAULT_TENANT],
-      );
-
-      if (user) {
-        // Link SSO to existing user
-        await db.query(
-          'UPDATE users SET sso_provider_id = $1 WHERE id = $2',
-          [claims.sub, user.id],
+      user = await db.withTenantContext(DEFAULT_TENANT, SYSTEM_USER_ID, 'admin', async () => {
+        const matched = await db.getOne<SsoUser>(
+          'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM users WHERE email = $1 AND tenant_id = $2',
+          [ssoEmail, DEFAULT_TENANT],
         );
-        logger.info({ userId: user.id, sub: claims.sub }, 'Linked SSO to existing user');
-      }
-    }
 
-    if (!user) {
-      // Auto-provision new user
-      const displayName = claims.name || claims.email.split('@')[0];
-      const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        if (matched) {
+          await db.query(
+            'UPDATE users SET sso_provider_id = $1 WHERE id = $2',
+            [ssoSubject, matched.id],
+          );
+          logger.info({ userId: matched.id, sub: ssoSubject }, 'Linked SSO to existing user');
+          return matched;
+        }
 
-      const newUser = await db.getOne<{ id: string }>(
-        `INSERT INTO users (
-          tenant_id, email, password_hash, display_name,
-          first_name, last_name, sso_provider_id, time_format, date_format, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, '24h', 'YYYY-MM-DD', true)
-        RETURNING id`,
-        [
-          DEFAULT_TENANT,
-          claims.email,
-          randomHash,
-          displayName,
-          claims.given_name || null,
-          claims.family_name || null,
-          claims.sub,
-        ],
-      );
-
-      // Assign default 'user' role
-      const userRole = await db.getOne<{ id: string }>(
-        "SELECT id FROM roles WHERE tenant_id = $1 AND name = 'user'",
-        [DEFAULT_TENANT],
-      );
-      if (userRole && newUser) {
-        await db.query(
-          'INSERT INTO user_roles (tenant_id, user_id, role_id) VALUES ($1, $2, $3)',
-          [DEFAULT_TENANT, newUser.id, userRole.id],
+        const displayName = claims.name || ssoEmail.split('@')[0];
+        const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        const newUser = await db.getOne<{ id: string }>(
+          `INSERT INTO users (
+            tenant_id, email, password_hash, display_name,
+            first_name, last_name, sso_provider_id, time_format, date_format, is_active
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, '24h', 'YYYY-MM-DD', true)
+          RETURNING id`,
+          [
+            DEFAULT_TENANT,
+            ssoEmail,
+            randomHash,
+            displayName,
+            claims.given_name || null,
+            claims.family_name || null,
+            ssoSubject,
+          ],
         );
-      }
 
-      user = await db.getOne(
-        'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM users WHERE id = $1',
-        [newUser!.id],
-      );
+        const userRole = await db.getOne<{ id: string }>(
+          "SELECT id FROM roles WHERE tenant_id = $1 AND name = 'user'",
+          [DEFAULT_TENANT],
+        );
+        if (userRole && newUser) {
+          await db.query(
+            'INSERT INTO user_roles (tenant_id, user_id, role_id) VALUES ($1, $2, $3)',
+            [DEFAULT_TENANT, newUser.id, userRole.id],
+          );
+        }
 
-      logger.info({ userId: user!.id, email: claims.email }, 'Auto-provisioned SSO user');
+        const created = await db.getOne<SsoUser>(
+          'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM users WHERE id = $1',
+          [newUser!.id],
+        );
+        logger.info({ userId: created!.id, email: ssoEmail }, 'Auto-provisioned SSO user');
+        return created;
+      });
     }
 
     if (!user || !user.is_active) {
@@ -337,13 +338,12 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       return;
     }
 
-    // Fetch roles
-    const roleRows = await db.getMany<{ name: string }>(
+    const roleRows = await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.getMany<{ name: string }>(
       `SELECT r.name FROM user_roles ur
        JOIN roles r ON r.id = ur.role_id
        WHERE ur.user_id = $1`,
-      [user.id],
-    );
+      [user!.id],
+    ));
     const roles = roleRows.map((r) => r.name);
 
     // Issue Nova JWT
@@ -360,14 +360,14 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
     const token = signAccessToken(payload);
 
     logger.info({ userId: user.id, roles }, 'SSO login successful');
-    void recordAuditEvent({
+    void db.withTenantContext(user.tenant_id, user.id, roles.join(',') || 'user', () => recordAuditEvent({
       tenantId: user.tenant_id,
       actorUserId: user.id,
       category: 'auth',
       action: 'auth.login.success',
       clientIp: getClientIp(req),
       metadata: { method: 'sso', provider: config.oidc.providerName },
-    });
+    }));
 
     // Redirect via one-time code (avoid token in URL/query logs).
     cleanupSsoCodes();

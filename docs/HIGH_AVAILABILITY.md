@@ -47,6 +47,7 @@ services:
     environment:
       POSTGRES_DB: nova
       POSTGRES_USER: nova_app
+      POSTGRES_APP_USER: nova_runtime
       POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
     volumes:
       - pg_data:/var/lib/postgresql/data
@@ -226,7 +227,9 @@ spec:
           env:
             - name: POSTGRES_HOST
               value: postgres
-            - name: POSTGRES_PASSWORD
+            - name: POSTGRES_APP_USER
+              value: nova_runtime
+            - name: POSTGRES_APP_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: nova-secrets

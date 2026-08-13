@@ -177,6 +177,8 @@ async function ensureSnapshotSchedulesStarted(): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
+  await db.assertRuntimeRoleCannotBypassRls();
+
   const schemaCheck = await db.checkSchemaCompatibility(config.db.expectedSchemaVersion);
   schemaRuntimeStatus.compatible = schemaCheck.ok;
   schemaRuntimeStatus.expectedVersion = schemaCheck.expectedVersion;

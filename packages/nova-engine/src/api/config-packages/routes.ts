@@ -6,7 +6,7 @@ import path from 'path';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { db } from '../../data/db';
-import { authenticate, requireRole } from '../../middleware/auth';
+import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
 import { recordAuditEvent } from '../../audit/events';
@@ -130,9 +130,17 @@ function emptyBundle(name: string, tenantId: string): ConfigPackageBundle {
   };
 }
 
+function isInsufficientPrivilege(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err
+    && String((err as { code: unknown }).code) === '42501';
+}
+
 async function ensureConfigPackageSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
+      // DDL is owned by the bootstrap superuser. nova_runtime cannot ALTER TABLE;
+      // columns already exist on current schema — treat permission errors as no-op.
+      try {
       await db.query('ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS external_key text');
       await db.query('ALTER TABLE service_items ADD COLUMN IF NOT EXISTS external_key text');
       await db.query('ALTER TABLE catalog_tasks ADD COLUMN IF NOT EXISTS external_key text');
@@ -185,6 +193,9 @@ async function ensureConfigPackageSchema(): Promise<void> {
         END $$;
       `);
       await db.query('ALTER TABLE config_deployment_runs FORCE ROW LEVEL SECURITY');
+      } catch (err) {
+        if (!isInsufficientPrivilege(err)) throw err;
+      }
     })().catch((err) => {
       schemaReady = null;
       throw err;
@@ -1042,7 +1053,7 @@ async function applyBundle(
   });
 }
 
-router.use(authenticate, requireRole('admin'));
+router.use(authenticate, requireRole('admin'), setTenantRLS, releaseTenantClient);
 
 router.get('/export/catalog/items/:id', async (req: Request, res: Response, next: NextFunction) => {
   let client: PoolClient | null = null;
@@ -1060,7 +1071,10 @@ router.get('/export/catalog/items/:id', async (req: Request, res: Response, next
   } catch (err) {
     next(err);
   } finally {
-    client?.release();
+    if (client) {
+      await db.clearTenantContext(client).catch(() => undefined);
+      client.release();
+    }
   }
 });
 
@@ -1093,7 +1107,10 @@ router.get('/export/catalog', async (req: Request, res: Response, next: NextFunc
   } catch (err) {
     next(err);
   } finally {
-    client?.release();
+    if (client) {
+      await db.clearTenantContext(client).catch(() => undefined);
+      client.release();
+    }
   }
 });
 
@@ -1112,7 +1129,10 @@ router.get('/export/notifications/rules/:id', async (req: Request, res: Response
   } catch (err) {
     next(err);
   } finally {
-    client?.release();
+    if (client) {
+      await db.clearTenantContext(client).catch(() => undefined);
+      client.release();
+    }
   }
 });
 
@@ -1139,7 +1159,10 @@ router.get('/export/notifications', async (req: Request, res: Response, next: Ne
   } catch (err) {
     next(err);
   } finally {
-    client?.release();
+    if (client) {
+      await db.clearTenantContext(client).catch(() => undefined);
+      client.release();
+    }
   }
 });
 
@@ -1165,7 +1188,10 @@ router.post('/validate', async (req: Request, res: Response, next: NextFunction)
   } catch (err) {
     next(err);
   } finally {
-    client?.release();
+    if (client) {
+      await db.clearTenantContext(client).catch(() => undefined);
+      client.release();
+    }
   }
 });
 
@@ -1178,6 +1204,7 @@ router.post('/apply', async (req: Request, res: Response, next: NextFunction) =>
     await setRequestTenantContext(client, req);
     await backfillExternalKeys(client, req.user!.tenant_id);
     const report = await validateBundle(client, req.user!.tenant_id, bundle);
+    await db.clearTenantContext(client).catch(() => undefined);
     client.release();
     client = null;
     if (!report.valid) {
@@ -1229,7 +1256,10 @@ router.post('/apply', async (req: Request, res: Response, next: NextFunction) =>
   } catch (err) {
     next(err);
   } finally {
-    client?.release();
+    if (client) {
+      await db.clearTenantContext(client).catch(() => undefined);
+      client.release();
+    }
   }
 });
 

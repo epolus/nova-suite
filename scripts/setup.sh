@@ -206,9 +206,11 @@ if confirm "Generate random secrets (Postgres password, credential keys)?" "y"; 
   cred_key="$(random_hex)"
   catalog_key="$(random_hex)"
   set_env_var POSTGRES_PASSWORD "${pg_pass}"
+  set_env_var POSTGRES_APP_USER nova_runtime
+  set_env_var POSTGRES_APP_PASSWORD "${pg_pass}"
   set_env_var CREDENTIALS_MASTER_KEY "${cred_key}"
   set_env_var CATALOG_AUTOMATION_SHARED_KEY "${catalog_key}"
-  echo "Generated POSTGRES_PASSWORD, CREDENTIALS_MASTER_KEY, CATALOG_AUTOMATION_SHARED_KEY"
+  echo "Generated POSTGRES_PASSWORD, POSTGRES_APP_PASSWORD, CREDENTIALS_MASTER_KEY, CATALOG_AUTOMATION_SHARED_KEY"
 else
   echo "Skipped secret generation — edit ${ENV_FILE} manually."
 fi

@@ -4,12 +4,12 @@ import type { NodeType, WorkflowBuilderEdge, WorkflowBuilderNode } from '@workfl
 import { isUnifiedBuilderNodeType, UNIFIED_BUILDER_NODE_LABELS } from '@nova-suite/shared';
 import type { UnifiedBuilderNodeType } from '@nova-suite/shared';
 import {
-  autoLayoutBuilderGraph,
   parseBuilderFromConfig,
   serializeBuilderToConfig,
   type BuilderError,
   type UnifiedBuilderNodeData,
 } from '../unifiedAutomationDesigner.internals';
+import { autoLayoutBuilderGraph } from '../unifiedAutomationDesigner.layout';
 import { NODE_TYPE_ICONS } from './icons';
 
 /** Matches `@workflowbuilder/sdk` `NodeType` enum values (avoid importing SDK runtime here). */

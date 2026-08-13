@@ -6,7 +6,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import { db } from '../../data/db';
 import { config } from '../../config';
-import { authenticate, requireRole } from '../../middleware/auth';
+import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { AppError, BadRequest } from '../../middleware/errorHandler';
 import { checkTemporalHealth, startNotificationDispatch } from '../../temporal/workflows';
@@ -139,6 +139,8 @@ router.get(
   '/assignment-groups',
   authenticate,
   requireRole('admin', 'fulfiller'),
+  setTenantRLS,
+  releaseTenantClient,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rows = await listAssignmentGroupsForTenant(req.user!.tenant_id);
@@ -148,7 +150,7 @@ router.get(
 );
 
 // All admin routes require authentication + admin role
-router.use(authenticate, requireRole('admin'));
+router.use(authenticate, requireRole('admin'), setTenantRLS, releaseTenantClient);
 
 router.use((req: Request, res: Response, next: NextFunction) => {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method.toUpperCase())) {
@@ -2021,6 +2023,7 @@ router.post('/automation/dry-run', async (req: Request, res: Response, next: Nex
         request_context: request,
       });
     } finally {
+      await db.clearTenantContext(client).catch(() => undefined);
       client.release();
     }
   } catch (err) { next(err); }

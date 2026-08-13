@@ -11,7 +11,9 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 -- Query statistics for admin /system-metrics (requires shared_preload_libraries; see docker-compose postgres service).
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
--- Grant CREATEDB so Temporal auto-setup can create its databases
+-- Grant CREATEDB so Temporal auto-setup can create its databases.
+-- This bootstrap role (POSTGRES_USER) is a superuser and MUST NOT be used by
+-- nova-engine / nova-worker — see 00-runtime-role.sh and POSTGRES_APP_USER.
 ALTER USER current_user CREATEDB;
 
 -- ============================================================

@@ -89,11 +89,7 @@ async function withSystemClient<T>(fn: (queryable: Queryable) => Promise<T>): Pr
     await db.setTenantContext(client, SYSTEM_TENANT_ID, SYSTEM_USER_ID, SYSTEM_ROLES);
     return await fn(client);
   } finally {
-    await client.query(
-      `SELECT set_config('app.current_tenant_id', '', false),
-              set_config('app.current_user_id', '', false),
-              set_config('app.current_user_roles', '', false)`,
-    ).catch(() => {});
+    await db.clearTenantContext(client).catch(() => undefined);
     client.release();
   }
 }

@@ -6,14 +6,16 @@ import multer from 'multer';
 import crypto from 'crypto';
 import { db } from '../../data/db';
 import { config } from '../../config';
-import { authenticate, requireRole } from '../../middleware/auth';
+import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { cacheDel, cacheGetJson, cacheMetrics, cacheSetJson, resetCacheMetrics } from '../../cache/redis';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.uploads.maxFileSize } });
 
 const DEFAULT_TENANT = 'a0000000-0000-0000-0000-000000000001';
+const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 const settingsCacheKey = (tenantId: string) => `tenant-settings:${tenantId}`;
+const adminSettings = [authenticate, requireRole('admin'), setTenantRLS, releaseTenantClient] as const;
 
 // ─── GET /api/settings/theme (public – no auth, used on login page) ───
 router.get('/theme', async (_req: Request, res: Response, next: NextFunction) => {
@@ -25,10 +27,10 @@ router.get('/theme', async (_req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    const rows = await db.getMany<{ key: string; value: string }>(
+    const rows = await db.withTenantContext(DEFAULT_TENANT, SYSTEM_USER_ID, 'user', () => db.getMany<{ key: string; value: string }>(
       `SELECT key, value FROM tenant_settings WHERE tenant_id = $1`,
       [DEFAULT_TENANT],
-    );
+    ));
     const settings: Record<string, string> = {};
     rows.forEach((r) => { settings[r.key] = r.value; });
     await cacheSetJson(cacheKey, settings);
@@ -41,10 +43,10 @@ router.get('/theme', async (_req: Request, res: Response, next: NextFunction) =>
 // ─── GET /api/settings/logo (public – serves logo image) ───
 router.get('/logo', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const row = await db.getOne<{ value: string }>(
+    const row = await db.withTenantContext(DEFAULT_TENANT, SYSTEM_USER_ID, 'user', () => db.getOne<{ value: string }>(
       `SELECT value FROM tenant_settings WHERE tenant_id = $1 AND key = 'logo_url'`,
       [DEFAULT_TENANT],
-    );
+    ));
     if (!row || !row.value) { res.status(204).end(); return; }
 
     const fullPath = path.join(config.uploads.dir, row.value);
@@ -68,7 +70,7 @@ router.get('/logo', async (_req: Request, res: Response, next: NextFunction) => 
 // GET /api/settings/cache/metrics – cache health/usage counters (admin)
 router.get(
   '/cache/metrics',
-  authenticate, requireRole('admin'),
+  ...adminSettings,
   async (_req: Request, res: Response) => {
     res.json({ cache: cacheMetrics() });
   },
@@ -77,7 +79,7 @@ router.get(
 // POST /api/settings/cache/metrics/reset – reset in-memory cache counters (admin)
 router.post(
   '/cache/metrics/reset',
-  authenticate, requireRole('admin'),
+  ...adminSettings,
   async (_req: Request, res: Response) => {
     resetCacheMetrics();
     res.json({ success: true, cache: cacheMetrics() });
@@ -87,7 +89,7 @@ router.post(
 // GET /api/settings – list all settings
 router.get(
   '/',
-  authenticate, requireRole('admin'),
+  ...adminSettings,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = req.user!.tenant_id;
@@ -115,7 +117,7 @@ router.get(
 // PUT /api/settings – bulk update settings
 router.put(
   '/',
-  authenticate, requireRole('admin'),
+  ...adminSettings,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = req.user!.tenant_id;
@@ -142,7 +144,7 @@ router.put(
 // POST /api/settings/logo – upload logo
 router.post(
   '/logo',
-  authenticate, requireRole('admin'),
+  ...adminSettings,
   upload.single('file'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -182,7 +184,7 @@ router.post(
 // DELETE /api/settings/logo – remove logo
 router.delete(
   '/logo',
-  authenticate, requireRole('admin'),
+  ...adminSettings,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = req.user!.tenant_id;

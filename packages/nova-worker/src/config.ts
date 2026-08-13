@@ -16,8 +16,8 @@ export const config = {
     host: env('POSTGRES_HOST', 'localhost'),
     port: envInt('POSTGRES_PORT', 5432),
     database: env('POSTGRES_DB', 'nova'),
-    user: env('POSTGRES_USER', 'nova_app'),
-    password: env('POSTGRES_PASSWORD', 'changeme'),
+    user: env('POSTGRES_APP_USER', 'nova_runtime'),
+    password: env('POSTGRES_APP_PASSWORD', env('POSTGRES_PASSWORD', 'changeme')),
     expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.00'),
   },
   temporal: {

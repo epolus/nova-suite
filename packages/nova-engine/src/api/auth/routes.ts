@@ -10,7 +10,7 @@ import { config } from '../../config';
 import { db } from '../../data/db';
 import { loginSchema, registerSchema } from '../../domain/schemas';
 import { validateBody } from '../../middleware/validate';
-import { authenticate, requireRole, AuthUser } from '../../middleware/auth';
+import { authenticate, requireRole, setTenantRLS, releaseTenantClient, AuthUser } from '../../middleware/auth';
 import { signAccessToken } from '../../auth/jwt';
 import { AppError } from '../../middleware/errorHandler';
 import { recordAuditEvent } from '../../audit/events';
@@ -30,7 +30,7 @@ router.post(
 
       const { email, password } = req.body;
 
-      // Find user (bypass RLS – login is pre-auth)
+      // Pre-auth: SECURITY DEFINER lookup (FORCE RLS would hide all rows otherwise)
       const user = await db.getOne<{
         id: string;
         tenant_id: string;
@@ -41,13 +41,13 @@ router.post(
         date_format: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
         is_active: boolean;
       }>(
-        'SELECT id, tenant_id, email, password_hash, display_name, time_format, date_format, is_active FROM users WHERE email = $1',
+        'SELECT id, tenant_id, email, password_hash, display_name, time_format, date_format, is_active FROM lookup_user_for_login($1)',
         [email],
       );
 
       if (!user || !user.is_active) {
         if (user?.tenant_id) {
-          void recordAuditEvent({
+          void db.withTenantContext(user.tenant_id, user.id, 'user', () => recordAuditEvent({
             tenantId: user.tenant_id,
             actorUserId: user.id,
             category: 'auth',
@@ -55,14 +55,14 @@ router.post(
             level: 'warning',
             clientIp: getClientIp(req),
             metadata: { email, reason: 'inactive_or_unknown' },
-          });
+          }));
         }
         throw new AppError(401, 'Invalid email or password');
       }
 
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid) {
-        void recordAuditEvent({
+        void db.withTenantContext(user.tenant_id, user.id, 'user', () => recordAuditEvent({
           tenantId: user.tenant_id,
           actorUserId: user.id,
           category: 'auth',
@@ -70,12 +70,12 @@ router.post(
           level: 'warning',
           clientIp: getClientIp(req),
           metadata: { email, reason: 'invalid_password' },
-        });
+        }));
         throw new AppError(401, 'Invalid email or password');
       }
 
       // Fetch roles for this user
-      const roleRows = await db.getMany<{ name: string }>(
+      const roleRows = await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.getMany<{ name: string }>(
         `SELECT DISTINCT r.name
          FROM roles r
          JOIN (
@@ -94,7 +94,7 @@ router.post(
          WHERE r.tenant_id = $2
          ORDER BY r.name`,
         [user.id, user.tenant_id],
-      );
+      ));
       const roles = roleRows.map((r) => r.name);
 
       const payload: AuthUser = {
@@ -113,24 +113,26 @@ router.post(
         token,
         user: payload,
       });
-      void recordAuditEvent({
+      void db.withTenantContext(user.tenant_id, user.id, roles.join(',') || 'user', () => recordAuditEvent({
         tenantId: user.tenant_id,
         actorUserId: user.id,
         category: 'auth',
         action: 'auth.login.success',
         clientIp: getClientIp(req),
         metadata: { method: 'password' },
-      });
+      }));
     } catch (err) {
       next(err);
     }
   },
 );
 
+const requireAuth = [authenticate, setTenantRLS, releaseTenantClient] as const;
+
 // ─── POST /api/auth/register (admin only) ───
 router.post(
   '/register',
-  authenticate,
+  ...requireAuth,
   requireRole('admin'),
   validateBody(registerSchema),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -213,12 +215,12 @@ router.post(
 );
 
 // ─── GET /api/auth/me ───
-router.get('/me', authenticate, (req: Request, res: Response) => {
+router.get('/me', ...requireAuth, (req: Request, res: Response) => {
   res.json({ user: req.user });
 });
 
 // ─── PATCH /api/auth/me/time-format ───
-router.patch('/me/time-format', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/me/time-format', ...requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const value = req.body?.time_format;
     if (value !== '12h' && value !== '24h') {
@@ -238,7 +240,7 @@ router.patch('/me/time-format', authenticate, async (req: Request, res: Response
 });
 
 // ─── PATCH /api/auth/me/date-format ───
-router.patch('/me/date-format', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/me/date-format', ...requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const value = req.body?.date_format;
     if (!['DD.MM.YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'].includes(value)) {
@@ -258,7 +260,7 @@ router.patch('/me/date-format', authenticate, async (req: Request, res: Response
 });
 
 // ─── GET /api/auth/me/preferences/:scope ───
-router.get('/me/preferences/:scope', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/me/preferences/:scope', ...requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const scope = String(req.params.scope || '').trim();
     if (!scope || scope.length > 120 || !/^[a-zA-Z0-9:_-]+$/.test(scope)) {
@@ -281,7 +283,7 @@ router.get('/me/preferences/:scope', authenticate, async (req: Request, res: Res
 });
 
 // ─── PUT /api/auth/me/preferences/:scope ───
-router.put('/me/preferences/:scope', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/me/preferences/:scope', ...requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const scope = String(req.params.scope || '').trim();
     if (!scope || scope.length > 120 || !/^[a-zA-Z0-9:_-]+$/.test(scope)) {
@@ -309,7 +311,7 @@ router.put('/me/preferences/:scope', authenticate, async (req: Request, res: Res
 // ─── GET /api/auth/users (for user_ref dropdowns) ───
 router.get(
   '/users',
-  authenticate,
+  ...requireAuth,
   requireRole('admin', 'fulfiller', 'user'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

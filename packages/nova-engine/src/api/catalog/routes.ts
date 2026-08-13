@@ -18,6 +18,27 @@ import {
 } from './automation-config';
 
 const router = Router();
+const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
+
+async function withAutomationTenantClient<T>(
+  requestId: string,
+  fn: (client: Awaited<ReturnType<typeof db.getClient>>, tenantId: string) => Promise<T>,
+): Promise<T> {
+  const client = await db.getClient();
+  try {
+    const tenantRes = await client.query<{ tenant_id: string | null }>(
+      'SELECT lookup_request_tenant($1::uuid) AS tenant_id',
+      [requestId],
+    );
+    const tenantId = tenantRes.rows[0]?.tenant_id;
+    if (!tenantId) throw NotFound('Request not found');
+    await db.setTenantContext(client, tenantId, SYSTEM_USER_ID, 'system');
+    return await fn(client, tenantId);
+  } finally {
+    await db.clearTenantContext(client).catch(() => undefined);
+    client.release();
+  }
+}
 
 function requireAutomationSharedKey(req: Request, res: Response, next: NextFunction): void {
   const configured = config.catalogAutomation.sharedKey;
@@ -46,7 +67,6 @@ router.post(
   '/automation/add-support-group-member',
   requireAutomationSharedKey,
   async (req: Request, res: Response, next: NextFunction) => {
-    let client: Awaited<ReturnType<typeof db.getClient>> | null = null;
     try {
       const userId = typeof req.body?.user_id === 'string' ? req.body.user_id.trim() : '';
       const groupIdRaw = typeof req.body?.group_id === 'string' ? req.body.group_id.trim() : '';
@@ -56,14 +76,7 @@ router.post(
       if (!userId) throw BadRequest('user_id is required');
       if (!groupIdRaw && !groupNameRaw) throw BadRequest('group_id or group_name is required');
 
-      client = await db.getClient();
-      const requestRes = await client.query(
-        `SELECT tenant_id FROM requests WHERE id = $1`,
-        [requestId],
-      );
-      if (requestRes.rows.length === 0) throw NotFound('Request not found');
-      const tenantId = String(requestRes.rows[0].tenant_id);
-
+      await withAutomationTenantClient(requestId, async (client, tenantId) => {
       const userResult = await client.query(
         `SELECT id, display_name
          FROM users
@@ -110,10 +123,9 @@ router.post(
         group_manager_id: group.manager_id,
         user_id: userId,
       });
+      });
     } catch (err) {
       next(err);
-    } finally {
-      client?.release();
     }
   },
 );
@@ -124,7 +136,6 @@ router.post(
   '/automation/create-laptop-ci',
   requireAutomationSharedKey,
   async (req: Request, res: Response, next: NextFunction) => {
-    let client: Awaited<ReturnType<typeof db.getClient>> | null = null;
     try {
       const requestId = typeof req.body?.request_id === 'string' ? req.body.request_id.trim() : '';
       const assetTag = typeof req.body?.asset_tag === 'string' ? req.body.asset_tag.trim() : '';
@@ -132,7 +143,7 @@ router.post(
       const vendorOrderId = typeof req.body?.vendor_order_id === 'string' ? req.body.vendor_order_id.trim() : '';
       if (!requestId) throw BadRequest('request_id is required');
 
-      client = await db.getClient();
+      await withAutomationTenantClient(requestId, async (client, tenantId) => {
       const requestRes = await client.query(
         `SELECT id, tenant_id, requester_id, requested_for, form_data
          FROM requests
@@ -146,7 +157,6 @@ router.post(
         requested_for: string | null;
         form_data: Record<string, unknown> | null;
       };
-      const tenantId = String(requestRow.tenant_id);
       const targetUserId = requestRow.requested_for || requestRow.requester_id;
       const formData = requestRow.form_data && typeof requestRow.form_data === 'object' ? requestRow.form_data : {};
       const osPreferenceRaw = typeof formData.os_preference === 'string' ? formData.os_preference : '';
@@ -207,10 +217,9 @@ router.post(
         ci_display_name: createdCi.display_name,
         assigned_to: createdCi.assigned_to,
       });
+      });
     } catch (err) {
       next(err);
-    } finally {
-      client?.release();
     }
   },
 );
@@ -219,7 +228,6 @@ router.post(
   '/automation/ci/create',
   requireAutomationSharedKey,
   async (req: Request, res: Response, next: NextFunction) => {
-    let client: Awaited<ReturnType<typeof db.getClient>> | null = null;
     try {
       const requestId = typeof req.body?.request_id === 'string' ? req.body.request_id.trim() : '';
       const className = typeof req.body?.class_name === 'string' ? req.body.class_name.trim() : '';
@@ -235,7 +243,7 @@ router.post(
       if (!className) throw BadRequest('class_name is required');
       if (!name) throw BadRequest('name is required');
 
-      client = await db.getClient();
+      await withAutomationTenantClient(requestId, async (client, tenantId) => {
       const requestRes = await client.query(
         `SELECT tenant_id, requester_id, requested_for
          FROM requests
@@ -243,7 +251,6 @@ router.post(
         [requestId],
       );
       if (requestRes.rows.length === 0) throw NotFound('Request not found');
-      const tenantId = String(requestRes.rows[0].tenant_id);
       const changedBy = String(requestRes.rows[0].requested_for || requestRes.rows[0].requester_id);
 
       const classRes = await client.query(
@@ -274,10 +281,9 @@ router.post(
       );
 
       res.json({ success: true, ci: created });
+      });
     } catch (err) {
       next(err);
-    } finally {
-      client?.release();
     }
   },
 );
@@ -286,7 +292,6 @@ router.post(
   '/automation/ci/lookup',
   requireAutomationSharedKey,
   async (req: Request, res: Response, next: NextFunction) => {
-    let client: Awaited<ReturnType<typeof db.getClient>> | null = null;
     try {
       const requestId = typeof req.body?.request_id === 'string' ? req.body.request_id.trim() : '';
       const className = typeof req.body?.class_name === 'string' ? req.body.class_name.trim() : '';
@@ -298,15 +303,7 @@ router.post(
           : null;
       if (!requestId) throw BadRequest('request_id is required');
 
-      client = await db.getClient();
-      const requestRes = await client.query(
-        `SELECT tenant_id
-         FROM requests
-         WHERE id = $1`,
-        [requestId],
-      );
-      if (requestRes.rows.length === 0) throw NotFound('Request not found');
-      const tenantId = String(requestRes.rows[0].tenant_id);
+      await withAutomationTenantClient(requestId, async (client, tenantId) => {
 
       const params: unknown[] = [tenantId];
       const where: string[] = ['ci.tenant_id = $1'];
@@ -335,10 +332,9 @@ router.post(
         count: result.rows.length,
         items: result.rows,
       });
+      });
     } catch (err) {
       next(err);
-    } finally {
-      client?.release();
     }
   },
 );

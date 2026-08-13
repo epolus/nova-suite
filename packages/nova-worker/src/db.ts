@@ -67,7 +67,42 @@ export async function withTenantContext<T>(
     );
     return await fn(client);
   } finally {
+    try {
+      await client.query(
+        `SELECT set_config('app.current_tenant_id', '', false),
+                set_config('app.current_user_id', '', false),
+                set_config('app.current_user_roles', '', false)`,
+      );
+    } catch {
+      // ignore – connection may already be broken
+    }
     client.release();
+  }
+}
+
+export type PgRoleBypassFlags = {
+  rolsuper: boolean;
+  rolbypassrls: boolean;
+};
+
+export function roleBypassesRls(role: PgRoleBypassFlags): boolean {
+  return role.rolsuper === true || role.rolbypassrls === true;
+}
+
+export async function assertRuntimeRoleCannotBypassRls(): Promise<void> {
+  const rows = await query<PgRoleBypassFlags>(
+    'SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user',
+  );
+  const row = rows[0];
+  if (!row) {
+    throw new Error('Connected database role was not found in pg_roles');
+  }
+  if (roleBypassesRls(row)) {
+    throw new Error(
+      `Database role "${config.db.user}" is superuser and/or BYPASSRLS. `
+      + 'Nova Suite must connect as POSTGRES_APP_USER (nova_runtime), not POSTGRES_USER. '
+      + 'FORCE ROW LEVEL SECURITY does not apply to superusers.',
+    );
   }
 }
 

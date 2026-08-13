@@ -105,22 +105,39 @@ router.post('/items', validateBody(cartItemSchema), async (req: Request, res: Re
       return;
     }
 
-    await client.query(
-      `
-      WITH upsert_cart AS (
+    // Parent INSERT in a data-modifying CTE is invisible to cart_items RLS
+    // WITH CHECK (same snapshot). Two statements so the cart row exists.
+    await client.query('BEGIN');
+    try {
+      const cartRes = await client.query(
+        `
         INSERT INTO carts (tenant_id, user_id)
         VALUES (current_tenant_id(), current_user_id())
         ON CONFLICT (tenant_id, user_id)
         DO UPDATE SET updated_at = NOW()
         RETURNING id
-      )
-      INSERT INTO cart_items (tenant_id, cart_id, service_item_id, form_data, priority, notes)
-      SELECT current_tenant_id(), upsert_cart.id, $1, COALESCE($2::jsonb, '{}'::jsonb), $3, $4
-      FROM upsert_cart
-      RETURNING id, priority, notes, form_data
-      `,
-      [service_item_id, JSON.stringify(form_data || {}), priority, notes],
-    );
+        `,
+      );
+      const cartId = cartRes.rows[0]?.id as string | undefined;
+      if (!cartId) {
+        throw new Error('Failed to upsert cart');
+      }
+      await client.query(
+        `
+        INSERT INTO cart_items (tenant_id, cart_id, service_item_id, form_data, priority, notes)
+        VALUES (current_tenant_id(), $1, $2, COALESCE($3::jsonb, '{}'::jsonb), $4, $5)
+        `,
+        [cartId, service_item_id, JSON.stringify(form_data || {}), priority, notes],
+      );
+      await client.query('COMMIT');
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore – connection may already be broken
+      }
+      throw err;
+    }
 
     // Return full cart for simplicity/consistency
     const r = await client.query(

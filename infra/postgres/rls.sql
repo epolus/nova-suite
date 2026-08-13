@@ -161,6 +161,8 @@ CREATE POLICY tenant_isolation_carts ON carts
   );
 
 -- ─── Cart Items ───
+-- WITH CHECK subqueries cannot see a parent INSERT from the same statement
+-- (data-modifying CTEs share one snapshot). Insert cart then items separately.
 CREATE POLICY tenant_isolation_cart_items ON cart_items
   FOR ALL USING (
     tenant_id = current_tenant_id()
@@ -173,22 +175,35 @@ CREATE POLICY tenant_isolation_cart_items ON cart_items
   );
 
 -- ─── Requests ───
--- Users can see only their own requests; fulfillers & admins see all
+-- Users see requests they opened or that were opened for them; fulfillers/admins/system see all
 CREATE POLICY tenant_isolation_requests ON requests
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
       current_user_has_role('admin', 'fulfiller', 'system')
       OR requester_id = current_user_id()
+      OR requested_for = current_user_id()
     )
   );
 
 -- ─── Incidents ───
--- Only fulfillers and admins can see incidents; system (worker) for automation
+-- Fulfillers/admins/system see all in-tenant. ESS users see incidents they
+-- reported (caller) or submitted (creation journal), matching the API filter.
 CREATE POLICY tenant_isolation_incidents ON incidents
   FOR ALL USING (
     tenant_id = current_tenant_id()
-    AND current_user_has_role('admin', 'fulfiller', 'system')
+    AND (
+      current_user_has_role('admin', 'fulfiller', 'system')
+      OR caller_id = current_user_id()
+      OR EXISTS (
+        SELECT 1
+        FROM incident_journal j
+        WHERE j.incident_id = incidents.id
+          AND j.author_id = current_user_id()
+          AND j.entry_type = 'state_change'
+          AND j.content LIKE 'Incident created with priority%'
+      )
+    )
   );
 
 -- ─── Incident Journal ───
@@ -314,7 +329,7 @@ CREATE POLICY tenant_isolation_problems ON problems
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller', 'problem')
+      current_user_has_role('admin', 'fulfiller', 'problem', 'system')
       OR reported_by = current_user_id()
       OR assigned_to = current_user_id()
     )
@@ -341,7 +356,7 @@ CREATE POLICY tenant_isolation_changes ON changes
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller', 'change_manager')
+      current_user_has_role('admin', 'fulfiller', 'change_manager', 'system')
       OR requested_by = current_user_id()
       OR assigned_to = current_user_id()
     )
@@ -577,8 +592,10 @@ CREATE POLICY tenant_isolation_notification_email_deliveries ON notification_ema
   );
 
 -- ============================================================
--- Force RLS even for the table owner (the app user)
--- This is critical – without it the app user bypasses RLS
+-- Force RLS even for the table owner
+-- This is critical – without it the table owner bypasses RLS.
+-- FORCE does NOT apply to superusers. nova-engine / nova-worker must
+-- connect as nova_runtime (NOSUPERUSER NOBYPASSRLS), never as POSTGRES_USER.
 -- ============================================================
 ALTER TABLE departments FORCE ROW LEVEL SECURITY;
 ALTER TABLE cost_centers FORCE ROW LEVEL SECURITY;
