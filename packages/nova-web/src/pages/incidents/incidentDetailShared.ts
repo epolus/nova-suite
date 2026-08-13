@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { createElement, type ReactNode } from 'react';
 import type { useIncidentDetail } from './useIncidentDetail';
 
 export type IncidentDetailState = ReturnType<typeof useIncidentDetail>;
@@ -27,4 +28,20 @@ export const INCIDENT_FIELD = {
 
 export function getInputCls(readonly: boolean): string {
   return `w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden${readonly ? ' bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`;
+}
+
+/** Read-only captions are spans so Chrome does not see an unlabeled <label>. */
+export function FieldCaption({
+  htmlFor,
+  hasControl,
+  className,
+  children,
+}: {
+  htmlFor: string;
+  hasControl: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  if (!hasControl) return createElement('span', { className }, children);
+  return createElement('label', { htmlFor, className }, children);
 }

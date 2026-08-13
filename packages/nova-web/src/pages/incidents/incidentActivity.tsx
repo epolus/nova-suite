@@ -6,7 +6,7 @@ import Badge from '../../components/Badge';
 import { formatDateTime } from '../../utils/dateTime';
 import { useFieldLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
-import { getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
+import { FieldCaption, getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
 
 export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
   const { inc, readonly, fields, setField } = d;
@@ -20,7 +20,7 @@ export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
       <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('incidentDetails')}</h3>
       <div className="space-y-4">
         <div>
-          <label htmlFor={INCIDENT_FIELD.title} className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('title')}</label>
+          <FieldCaption htmlFor={INCIDENT_FIELD.title} hasControl={!readonly} className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('title')}</FieldCaption>
           {readonly ? (
             <p className="text-sm font-medium text-gray-900">{inc.title}</p>
           ) : (
@@ -28,7 +28,7 @@ export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
           )}
         </div>
         <div>
-          <label htmlFor={INCIDENT_FIELD.description} className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('description')}</label>
+          <FieldCaption htmlFor={INCIDENT_FIELD.description} hasControl={!readonly} className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('description')}</FieldCaption>
           {readonly ? (
             <p className="text-sm text-gray-900 whitespace-pre-wrap">{inc.description || tTable('emDash')}</p>
           ) : (
@@ -37,7 +37,7 @@ export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
         </div>
         {(fields.status === 'resolved' || inc.status === 'resolved' || inc.resolution_notes) && (
           <div>
-            <label htmlFor={INCIDENT_FIELD.resolutionNotes} className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('resolutionNotes')}</label>
+            <FieldCaption htmlFor={INCIDENT_FIELD.resolutionNotes} hasControl={!readonly} className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('resolutionNotes')}</FieldCaption>
             {readonly ? (
               <p className="text-sm text-gray-900 whitespace-pre-wrap">{inc.resolution_notes || tTable('emDash')}</p>
             ) : (

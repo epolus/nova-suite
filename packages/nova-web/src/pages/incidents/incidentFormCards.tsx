@@ -6,7 +6,7 @@ import { formatDateTime } from '../../utils/dateTime';
 import type { UserListItem, ServiceListItem, CI, Problem } from '../../api/client';
 import { useFieldLabel, useImpactUrgencyLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
-import { getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
+import { FieldCaption, getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
 
 export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
   const { inc, readonly, fields, setField, requiredFieldMissing, assignmentGroups, groupMembers } = d;
@@ -21,9 +21,9 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
       <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('summary')}</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor={INCIDENT_FIELD.assignmentGroupId} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.assignment_group ? 'text-red-600' : 'text-gray-500'}`}>
+          <FieldCaption htmlFor={INCIDENT_FIELD.assignmentGroupId} hasControl={!readonly} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.assignment_group ? 'text-red-600' : 'text-gray-500'}`}>
             {fieldLabel('assignmentGroup')} <span className="text-red-500">*</span>
-          </label>
+          </FieldCaption>
           {readonly ? (
             <p className="text-sm text-gray-900 mt-0.5">{inc.assignment_group_name || tTable('emDash')}</p>
           ) : (
@@ -42,7 +42,7 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
           )}
         </div>
         <div>
-          <label htmlFor={INCIDENT_FIELD.assignedTo} className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('assignedTo')}</label>
+          <FieldCaption htmlFor={INCIDENT_FIELD.assignedTo} hasControl={!readonly} className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('assignedTo')}</FieldCaption>
           {readonly ? (
             <p className="text-sm text-gray-900 mt-0.5">{inc.assigned_to_name || tIncidents('unassigned')}</p>
           ) : (
@@ -55,9 +55,9 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
           )}
         </div>
         <div>
-          <label htmlFor={INCIDENT_FIELD.impact} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.impact ? 'text-red-600' : 'text-gray-500'}`}>
+          <FieldCaption htmlFor={INCIDENT_FIELD.impact} hasControl={!readonly} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.impact ? 'text-red-600' : 'text-gray-500'}`}>
             {fieldLabel('impact')} <span className="text-red-500">*</span>
-          </label>
+          </FieldCaption>
           {readonly ? (
             <Badge value={inc.impact} />
           ) : (
@@ -67,9 +67,9 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
           )}
         </div>
         <div>
-          <label htmlFor={INCIDENT_FIELD.urgency} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.urgency ? 'text-red-600' : 'text-gray-500'}`}>
+          <FieldCaption htmlFor={INCIDENT_FIELD.urgency} hasControl={!readonly} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.urgency ? 'text-red-600' : 'text-gray-500'}`}>
             {fieldLabel('urgency')} <span className="text-red-500">*</span>
-          </label>
+          </FieldCaption>
           {readonly ? (
             <Badge value={inc.urgency} />
           ) : (
@@ -91,9 +91,9 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
         </div>
         {fields.status === 'pending' && (
           <div>
-            <label htmlFor={INCIDENT_FIELD.pendingReason} className="block text-xs font-medium text-gray-500 mb-1">
+            <FieldCaption htmlFor={INCIDENT_FIELD.pendingReason} hasControl={!readonly} className="block text-xs font-medium text-gray-500 mb-1">
               {tIncidents('pendingReason')} <span className="text-red-500">*</span>
-            </label>
+            </FieldCaption>
             {readonly ? (
               <p className="text-sm text-gray-900 mt-0.5">{inc.resolution_code || tTable('emDash')}</p>
             ) : (
@@ -125,9 +125,9 @@ export function IncidentCallerCard({ d }: { d: IncidentDetailState }) {
       <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('callerProfile')}</h3>
       <div className="grid grid-cols-1 gap-4">
         <div>
-          <label htmlFor={INCIDENT_FIELD.callerId} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.caller ? 'text-red-600' : 'text-gray-500'}`}>
+          <FieldCaption htmlFor={INCIDENT_FIELD.callerId} hasControl={!readonly} className={`block text-xs font-medium mb-1 ${requiredFieldMissing.caller ? 'text-red-600' : 'text-gray-500'}`}>
             {fieldLabel('caller')} <span className="text-red-500">*</span>
-          </label>
+          </FieldCaption>
           {readonly ? (
             <p className="text-sm font-medium text-gray-900">{inc.caller_name || tTable('emDash')}</p>
           ) : (
@@ -177,7 +177,7 @@ export function IncidentCallerCard({ d }: { d: IncidentDetailState }) {
           </div>
         )}
         <div>
-          <label htmlFor={INCIDENT_FIELD.contactInfo} className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('contactInfo')}</label>
+          <FieldCaption htmlFor={INCIDENT_FIELD.contactInfo} hasControl={!readonly} className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('contactInfo')}</FieldCaption>
           {readonly ? (
             <p className="text-sm text-gray-900">{inc.contact_info || tTable('emDash')}</p>
           ) : (
