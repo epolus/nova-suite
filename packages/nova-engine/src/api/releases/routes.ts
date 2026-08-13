@@ -2,6 +2,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { authenticate, getRequestClient, releaseTenantClient, setTenantRLS } from '../../middleware/auth';
+import { validateBody } from '../../middleware/validate';
+import { RELEASE_UPDATE_COLUMNS, createReleaseSchema, updateReleaseSchema } from '../../domain/schemas';
+import { parameterizedSet } from '../../data/parameterized-set';
 import { hasChangeRole, isAdminRole } from '../roles';
 
 const router = Router();
@@ -28,7 +31,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', validateBody(createReleaseSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!canManageRelease(req)) throw new AppError(403, 'Insufficient permissions');
     const b = req.body || {};
@@ -84,25 +87,18 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/:id', validateBody(updateReleaseSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!canManageRelease(req)) throw new AppError(403, 'Insufficient permissions');
-    const updates = req.body || {};
-    const sets: string[] = [];
-    const vals: unknown[] = [];
-    let i = 1;
-    for (const [key, value] of Object.entries(updates)) {
-      sets.push(`${key} = $${i++}`);
-      vals.push(value);
-    }
-    if (sets.length === 0) return void res.json({ success: true });
-    vals.push(req.params.id);
+    const patch = parameterizedSet(RELEASE_UPDATE_COLUMNS, req.body || {});
+    if (!patch) return void res.json({ success: true });
+    const vals = [...patch.values, req.params.id];
     const client = getRequestClient(req);
     const updated = await client.query(
       `UPDATE releases
-       SET ${sets.join(', ')}
+       SET ${patch.sets.join(', ')}
        WHERE tenant_id = current_tenant_id()
-         AND id = $${i}
+         AND id = $${patch.sets.length + 1}
        RETURNING *`,
       vals,
     );

@@ -521,6 +521,54 @@ export const majorIncidentListQuerySchema = paginationSchema.extend({
   priority_lte: z.coerce.number().int().min(1).max(2).optional(),
 });
 
+// ─── Assets ───
+const assetCategorySchema = z.enum(['hardware', 'software', 'license', 'consumable']);
+const assetStatusSchema = z.enum(['in_use', 'in_stock', 'retired', 'disposed']);
+
+export const createAssetSchema = z.object({
+  asset_tag: z.string().min(1).max(255),
+  name: z.string().min(1).max(255),
+  category: assetCategorySchema.optional(),
+  status: assetStatusSchema.optional(),
+  owner_user_id: uuidSchema.nullable().optional(),
+  linked_ci_id: uuidSchema.nullable().optional(),
+  vendor_name: z.string().max(255).nullable().optional(),
+  purchase_cost: z.number().nullable().optional(),
+  purchase_currency: z.string().max(8).nullable().optional(),
+  purchase_date: z.string().max(32).nullable().optional(),
+  warranty_expires_at: z.string().max(32).nullable().optional(),
+  contract_ref: z.string().max(255).nullable().optional(),
+  depreciation_months: z.number().int().nullable().optional(),
+  notes: z.string().max(10000).nullable().optional(),
+});
+
+export const updateAssetSchema = createAssetSchema.partial();
+export const ASSET_UPDATE_COLUMNS = Object.keys(updateAssetSchema.shape);
+
+// ─── Releases ───
+const releaseStatusSchema = z.enum(['planned', 'in_progress', 'deployed', 'cancelled']);
+const releaseTypeSchema = z.enum(['major', 'minor', 'emergency']);
+const releaseRiskSchema = z.enum(['low', 'medium', 'high']);
+
+export const createReleaseSchema = z.object({
+  number: z.string().min(1).max(64).optional(),
+  title: z.string().min(1).max(500),
+  description: z.string().max(10000).nullable().optional(),
+  status: releaseStatusSchema.optional(),
+  release_type: releaseTypeSchema.optional(),
+  risk_level: releaseRiskSchema.optional(),
+  planned_start: z.string().max(64).nullable().optional(),
+  planned_end: z.string().max(64).nullable().optional(),
+  deployed_at: z.string().max(64).nullable().optional(),
+  owner_user_id: uuidSchema.nullable().optional(),
+  change_id: uuidSchema.nullable().optional(),
+  validation_notes: z.string().max(10000).nullable().optional(),
+  rollback_plan: z.string().max(10000).nullable().optional(),
+});
+
+export const updateReleaseSchema = createReleaseSchema.partial();
+export const RELEASE_UPDATE_COLUMNS = Object.keys(updateReleaseSchema.shape);
+
 // ─── Type Exports ───
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
