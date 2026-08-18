@@ -9,6 +9,11 @@ import { db } from '../../data/db';
 import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
+import {
+  assertUuidParam,
+  resolveUploadPath,
+  safeImageExtension,
+} from '../../data/upload-path';
 import { recordAuditEvent } from '../../audit/events';
 import { getClientIp } from '../../middleware/client-ip';
 import {
@@ -272,7 +277,12 @@ async function backfillExternalKeys(client: PoolClient, tenantId: string): Promi
 
 async function loadPicture(storageKey: string | null): Promise<ConfigPackageServiceItem['picture']> {
   if (!storageKey) return null;
-  const fullPath = path.join(config.uploads.dir, storageKey);
+  let fullPath: string;
+  try {
+    fullPath = resolveUploadPath(config.uploads.dir, storageKey);
+  } catch {
+    return null;
+  }
   if (!fs.existsSync(fullPath)) return null;
   const stat = fs.statSync(fullPath);
   if (stat.size > 512 * 1024) return null;
@@ -807,9 +817,9 @@ async function writePicture(
     throw BadRequest(`Picture checksum mismatch for ${picture.file_name}`);
   }
 
-  const ext = path.extname(picture.file_name) || '.bin';
-  const storageKey = `catalog/${itemId}/${crypto.randomUUID()}${ext}`;
-  const fullPath = path.join(config.uploads.dir, storageKey);
+  const ext = safeImageExtension(picture.file_name, '.bin');
+  const storageKey = `catalog/${assertUuidParam(itemId)}/${crypto.randomUUID()}${ext}`;
+  const fullPath = resolveUploadPath(config.uploads.dir, storageKey);
   ensureDir(path.dirname(fullPath));
   fs.writeFileSync(fullPath, buffer);
 
@@ -820,7 +830,7 @@ async function writePicture(
   const oldKey = old.rows[0]?.picture_storage_key;
   if (oldKey) {
     try {
-      fs.unlinkSync(path.join(config.uploads.dir, oldKey));
+      fs.unlinkSync(resolveUploadPath(config.uploads.dir, oldKey));
     } catch {
       // Best effort cleanup; stale blobs should not fail a deployment.
     }

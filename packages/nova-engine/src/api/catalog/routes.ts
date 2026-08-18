@@ -12,6 +12,12 @@ import { createCategorySchema, createServiceItemSchema } from '../../domain/sche
 import { NotFound, BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
 import {
+  assertUuidParam,
+  resolveUploadPath,
+  safeImageExtension,
+  UnsafeUploadPathError,
+} from '../../data/upload-path';
+import {
   collectCredentialSlugsFromAutomationConfig,
   ensureCredentialSlugsExist,
   validateAndParseAutomationConfig,
@@ -536,26 +542,35 @@ router.post(
       const file = req.file;
       if (!file) { res.status(400).json({ error: 'No file uploaded' }); return; }
 
-      const ext = path.extname(file.originalname) || '.jpg';
-      const storageKey = `catalog/${req.params.id}/${crypto.randomUUID()}${ext}`;
-      const fullPath = path.join(config.uploads.dir, storageKey);
+      const itemId = assertUuidParam(
+        Array.isArray(req.params.id) ? req.params.id[0] : req.params.id,
+      );
+      const ext = safeImageExtension(file.originalname);
+      const storageKey = `catalog/${itemId}/${crypto.randomUUID()}${ext}`;
+      const fullPath = resolveUploadPath(config.uploads.dir, storageKey);
 
       ensureDir(path.dirname(fullPath));
       fs.writeFileSync(fullPath, file.buffer);
 
       // Remove old picture if exists
-      const old = await client.query('SELECT picture_storage_key FROM service_items WHERE id = $1', [req.params.id]);
+      const old = await client.query('SELECT picture_storage_key FROM service_items WHERE id = $1', [itemId]);
       if (old.rows[0]?.picture_storage_key) {
-        try { fs.unlinkSync(path.join(config.uploads.dir, old.rows[0].picture_storage_key as string)); } catch { /* ignore */ }
+        try {
+          fs.unlinkSync(resolveUploadPath(config.uploads.dir, old.rows[0].picture_storage_key as string));
+        } catch { /* ignore */ }
       }
 
       const result = await client.query(
         'UPDATE service_items SET picture_storage_key = $1, updated_at = now() WHERE id = $2 RETURNING *',
-        [storageKey, req.params.id],
+        [storageKey, itemId],
       );
       if (result.rows.length === 0) throw NotFound('Service item not found');
       res.json(result.rows[0]);
     } catch (err) {
+      if (err instanceof UnsafeUploadPathError) {
+        next(BadRequest(err.message));
+        return;
+      }
       next(err);
     }
   },
@@ -569,7 +584,12 @@ router.get('/items/:id/picture', async (req: Request, res: Response, next: NextF
     if (result.rows.length === 0 || !result.rows[0].picture_storage_key) {
       res.status(204).end(); return;
     }
-    const fullPath = path.join(config.uploads.dir, result.rows[0].picture_storage_key as string);
+    let fullPath: string;
+    try {
+      fullPath = resolveUploadPath(config.uploads.dir, result.rows[0].picture_storage_key as string);
+    } catch {
+      res.status(204).end(); return;
+    }
     if (!fs.existsSync(fullPath)) { res.status(204).end(); return; }
 
     const ext = path.extname(fullPath).toLowerCase();
@@ -589,7 +609,9 @@ router.delete('/items/:id/picture', requireRole('admin', 'catalog_designer'),
       const client = getRequestClient(req);
       const old = await client.query('SELECT picture_storage_key FROM service_items WHERE id = $1', [req.params.id]);
       if (old.rows[0]?.picture_storage_key) {
-        try { fs.unlinkSync(path.join(config.uploads.dir, old.rows[0].picture_storage_key as string)); } catch { /* ignore */ }
+        try {
+          fs.unlinkSync(resolveUploadPath(config.uploads.dir, old.rows[0].picture_storage_key as string));
+        } catch { /* ignore */ }
       }
       await client.query('UPDATE service_items SET picture_storage_key = NULL, updated_at = now() WHERE id = $1', [req.params.id]);
       res.json({ success: true });

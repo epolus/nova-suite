@@ -3,6 +3,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { UnsafeUploadPathError } from '../data/upload-path';
 import { logger } from '../logger';
 
 /** Application-level error with HTTP status. */
@@ -35,6 +36,14 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
         path: e.path.join('.'),
         message: e.message,
       })),
+    });
+    return;
+  }
+
+  if (err instanceof UnsafeUploadPathError) {
+    res.status(400).json({
+      error: err.message,
+      code: 'BAD_REQUEST',
     });
     return;
   }

@@ -8,6 +8,7 @@ import { db } from '../../data/db';
 import { config } from '../../config';
 import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { cacheDel, cacheGetJson, cacheMetrics, cacheSetJson, resetCacheMetrics } from '../../cache/redis';
+import { resolveUploadPath, safeImageExtension, UnsafeUploadPathError } from '../../data/upload-path';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.uploads.maxFileSize } });
@@ -49,7 +50,15 @@ router.get('/logo', async (_req: Request, res: Response, next: NextFunction) => 
     ));
     if (!row || !row.value) { res.status(204).end(); return; }
 
-    const fullPath = path.join(config.uploads.dir, row.value);
+    let fullPath: string;
+    try {
+      fullPath = resolveUploadPath(config.uploads.dir, row.value);
+    } catch (err) {
+      if (err instanceof UnsafeUploadPathError) {
+        res.status(204).end(); return;
+      }
+      throw err;
+    }
     if (!fs.existsSync(fullPath)) { res.status(204).end(); return; }
 
     const ext = path.extname(fullPath).toLowerCase();
@@ -152,9 +161,9 @@ router.post(
       const file = req.file;
       if (!file) { res.status(400).json({ error: 'No file uploaded' }); return; }
 
-      const ext = path.extname(file.originalname) || '.png';
+      const ext = safeImageExtension(file.originalname, '.png');
       const storageKey = `branding/${crypto.randomUUID()}${ext}`;
-      const fullPath = path.join(config.uploads.dir, storageKey);
+      const fullPath = resolveUploadPath(config.uploads.dir, storageKey);
       fs.mkdirSync(path.dirname(fullPath), { recursive: true });
       fs.writeFileSync(fullPath, file.buffer);
 
@@ -163,7 +172,7 @@ router.post(
         [tenantId],
       );
       if (old?.value) {
-        try { fs.unlinkSync(path.join(config.uploads.dir, old.value)); } catch { /* ignore */ }
+        try { fs.unlinkSync(resolveUploadPath(config.uploads.dir, old.value)); } catch { /* ignore */ }
       }
 
       await db.query(
@@ -193,7 +202,7 @@ router.delete(
         [tenantId],
       );
       if (old?.value) {
-        try { fs.unlinkSync(path.join(config.uploads.dir, old.value)); } catch { /* ignore */ }
+        try { fs.unlinkSync(resolveUploadPath(config.uploads.dir, old.value)); } catch { /* ignore */ }
       }
       await db.query(
         `INSERT INTO tenant_settings (tenant_id, key, value)

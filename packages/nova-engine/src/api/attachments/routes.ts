@@ -7,6 +7,13 @@ import crypto from 'crypto';
 import { authenticate, setTenantRLS, releaseTenantClient, getRequestClient } from '../../middleware/auth';
 import { config } from '../../config';
 import { logger } from '../../logger';
+import {
+  assertPathSegment,
+  assertUuidParam,
+  resolveUploadPath,
+  safeAttachmentExtension,
+  UnsafeUploadPathError,
+} from '../../data/upload-path';
 
 const router = Router();
 router.use(authenticate);
@@ -32,9 +39,11 @@ router.post('/upload', upload.single('file'), setTenantRLS, releaseTenantClient,
       if (!file) { res.status(400).json({ error: 'No file uploaded' }); return; }
       if (!entityType || !entityId) { res.status(400).json({ error: 'entity_type and entity_id are required' }); return; }
 
-      const ext = path.extname(file.originalname) || '';
-      const storageKey = `${entityType}/${entityId}/${crypto.randomUUID()}${ext}`;
-      const fullPath = path.join(config.uploads.dir, storageKey);
+      const safeType = assertPathSegment(entityType, 'entity_type');
+      const safeId = assertUuidParam(entityId);
+      const ext = safeAttachmentExtension(file.originalname);
+      const storageKey = `${safeType}/${safeId}/${crypto.randomUUID()}${ext}`;
+      const fullPath = resolveUploadPath(config.uploads.dir, storageKey);
 
       ensureDir(path.dirname(fullPath));
       fs.writeFileSync(fullPath, file.buffer);
@@ -42,7 +51,7 @@ router.post('/upload', upload.single('file'), setTenantRLS, releaseTenantClient,
       const result = await client.query(
         `INSERT INTO attachments (tenant_id, entity_type, entity_id, file_name, mime_type, size_bytes, storage_key, uploaded_by)
          VALUES (current_tenant_id(), $1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [entityType, entityId, file.originalname, file.mimetype, file.size, storageKey, req.user!.id],
+        [safeType, safeId, file.originalname, file.mimetype, file.size, storageKey, req.user!.id],
       );
 
       const att = result.rows[0];
@@ -121,7 +130,15 @@ router.get('/:id/download', setTenantRLS, releaseTenantClient,
       if (result.rows.length === 0) { res.status(404).json({ error: 'Attachment not found' }); return; }
 
       const att = result.rows[0];
-      const fullPath = path.join(config.uploads.dir, att.storage_key as string);
+      let fullPath: string;
+      try {
+        fullPath = resolveUploadPath(config.uploads.dir, att.storage_key as string);
+      } catch (err) {
+        if (err instanceof UnsafeUploadPathError) {
+          res.status(404).json({ error: 'File not found on disk' }); return;
+        }
+        throw err;
+      }
 
       if (!fs.existsSync(fullPath)) { res.status(404).json({ error: 'File not found on disk' }); return; }
 
@@ -145,11 +162,18 @@ router.delete('/:id', setTenantRLS, releaseTenantClient,
       if (result.rows.length === 0) { res.status(404).json({ error: 'Attachment not found' }); return; }
 
       const att = result.rows[0];
-      const fullPath = path.join(config.uploads.dir, att.storage_key as string);
+      let fullPath: string | null = null;
+      try {
+        fullPath = resolveUploadPath(config.uploads.dir, att.storage_key as string);
+      } catch {
+        /* stored key is invalid; still delete the row */
+      }
 
       await client.query('DELETE FROM attachments WHERE id = $1', [req.params.id]);
 
-      try { fs.unlinkSync(fullPath); } catch { /* file may already be gone */ }
+      if (fullPath) {
+        try { fs.unlinkSync(fullPath); } catch { /* file may already be gone */ }
+      }
 
       res.json({ success: true });
     } catch (err) {
