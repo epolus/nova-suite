@@ -28,6 +28,27 @@ services:
       timeout: 5s
       retries: 10
 
+  # ─── Schema migrator (one-shot; bootstrap role, not nova_runtime) ───
+  nova-migrate:
+    build:
+      context: .
+      dockerfile: packages/nova-engine/Dockerfile
+    restart: "no"
+    command: ["node", "packages/nova-engine/dist/migrate.js"]
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nova}
+      POSTGRES_USER: ${POSTGRES_USER:-nova_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
   # ─── Nova Engine API ───
   nova-engine:
     build:
@@ -37,12 +58,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      nova-migrate:
+        condition: service_completed_successfully
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-nova}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-nova_runtime}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD:-changeme}}
+      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.00}
       JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-/secrets/jwt-private.pem}
       JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/secrets/jwt-public.pem}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
@@ -138,6 +162,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      nova-migrate:
+        condition: service_completed_successfully
       temporal:
         condition: service_started
     environment:
@@ -146,6 +172,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nova}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-nova_runtime}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD:-changeme}}
+      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.00}
       TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
       TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-nova-itsm}

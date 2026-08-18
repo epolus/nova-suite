@@ -2,28 +2,20 @@
 
 ## Zero-Downtime Upgrade Principles
 
-1. **Database migrations run before code deploys** — new code always sees the latest schema
+1. **Database migrations run before code deploys** — `nova-migrate` must finish before `nova-engine` / `nova-worker` start
 2. **Migrations must be backward-compatible** — old code must still work after migration
 3. **Rolling deploys** — replace instances one at a time
 4. **Health checks gate traffic** — unhealthy instances are removed from rotation
 
 ## Database Migration Strategy
 
-### Forward-Only Migrations
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). That seeds `schema_migrations` at `v00.01.00`. Those files **do not re-run** on an existing volume.
 
-Each migration is a numbered SQL file:
+Later schema changes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). That folder is empty at `v00.01.00`: the job is the mechanism for **future** changes, not a replay of P0.1–P0.3.
 
-```
-migrations/
-├── 001_initial_schema.sql
-├── 002_add_request_due_date.sql
-├── 003_add_ci_tags.sql
-└── ...
-```
+`nova-migrate` (compose one-shot, same image as the engine, command `node packages/nova-engine/dist/migrate.js`) connects as `POSTGRES_USER` (`nova_app`), applies any file whose version is greater than the ledger, then exits. Engine and worker wait on `service_completed_successfully` and keep using `POSTGRES_APP_USER` (`nova_runtime`).
 
 ### Migration Ledger Contract
-
-Nova Suite tracks applied schema versions in a migration ledger table:
 
 ```sql
 CREATE TABLE schema_migrations (
@@ -33,18 +25,18 @@ CREATE TABLE schema_migrations (
 );
 ```
 
-- Each schema change must insert exactly one new row into `schema_migrations`.
-- The API and worker compare the latest DB `version` with `DB_SCHEMA_VERSION`.
-- Mismatch behavior is degraded mode: API stays up with degraded health, and workflow background execution is gated.
-- Version format is fixed-width semantic style: `vNN.NN.NN` (example baseline: `v00.01.00`).
-- Database-level validation enforces the same version format with a table `CHECK` constraint.
+- Filename pattern: `vNN.NN.NN__slug.sql` (example: `v00.01.01__add_request_due_date.sql`).
+- One file per version. Duplicate versions fail the job.
+- Each successful file inserts exactly one ledger row. SQL error rolls back that file and exits non-zero.
+- API and worker compare `MAX(version)` with `DB_SCHEMA_VERSION`. Mismatch → degraded health; worker will not poll workflows.
+- If `schema_migrations` is missing, the job fails. It does not repair an unknown database.
 
 ### Version Bump Workflow
 
-1. Add migration SQL (forward-only, backward-compatible when possible).
-2. Insert a new ledger row (`schema_migrations.version = vNN.NN.NN`).
-3. Set `DB_SCHEMA_VERSION=vNN.NN.NN` for `nova-engine` and `nova-worker`.
-4. Deploy migration first, then deploy code.
+1. Update `init.sql` / `rls.sql` so a **wiped** volume is current. Those files stay CREATE-only (`DROP POLICY` belongs in the numbered file, not in `rls.sql`).
+2. Add `infra/postgres/migrations/vNN.NN.NN__slug.sql` with the incremental DDL (idempotent when replacing a policy).
+3. Set `DB_SCHEMA_VERSION=vNN.NN.NN` in `.env.example`, engine/worker defaults, and compose.
+4. Deploy: Postgres healthy → `nova-migrate` → engine/worker.
 5. Verify `/health` and `/api/admin/runtime-health` report schema as `compatible`.
 
 ### Backward-Compatible Changes
@@ -63,10 +55,9 @@ CREATE TABLE schema_migrations (
 ### Example: Adding a Column
 
 ```sql
--- Migration 004: Add due_date to requests
+-- infra/postgres/migrations/v00.01.01__request_due_date.sql
 ALTER TABLE requests ADD COLUMN due_date timestamptz;
 
--- Backfill existing data
 UPDATE requests r
 SET due_date = r.created_at + (si.sla_hours || ' hours')::interval
 FROM service_items si
@@ -74,7 +65,7 @@ WHERE si.id = r.service_item_id
   AND r.due_date IS NULL;
 ```
 
-Deploy this migration, then deploy the code that uses `due_date`.
+Also add the same column to `init.sql`. Deploy this migration, then deploy the code that uses `due_date`.
 
 ## Deployment Strategies
 
@@ -158,7 +149,7 @@ If a migration must be reversed:
 - [ ] All migrations are backward-compatible
 - [ ] Migrations tested against a copy of production data
 - [ ] Health check endpoint returns correctly on new version
-- [ ] Smoke tests pass against new version
+- [ ] Smoke tests pass against the new version
 - [ ] Rollback plan documented and tested
 - [ ] Team notified of deployment window
 - [ ] Monitoring dashboards open

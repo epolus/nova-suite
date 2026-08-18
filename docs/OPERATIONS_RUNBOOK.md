@@ -9,6 +9,14 @@ This runbook covers production backup/restore and secret rotation validation for
 - Created on first Postgres init by `infra/postgres/00-runtime-role.sh` and `04-runtime-grants.sql`.
 - Both processes exit on boot if the connected role is superuser or `BYPASSRLS`.
 
+## 0.1 Schema migrations
+
+`nova-migrate` is a one-shot Compose service. It connects as `POSTGRES_USER` (`nova_app`) and applies pending files from `infra/postgres/migrations/`. API and worker must not run DDL.
+
+- Engine and worker wait until this job exits 0 (`service_completed_successfully`).
+- Expected schema is `DB_SCHEMA_VERSION` (must match the latest numbered file).
+- A missing `schema_migrations` table is a hard failure, not a repair case.
+
 ## 1. Database Backup
 
 - Create a full logical backup with:

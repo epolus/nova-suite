@@ -218,7 +218,6 @@ CREATE POLICY tenant_isolation_journal ON incident_journal
   );
 
 -- ─── Major incidents: fulfillers read; managers + admin write; system (worker) writes events ───
-DROP POLICY IF EXISTS tenant_isolation_major_incidents ON major_incidents;
 CREATE POLICY major_incidents_select ON major_incidents
   FOR SELECT USING (
     tenant_id = current_tenant_id()
@@ -238,7 +237,6 @@ CREATE POLICY major_incidents_update ON major_incidents
     AND current_user_has_role('admin', 'major_incident_manager', 'system')
   );
 
-DROP POLICY IF EXISTS tenant_isolation_mi_stakeholder_updates ON major_incident_stakeholder_updates;
 CREATE POLICY mi_stakeholder_updates_select ON major_incident_stakeholder_updates
   FOR SELECT USING (
     tenant_id = current_tenant_id()
@@ -250,7 +248,6 @@ CREATE POLICY mi_stakeholder_updates_insert ON major_incident_stakeholder_update
     AND current_user_has_role('admin', 'major_incident_manager', 'system')
   );
 
-DROP POLICY IF EXISTS tenant_isolation_mi_events ON major_incident_events;
 CREATE POLICY mi_events_select ON major_incident_events
   FOR SELECT USING (
     tenant_id = current_tenant_id()
@@ -262,7 +259,6 @@ CREATE POLICY mi_events_insert ON major_incident_events
     AND current_user_has_role('admin', 'fulfiller', 'major_incident_manager', 'system')
   );
 
-DROP POLICY IF EXISTS tenant_isolation_mi_related ON major_incident_related_incidents;
 CREATE POLICY mi_related_select ON major_incident_related_incidents
   FOR SELECT USING (
     tenant_id = current_tenant_id()
@@ -274,7 +270,6 @@ CREATE POLICY mi_related_insert ON major_incident_related_incidents
     AND current_user_has_role('admin', 'major_incident_manager', 'fulfiller', 'system')
   );
 
-DROP POLICY IF EXISTS tenant_isolation_mi_participants ON major_incident_participants;
 CREATE POLICY mi_participants_select ON major_incident_participants
   FOR SELECT USING (
     tenant_id = current_tenant_id()
@@ -291,7 +286,6 @@ CREATE POLICY mi_participants_delete ON major_incident_participants
     AND current_user_has_role('admin', 'major_incident_manager', 'system')
   );
 
-DROP POLICY IF EXISTS tenant_isolation_postmortems ON postmortems;
 CREATE POLICY postmortems_select ON postmortems
   FOR SELECT USING (
     tenant_id = current_tenant_id()

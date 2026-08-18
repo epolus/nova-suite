@@ -28,6 +28,7 @@ COPY --from=deps /app /app
 COPY --from=build /app/packages/nova-engine/dist /app/packages/nova-engine/dist
 COPY --from=build /app/packages/nova-engine/package.json /app/packages/nova-engine/package.json
 COPY --from=build /app/packages/nova-shared /app/packages/nova-shared
+COPY infra/postgres/migrations /app/infra/postgres/migrations
 
 # Non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
