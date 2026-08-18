@@ -3,9 +3,11 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../../data/db';
 import { config } from '../../config';
 import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
+import { AppError } from '../../middleware/errorHandler';
 import { ENTITY_DEFS } from '../import/entity-defs';
 import { startDataSourceSync, cancelDataSourceSchedule } from '../../temporal/workflows';
 import { enqueueDataSourceScheduleStartJob } from '../../temporal/workflow-start-queue';
+import { assertPublicHttpUrl, UnsafeHttpUrlError } from '../../data/public-http-url';
 import SftpClient from 'ssh2-sftp-client';
 
 const router = Router();
@@ -163,10 +165,12 @@ async function fetchOAuth2Token(cfg: SourceConfig): Promise<string> {
     client_secret: cfg.oauth2_client_secret,
   });
   if (cfg.oauth2_scope) params.set('scope', cfg.oauth2_scope);
-  const response = await fetch(cfg.oauth2_token_url, {
+  const tokenUrl = await assertPublicHttpUrl(cfg.oauth2_token_url);
+  const response = await fetch(tokenUrl.toString(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
     body: params.toString(),
+    redirect: 'error',
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`OAuth2 token request failed: ${response.status} ${response.statusText}`);
@@ -266,7 +270,7 @@ router.post('/test-source', async (req: Request, res: Response, next: NextFuncti
         headers.Authorization = `Bearer ${sourceConfig.bearer_token}`;
       }
 
-      const requestUrl = new URL(sourceConfig.url);
+      const requestUrl = await assertPublicHttpUrl(sourceConfig.url);
       if (sourceType === 'rest_api' && sourceConfig.pagination?.enabled) {
         const p = sourceConfig.pagination;
         const mode = p.mode === 'offset' ? 'offset' : 'page';
@@ -279,7 +283,7 @@ router.post('/test-source', async (req: Request, res: Response, next: NextFuncti
         }
       }
 
-      const response = await fetch(requestUrl.toString(), { headers });
+      const response = await fetch(requestUrl.toString(), { headers, redirect: 'error' });
       contentType = response.headers.get('content-type') || '';
       const text = await response.text();
       if (!response.ok) {
@@ -302,7 +306,13 @@ router.post('/test-source', async (req: Request, res: Response, next: NextFuncti
         content_type: contentType,
       },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err instanceof UnsafeHttpUrlError) {
+      next(new AppError(400, err.message));
+      return;
+    }
+    next(err);
+  }
 });
 
 // ─── GET /api/datasources ───

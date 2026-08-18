@@ -4,6 +4,7 @@ import type { PoolClient } from 'pg';
 import { withTenantContext } from '../db';
 import SftpClient from 'ssh2-sftp-client';
 import { decryptCredentialSecret } from '../credentials/vault';
+import { assertPublicHttpUrl } from '../public-http-url';
 
 interface SourceConfig {
   url?: string;
@@ -240,10 +241,12 @@ async function fetchOAuth2Token(cfg: SourceConfig): Promise<string> {
 
   log.info('Fetching OAuth2 token', { tokenUrl: cfg.oauth2_token_url, grantType });
 
-  const response = await fetch(cfg.oauth2_token_url, {
+  const tokenUrl = await assertPublicHttpUrl(cfg.oauth2_token_url);
+  const response = await fetch(tokenUrl.toString(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
+    redirect: 'error',
   });
 
   if (!response.ok) {
@@ -290,7 +293,8 @@ async function fetchViaHttp(ds: DataSourceRow): Promise<Record<string, string>[]
     return fetchRestWithPagination(cfg, headers);
   }
 
-  const response = await fetch(cfg.url, { headers });
+  const requestUrl = await assertPublicHttpUrl(cfg.url);
+  const response = await fetch(requestUrl.toString(), { headers, redirect: 'error' });
   if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
 
   const contentType = response.headers.get('content-type') || '';
@@ -324,7 +328,7 @@ async function fetchRestWithPagination(
   const rows: Record<string, string>[] = [];
 
   for (let idx = 0; idx < maxPages; idx++) {
-    const u = new URL(cfg.url);
+    const u = await assertPublicHttpUrl(cfg.url);
     const pageSize = Math.max(1, Number(pag.page_size || pag.limit) || 100);
     if (mode === 'page') {
       const pageParam = pag.page_param || 'page';
@@ -340,7 +344,7 @@ async function fetchRestWithPagination(
       u.searchParams.set(limitParam, String(pageSize));
     }
 
-    const response = await fetch(u.toString(), { headers });
+    const response = await fetch(u.toString(), { headers, redirect: 'error' });
     if (!response.ok) {
       throw new Error(`Fetch failed on page ${idx + 1}: ${response.status} ${response.statusText}`);
     }
