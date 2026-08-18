@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg';
 import { withTenantContext } from '../db';
 import SftpClient from 'ssh2-sftp-client';
 import { decryptCredentialSecret } from '../credentials/vault';
-import { assertPublicHttpUrl } from '../public-http-url';
+import { assertPublicHttpUrl, toPublicHttpHref } from '../public-http-url';
 
 interface SourceConfig {
   url?: string;
@@ -242,7 +242,7 @@ async function fetchOAuth2Token(cfg: SourceConfig): Promise<string> {
   log.info('Fetching OAuth2 token', { tokenUrl: cfg.oauth2_token_url, grantType });
 
   const tokenUrl = await assertPublicHttpUrl(cfg.oauth2_token_url);
-  const response = await fetch(tokenUrl.toString(), {
+  const response = await fetch(toPublicHttpHref(tokenUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
@@ -294,7 +294,7 @@ async function fetchViaHttp(ds: DataSourceRow): Promise<Record<string, string>[]
   }
 
   const requestUrl = await assertPublicHttpUrl(cfg.url);
-  const response = await fetch(requestUrl.toString(), { headers, redirect: 'error' });
+  const response = await fetch(toPublicHttpHref(requestUrl), { headers, redirect: 'error' });
   if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
 
   const contentType = response.headers.get('content-type') || '';
@@ -344,7 +344,7 @@ async function fetchRestWithPagination(
       u.searchParams.set(limitParam, String(pageSize));
     }
 
-    const response = await fetch(u.toString(), { headers, redirect: 'error' });
+    const response = await fetch(toPublicHttpHref(u), { headers, redirect: 'error' });
     if (!response.ok) {
       throw new Error(`Fetch failed on page ${idx + 1}: ${response.status} ${response.statusText}`);
     }

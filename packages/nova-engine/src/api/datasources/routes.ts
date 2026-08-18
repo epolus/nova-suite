@@ -7,7 +7,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { ENTITY_DEFS } from '../import/entity-defs';
 import { startDataSourceSync, cancelDataSourceSchedule } from '../../temporal/workflows';
 import { enqueueDataSourceScheduleStartJob } from '../../temporal/workflow-start-queue';
-import { assertPublicHttpUrl, UnsafeHttpUrlError } from '../../data/public-http-url';
+import { assertPublicHttpUrl, toPublicHttpHref, UnsafeHttpUrlError } from '../../data/public-http-url';
 import SftpClient from 'ssh2-sftp-client';
 
 const router = Router();
@@ -166,7 +166,7 @@ async function fetchOAuth2Token(cfg: SourceConfig): Promise<string> {
   });
   if (cfg.oauth2_scope) params.set('scope', cfg.oauth2_scope);
   const tokenUrl = await assertPublicHttpUrl(cfg.oauth2_token_url);
-  const response = await fetch(tokenUrl.toString(), {
+  const response = await fetch(toPublicHttpHref(tokenUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
     body: params.toString(),
@@ -283,7 +283,7 @@ router.post('/test-source', async (req: Request, res: Response, next: NextFuncti
         }
       }
 
-      const response = await fetch(requestUrl.toString(), { headers, redirect: 'error' });
+      const response = await fetch(toPublicHttpHref(requestUrl), { headers, redirect: 'error' });
       contentType = response.headers.get('content-type') || '';
       const text = await response.text();
       if (!response.ok) {

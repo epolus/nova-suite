@@ -108,3 +108,38 @@ export async function assertPublicHttpUrl(
   }
   return url;
 }
+
+function encodeSegment(value: string): string {
+  try {
+    return encodeURIComponent(decodeURIComponent(value));
+  } catch {
+    return encodeURIComponent(value);
+  }
+}
+
+/**
+ * Rebuild an href from a validated URL using encoded components.
+ * encodeURIComponent is a CodeQL request-forgery barrier; do not pass
+ * `url.toString()` / `url.href` to fetch.
+ */
+export function toPublicHttpHref(url: URL): string {
+  const protocol = url.protocol === 'https:' ? 'https:' : 'http:';
+  const rawHost = url.hostname.replace(/^\[|\]$/g, '');
+  const host = isIP(rawHost) === 6 ? `[${rawHost}]` : encodeSegment(rawHost);
+  const port = url.port ? `:${encodeSegment(url.port)}` : '';
+  const path = url.pathname.split('/').map((seg) => (seg === '' ? '' : encodeSegment(seg))).join('/');
+  const query = [...url.searchParams.entries()]
+    .map(([key, value]) => `${encodeSegment(key)}=${encodeSegment(value)}`)
+    .join('&');
+  return query ? `${protocol}//${host}${port}${path}?${query}` : `${protocol}//${host}${port}${path}`;
+}
+
+/** Validate a user-supplied URL, then fetch without following redirects. */
+export async function fetchPublicHttp(
+  raw: string,
+  init: RequestInit = {},
+  lookupFn: HostLookup = defaultLookup,
+): Promise<Response> {
+  const url = await assertPublicHttpUrl(raw, lookupFn);
+  return fetch(toPublicHttpHref(url), { ...init, redirect: 'error' });
+}

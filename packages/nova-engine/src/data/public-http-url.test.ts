@@ -4,6 +4,7 @@ import {
   assertPublicHttpUrl,
   isBlockedHostname,
   isBlockedIp,
+  toPublicHttpHref,
   type HostLookup,
 } from './public-http-url';
 
@@ -58,5 +59,17 @@ describe('assertPublicHttpUrl', () => {
     const url = await assertPublicHttpUrl('https://files.example.com/data.csv', publicLookup);
     expect(url.protocol).toBe('https:');
     expect(url.hostname).toBe('files.example.com');
+  });
+});
+
+describe('toPublicHttpHref', () => {
+  it('rebuilds a public https URL with encoded path and query', () => {
+    const url = new URL('https://files.example.com/reports/Q1.csv?x=a b');
+    expect(toPublicHttpHref(url)).toBe('https://files.example.com/reports/Q1.csv?x=a%20b');
+  });
+
+  it('keeps a non-default port', () => {
+    const url = new URL('http://files.example.com:8080/data.json');
+    expect(toPublicHttpHref(url)).toBe('http://files.example.com:8080/data.json');
   });
 });
