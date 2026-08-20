@@ -1677,6 +1677,7 @@
           "nameRequired": "Name is required to save",
           "workflowTypeRequired": "Workflow type is required to save",
           "invalidJson": "Automation config JSON is invalid",
+          "canvasNotReady": "Could not read the workflow canvas. Fix any designer errors, then try Save Draft again.",
           "saveDraftFirst": "Save draft first before publishing",
           "cannotPublish": "Cannot publish: automation config JSON is invalid.",
           "duplicated": "Duplicated definition",
