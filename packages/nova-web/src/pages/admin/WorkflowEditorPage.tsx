@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
-import UnifiedAutomationDesigner from '../../components/workflow/UnifiedAutomationDesigner';
+import UnifiedAutomationDesigner, {
+  type UnifiedAutomationDesignerHandle,
+} from '../../components/workflow/UnifiedAutomationDesigner';
 import AutomationDryRunPanel from '../../components/workflow/AutomationDryRunPanel';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
@@ -12,6 +14,8 @@ import { diffObjects, formatDiffValue } from './workflow-editor/diff';
 import {
   normalizeLoadedDefinition,
   stableConfigJson,
+  defaultAutomationConfigJson,
+  isPersistableAutomationConfig,
   type EditorSnapshot,
   type PersistedUnifiedDefinition,
 } from './workflow-editor/definition';
@@ -29,12 +33,16 @@ export default function WorkflowEditorPage() {
   const [loadedVersion, setLoadedVersion] = useState<number>(0);
   const [loadedPublishedAt, setLoadedPublishedAt] = useState<string | null>(null);
   const [workflowType, setWorkflowType] = useState('ticket-triage-workflow');
-  const [automationConfigJson, setAutomationConfigJson] = useState('{\n  \n}');
+  const [automationConfigJson, setAutomationConfigJson] = useState(defaultAutomationConfigJson);
   const [baseline, setBaseline] = useState<EditorSnapshot | null>(null);
   const [localDialogOpen, setLocalDialogOpen] = useState(false);
   const absorbNextConfigRef = useRef(true);
+  const loadingDefinitionRef = useRef(false);
   const pendingLocalAction = useRef<(() => void) | null>(null);
-  const saveRef = useRef<() => Promise<boolean>>(async () => false);
+  const saveRef = useRef<(cfg?: Record<string, unknown>) => Promise<boolean>>(async () => false);
+  const designerRef = useRef<UnifiedAutomationDesignerHandle | null>(null);
+  const [designerEpoch, setDesignerEpoch] = useState(0);
+  const [designerMounted, setDesignerMounted] = useState(true);
 
   const refreshDefinitions = useCallback(async () => {
     setLoadingDefinitions(true);
@@ -89,7 +97,7 @@ export default function WorkflowEditorPage() {
     ),
   );
 
-  const saveDraft = useCallback(async (): Promise<boolean> => {
+  const saveDraft = useCallback(async (automationConfigOverride?: Record<string, unknown>): Promise<boolean> => {
     if (!definitionName.trim()) {
       setMessage(t('nameRequired'));
       return false;
@@ -98,59 +106,72 @@ export default function WorkflowEditorPage() {
       setMessage(t('workflowTypeRequired'));
       return false;
     }
-    if (!parsedAutomationConfig.valid) {
-      setMessage(t('invalidJson'));
+
+    // Prefer an explicit config (SDK save) or a synchronous canvas flush — never trust stale parent JSON alone.
+    const flushed = automationConfigOverride ?? designerRef.current?.flush() ?? null;
+    if (!isPersistableAutomationConfig(flushed)) {
+      setMessage(t('canvasNotReady'));
       return false;
     }
+    const automationConfig = flushed;
+    const configJson = JSON.stringify(automationConfig, null, 2);
+    const draft: PersistedUnifiedDefinition = {
+      kind: 'unified_automation_designer_v1',
+      workflowType: workflowType.trim(),
+      automationConfig,
+    };
+
     setBusy(true);
     try {
       if (!definitionId) {
         const created = await admin.createWorkflowDefinition({
           name: definitionName.trim(),
           workflow_type: workflowType.trim(),
-          draft_definition: serializedDraft as unknown as Record<string, unknown>,
+          draft_definition: draft as unknown as Record<string, unknown>,
         });
         setDefinitionId(created.id);
         setBaseline({
           definitionId: created.id,
           definitionName: definitionName.trim(),
           workflowType: workflowType.trim(),
-          config: stableConfigJson(automationConfigJson),
+          config: stableConfigJson(configJson),
         });
       } else {
         await admin.updateWorkflowDefinition(definitionId, {
           name: definitionName.trim(),
           workflow_type: workflowType.trim(),
-          draft_definition: serializedDraft as unknown as Record<string, unknown>,
+          draft_definition: draft as unknown as Record<string, unknown>,
         });
         setBaseline({
           definitionId,
           definitionName: definitionName.trim(),
           workflowType: workflowType.trim(),
-          config: stableConfigJson(automationConfigJson),
+          config: stableConfigJson(configJson),
         });
       }
       await refreshDefinitions();
       setMessage(t('saved'));
       return true;
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : t('invalidJson'));
+      setMessage(err instanceof Error ? err.message : t('saveFailed'));
       return false;
     } finally {
       setBusy(false);
     }
   }, [
-    automationConfigJson,
     definitionId,
     definitionName,
-    parsedAutomationConfig.valid,
     refreshDefinitions,
-    serializedDraft,
     t,
     workflowType,
   ]);
 
   saveRef.current = saveDraft;
+
+  const persistFromDesigner = useCallback(
+    (cfg: Record<string, unknown>) => saveRef.current(cfg),
+    [],
+  );
 
   const {
     dialogOpen: unsavedDialogOpen,
@@ -203,6 +224,9 @@ export default function WorkflowEditorPage() {
   }, [localDialogOpen, saveAndLeave]);
 
   const handleDesignerApply = useCallback((cfg: Record<string, unknown>) => {
+    // Ignore canvas sync while a definition is loading — a pending SyncBridge can
+    // otherwise overwrite the freshly loaded draft with the previous graph.
+    if (loadingDefinitionRef.current) return;
     setAutomationConfigJson(JSON.stringify(cfg, null, 2));
     if (absorbNextConfigRef.current) {
       absorbNextConfigRef.current = false;
@@ -220,16 +244,19 @@ export default function WorkflowEditorPage() {
     setDefinitionId(null);
     setDefinitionName(t('newDefinition'));
     setWorkflowType('ticket-triage-workflow');
-    setAutomationConfigJson('{\n  \n}');
+    setAutomationConfigJson(defaultAutomationConfigJson());
     setLoadedPublishedDefinition(null);
     setLoadedVersion(0);
     setLoadedPublishedAt(null);
     setBaseline(null);
+    setDesignerEpoch((n) => n + 1);
     setMessage(t('startedNewDraft'));
   };
 
   const loadDefinition = async (id: string) => {
     setBusy(true);
+    loadingDefinitionRef.current = true;
+    setDesignerMounted(false);
     try {
       const result = await admin.workflowDefinition(id);
       const def = result.workflow_definition;
@@ -248,9 +275,15 @@ export default function WorkflowEditorPage() {
         workflowType: normalized.workflowType,
         config: stableConfigJson(normalized.automationConfigJson),
       });
+      setDesignerEpoch((n) => n + 1);
+      setDesignerMounted(true);
       setMessage(t('loaded', { name: def.name }));
     } finally {
       setBusy(false);
+      // Allow applies only after the remount commit has been scheduled.
+      queueMicrotask(() => {
+        loadingDefinitionRef.current = false;
+      });
     }
   };
 
@@ -259,16 +292,24 @@ export default function WorkflowEditorPage() {
       setMessage(t('saveDraftFirst'));
       return;
     }
-    if (!parsedAutomationConfig.valid) {
-      setMessage(t('cannotPublish'));
+
+    const flushed = designerRef.current?.flush() ?? null;
+    if (!isPersistableAutomationConfig(flushed)) {
+      setMessage(t('canvasNotReady'));
       return;
     }
+    const draft: PersistedUnifiedDefinition = {
+      kind: 'unified_automation_designer_v1',
+      workflowType: workflowType.trim(),
+      automationConfig: flushed,
+    };
+
     setBusy(true);
     try {
       await admin.publishWorkflowDefinition(definitionId, {
-        draft_definition: serializedDraft as unknown as Record<string, unknown>,
+        draft_definition: draft as unknown as Record<string, unknown>,
       });
-      setLoadedPublishedDefinition(serializedDraft as unknown as Record<string, unknown>);
+      setLoadedPublishedDefinition(draft as unknown as Record<string, unknown>);
       setLoadedVersion((v) => v + 1);
       setLoadedPublishedAt(new Date().toISOString());
       await refreshDefinitions();
@@ -379,11 +420,16 @@ export default function WorkflowEditorPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] gap-4 xl:flex-1 xl:min-h-0">
         <div className="min-h-[420px] xl:min-h-0 xl:h-full">
-          <UnifiedAutomationDesigner
-            fillAvailableSpace
-            initialConfigJson={automationConfigJson}
-            onApply={handleDesignerApply}
-          />
+          {designerMounted ? (
+            <UnifiedAutomationDesigner
+              key={`designer-${definitionId ?? 'new'}-${designerEpoch}`}
+              ref={designerRef}
+              fillAvailableSpace
+              initialConfigJson={automationConfigJson}
+              onApply={handleDesignerApply}
+              onPersist={persistFromDesigner}
+            />
+          ) : null}
         </div>
         <div className="min-h-0 flex flex-col gap-3 xl:overflow-hidden">
           <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col min-h-0 xl:flex-1">

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import {
   getStoreDataForIntegration,
@@ -19,6 +19,19 @@ import {
 } from './sdk/adapter';
 import { workflowNodeTypes } from './sdk/nodeTypes';
 import type { BuilderError } from './unifiedAutomationDesigner.internals';
+
+export type UnifiedAutomationDesignerHandle = {
+  /** Serialize the live canvas into the parent via onApply and return it (or null if invalid). */
+  flush: () => Record<string, unknown> | null;
+};
+
+type UnifiedAutomationDesignerProps = {
+  initialConfigJson: string;
+  onApply: (cfg: Record<string, unknown>) => void;
+  /** Persist canvas config (e.g. API save). Called for manual SDK save, not autosave. */
+  onPersist?: (cfg: Record<string, unknown>) => Promise<boolean>;
+  fillAvailableSpace?: boolean;
+};
 
 const isValidConnection: WorkflowBuilderIsValidConnection = ({ sourceNode, targetNode }) => {
   if (sourceNode.id === targetNode.id) return false;
@@ -113,6 +126,10 @@ function SyncBridge({
 }) {
   const tErrors = useTranslations('components.unifiedAutomationDesigner.errors');
   const timestamp = useChangesTrackerStore((s) => s.lastChangeTimestamp);
+  // Changes tracker is a global zustand store — ignore the timestamp that already
+  // existed when this bridge mounted, or a remount will re-emit a stale graph and
+  // overwrite a freshly loaded definition.
+  const lastSeenTimestampRef = useRef<number | null>(null);
 
   const formatError = useCallback(
     (error: BuilderError) => tErrors(error.code as never, error.params as never),
@@ -121,8 +138,16 @@ function SyncBridge({
 
   useEffect(() => {
     if (!timestamp) return;
+    if (lastSeenTimestampRef.current === null) {
+      lastSeenTimestampRef.current = timestamp;
+      return;
+    }
+    if (timestamp === lastSeenTimestampRef.current) return;
+    lastSeenTimestampRef.current = timestamp;
+
     const timer = window.setTimeout(() => {
       const data = getStoreDataForIntegration();
+      if (!data.nodes?.length) return;
       const out = serializeSdkGraphToConfig(data.nodes, data.edges);
       if (!out.config) {
         onError(out.errors.map(formatError).join(' '));
@@ -193,15 +218,15 @@ function FitViewBridge({
   return null;
 }
 
-function UnifiedAutomationDesignerInner({
-  initialConfigJson,
-  onApply,
-  fillAvailableSpace = false,
-}: {
-  initialConfigJson: string;
-  onApply: (cfg: Record<string, unknown>) => void;
-  fillAvailableSpace?: boolean;
-}) {
+const UnifiedAutomationDesignerInner = forwardRef(function UnifiedAutomationDesignerInner(
+  {
+    initialConfigJson,
+    onApply,
+    onPersist,
+    fillAvailableSpace = false,
+  }: UnifiedAutomationDesignerProps,
+  ref: React.ForwardedRef<UnifiedAutomationDesignerHandle>,
+) {
   const t = useTranslations('components.unifiedAutomationDesigner');
   const tErrors = useTranslations('components.unifiedAutomationDesigner.errors');
   const lastEmittedJsonRef = useRef('');
@@ -244,29 +269,64 @@ function UnifiedAutomationDesignerInner({
     setEditorKey((k) => k + 1);
   }, [formatError, initialConfigJson, loaded]);
 
+  const applySerializedConfig = useCallback(
+    (cfg: Record<string, unknown>) => {
+      const json = JSON.stringify(cfg, null, 2);
+      lastEmittedJsonRef.current = json;
+      skipNextRemountRef.current = true;
+      onApply(cfg);
+      return cfg;
+    },
+    [onApply],
+  );
+
+  const flush = useCallback((): Record<string, unknown> | null => {
+    try {
+      const data = getStoreDataForIntegration();
+      if (!data.nodes?.length) {
+        if (loaded.error) {
+          setBuilderError(formatError(loaded.error));
+        }
+        return null;
+      }
+      const out = serializeSdkGraphToConfig(data.nodes, data.edges);
+      if (!out.config) {
+        setBuilderError(out.errors.map(formatError).join(' '));
+        return null;
+      }
+      setBuilderError('');
+      return applySerializedConfig(out.config);
+    } catch {
+      return null;
+    }
+  }, [applySerializedConfig, formatError, loaded.error]);
+
+  useImperativeHandle(ref, () => ({ flush }), [flush]);
+
   const handleSave = useCallback(
-    async (data: IntegrationDataFormat) => {
+    async (data: IntegrationDataFormat, savingParams?: { isAutoSave?: boolean }) => {
       const out = serializeSdkGraphToConfig(data.nodes, data.edges);
       if (!out.config) {
         setBuilderError(out.errors.map(formatError).join(' '));
         return 'error' as const;
       }
       setBuilderError('');
-      const json = JSON.stringify(out.config, null, 2);
-      lastEmittedJsonRef.current = json;
-      skipNextRemountRef.current = true;
-      onApply(out.config);
+      applySerializedConfig(out.config);
+      // Autosave only syncs parent JSON; manual floppy-disk save persists via the page.
+      if (onPersist && !savingParams?.isAutoSave) {
+        const ok = await onPersist(out.config);
+        return ok ? ('success' as const) : ('error' as const);
+      }
       return 'success' as const;
     },
-    [formatError, onApply],
+    [applySerializedConfig, formatError, onPersist],
   );
 
   const handleApplyFromSync = useCallback(
     (cfg: Record<string, unknown>) => {
-      skipNextRemountRef.current = true;
-      onApply(cfg);
+      applySerializedConfig(cfg);
     },
-    [onApply],
+    [applySerializedConfig],
   );
 
   // Push loaded/default graph into the parent JSON once per editor mount.
@@ -276,10 +336,8 @@ function UnifiedAutomationDesignerInner({
     if (!out.config) return;
     const json = JSON.stringify(out.config, null, 2);
     if (json === lastEmittedJsonRef.current || json === initialConfigJson) return;
-    lastEmittedJsonRef.current = json;
-    skipNextRemountRef.current = true;
-    onApply(out.config);
-  }, [editorKey, loaded, initialConfigJson, onApply]);
+    applySerializedConfig(out.config);
+  }, [applySerializedConfig, editorKey, initialConfigJson, loaded]);
 
   const nodeCount = loaded.error ? 0 : loaded.nodes.length;
 
@@ -349,12 +407,6 @@ function UnifiedAutomationDesignerInner({
       </div>
     </div>
   );
-}
+});
 
-export default function UnifiedAutomationDesigner(props: {
-  initialConfigJson: string;
-  onApply: (cfg: Record<string, unknown>) => void;
-  fillAvailableSpace?: boolean;
-}) {
-  return <UnifiedAutomationDesignerInner {...props} />;
-}
+export default UnifiedAutomationDesignerInner;
