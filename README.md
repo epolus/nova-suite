@@ -93,6 +93,26 @@ curl http://localhost:4000/health
 # Temporal UI:   http://localhost:8080
 ```
 
+### Deploy from published images
+
+To run Nova Suite without cloning or building anything, use the deployment stack. It pulls
+prebuilt images from Docker Hub and needs no files from this repository at runtime:
+
+```bash
+curl -O https://raw.githubusercontent.com/epolus/nova-suite/main/docker-compose.deploy.yml
+curl -o .env https://raw.githubusercontent.com/epolus/nova-suite/main/.env.deploy.example
+
+# Fill in the three required secrets: openssl rand -hex 24
+$EDITOR .env
+
+docker compose -f docker-compose.deploy.yml up -d
+```
+
+All five components live in one Docker Hub repository, distinguished by a tag prefix
+(`engine-`, `web-`, `worker-`, `postgres-`, `proxy-`). Set `NOVA_TAG` to pin a release across
+the whole stack. The database schema, RLS policies, runtime role and RS256 session keys are
+created automatically on first boot. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for details.
+
 **Default credentials** (quick-fill buttons on the login page; hide in production with `VITE_HIDE_DEMO_LOGIN_CREDENTIALS=true` in `.env`, then rebuild `nova-web`):
 
 | Role                   | Email                    | Password   |

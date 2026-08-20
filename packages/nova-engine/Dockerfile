@@ -30,10 +30,11 @@ COPY --from=build /app/packages/nova-engine/package.json /app/packages/nova-engi
 COPY --from=build /app/packages/nova-shared /app/packages/nova-shared
 COPY infra/postgres/migrations /app/infra/postgres/migrations
 
-# Non-root user for security
+# Non-root user for security. /secrets is created here so that an empty named
+# volume mounted over it inherits nova's ownership and the key generator can write.
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nova -u 1001 && \
-    mkdir -p /data/uploads && chown nova:nodejs /data/uploads
+    mkdir -p /data/uploads /secrets && chown nova:nodejs /data/uploads /secrets
 USER nova
 
 EXPOSE 4000
