@@ -61,7 +61,29 @@ SMTP_USER=
 SMTP_PASS=
 ```
 
+## Deployment stack (published images)
+
+These apply to `docker-compose.deploy.yml`, which pulls published images instead of building.
+See `.env.deploy.example` for the annotated baseline.
+
+| Variable | Default | Notes |
+|----------|---------|--------|
+| `NOVA_IMAGE` | `epolus/nova-suite` | Docker Hub repository holding all five components. |
+| `NOVA_TAG` | `latest` | Version applied to every component. Tags are prefixed per component (`engine-1.4.2`, `web-1.4.2`, …), so this value is the part after the prefix. Pin a release in production. |
+| `NOVA_LOAD_DEMO_DATA` | `false` | Loads the bulk demo dataset (~500 incidents, ~200 requests, ~80 CIs) during **database initialization only**. Ignored on an existing volume. |
+| `HTTP_PORT` / `HTTPS_PORT` | `80` / `443` | Host ports published by the edge proxy. |
+
+`POSTGRES_PASSWORD`, `CREDENTIALS_MASTER_KEY` and `CATALOG_AUTOMATION_SHARED_KEY` are declared
+required in that file, so Compose fails with a named error rather than starting on a placeholder.
+
 ## Behavior Notes
+
+- **JWT keys in the deployment stack** — the `nova-keygen` one-shot service runs
+  `node packages/nova-engine/dist/ensure-jwt-keys.js` before the API starts and writes an RS256
+  pair into the `nova_secrets` volume at `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`. It never
+  overwrites existing keys, and aborts if only one half of the pair is present rather than
+  issuing tokens the API cannot verify. Deleting the volume invalidates every active session.
+  Inline `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` take precedence and skip generation entirely.
 
 - **`CREDENTIALS_MASTER_KEY`** — symmetric passphrase for PostgreSQL `pgp_sym_encrypt` / `pgp_sym_decrypt` on the `tenant_credentials` table. Must be identical on **nova-engine** (create/list credentials, data source **Test connection**) and **nova-worker** (catalog `{{cred.slug}}`, scheduled imports using `credential_slug`). Use a long random string (≥16 characters). If unset or too short, vault writes and runtime decryption fail.
 - **`CATALOG_AUTOMATION_SHARED_KEY`** — shared secret used by internal catalog automation endpoints under `/api/catalog/automation/*` (for example the demo add-support-group-member endpoint). Must be identical on **nova-engine** and **nova-worker**. If missing/mismatched, automated tasks can fail with HTTP `401 Invalid automation key` or `503 Catalog automation key is not configured`.

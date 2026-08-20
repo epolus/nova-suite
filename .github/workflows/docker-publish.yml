@@ -20,17 +20,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || github.repository_owner }}
+      # All five components share one Docker Hub repository and are told apart by
+      # a tag prefix, e.g. nova-suite:engine-1.4.2 and nova-suite:web-1.4.2.
+      IMAGE: ${{ vars.DOCKERHUB_NAMESPACE || github.repository_owner }}/nova-suite
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: nova-engine
+          - component: engine
             dockerfile: packages/nova-engine/Dockerfile
-          - name: nova-worker
+          - component: worker
             dockerfile: packages/nova-worker/Dockerfile
-          - name: nova-web
+          - component: web
             dockerfile: packages/nova-web/Dockerfile
+          - component: proxy
+            dockerfile: infra/caddy/Dockerfile
+          - component: postgres
+            dockerfile: infra/postgres/Dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -48,13 +54,16 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.NAMESPACE }}/${{ matrix.name }}
+          images: ${{ env.IMAGE }}
+          # latest=false is required: semver's automatic "latest" would be
+          # unprefixed, so all five components would overwrite each other.
+          flavor: latest=false
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=match,pattern=v(.*),group=1
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha,format=short
+            type=raw,value=${{ matrix.component }}-latest,enable={{is_default_branch}}
+            type=match,pattern=v(.*),group=1,prefix=${{ matrix.component }}-
+            type=semver,pattern={{major}}.{{minor}},prefix=${{ matrix.component }}-
+            type=semver,pattern={{major}},prefix=${{ matrix.component }}-
+            type=sha,format=short,prefix=${{ matrix.component }}-sha-
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -67,5 +76,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Keeps the Docker Hub tag list free of "unknown/unknown" attestation entries
           provenance: false
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
