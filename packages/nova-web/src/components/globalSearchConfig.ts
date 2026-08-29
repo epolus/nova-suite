@@ -83,7 +83,7 @@ export const NAV_ITEM_DEFS: NavItemDef[] = [
   { id: 'adminServiceItems', path: '/admin/service-items', icon: 'service_item', adminOnly: true },
 ];
 
-export const COMMAND_NAMES = ['inc', 'chg', 'prb', 'kb', 'ci', 'help'] as const;
+export const COMMAND_NAMES = ['inc', 'chg', 'prb', 'kb', 'ci', 'cat', 'help'] as const;
 
 export const COMMAND_TYPES: Record<(typeof COMMAND_NAMES)[number], SearchResult['type'] | null> = {
   inc: 'incident',
@@ -91,6 +91,7 @@ export const COMMAND_TYPES: Record<(typeof COMMAND_NAMES)[number], SearchResult[
   prb: 'problem',
   kb: 'knowledge',
   ci: 'ci',
+  cat: 'catalog',
   help: null,
 };
 
@@ -118,6 +119,8 @@ export const TYPE_ICON: Record<string, IconName> = {
   kb: 'knowledge',
   ci: 'ci',
   configuration_item: 'ci',
+  catalog: 'catalog',
+  service_item: 'catalog',
 };
 
 export const CMD_ICON: Record<string, IconName> = {
@@ -126,6 +129,7 @@ export const CMD_ICON: Record<string, IconName> = {
   prb: 'problem',
   kb: 'knowledge',
   ci: 'ci',
+  cat: 'catalog',
   help: 'help',
 };
 
@@ -143,5 +147,6 @@ export function normalizeResultType(type: string): string {
   const value = String(type || '').toLowerCase();
   if (value === 'kb') return 'knowledge';
   if (value === 'configuration_item') return 'ci';
+  if (value === 'service_item') return 'catalog';
   return value;
 }
