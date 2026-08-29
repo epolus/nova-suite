@@ -6,6 +6,24 @@ Nova Suite is a complete service management solution: a self-service portal with
 
 Source: **[github.com/epolus/nova-suite](https://github.com/epolus/nova-suite)**
 
+## Screenshots
+
+![Employee self-service portal](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/portal.png)
+
+*Employee self-service portal — search, service catalog, requests, and knowledge base*
+
+![Incident detail](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/incident-detail.png)
+
+*Incident detail — assignment, priority, SLA, caller context, and resolution actions*
+
+![CMDB configuration item](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/cmdb-ci.png)
+
+*CMDB configuration item — attributes, relationships, history, and impact analysis*
+
+![Admin workflow editor](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/admin-workflow.png)
+
+*Workflow designer — visual Temporal automation with live JSON sync and test runs*
+
 ## Quick start
 
 The whole stack runs from two files, with no need to clone the repository:
