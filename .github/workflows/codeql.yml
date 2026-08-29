@@ -1,0 +1,64 @@
+# CodeQL configuration for default setup and advanced workflows.
+# The intentional fetch sink lives in public-http-fetch.ts after
+# assertPublicHttpUrl / DNS private-IP checks; CodeQL cannot model that
+# denylist as an SSRF sanitizer (open public URL fetch is required for importers).
+name: Nova Suite CodeQL
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - 'packages/nova-engine/src/data/public-http-fetch.ts'
+      - 'packages/nova-worker/src/public-http-fetch.ts'
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:
+      - 'packages/nova-engine/src/data/public-http-fetch.ts'
+      - 'packages/nova-worker/src/public-http-fetch.ts'
+  schedule:
+    - cron: '30 1 * * 2'
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - language: actions
+          build-mode: none
+        - language: javascript-typescript
+          build-mode: none
+          
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+
+    - name: Run manual build steps
+      if: matrix.build-mode == 'manual'
+      shell: bash
+      run: |
+        echo 'If you are using a "manual" build mode for one or more of the' \
+          'languages you are analyzing, replace this with the commands to build' \
+          'your code, for example:'
+        echo '  make bootstrap'
+        echo '  make release'
+        exit 1
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
+      with:
+        category: "/language:${{matrix.language}}"
