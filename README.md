@@ -8,6 +8,21 @@
 
 Nova Suite provides a complete service management solution — service catalog, incident management, CMDB, workflow automation, SSO, AI assistant, and a modern admin dashboard — all with built-in multi-tenancy and row-level security.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/portal.png" alt="Employee self-service portal" width="80%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/incident-detail.png" alt="Incident detail" width="80%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/cmdb-ci.png" alt="CMDB configuration item" width="80%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/admin-workflow.png" alt="Admin workflow editor" width="80%">
+</p>
+
 ## Features
 
 ### User Portal
@@ -300,6 +315,7 @@ nova-suite/
 │   └── caddy/
 │       └── Caddyfile             # Reverse proxy config
 ├── docs/
+│   ├── screenshots/              # Product screenshots (README + Docker Hub)
 │   ├── ARCHITECTURE.md
 │   ├── AI_ASSISTANT.md
 │   ├── CATALOG_TASK_AUTOMATION.md
