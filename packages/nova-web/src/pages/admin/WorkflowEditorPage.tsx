@@ -432,18 +432,18 @@ export default function WorkflowEditorPage() {
           ) : null}
         </div>
         <div className="min-h-0 flex flex-col gap-3 xl:overflow-hidden">
-          <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col min-h-0 xl:flex-1">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col min-h-[180px] xl:flex-1 xl:min-h-[180px]">
             <p className="text-sm font-semibold text-gray-900 mb-2 shrink-0">{t('unifiedJson')}</p>
             <textarea
               value={automationConfigJson}
               onChange={(e) => setAutomationConfigJson(e.target.value)}
-              className="w-full flex-1 min-h-[160px] px-2.5 py-2 rounded-sm border border-gray-200 text-sm font-mono resize-y xl:resize-none"
+              className="w-full flex-1 min-h-[120px] px-2.5 py-2 rounded-sm border border-gray-200 text-sm font-mono resize-y xl:resize-none"
             />
             {!parsedAutomationConfig.valid && (
               <p className="mt-2 text-xs text-red-700 shrink-0">{t('jsonInvalid')}</p>
             )}
           </div>
-          <div className="shrink-0">
+          <div className="min-h-0 xl:max-h-[48%] xl:overflow-y-auto">
             <AutomationDryRunPanel
               disabled={busy || !parsedAutomationConfig.valid}
               getConfig={() => {
