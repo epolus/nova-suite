@@ -3,7 +3,7 @@
 // GET /api/search?q=term&limit=20
 //
 // Fuzzy search across incidents, changes, problems, knowledge articles,
-// and configuration items.
+// configuration items, and service catalog items.
 //
 // Scoring priority per row:
 //   1.00  exact number match         (lower(number) = lower(q))
@@ -183,7 +183,54 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           OR similarity(COALESCE(ci.display_name, ci.name), $1) > 0.10
           OR similarity(ci.name, $1) > 0.10
         )
-        AND $4::boolean
+        -- Fulfillers see all CIs; ESS users see CIs they manage or are assigned to
+        -- (mirrors GET /api/cmdb/items/:id access and incident caller_id scoping)
+        AND (
+          $4::boolean
+          OR ci.managed_by = current_user_id()
+          OR ci.assigned_to = current_user_id()
+        )
+        AND ($4::boolean OR ci.is_active = true)
+
+        UNION ALL
+
+        -- ── Service Catalog Items ───────────────────────────────
+        SELECT
+          'catalog'::text,
+          si.id::text,
+          COALESCE(si.external_key, si.name),
+          si.name,
+          COALESCE(
+            NULLIF(trim(both FROM concat_ws(' · ', sc.name, si.short_description)), ''),
+            sc.name
+          ),
+          '/catalog/' || si.id,
+          GREATEST(
+            CASE WHEN lower(si.name) = lower($1)                            THEN 1.00 ELSE 0 END,
+            CASE WHEN si.name ILIKE $1 || '%'                                THEN 0.80 ELSE 0 END,
+            CASE WHEN si.name ILIKE '%' || $1 || '%'                         THEN 0.60 ELSE 0 END,
+            CASE WHEN si.short_description ILIKE '%' || $1 || '%'            THEN 0.50 ELSE 0 END,
+            CASE WHEN sc.name ILIKE '%' || $1 || '%'                         THEN 0.45 ELSE 0 END,
+            CASE WHEN si.external_key ILIKE '%' || $1 || '%'                 THEN 0.55 ELSE 0 END,
+            similarity(si.name, $1) * 0.9,
+            similarity(COALESCE(si.short_description, ''), $1) * 0.5,
+            similarity(sc.name, $1) * 0.4
+          )
+        FROM service_items si
+        JOIN service_categories sc ON sc.id = si.category_id
+        WHERE (
+          lower(si.name) = lower($1)
+          OR si.name ILIKE $1 || '%'
+          OR si.name ILIKE '%' || $1 || '%'
+          OR si.short_description ILIKE '%' || $1 || '%'
+          OR sc.name ILIKE '%' || $1 || '%'
+          OR si.external_key ILIKE '%' || $1 || '%'
+          OR similarity(si.name, $1) > 0.10
+          OR similarity(COALESCE(si.short_description, ''), $1) > 0.10
+          OR similarity(sc.name, $1) > 0.10
+        )
+        AND si.is_active = true
+        AND sc.is_active = true
 
       )
       SELECT type, id, identifier, title, subtitle, path, score

@@ -6,7 +6,7 @@ import { search, type SearchResult } from '../api/client';
 import PageHeader from '../components/PageHeader';
 import Spinner from '../components/Spinner';
 
-const TYPE_ORDER: SearchResult['type'][] = ['incident', 'change', 'problem', 'knowledge', 'ci'];
+const TYPE_ORDER: SearchResult['type'][] = ['incident', 'change', 'problem', 'knowledge', 'ci', 'catalog'];
 
 function groupByType(items: SearchResult[]): Record<SearchResult['type'], SearchResult[]> {
   return items.reduce((acc, item) => {

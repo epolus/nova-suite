@@ -48,7 +48,7 @@ export default function GlobalSearchPanel({
 
   const typeLabel = (type: string) => {
     const key = normalizeResultType(type);
-    if (key === 'incident' || key === 'change' || key === 'problem' || key === 'knowledge' || key === 'ci') {
+    if (key === 'incident' || key === 'change' || key === 'problem' || key === 'knowledge' || key === 'ci' || key === 'catalog') {
       return t(`types.${key}`);
     }
     return t('types.record');

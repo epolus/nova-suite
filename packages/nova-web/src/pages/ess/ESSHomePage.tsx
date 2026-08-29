@@ -4,14 +4,8 @@ import { useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { useAuth } from '../../context/AuthContext';
 import { search as searchApi, type SearchResult } from '../../api/client';
-
-const TYPE_ICON: Record<string, string> = {
-  incident: '🔥',
-  change:   '🛠️',
-  problem:  '🧩',
-  knowledge:'📚',
-  ci:       '🖥️',
-};
+import { TYPE_ICON, normalizeResultType } from '../../components/globalSearchConfig';
+import { AppIcon } from '../../components/globalSearchIcons';
 
 function useGreeting(name: string): string {
   const t = useTranslations('pages.ess.home');
@@ -33,6 +27,7 @@ function ESSSearchBar() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -44,9 +39,22 @@ function ESSSearchBar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const active = list.querySelector<HTMLElement>('[data-active="true"]');
+    active?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, results]);
+
   const typeLabel = useCallback(
     (type: string) => {
-      const key = type as 'incident' | 'change' | 'problem' | 'knowledge' | 'ci';
+      const key = normalizeResultType(type) as
+        | 'incident'
+        | 'change'
+        | 'problem'
+        | 'knowledge'
+        | 'ci'
+        | 'catalog';
       if (key in TYPE_ICON) return t(`searchTypes.${key}`);
       return type;
     },
@@ -134,7 +142,10 @@ function ESSSearchBar() {
       </div>
 
       {showDropdown && (
-        <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
+        <div
+          ref={listRef}
+          className="absolute top-full mt-2 w-full max-h-80 overflow-y-auto bg-white rounded-xl shadow-xl border border-gray-100 z-50"
+        >
           {searchError ? (
             <p className="px-4 py-6 text-sm text-red-600 text-center">{searchError}</p>
           ) : loading && results.length === 0 ? (
@@ -144,33 +155,38 @@ function ESSSearchBar() {
               {t('noResultsFor', { query })}
             </p>
           ) : (
-            results.map((r, i) => (
-              <button
-                key={`${r.type}-${r.id}`}
-                onClick={() => handleSelect(r)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                  activeIndex === i ? 'bg-indigo-50' : 'hover:bg-gray-50'
-                } ${i < results.length - 1 ? 'border-b border-gray-50' : ''}`}
-              >
-                <span className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-sm shrink-0">
-                  {TYPE_ICON[r.type] ?? '📄'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                      {typeLabel(r.type)}
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-mono">{r.identifier}</span>
+            results.map((r, i) => {
+              const resultType = normalizeResultType(r.type);
+              return (
+                <button
+                  key={`${r.type}-${r.id}`}
+                  type="button"
+                  data-active={activeIndex === i ? 'true' : undefined}
+                  onClick={() => handleSelect(r)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                    activeIndex === i ? 'bg-indigo-50' : 'hover:bg-gray-50'
+                  } ${i < results.length - 1 ? 'border-b border-gray-50' : ''}`}
+                >
+                  <span className="w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center text-sm shrink-0 text-gray-600">
+                    <AppIcon name={TYPE_ICON[resultType] ?? 'record'} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                        {typeLabel(resultType)}
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-mono">{r.identifier}</span>
+                    </div>
+                    <p className={`text-sm font-medium truncate ${activeIndex === i ? 'text-indigo-700' : 'text-gray-800'}`}>
+                      {r.title}
+                    </p>
+                    {r.subtitle && (
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{r.subtitle}</p>
+                    )}
                   </div>
-                  <p className={`text-sm font-medium truncate ${activeIndex === i ? 'text-indigo-700' : 'text-gray-800'}`}>
-                    {r.title}
-                  </p>
-                  {r.subtitle && (
-                    <p className="text-xs text-gray-400 truncate mt-0.5">{r.subtitle}</p>
-                  )}
-                </div>
-              </button>
-            ))
+                </button>
+              );
+            })
           )}
         </div>
       )}
@@ -229,14 +245,17 @@ export default function ESSHomePage() {
 
   return (
     <div className="flex flex-col">
-      <section className="relative overflow-hidden bg-linear-to-br from-slate-900 to-indigo-950 text-white">
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: 'linear-gradient(var(--color-primary) 1px, transparent 1px), linear-gradient(to right, var(--color-primary) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
+      <section className="relative bg-linear-to-br from-slate-900 to-indigo-950 text-white">
+        {/* Clip the decorative grid only — not the search dropdown */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+          <div
+            className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage: 'linear-gradient(var(--color-primary) 1px, transparent 1px), linear-gradient(to right, var(--color-primary) 1px, transparent 1px)',
+              backgroundSize: '40px 40px',
+            }}
+          />
+        </div>
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 flex flex-col items-center text-center">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
             {greeting}

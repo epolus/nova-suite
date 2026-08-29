@@ -104,7 +104,7 @@ export interface AppNotification {
 }
 
 export interface SearchResult {
-  type: 'incident' | 'change' | 'problem' | 'knowledge' | 'ci';
+  type: 'incident' | 'change' | 'problem' | 'knowledge' | 'ci' | 'catalog';
   id: string;
   identifier: string;
   title: string;

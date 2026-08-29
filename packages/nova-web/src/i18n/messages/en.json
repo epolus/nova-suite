@@ -1251,7 +1251,8 @@
         "change": "Changes",
         "problem": "Problems",
         "knowledge": "Knowledge",
-        "ci": "CMDB"
+        "ci": "CMDB",
+        "catalog": "Services"
       }
     },
     "admin": {
@@ -2883,7 +2884,8 @@
           "change": "Change",
           "problem": "Problem",
           "knowledge": "Knowledge",
-          "ci": "CMDB"
+          "ci": "CMDB",
+          "catalog": "Service"
         }
       },
       "approvals": {
@@ -3144,7 +3146,7 @@
     "globalSearch": {
       "placeholder": "Search...",
       "title": "Global search (Ctrl+K)",
-      "searchIncidentsPlaceholder": "Search incidents, changes, knowledge articles, CIs...",
+      "searchIncidentsPlaceholder": "Search incidents, changes, knowledge articles, services, CIs...",
       "searchTypePlaceholder": "Search {type}...",
       "commandPlaceholder": "Type a command or pick one below...",
       "typeToSearchType": "Type to search {type}...",
@@ -3170,6 +3172,7 @@
         "problem": "Problem",
         "knowledge": "Knowledge",
         "ci": "CMDB",
+        "catalog": "Service",
         "record": "Record"
       },
       "commandDefs": {
@@ -3178,6 +3181,7 @@
         "prb": { "label": "Problems", "description": "Search only problems" },
         "kb": { "label": "Knowledge", "description": "Search only knowledge articles" },
         "ci": { "label": "CMDB", "description": "Search only configuration items" },
+        "cat": { "label": "Services", "description": "Search only catalog services" },
         "help": { "label": "Help", "description": "Show all available commands" }
       },
       "nav": {
