@@ -17,6 +17,8 @@ export interface FormData {
   // OAuth2 (rest_api)
   auth_type: string;
   bearer_token: string;
+  basic_username: string;
+  basic_password: string;
   oauth2_token_url: string;
   oauth2_client_id: string;
   oauth2_client_secret: string;
@@ -62,6 +64,8 @@ export const EMPTY_FORM: FormData = {
   column_mapping: '{}',
   auth_type: 'none',
   bearer_token: '',
+  basic_username: '',
+  basic_password: '',
   oauth2_token_url: '',
   oauth2_client_id: '',
   oauth2_client_secret: '',
@@ -136,17 +140,23 @@ export function buildSaveSourceConfig(
     sourceConfig.url = form.url;
     if (Object.keys(headers).length > 0) sourceConfig.headers = headers;
     if (form.json_path) sourceConfig.json_path = form.json_path;
-    if (form.source_type === 'rest_api') {
-      sourceConfig.auth_type = form.auth_type;
-      if (form.auth_type === 'bearer') {
+    if (form.source_type === 'rest_api' || form.source_type === 'csv_url' || form.source_type === 'json_url') {
+      const authType = form.source_type !== 'rest_api' && form.auth_type === 'oauth2'
+        ? 'none'
+        : form.auth_type;
+      sourceConfig.auth_type = authType;
+      if (authType === 'bearer') {
         sourceConfig.bearer_token = form.bearer_token;
-      } else if (form.auth_type === 'oauth2') {
+      } else if (authType === 'basic') {
+        sourceConfig.basic_username = form.basic_username;
+        sourceConfig.basic_password = form.basic_password;
+      } else if (form.source_type === 'rest_api' && authType === 'oauth2') {
         sourceConfig.oauth2_token_url = form.oauth2_token_url;
         sourceConfig.oauth2_client_id = form.oauth2_client_id;
         sourceConfig.oauth2_client_secret = form.oauth2_client_secret;
         if (form.oauth2_scope) sourceConfig.oauth2_scope = form.oauth2_scope;
       }
-      if (form.pagination_enabled) {
+      if (form.source_type === 'rest_api' && form.pagination_enabled) {
         sourceConfig.pagination = buildPagination(form);
       }
     }
@@ -156,6 +166,7 @@ export function buildSaveSourceConfig(
   if (slugTrim) {
     sourceConfig.credential_slug = slugTrim;
     delete sourceConfig.bearer_token;
+    delete sourceConfig.basic_password;
     delete sourceConfig.oauth2_client_secret;
     delete sourceConfig.sftp_password;
   }
@@ -182,16 +193,23 @@ export function buildTestSourceConfig(
     if (Object.keys(headers).length > 0) sourceConfig.headers = headers;
     if (form.json_path) sourceConfig.json_path = form.json_path;
   }
-  if (form.source_type === 'rest_api') {
-    sourceConfig.auth_type = form.auth_type;
-    if (form.auth_type === 'bearer') sourceConfig.bearer_token = form.bearer_token;
-    if (form.auth_type === 'oauth2') {
+  if (form.source_type === 'rest_api' || form.source_type === 'csv_url' || form.source_type === 'json_url') {
+    const authType = form.source_type !== 'rest_api' && form.auth_type === 'oauth2'
+      ? 'none'
+      : form.auth_type;
+    sourceConfig.auth_type = authType;
+    if (authType === 'bearer') sourceConfig.bearer_token = form.bearer_token;
+    if (authType === 'basic') {
+      sourceConfig.basic_username = form.basic_username;
+      sourceConfig.basic_password = form.basic_password;
+    }
+    if (form.source_type === 'rest_api' && authType === 'oauth2') {
       sourceConfig.oauth2_token_url = form.oauth2_token_url;
       sourceConfig.oauth2_client_id = form.oauth2_client_id;
       sourceConfig.oauth2_client_secret = form.oauth2_client_secret;
       if (form.oauth2_scope) sourceConfig.oauth2_scope = form.oauth2_scope;
     }
-    if (form.pagination_enabled) {
+    if (form.source_type === 'rest_api' && form.pagination_enabled) {
       sourceConfig.pagination = buildPagination(form);
     }
   }
@@ -200,6 +218,7 @@ export function buildTestSourceConfig(
   if (slugTrimTest) {
     sourceConfig.credential_slug = slugTrimTest;
     delete sourceConfig.bearer_token;
+    delete sourceConfig.basic_password;
     delete sourceConfig.oauth2_client_secret;
     delete sourceConfig.sftp_password;
   }

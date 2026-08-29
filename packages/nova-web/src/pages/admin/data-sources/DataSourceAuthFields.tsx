@@ -16,7 +16,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
 
   return (
     <>
-      {(form.source_type === 'rest_api' || form.source_type === 'sftp') && (
+      {(form.source_type === 'rest_api' || form.source_type === 'csv_url' || form.source_type === 'json_url' || form.source_type === 'sftp') && (
         <Card>
           <h3 className="font-semibold text-gray-900 mb-4">{t('vaultSection')}</h3>
           <p className="text-xs text-gray-500 mb-3">
@@ -30,6 +30,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
               onChange={(e) => setField('credential_slug', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
               placeholder="my_integration_secret"
+              autoComplete="off"
             />
             <datalist id="nova-vault-slugs-ds">
               {vaultCreds.map((c) => (
@@ -40,8 +41,8 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
         </Card>
       )}
 
-      {/* ── Authentication (REST API only) ── */}
-      {form.source_type === 'rest_api' && (
+      {/* ── Authentication (HTTP sources) ── */}
+      {(form.source_type === 'rest_api' || form.source_type === 'csv_url' || form.source_type === 'json_url') && (
         <Card>
           <h3 className="font-semibold text-gray-900 mb-4">{t('authentication')}</h3>
           <div className="space-y-4">
@@ -54,7 +55,10 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
               >
                 <option value="none">{t('authTypes.none')}</option>
                 <option value="bearer">{t('authTypes.bearer')}</option>
-                <option value="oauth2">{t('authTypes.oauth2')}</option>
+                <option value="basic">{t('authTypes.basic')}</option>
+                {form.source_type === 'rest_api' && (
+                  <option value="oauth2">{t('authTypes.oauth2')}</option>
+                )}
               </select>
             </div>
 
@@ -67,11 +71,54 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
                   onChange={(e) => setField('bearer_token', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
                   placeholder="your-api-token"
+                  name="ds-bearer-token"
+                  autoComplete="new-password"
                 />
               </div>
             )}
 
-            {form.auth_type === 'oauth2' && (
+            {form.auth_type === 'basic' && (
+              <div className="space-y-3">
+                {form.credential_slug.trim() ? (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    {t('basicVaultPasswordHint')}
+                  </p>
+                ) : null}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('basicUsername')}</label>
+                    <input
+                      type="text"
+                      value={form.basic_username}
+                      onChange={(e) => setField('basic_username', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
+                      placeholder="username"
+                      name="ds-basic-username"
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('basicPassword')}</label>
+                    <input
+                      type="password"
+                      value={form.basic_password}
+                      onChange={(e) => setField('basic_password', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
+                      placeholder={form.credential_slug.trim() ? t('passwordFromVault') : 'password'}
+                      name="ds-basic-password"
+                      autoComplete="new-password"
+                      data-1p-ignore
+                      data-lpignore="true"
+                      disabled={Boolean(form.credential_slug.trim())}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {form.source_type === 'rest_api' && form.auth_type === 'oauth2' && (
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{tFields('tokenUrl')}</label>

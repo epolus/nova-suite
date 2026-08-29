@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg';
 import { withTenantContext } from '../db';
 import SftpClient from 'ssh2-sftp-client';
 import { decryptCredentialSecret } from '../credentials/vault';
-import { assertPublicHttpUrl, toPublicHttpHref } from '../public-http-url';
+import { assertPublicHttpUrl, fetchPublicHttp, fetchValidatedPublicHttp } from '../public-http-url';
 
 interface SourceConfig {
   url?: string;
@@ -12,9 +12,11 @@ interface SourceConfig {
   json_path?: string;
   /** When set, secret value is loaded from tenant_credentials (same as catalog {{cred.slug}}). */
   credential_slug?: string;
-  // OAuth2 (for rest_api)
-  auth_type?: 'none' | 'bearer' | 'oauth2';
+  // Auth (for HTTP sources)
+  auth_type?: 'none' | 'bearer' | 'basic' | 'oauth2';
   bearer_token?: string;
+  basic_username?: string;
+  basic_password?: string;
   oauth2_token_url?: string;
   oauth2_client_id?: string;
   oauth2_client_secret?: string;
@@ -70,6 +72,8 @@ async function resolveSourceConfigSecrets(
   const next: SourceConfig = { ...cfg };
   if (next.auth_type === 'oauth2') {
     next.oauth2_client_secret = secret;
+  } else if (next.auth_type === 'basic') {
+    next.basic_password = secret;
   } else {
     next.bearer_token = secret;
     if (!next.auth_type || next.auth_type === 'none') {
@@ -241,12 +245,10 @@ async function fetchOAuth2Token(cfg: SourceConfig): Promise<string> {
 
   log.info('Fetching OAuth2 token', { tokenUrl: cfg.oauth2_token_url, grantType });
 
-  const tokenUrl = await assertPublicHttpUrl(cfg.oauth2_token_url);
-  const response = await fetch(toPublicHttpHref(tokenUrl), {
+  const response = await fetchPublicHttp(cfg.oauth2_token_url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
-    redirect: 'error',
   });
 
   if (!response.ok) {
@@ -287,6 +289,11 @@ async function fetchViaHttp(ds: DataSourceRow): Promise<Record<string, string>[]
     headers['Authorization'] = `Bearer ${token}`;
   } else if (cfg.auth_type === 'bearer' && cfg.bearer_token) {
     headers['Authorization'] = `Bearer ${cfg.bearer_token}`;
+  } else if (cfg.auth_type === 'basic') {
+    const username = (cfg.basic_username ?? '').trim();
+    const password = cfg.basic_password ?? '';
+    if (!username) throw new Error('Basic auth requires a username');
+    headers['Authorization'] = `Basic ${Buffer.from(`${username}:${password}`, 'utf8').toString('base64')}`;
   }
 
   if (ds.source_type === 'rest_api' && cfg.pagination?.enabled) {
@@ -294,7 +301,7 @@ async function fetchViaHttp(ds: DataSourceRow): Promise<Record<string, string>[]
   }
 
   const requestUrl = await assertPublicHttpUrl(cfg.url);
-  const response = await fetch(toPublicHttpHref(requestUrl), { headers, redirect: 'error' });
+  const response = await fetchValidatedPublicHttp(requestUrl, { headers });
   if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
 
   const contentType = response.headers.get('content-type') || '';
@@ -330,21 +337,28 @@ async function fetchRestWithPagination(
   for (let idx = 0; idx < maxPages; idx++) {
     const u = await assertPublicHttpUrl(cfg.url);
     const pageSize = Math.max(1, Number(pag.page_size || pag.limit) || 100);
+    const safeParam = (name: string, fallback: string) => {
+      const value = (name || fallback).trim();
+      if (!/^[A-Za-z0-9._-]{1,64}$/.test(value)) {
+        throw new Error(`Invalid pagination parameter name: ${value}`);
+      }
+      return value;
+    };
     if (mode === 'page') {
-      const pageParam = pag.page_param || 'page';
-      const pageSizeParam = pag.page_size_param || 'limit';
+      const pageParam = safeParam(pag.page_param || 'page', 'page');
+      const pageSizeParam = safeParam(pag.page_size_param || 'limit', 'limit');
       const pageStart = Number(pag.page_start ?? 1);
       u.searchParams.set(pageParam, String(pageStart + idx));
       u.searchParams.set(pageSizeParam, String(pageSize));
     } else {
-      const offsetParam = pag.offset_param || 'offset';
-      const limitParam = pag.limit_param || 'limit';
+      const offsetParam = safeParam(pag.offset_param || 'offset', 'offset');
+      const limitParam = safeParam(pag.limit_param || 'limit', 'limit');
       const offsetStart = Number(pag.offset_start ?? 0);
       u.searchParams.set(offsetParam, String(offsetStart + idx * pageSize));
       u.searchParams.set(limitParam, String(pageSize));
     }
 
-    const response = await fetch(toPublicHttpHref(u), { headers, redirect: 'error' });
+    const response = await fetchValidatedPublicHttp(u, { headers });
     if (!response.ok) {
       throw new Error(`Fetch failed on page ${idx + 1}: ${response.status} ${response.statusText}`);
     }
@@ -413,6 +427,27 @@ function inferFileType(path: string): 'csv' | 'json' {
   return 'csv';
 }
 
+function coerceJsonRows(picked: unknown, jsonPath?: string): unknown[] {
+  if (Array.isArray(picked)) return picked;
+  if (picked && typeof picked === 'object') {
+    const record = picked as Record<string, unknown>;
+    // Common API wrappers: { data: [...] }, { items: [...] }, { results: [...] }
+    const preferredKeys = ['data', 'items', 'results', 'records', 'rows', 'value'];
+    for (const key of preferredKeys) {
+      if (Array.isArray(record[key])) return record[key] as unknown[];
+    }
+    const arrayValue = Object.values(record).find((value) => Array.isArray(value));
+    if (arrayValue) return arrayValue as unknown[];
+    // Single object payload → one import row
+    return [record];
+  }
+  throw new Error(
+    jsonPath
+      ? `JSON path "${jsonPath}" did not resolve to an array or object`
+      : 'JSON response is not an array or object (set json_path if rows are nested, e.g. data or items)',
+  );
+}
+
 function parseJsonResponse(text: string, jsonPath?: string): Record<string, string>[] {
   let data: unknown;
   try {
@@ -430,16 +465,20 @@ function parseJsonResponse(text: string, jsonPath?: string): Record<string, stri
     for (const p of parts) {
       if (data && typeof data === 'object' && p in (data as Record<string, unknown>)) {
         data = (data as Record<string, unknown>)[p];
+      } else {
+        throw new Error(`JSON path "${jsonPath}" not found in response (failed at "${p}")`);
       }
     }
   }
-  if (!Array.isArray(data)) throw new Error('JSON response is not an array');
-  return data.map((item: unknown) => {
+  const items = coerceJsonRows(data, jsonPath);
+  return items.map((item: unknown) => {
     const row: Record<string, string> = {};
-    if (item && typeof item === 'object') {
+    if (item && typeof item === 'object' && !Array.isArray(item)) {
       for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
         row[k] = v == null ? '' : String(v);
       }
+    } else {
+      row.value = item == null ? '' : String(item);
     }
     return row;
   });

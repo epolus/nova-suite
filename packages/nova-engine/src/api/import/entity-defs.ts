@@ -33,7 +33,7 @@ export const ENTITY_DEFS: Record<string, EntityDef> = {
     key: 'cost_centers',
     label: 'Cost Centers',
     fields: [
-      { key: 'code', label: 'Code', required: true, unique: { table: 'cost_centers', column: 'code' }, aliases: ['cost_center_code', 'cc_code'] },
+      { key: 'code', label: 'Code', required: true, unique: { table: 'cost_centers', column: 'code' }, aliases: ['cost_center_code', 'cc_code', 'account_number', 'number', 'sys_id'] },
       { key: 'name', label: 'Name', required: true, aliases: ['cost_center', 'cc_name'] },
       { key: 'description', label: 'Description', aliases: ['desc'] },
       { key: 'is_active', label: 'Active', type: 'boolean', aliases: ['active'] },
