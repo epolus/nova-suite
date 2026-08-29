@@ -12,8 +12,10 @@ export interface DataSource {
     /** Resolved from tenant_credentials at import time (same slugs as catalog {{cred.slug}}). */
     credential_slug?: string;
     // OAuth2
-    auth_type?: 'none' | 'bearer' | 'oauth2';
+    auth_type?: 'none' | 'bearer' | 'basic' | 'oauth2';
     bearer_token?: string;
+    basic_username?: string;
+    basic_password?: string;
     oauth2_token_url?: string;
     oauth2_client_id?: string;
     oauth2_client_secret?: string;

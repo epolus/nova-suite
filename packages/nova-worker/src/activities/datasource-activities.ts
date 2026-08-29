@@ -12,9 +12,11 @@ interface SourceConfig {
   json_path?: string;
   /** When set, secret value is loaded from tenant_credentials (same as catalog {{cred.slug}}). */
   credential_slug?: string;
-  // OAuth2 (for rest_api)
-  auth_type?: 'none' | 'bearer' | 'oauth2';
+  // Auth (for HTTP sources)
+  auth_type?: 'none' | 'bearer' | 'basic' | 'oauth2';
   bearer_token?: string;
+  basic_username?: string;
+  basic_password?: string;
   oauth2_token_url?: string;
   oauth2_client_id?: string;
   oauth2_client_secret?: string;
@@ -70,6 +72,8 @@ async function resolveSourceConfigSecrets(
   const next: SourceConfig = { ...cfg };
   if (next.auth_type === 'oauth2') {
     next.oauth2_client_secret = secret;
+  } else if (next.auth_type === 'basic') {
+    next.basic_password = secret;
   } else {
     next.bearer_token = secret;
     if (!next.auth_type || next.auth_type === 'none') {
@@ -287,6 +291,11 @@ async function fetchViaHttp(ds: DataSourceRow): Promise<Record<string, string>[]
     headers['Authorization'] = `Bearer ${token}`;
   } else if (cfg.auth_type === 'bearer' && cfg.bearer_token) {
     headers['Authorization'] = `Bearer ${cfg.bearer_token}`;
+  } else if (cfg.auth_type === 'basic') {
+    const username = (cfg.basic_username ?? '').trim();
+    const password = cfg.basic_password ?? '';
+    if (!username) throw new Error('Basic auth requires a username');
+    headers['Authorization'] = `Basic ${Buffer.from(`${username}:${password}`, 'utf8').toString('base64')}`;
   }
 
   if (ds.source_type === 'rest_api' && cfg.pagination?.enabled) {
@@ -413,6 +422,27 @@ function inferFileType(path: string): 'csv' | 'json' {
   return 'csv';
 }
 
+function coerceJsonRows(picked: unknown, jsonPath?: string): unknown[] {
+  if (Array.isArray(picked)) return picked;
+  if (picked && typeof picked === 'object') {
+    const record = picked as Record<string, unknown>;
+    // Common API wrappers: { data: [...] }, { items: [...] }, { results: [...] }
+    const preferredKeys = ['data', 'items', 'results', 'records', 'rows', 'value'];
+    for (const key of preferredKeys) {
+      if (Array.isArray(record[key])) return record[key] as unknown[];
+    }
+    const arrayValue = Object.values(record).find((value) => Array.isArray(value));
+    if (arrayValue) return arrayValue as unknown[];
+    // Single object payload → one import row
+    return [record];
+  }
+  throw new Error(
+    jsonPath
+      ? `JSON path "${jsonPath}" did not resolve to an array or object`
+      : 'JSON response is not an array or object (set json_path if rows are nested, e.g. data or items)',
+  );
+}
+
 function parseJsonResponse(text: string, jsonPath?: string): Record<string, string>[] {
   let data: unknown;
   try {
@@ -430,16 +460,20 @@ function parseJsonResponse(text: string, jsonPath?: string): Record<string, stri
     for (const p of parts) {
       if (data && typeof data === 'object' && p in (data as Record<string, unknown>)) {
         data = (data as Record<string, unknown>)[p];
+      } else {
+        throw new Error(`JSON path "${jsonPath}" not found in response (failed at "${p}")`);
       }
     }
   }
-  if (!Array.isArray(data)) throw new Error('JSON response is not an array');
-  return data.map((item: unknown) => {
+  const items = coerceJsonRows(data, jsonPath);
+  return items.map((item: unknown) => {
     const row: Record<string, string> = {};
-    if (item && typeof item === 'object') {
+    if (item && typeof item === 'object' && !Array.isArray(item)) {
       for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
         row[k] = v == null ? '' : String(v);
       }
+    } else {
+      row.value = item == null ? '' : String(item);
     }
     return row;
   });
