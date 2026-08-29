@@ -7,7 +7,7 @@ import { AppError, BadRequest } from '../../middleware/errorHandler';
 import { ENTITY_DEFS } from '../import/entity-defs';
 import { startDataSourceSync, cancelDataSourceSchedule } from '../../temporal/workflows';
 import { enqueueDataSourceScheduleStartJob } from '../../temporal/workflow-start-queue';
-import { assertPublicHttpUrl, toPublicHttpHref, UnsafeHttpUrlError } from '../../data/public-http-url';
+import { assertPublicHttpUrl, fetchPublicHttp, fetchValidatedPublicHttp, UnsafeHttpUrlError } from '../../data/public-http-url';
 
 const router = Router();
 router.use(authenticate, requireRole('admin'), setTenantRLS, releaseTenantClient);
@@ -236,16 +236,15 @@ async function fetchOAuth2Token(cfg: SourceConfig): Promise<string> {
     client_secret: cfg.oauth2_client_secret,
   });
   if (cfg.oauth2_scope) params.set('scope', cfg.oauth2_scope);
-  const tokenUrl = await assertPublicHttpUrl(cfg.oauth2_token_url);
   let response: globalThis.Response;
   try {
-    response = await fetch(toPublicHttpHref(tokenUrl), {
+    response = await fetchPublicHttp(cfg.oauth2_token_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
       body: params.toString(),
-      redirect: 'error',
     });
   } catch (err) {
+    if (err instanceof UnsafeHttpUrlError) throw BadRequest(err.message);
     const message = err instanceof Error ? err.message : 'network error';
     throw BadRequest(`OAuth2 token request failed: ${message}`);
   }
@@ -377,19 +376,30 @@ router.post('/test-source', async (req: Request, res: Response, next: NextFuncti
       if (sourceType === 'rest_api' && sourceConfig.pagination?.enabled) {
         const p = sourceConfig.pagination;
         const mode = p.mode === 'offset' ? 'offset' : 'page';
+        const safeParam = (name: string, fallback: string) => {
+          const value = (name || fallback).trim();
+          if (!/^[A-Za-z0-9._-]{1,64}$/.test(value)) {
+            throw BadRequest(`Invalid pagination parameter name: ${value}`);
+          }
+          return value;
+        };
         if (mode === 'page') {
-          requestUrl.searchParams.set(p.page_param || 'page', String(p.page_start ?? 1));
-          requestUrl.searchParams.set(p.page_size_param || 'limit', String(p.page_size ?? 100));
+          requestUrl.searchParams.set(safeParam(p.page_param || 'page', 'page'), String(p.page_start ?? 1));
+          requestUrl.searchParams.set(safeParam(p.page_size_param || 'limit', 'limit'), String(p.page_size ?? 100));
         } else {
-          requestUrl.searchParams.set(p.offset_param || 'offset', String(p.offset_start ?? 0));
-          requestUrl.searchParams.set(p.limit_param || 'limit', String(p.limit ?? 100));
+          requestUrl.searchParams.set(safeParam(p.offset_param || 'offset', 'offset'), String(p.offset_start ?? 0));
+          requestUrl.searchParams.set(safeParam(p.limit_param || 'limit', 'limit'), String(p.limit ?? 100));
         }
       }
 
       let response: globalThis.Response;
       try {
-        response = await fetch(toPublicHttpHref(requestUrl), { headers, redirect: 'error' });
+        response = await fetchValidatedPublicHttp(requestUrl, { headers });
       } catch (err) {
+        if (err instanceof UnsafeHttpUrlError) {
+          fail(err.message);
+          return;
+        }
         const message = err instanceof Error ? err.message : 'network error';
         fail(`Source request failed: ${message}`);
         return;

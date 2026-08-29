@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg';
 import { withTenantContext } from '../db';
 import SftpClient from 'ssh2-sftp-client';
 import { decryptCredentialSecret } from '../credentials/vault';
-import { assertPublicHttpUrl, toPublicHttpHref } from '../public-http-url';
+import { assertPublicHttpUrl, fetchPublicHttp, fetchValidatedPublicHttp } from '../public-http-url';
 
 interface SourceConfig {
   url?: string;
@@ -245,12 +245,10 @@ async function fetchOAuth2Token(cfg: SourceConfig): Promise<string> {
 
   log.info('Fetching OAuth2 token', { tokenUrl: cfg.oauth2_token_url, grantType });
 
-  const tokenUrl = await assertPublicHttpUrl(cfg.oauth2_token_url);
-  const response = await fetch(toPublicHttpHref(tokenUrl), {
+  const response = await fetchPublicHttp(cfg.oauth2_token_url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
-    redirect: 'error',
   });
 
   if (!response.ok) {
@@ -303,7 +301,7 @@ async function fetchViaHttp(ds: DataSourceRow): Promise<Record<string, string>[]
   }
 
   const requestUrl = await assertPublicHttpUrl(cfg.url);
-  const response = await fetch(toPublicHttpHref(requestUrl), { headers, redirect: 'error' });
+  const response = await fetchValidatedPublicHttp(requestUrl, { headers });
   if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
 
   const contentType = response.headers.get('content-type') || '';
@@ -339,21 +337,28 @@ async function fetchRestWithPagination(
   for (let idx = 0; idx < maxPages; idx++) {
     const u = await assertPublicHttpUrl(cfg.url);
     const pageSize = Math.max(1, Number(pag.page_size || pag.limit) || 100);
+    const safeParam = (name: string, fallback: string) => {
+      const value = (name || fallback).trim();
+      if (!/^[A-Za-z0-9._-]{1,64}$/.test(value)) {
+        throw new Error(`Invalid pagination parameter name: ${value}`);
+      }
+      return value;
+    };
     if (mode === 'page') {
-      const pageParam = pag.page_param || 'page';
-      const pageSizeParam = pag.page_size_param || 'limit';
+      const pageParam = safeParam(pag.page_param || 'page', 'page');
+      const pageSizeParam = safeParam(pag.page_size_param || 'limit', 'limit');
       const pageStart = Number(pag.page_start ?? 1);
       u.searchParams.set(pageParam, String(pageStart + idx));
       u.searchParams.set(pageSizeParam, String(pageSize));
     } else {
-      const offsetParam = pag.offset_param || 'offset';
-      const limitParam = pag.limit_param || 'limit';
+      const offsetParam = safeParam(pag.offset_param || 'offset', 'offset');
+      const limitParam = safeParam(pag.limit_param || 'limit', 'limit');
       const offsetStart = Number(pag.offset_start ?? 0);
       u.searchParams.set(offsetParam, String(offsetStart + idx * pageSize));
       u.searchParams.set(limitParam, String(pageSize));
     }
 
-    const response = await fetch(toPublicHttpHref(u), { headers, redirect: 'error' });
+    const response = await fetchValidatedPublicHttp(u, { headers });
     if (!response.ok) {
       throw new Error(`Fetch failed on page ${idx + 1}: ${response.status} ${response.statusText}`);
     }

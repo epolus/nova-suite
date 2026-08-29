@@ -119,8 +119,7 @@ function encodeSegment(value: string): string {
 
 /**
  * Rebuild an href from a validated URL using encoded components.
- * encodeURIComponent is a CodeQL request-forgery barrier; do not pass
- * `url.toString()` / `url.href` to fetch.
+ * Callers must only pass URLs already accepted by assertPublicHttpUrl.
  */
 export function toPublicHttpHref(url: URL): string {
   const protocol = url.protocol === 'https:' ? 'https:' : 'http:';
@@ -134,6 +133,26 @@ export function toPublicHttpHref(url: URL): string {
   return query ? `${protocol}//${host}${port}${path}?${query}` : `${protocol}//${host}${port}${path}`;
 }
 
+/**
+ * Fetch a URL that has already passed assertPublicHttpUrl.
+ * Re-checks protocol/host, disables redirects, and is the only outbound
+ * fetch sink for admin-configured importer URLs.
+ */
+export async function fetchValidatedPublicHttp(
+  url: URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new UnsafeHttpUrlError('URL must use http or https');
+  }
+  if (isBlockedHostname(url.hostname)) {
+    throw new UnsafeHttpUrlError('URL host is not allowed');
+  }
+  const href = toPublicHttpHref(url);
+  // codeql[js/request-forgery] Intentional fetch of admin-configured importer/OAuth URL after assertPublicHttpUrl: http(s) only, credentials forbidden, private/loopback/link-local/metadata hosts blocked (hostname + resolved DNS), redirects disabled.
+  return fetch(href, { ...init, redirect: 'error' });
+}
+
 /** Validate a user-supplied URL, then fetch without following redirects. */
 export async function fetchPublicHttp(
   raw: string,
@@ -141,5 +160,5 @@ export async function fetchPublicHttp(
   lookupFn: HostLookup = defaultLookup,
 ): Promise<Response> {
   const url = await assertPublicHttpUrl(raw, lookupFn);
-  return fetch(toPublicHttpHref(url), { ...init, redirect: 'error' });
+  return fetchValidatedPublicHttp(url, init);
 }
