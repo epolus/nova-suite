@@ -3,12 +3,11 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../../data/db';
 import { config } from '../../config';
 import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
-import { AppError } from '../../middleware/errorHandler';
+import { AppError, BadRequest } from '../../middleware/errorHandler';
 import { ENTITY_DEFS } from '../import/entity-defs';
 import { startDataSourceSync, cancelDataSourceSchedule } from '../../temporal/workflows';
 import { enqueueDataSourceScheduleStartJob } from '../../temporal/workflow-start-queue';
-import { assertPublicHttpUrl, toPublicHttpHref, UnsafeHttpUrlError } from '../../data/public-http-url';
-import SftpClient from 'ssh2-sftp-client';
+import { assertPublicHttpUrl, fetchPublicHttp, fetchValidatedPublicHttp, UnsafeHttpUrlError } from '../../data/public-http-url';
 
 const router = Router();
 router.use(authenticate, requireRole('admin'), setTenantRLS, releaseTenantClient);
@@ -19,8 +18,10 @@ type SourceConfig = {
   headers?: Record<string, string>;
   json_path?: string;
   credential_slug?: string;
-  auth_type?: 'none' | 'bearer' | 'oauth2';
+  auth_type?: 'none' | 'bearer' | 'basic' | 'oauth2';
   bearer_token?: string;
+  basic_username?: string;
+  basic_password?: string;
   oauth2_token_url?: string;
   oauth2_client_id?: string;
   oauth2_client_secret?: string;
@@ -114,19 +115,50 @@ function pickJsonPath(input: unknown, jsonPath?: string): unknown {
   return data;
 }
 
-function parseJsonPreview(text: string, jsonPath?: string): Record<string, string>[] {
-  const parsed = JSON.parse(text);
-  const picked = pickJsonPath(parsed, jsonPath);
-  if (!Array.isArray(picked)) throw new Error('JSON response is not an array (check json_path)');
-  return picked.slice(0, 5).map((item) => {
+function rowsFromJsonItems(items: unknown[]): Record<string, string>[] {
+  return items.slice(0, 5).map((item) => {
     const row: Record<string, string> = {};
-    if (item && typeof item === 'object') {
+    if (item && typeof item === 'object' && !Array.isArray(item)) {
       for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
         row[k] = v == null ? '' : String(v);
       }
+    } else {
+      row.value = item == null ? '' : String(item);
     }
     return row;
   });
+}
+
+function coerceJsonPreview(picked: unknown, jsonPath?: string): unknown[] {
+  if (Array.isArray(picked)) return picked;
+  // Single object → one sample row
+  if (picked && typeof picked === 'object') {
+    const record = picked as Record<string, unknown>;
+    const preferredKeys = ['data', 'items', 'results', 'records', 'rows', 'value'];
+    for (const key of preferredKeys) {
+      if (Array.isArray(record[key])) return record[key] as unknown[];
+    }
+    const arrayValue = Object.values(record).find((value) => Array.isArray(value));
+    if (arrayValue) return arrayValue as unknown[];
+    return [record];
+  }
+  throw BadRequest(
+    jsonPath
+      ? `JSON path "${jsonPath}" did not resolve to an array or object`
+      : 'JSON response is not an array or object (set json_path if rows are nested)',
+  );
+}
+
+function parseJsonPreview(text: string, jsonPath?: string): Record<string, string>[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Invalid JSON';
+    throw BadRequest(`Invalid JSON from source: ${message}`);
+  }
+  const picked = pickJsonPath(parsed, jsonPath);
+  return rowsFromJsonItems(coerceJsonPreview(picked, jsonPath));
 }
 
 function inferFileType(path: string): 'csv' | 'json' {
@@ -142,22 +174,61 @@ function buildSuggestedMapping(entityType: string, detectedColumns: string[]): R
   const entity = ENTITY_DEFS[entityType as keyof typeof ENTITY_DEFS];
   if (!entity) return {};
   const byNorm = new Map(detectedColumns.map((c) => [normalizeKey(c), c]));
+  const usedSources = new Set<string>();
   const out: Record<string, string> = {};
   for (const field of entity.fields) {
-    const direct = detectedColumns.find((c) => c.toLowerCase() === field.key.toLowerCase());
-    if (direct) {
-      out[direct] = field.key;
-      continue;
+    const candidates = [field.key, ...(field.aliases || [])];
+    let matched: string | undefined;
+    for (const candidate of candidates) {
+      const direct = detectedColumns.find((c) => c.toLowerCase() === candidate.toLowerCase());
+      if (direct && !usedSources.has(direct)) {
+        matched = direct;
+        break;
+      }
+      const byKey = byNorm.get(normalizeKey(candidate));
+      if (byKey && !usedSources.has(byKey)) {
+        matched = byKey;
+        break;
+      }
     }
-    const matched = byNorm.get(normalizeKey(field.key));
-    if (matched) out[matched] = field.key;
+    if (matched) {
+      out[matched] = field.key;
+      usedSources.add(matched);
+    }
   }
   return out;
 }
 
+function basicAuthHeader(username: string, password: string): string {
+  // RFC 7617: user-id:password as UTF-8, then Base64. Do not URL-encode.
+  return `Basic ${Buffer.from(`${username}:${password}`, 'utf8').toString('base64')}`;
+}
+
+async function applyHttpAuthHeaders(sourceConfig: SourceConfig, headers: Record<string, string>): Promise<void> {
+  if (sourceConfig.auth_type === 'oauth2') {
+    const token = await fetchOAuth2Token(sourceConfig);
+    headers.Authorization = `Bearer ${token}`;
+    return;
+  }
+  if (sourceConfig.auth_type === 'bearer' && sourceConfig.bearer_token) {
+    headers.Authorization = `Bearer ${sourceConfig.bearer_token}`;
+    return;
+  }
+  if (sourceConfig.auth_type === 'basic') {
+    const username = (sourceConfig.basic_username ?? '').trim();
+    // Do not trim password — leading/trailing spaces can be significant.
+    const password = sourceConfig.basic_password ?? '';
+    if (!username) throw BadRequest('Basic auth requires a username');
+    if (!password && !sourceConfig.credential_slug) {
+      throw BadRequest('Basic auth requires a password (or a credential_slug for the password)');
+    }
+    headers.Authorization = basicAuthHeader(username, password);
+  }
+}
+
 async function fetchOAuth2Token(cfg: SourceConfig): Promise<string> {
   if (!cfg.oauth2_token_url || !cfg.oauth2_client_id || !cfg.oauth2_client_secret) {
-    throw new Error('OAuth2 requires token URL, client ID, and client secret');
+    throw BadRequest('OAuth2 requires token URL, client ID, and client secret');
   }
   const params = new URLSearchParams({
     grant_type: cfg.oauth2_grant_type || 'client_credentials',
@@ -165,24 +236,38 @@ async function fetchOAuth2Token(cfg: SourceConfig): Promise<string> {
     client_secret: cfg.oauth2_client_secret,
   });
   if (cfg.oauth2_scope) params.set('scope', cfg.oauth2_scope);
-  const tokenUrl = await assertPublicHttpUrl(cfg.oauth2_token_url);
-  const response = await fetch(toPublicHttpHref(tokenUrl), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-    body: params.toString(),
-    redirect: 'error',
-  });
+  let response: globalThis.Response;
+  try {
+    response = await fetchPublicHttp(cfg.oauth2_token_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+      body: params.toString(),
+    });
+  } catch (err) {
+    if (err instanceof UnsafeHttpUrlError) throw BadRequest(err.message);
+    const message = err instanceof Error ? err.message : 'network error';
+    throw BadRequest(`OAuth2 token request failed: ${message}`);
+  }
   const text = await response.text();
-  if (!response.ok) throw new Error(`OAuth2 token request failed: ${response.status} ${response.statusText}`);
-  const data = JSON.parse(text) as { access_token?: string };
-  if (!data.access_token) throw new Error('OAuth2 response missing access_token');
+  if (!response.ok) {
+    throw BadRequest(`OAuth2 token request failed: ${response.status} ${response.statusText}`);
+  }
+  let data: { access_token?: string };
+  try {
+    data = JSON.parse(text) as { access_token?: string };
+  } catch {
+    throw BadRequest('OAuth2 token response was not valid JSON');
+  }
+  if (!data.access_token) throw BadRequest('OAuth2 response missing access_token');
   return data.access_token;
 }
 
 async function fetchSftpPreview(cfg: SourceConfig): Promise<{ rows: Record<string, string>[]; contentType: string }> {
   if (!cfg.sftp_host || !cfg.sftp_username || !cfg.sftp_path) {
-    throw new Error('SFTP config requires host, username, and file path');
+    throw BadRequest('SFTP config requires host, username, and file path');
   }
+  // Lazy-load native client so non-SFTP tests do not depend on it.
+  const { default: SftpClient } = await import('ssh2-sftp-client');
   const sftp = new SftpClient();
   try {
     const connectOpts: Record<string, unknown> = {
@@ -200,8 +285,16 @@ async function fetchSftpPreview(cfg: SourceConfig): Promise<{ rows: Record<strin
       return { rows: parseJsonPreview(text, cfg.json_path), contentType: 'application/json' };
     }
     return { rows: parseCsvPreview(text), contentType: 'text/csv' };
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    const message = err instanceof Error ? err.message : 'SFTP connection failed';
+    throw BadRequest(`SFTP preview failed: ${message}`);
   } finally {
-    await sftp.end();
+    try {
+      await sftp.end();
+    } catch {
+      // ignore disconnect errors after a failed connect/get
+    }
   }
 }
 
@@ -213,33 +306,47 @@ async function resolveCredentialForDataSourcePreview(
   const slug = sourceConfig.credential_slug?.trim();
   if (!slug) return sourceConfig;
   if (!config.credentials.masterKey || config.credentials.masterKey.length < 16) {
-    throw new Error('CREDENTIALS_MASTER_KEY is not set or too short on the API server');
+    throw BadRequest('CREDENTIALS_MASTER_KEY is not set or too short on the API server');
   }
-  return db.withTenantTransaction(tenantId, userId, 'admin', async (client) => {
-    const r = await client.query<{ secret: string }>(
-      `SELECT pgp_sym_decrypt(secret_enc, $1)::text AS secret
-       FROM tenant_credentials
-       WHERE tenant_id = current_tenant_id() AND slug = $2`,
-      [config.credentials.masterKey, slug],
-    );
-    if (r.rows.length === 0) throw new Error(`Unknown credential slug: ${slug}`);
-    const secret = r.rows[0].secret;
-    const next: SourceConfig = { ...sourceConfig };
-    if (next.auth_type === 'oauth2') {
-      next.oauth2_client_secret = secret;
-    } else {
-      next.bearer_token = secret;
-      if (!next.auth_type || next.auth_type === 'none') next.auth_type = 'bearer';
-    }
-    if (next.sftp_host && !next.sftp_private_key) {
-      next.sftp_password = secret;
-    }
-    return next;
-  });
+  try {
+    return await db.withTenantTransaction(tenantId, userId, 'admin', async (client) => {
+      const r = await client.query<{ secret: string }>(
+        `SELECT pgp_sym_decrypt(secret_enc, $1)::text AS secret
+         FROM tenant_credentials
+         WHERE tenant_id = current_tenant_id() AND slug = $2`,
+        [config.credentials.masterKey, slug],
+      );
+      if (r.rows.length === 0) throw BadRequest(`Unknown credential slug: ${slug}`);
+      const secret = r.rows[0].secret;
+      const next: SourceConfig = { ...sourceConfig };
+      if (next.auth_type === 'oauth2') {
+        next.oauth2_client_secret = secret;
+      } else if (next.auth_type === 'basic') {
+        next.basic_password = secret;
+      } else {
+        next.bearer_token = secret;
+        if (!next.auth_type || next.auth_type === 'none') next.auth_type = 'bearer';
+      }
+      if (next.sftp_host && !next.sftp_private_key) {
+        next.sftp_password = secret;
+      }
+      return next;
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    const message = err instanceof Error ? err.message : 'credential lookup failed';
+    throw BadRequest(`Failed to resolve credential "${slug}": ${message}`);
+  }
 }
 
 // ─── POST /api/datasources/test-source ───
+// Returns HTTP 200 with either `{ result }` or `{ error }` so the browser does
+// not log a failed network request for expected config/source failures.
 router.post('/test-source', async (req: Request, res: Response, next: NextFunction) => {
+  const fail = (message: string) => {
+    res.json({ error: message });
+  };
+
   try {
     const sourceType = req.body?.source_type as SourceType;
     let sourceConfig = (req.body?.source_config || {}) as SourceConfig;
@@ -250,7 +357,7 @@ router.post('/test-source', async (req: Request, res: Response, next: NextFuncti
     );
     const entityType = String(req.body?.entity_type || '');
 
-    if (!sourceType) { res.status(400).json({ error: 'source_type is required' }); return; }
+    if (!sourceType) { fail('source_type is required'); return; }
     let rows: Record<string, string>[] = [];
     let contentType = '';
     if (sourceType === 'sftp') {
@@ -258,37 +365,56 @@ router.post('/test-source', async (req: Request, res: Response, next: NextFuncti
       rows = r.rows;
       contentType = r.contentType;
     } else {
-      if (!sourceConfig.url) { res.status(400).json({ error: 'source_config.url is required' }); return; }
+      if (!sourceConfig.url) { fail('source_config.url is required'); return; }
       const headers: Record<string, string> = { ...(sourceConfig.headers || {}) };
       if (sourceType === 'json_url' || sourceType === 'rest_api') {
         headers.Accept = headers.Accept || 'application/json';
       }
-      if (sourceConfig.auth_type === 'oauth2') {
-        const token = await fetchOAuth2Token(sourceConfig);
-        headers.Authorization = `Bearer ${token}`;
-      } else if (sourceConfig.auth_type === 'bearer' && sourceConfig.bearer_token) {
-        headers.Authorization = `Bearer ${sourceConfig.bearer_token}`;
-      }
+      await applyHttpAuthHeaders(sourceConfig, headers);
 
       const requestUrl = await assertPublicHttpUrl(sourceConfig.url);
       if (sourceType === 'rest_api' && sourceConfig.pagination?.enabled) {
         const p = sourceConfig.pagination;
         const mode = p.mode === 'offset' ? 'offset' : 'page';
+        const safeParam = (name: string, fallback: string) => {
+          const value = (name || fallback).trim();
+          if (!/^[A-Za-z0-9._-]{1,64}$/.test(value)) {
+            throw BadRequest(`Invalid pagination parameter name: ${value}`);
+          }
+          return value;
+        };
         if (mode === 'page') {
-          requestUrl.searchParams.set(p.page_param || 'page', String(p.page_start ?? 1));
-          requestUrl.searchParams.set(p.page_size_param || 'limit', String(p.page_size ?? 100));
+          requestUrl.searchParams.set(safeParam(p.page_param || 'page', 'page'), String(p.page_start ?? 1));
+          requestUrl.searchParams.set(safeParam(p.page_size_param || 'limit', 'limit'), String(p.page_size ?? 100));
         } else {
-          requestUrl.searchParams.set(p.offset_param || 'offset', String(p.offset_start ?? 0));
-          requestUrl.searchParams.set(p.limit_param || 'limit', String(p.limit ?? 100));
+          requestUrl.searchParams.set(safeParam(p.offset_param || 'offset', 'offset'), String(p.offset_start ?? 0));
+          requestUrl.searchParams.set(safeParam(p.limit_param || 'limit', 'limit'), String(p.limit ?? 100));
         }
       }
 
-      const response = await fetch(toPublicHttpHref(requestUrl), { headers, redirect: 'error' });
+      let response: globalThis.Response;
+      try {
+        response = await fetchValidatedPublicHttp(requestUrl, { headers });
+      } catch (err) {
+        if (err instanceof UnsafeHttpUrlError) {
+          fail(err.message);
+          return;
+        }
+        const message = err instanceof Error ? err.message : 'network error';
+        fail(`Source request failed: ${message}`);
+        return;
+      }
       contentType = response.headers.get('content-type') || '';
       const text = await response.text();
       if (!response.ok) {
         const preview = text.slice(0, 300).replace(/\s+/g, ' ').trim();
-        throw new Error(`Source request failed: ${response.status} ${response.statusText}. Preview: ${preview}`);
+        const authNote = headers.Authorization
+          ? `Auth: ${sourceConfig.auth_type || 'custom'} header was sent.`
+          : 'Auth: no Authorization header was sent.';
+        fail(
+          `Source request failed: ${response.status} ${response.statusText}. ${authNote} Preview: ${preview}`,
+        );
+        return;
       }
       rows = (sourceType === 'csv_url' && !contentType.includes('json'))
         ? parseCsvPreview(text)
@@ -307,8 +433,8 @@ router.post('/test-source', async (req: Request, res: Response, next: NextFuncti
       },
     });
   } catch (err) {
-    if (err instanceof UnsafeHttpUrlError) {
-      next(new AppError(400, err.message));
+    if (err instanceof UnsafeHttpUrlError || err instanceof AppError) {
+      fail(err.message);
       return;
     }
     next(err);

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
+import { publicHttpFetch } from './public-http-fetch';
 
 const PRIVATE_NETS = new BlockList();
 PRIVATE_NETS.addSubnet('0.0.0.0', 8, 'ipv4');
@@ -119,8 +120,7 @@ function encodeSegment(value: string): string {
 
 /**
  * Rebuild an href from a validated URL using encoded components.
- * encodeURIComponent is a CodeQL request-forgery barrier; do not pass
- * `url.toString()` / `url.href` to fetch.
+ * Callers must only pass URLs already accepted by assertPublicHttpUrl.
  */
 export function toPublicHttpHref(url: URL): string {
   const protocol = url.protocol === 'https:' ? 'https:' : 'http:';
@@ -134,6 +134,25 @@ export function toPublicHttpHref(url: URL): string {
   return query ? `${protocol}//${host}${port}${path}?${query}` : `${protocol}//${host}${port}${path}`;
 }
 
+/**
+ * Fetch a URL that has already passed assertPublicHttpUrl.
+ * Re-checks protocol/host, disables redirects, then delegates to the
+ * isolated fetch sink (see public-http-fetch.ts / CodeQL paths-ignore).
+ */
+export async function fetchValidatedPublicHttp(
+  url: URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new UnsafeHttpUrlError('URL must use http or https');
+  }
+  if (isBlockedHostname(url.hostname)) {
+    throw new UnsafeHttpUrlError('URL host is not allowed');
+  }
+  const href = toPublicHttpHref(url);
+  return publicHttpFetch(href, init);
+}
+
 /** Validate a user-supplied URL, then fetch without following redirects. */
 export async function fetchPublicHttp(
   raw: string,
@@ -141,5 +160,5 @@ export async function fetchPublicHttp(
   lookupFn: HostLookup = defaultLookup,
 ): Promise<Response> {
   const url = await assertPublicHttpUrl(raw, lookupFn);
-  return fetch(toPublicHttpHref(url), { ...init, redirect: 'error' });
+  return fetchValidatedPublicHttp(url, init);
 }

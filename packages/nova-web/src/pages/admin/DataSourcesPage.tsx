@@ -40,6 +40,8 @@ export default function DataSourcesPage() {
   const [testError, setTestError] = useState('');
   const [testResult, setTestResult] = useState<DataSourceTestResult | null>(null);
   const [vaultCreds, setVaultCreds] = useState<TenantCredentialListItem[]>([]);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [saveOk, setSaveOk] = useState(false);
 
   const loadSources = useCallback(async () => {
     try {
@@ -61,11 +63,19 @@ export default function DataSourcesPage() {
   const openCreate = () => {
     setEditId(null);
     setForm(EMPTY_FORM);
+    setSaveMessage('');
+    setSaveOk(false);
+    setTestResult(null);
+    setTestError('');
     setView('form');
   };
 
   const openEdit = (ds: DataSource) => {
     setEditId(ds.id);
+    setSaveMessage('');
+    setSaveOk(false);
+    setTestResult(null);
+    setTestError('');
     const cfg = ds.source_config;
     setForm({
       name: ds.name,
@@ -82,6 +92,8 @@ export default function DataSourcesPage() {
       column_mapping: JSON.stringify(ds.column_mapping || {}, null, 2),
       auth_type: cfg.auth_type || 'none',
       bearer_token: cfg.bearer_token || '',
+      basic_username: cfg.basic_username || '',
+      basic_password: cfg.basic_password || '',
       oauth2_token_url: cfg.oauth2_token_url || '',
       oauth2_client_id: cfg.oauth2_client_id || '',
       oauth2_client_secret: cfg.oauth2_client_secret || '',
@@ -123,8 +135,10 @@ export default function DataSourcesPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (closeAfter: boolean) => {
     setSaving(true);
+    setSaveMessage('');
+    setSaveOk(false);
     try {
       let headers: Record<string, string> = {};
       try { if (form.headers.trim()) headers = JSON.parse(form.headers); } catch { /* ignore */ }
@@ -150,13 +164,24 @@ export default function DataSourcesPage() {
       if (editId) {
         await api.update(editId, payload as Partial<DataSource>);
       } else {
-        await api.create(payload as Partial<DataSource>);
+        const { id } = await api.create(payload as Partial<DataSource>);
+        setEditId(id);
       }
 
       await loadSources();
-      setView('list');
-      setTestResult(null);
-      setTestError('');
+      if (closeAfter) {
+        setView('list');
+        setTestResult(null);
+        setTestError('');
+        setSaveMessage('');
+        setSaveOk(false);
+      } else {
+        setSaveOk(true);
+        setSaveMessage(t('savedStay'));
+      }
+    } catch (err) {
+      setSaveOk(false);
+      setSaveMessage(err instanceof Error ? err.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -172,12 +197,16 @@ export default function DataSourcesPage() {
 
       const sourceConfig = buildTestSourceConfig(form, headers);
 
-      const { result } = await api.testSource({
+      const response = await api.testSource({
         entity_type: form.entity_type,
         source_type: form.source_type as DataSource['source_type'],
         source_config: sourceConfig as DataSource['source_config'],
       });
-      setTestResult(result);
+      if (response.error || !response.result) {
+        setTestError(response.error || t('testFailed'));
+        return;
+      }
+      setTestResult(response.result);
     } catch (err) {
       setTestError(err instanceof Error ? err.message : t('testFailed'));
     } finally {
@@ -268,10 +297,13 @@ export default function DataSourcesPage() {
         vaultCreds={vaultCreds}
         editId={editId}
         saving={saving}
+        saveMessage={saveMessage}
+        saveOk={saveOk}
         testingSource={testingSource}
         testError={testError}
         testResult={testResult}
-        onSave={handleSave}
+        onSave={() => { void handleSave(false); }}
+        onSaveAndClose={() => { void handleSave(true); }}
         onTest={handleTestSource}
         onCancel={() => setView('list')}
         onApplySuggestedMapping={applySuggestedMapping}

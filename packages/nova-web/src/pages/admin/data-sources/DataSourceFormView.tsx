@@ -15,10 +15,13 @@ interface DataSourceFormViewProps {
   vaultCreds: TenantCredentialListItem[];
   editId: string | null;
   saving: boolean;
+  saveMessage: string;
+  saveOk: boolean;
   testingSource: boolean;
   testError: string;
   testResult: DataSourceTestResult | null;
   onSave: () => void;
+  onSaveAndClose: () => void;
   onTest: () => void;
   onCancel: () => void;
   onApplySuggestedMapping: () => void;
@@ -32,10 +35,13 @@ export default function DataSourceFormView({
   vaultCreds,
   editId,
   saving,
+  saveMessage,
+  saveOk,
   testingSource,
   testError,
   testResult,
   onSave,
+  onSaveAndClose,
   onTest,
   onCancel,
   onApplySuggestedMapping,
@@ -145,7 +151,7 @@ export default function DataSourceFormView({
           </div>
         </Card>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={onTest}
             disabled={
@@ -164,7 +170,14 @@ export default function DataSourceFormView({
             disabled={saving || !form.name || !form.entity_type || (form.source_type === 'sftp' ? (!form.sftp_host || !form.sftp_path) : !form.url)}
             className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
           >
-            {saving ? tActions('saving') : (editId ? t('updateButton') : t('createDataSource'))}
+            {saving ? tActions('saving') : tActions('save')}
+          </button>
+          <button
+            onClick={onSaveAndClose}
+            disabled={saving || !form.name || !form.entity_type || (form.source_type === 'sftp' ? (!form.sftp_host || !form.sftp_path) : !form.url)}
+            className="px-6 py-2.5 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 transition-colors"
+          >
+            {t('saveAndClose')}
           </button>
           <button
             onClick={onCancel}
@@ -172,6 +185,11 @@ export default function DataSourceFormView({
           >
             {tActions('cancel')}
           </button>
+          {saveMessage ? (
+            <span className={`text-sm ${saveOk ? 'text-green-700' : 'text-red-700'}`}>
+              {saveMessage}
+            </span>
+          ) : null}
         </div>
 
         {(testError || testResult) && (

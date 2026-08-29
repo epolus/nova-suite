@@ -6,6 +6,24 @@ Nova Suite is a complete service management solution: a self-service portal with
 
 Source: **[github.com/epolus/nova-suite](https://github.com/epolus/nova-suite)**
 
+## Screenshots
+
+![Employee self-service portal](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/portal.png)
+
+*Employee self-service portal — search, service catalog, requests, and knowledge base*
+
+![Incident detail](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/incident-detail.png)
+
+*Incident detail — assignment, priority, SLA, caller context, and resolution actions*
+
+![CMDB configuration item](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/cmdb-ci.png)
+
+*CMDB configuration item — attributes, relationships, history, and impact analysis*
+
+![Admin workflow editor](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/admin-workflow.png)
+
+*Workflow designer — visual Temporal automation with live JSON sync and test runs*
+
 ## Quick start
 
 The whole stack runs from two files, with no need to clone the repository:
@@ -41,14 +59,14 @@ For each component you get:
 | Tag | Meaning |
 | --- | --- |
 | `engine-latest` | Latest commit on `main`. Moves often — pin a version for production. |
-| `engine-1.4.2` | Exact release. Immutable. |
-| `engine-1.4`, `engine-1` | Moving tags following the newest patch / minor in that line. |
+| `engine-0.1.0` | Exact release. Immutable. |
+| `engine-0.1`, `engine-0` | Moving tags following the newest patch / minor in that line. |
 | `engine-sha-a1b2c3d` | Exact commit, for traceability. |
 
 There is deliberately **no bare `latest`**, since five different components share the repository. Pin a release by setting a single variable:
 
 ```bash
-NOVA_TAG=1.4.2
+NOVA_TAG=0.1.0
 ```
 
 Always run every component on the same version. Platform: `linux/amd64`.

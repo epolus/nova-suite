@@ -4,6 +4,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { UnsafeUploadPathError } from '../data/upload-path';
+import { UnsafeHttpUrlError } from '../data/public-http-url';
 import { logger } from '../logger';
 
 /** Application-level error with HTTP status. */
@@ -40,7 +41,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
-  if (err instanceof UnsafeUploadPathError) {
+  if (err instanceof UnsafeUploadPathError || err instanceof UnsafeHttpUrlError) {
     res.status(400).json({
       error: err.message,
       code: 'BAD_REQUEST',

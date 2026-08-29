@@ -20,7 +20,7 @@ export const dataSources = {
     entity_type: string;
     source_type: DataSource['source_type'];
     source_config: DataSource['source_config'];
-  }) => request<{ result: DataSourceTestResult }>('/datasources/test-source', {
+  }) => request<{ result?: DataSourceTestResult; error?: string }>('/datasources/test-source', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
