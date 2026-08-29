@@ -43,5 +43,5 @@ When adding or refactoring pages in `packages/nova-web`, follow these convention
 
 ### i18n
 
-- Add keys to all locale files under `src/i18n/messages/`.
+- Add new keys to `src/i18n/messages/en.json` only. Other locales fall back to English via `mergeMessages` (see `packages/nova-web/src/i18n/README.md`).
 - Use `useTranslations('<namespace>')` from `use-intl`.
