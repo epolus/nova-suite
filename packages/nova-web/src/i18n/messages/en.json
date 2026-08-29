@@ -2121,7 +2121,7 @@
       },
       "configPackages": {
         "title": "Configuration Packages",
-        "description": "Export, validate, and apply portable catalog and notification configuration between Nova instances.",
+        "description": "Export, validate, and apply portable catalog, notification, and data source configuration between Nova instances.",
         "exportSection": "Export from this instance",
         "exportDescription": "Download a versioned JSON package that can be validated and applied on another instance.",
         "exportScope": "Export scope",
@@ -2129,10 +2129,12 @@
           "catalog": "All service catalog configuration",
           "catalog_item": "One service catalog item",
           "notifications": "All notification rules",
-          "notification_rule": "One notification rule"
+          "notification_rule": "One notification rule",
+          "data_sources": "All data sources",
+          "data_source": "One data source"
         },
         "objectUuid": "Object UUID",
-        "objectUuidPlaceholder": "Paste the service item or notification rule UUID",
+        "objectUuidPlaceholder": "Paste the service item, notification rule, or data source UUID",
         "exportButton": "Export Package",
         "exporting": "Exporting...",
         "importSection": "Import into this instance",
@@ -2161,7 +2163,7 @@
         "loaded": "Loaded {name}. Run validation before applying.",
         "valid": "Package is valid for this instance.",
         "hasErrors": "Package has blocking validation errors.",
-        "applied": "Applied package: {categories} categories, {serviceItems} service items, {catalogTasks} tasks, {notificationRules} notification rules.",
+        "applied": "Applied package: {categories} categories, {serviceItems} service items, {catalogTasks} tasks, {notificationRules} notification rules, {dataSources} data sources.",
         "exportFailed": "Export failed",
         "parseFailed": "Could not parse JSON package",
         "validationFailed": "Validation failed",

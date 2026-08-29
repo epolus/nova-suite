@@ -993,7 +993,8 @@ CREATE TABLE schema_migrations (
 );
 
 INSERT INTO schema_migrations (version, name) VALUES
-  ('v00.01.00', '001_initial_schema');
+  ('v00.01.00', '001_initial_schema'),
+  ('v00.01.01', 'data_sources_external_key');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2080,6 +2081,7 @@ CREATE TRIGGER trg_tenant_credentials_updated_at
 CREATE TABLE data_sources (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  external_key    text,
   name            text NOT NULL,
   description     text,
   entity_type     text NOT NULL,
@@ -2099,6 +2101,7 @@ CREATE TABLE data_sources (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX uq_data_sources_tenant_external_key ON data_sources(tenant_id, external_key);
 CREATE INDEX idx_data_sources_tenant ON data_sources(tenant_id);
 CREATE INDEX idx_data_sources_source_config_gin ON data_sources USING gin (source_config);
 CREATE INDEX idx_data_sources_column_mapping_gin ON data_sources USING gin (column_mapping);

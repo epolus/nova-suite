@@ -162,6 +162,21 @@ export const configPackageNotificationRuleSchema = z.object({
   sort_order: z.number().int().default(100),
 });
 
+export const configPackageDataSourceSchema = z.object({
+  external_key: configExternalKeySchema,
+  name: z.string().min(1).max(255),
+  description: nullableStringSchema,
+  entity_type: z.string().min(1).max(100),
+  source_type: z.enum(['csv_url', 'json_url', 'rest_api', 'sftp']).default('csv_url'),
+  /** Connection config without inline secrets (credential_slug is preferred). */
+  source_config: z.record(z.string(), z.unknown()).default({}),
+  column_mapping: z.record(z.string(), z.unknown()).default({}),
+  schedule_cron: z.string().min(1).max(100).default('0 2 * * *'),
+  schedule_enabled: z.boolean().default(false),
+  import_mode: z.enum(['insert', 'upsert', 'full_sync']).default('insert'),
+  upsert_key: nullableStringSchema,
+});
+
 export const configPackageBundleSchema = z.object({
   format: z.literal('nova.config-package'),
   version: z.literal(1),
@@ -180,9 +195,13 @@ export const configPackageBundleSchema = z.object({
     notifications: z.object({
       rules: z.array(configPackageNotificationRuleSchema).default([]),
     }).default({ rules: [] }),
+    data_sources: z.object({
+      sources: z.array(configPackageDataSourceSchema).default([]),
+    }).default({ sources: [] }),
   }).default({
     catalog: { categories: [], service_items: [] },
     notifications: { rules: [] },
+    data_sources: { sources: [] },
   }),
 });
 

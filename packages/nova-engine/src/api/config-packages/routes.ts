@@ -24,6 +24,9 @@ import {
   collectCredentialSlugsFromAutomationConfig,
   validateAndParseAutomationConfig,
 } from '../catalog/automation-config';
+import { ENTITY_DEFS } from '../import/entity-defs';
+import { cancelDataSourceSchedule } from '../../temporal/workflows';
+import { enqueueDataSourceScheduleStartJob } from '../../temporal/workflow-start-queue';
 
 const router = Router();
 
@@ -32,6 +35,7 @@ type ConfigPackageCategory = ConfigPackageBundle['contents']['catalog']['categor
 type ConfigPackageServiceItem = ConfigPackageBundle['contents']['catalog']['service_items'][number];
 type ConfigPackageCatalogTask = ConfigPackageServiceItem['tasks'][number];
 type ConfigPackageNotificationRule = ConfigPackageBundle['contents']['notifications']['rules'][number];
+type ConfigPackageDataSource = ConfigPackageBundle['contents']['data_sources']['sources'][number];
 
 type ValidationIssue = {
   severity: 'error' | 'warning';
@@ -40,7 +44,7 @@ type ValidationIssue = {
 };
 
 type PackageChange = {
-  type: 'category' | 'service_item' | 'catalog_task' | 'notification_rule';
+  type: 'category' | 'service_item' | 'catalog_task' | 'notification_rule' | 'data_source';
   external_key: string;
   name: string;
   action: 'create' | 'update' | 'skip';
@@ -68,8 +72,17 @@ type ApplyResult = {
     service_items: number;
     catalog_tasks: number;
     notification_rules: number;
+    data_sources: number;
   };
 };
+
+const DATA_SOURCE_SECRET_KEYS = [
+  'bearer_token',
+  'basic_password',
+  'oauth2_client_secret',
+  'sftp_password',
+  'sftp_private_key',
+] as const;
 
 let schemaReady: Promise<void> | null = null;
 
@@ -131,6 +144,7 @@ function emptyBundle(name: string, tenantId: string): ConfigPackageBundle {
     contents: {
       catalog: { categories: [], service_items: [] },
       notifications: { rules: [] },
+      data_sources: { sources: [] },
     },
   };
 }
@@ -150,6 +164,7 @@ async function ensureConfigPackageSchema(): Promise<void> {
       await db.query('ALTER TABLE service_items ADD COLUMN IF NOT EXISTS external_key text');
       await db.query('ALTER TABLE catalog_tasks ADD COLUMN IF NOT EXISTS external_key text');
       await db.query('ALTER TABLE notification_rules ADD COLUMN IF NOT EXISTS external_key text');
+      await db.query('ALTER TABLE data_sources ADD COLUMN IF NOT EXISTS external_key text');
       await db.query(
         'CREATE UNIQUE INDEX IF NOT EXISTS uq_service_categories_tenant_external_key ON service_categories(tenant_id, external_key)',
       );
@@ -161,6 +176,9 @@ async function ensureConfigPackageSchema(): Promise<void> {
       );
       await db.query(
         'CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_rules_tenant_external_key ON notification_rules(tenant_id, external_key)',
+      );
+      await db.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS uq_data_sources_tenant_external_key ON data_sources(tenant_id, external_key)',
       );
       await db.query(`
         CREATE TABLE IF NOT EXISTS config_deployment_runs (
@@ -271,6 +289,20 @@ async function backfillExternalKeys(client: PoolClient, tenantId: string): Promi
        SET external_key = $1
        WHERE tenant_id = $2 AND id = $3 AND external_key IS NULL`,
       [makeExternalKey('notification-rule', logicalName, row.id), tenantId, row.id],
+    );
+  }
+
+  const dataSources = await client.query<{ id: string; name: string }>(
+    `SELECT id, name FROM data_sources
+     WHERE tenant_id = $1 AND external_key IS NULL`,
+    [tenantId],
+  );
+  for (const row of dataSources.rows) {
+    await client.query(
+      `UPDATE data_sources
+       SET external_key = $1
+       WHERE tenant_id = $2 AND id = $3 AND external_key IS NULL`,
+      [makeExternalKey('data-source', row.name, row.id), tenantId, row.id],
     );
   }
 }
@@ -451,6 +483,68 @@ async function exportNotificationRule(
   };
 }
 
+function sanitizeSourceConfigForExport(sourceConfig: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...sourceConfig };
+  for (const key of DATA_SOURCE_SECRET_KEYS) {
+    delete next[key];
+  }
+  return next;
+}
+
+function dataSourceNeedsCredentialHint(sourceConfig: Record<string, unknown>): boolean {
+  const authType = typeof sourceConfig.auth_type === 'string' ? sourceConfig.auth_type : 'none';
+  const credentialSlug = typeof sourceConfig.credential_slug === 'string'
+    ? sourceConfig.credential_slug.trim()
+    : '';
+  if (credentialSlug) return false;
+  if (authType === 'bearer' || authType === 'basic' || authType === 'oauth2') return true;
+  if (sourceConfig.sftp_host && !sourceConfig.sftp_private_key && !sourceConfig.sftp_password) return true;
+  return false;
+}
+
+async function exportDataSource(
+  client: PoolClient,
+  tenantId: string,
+  sourceId: string,
+): Promise<ConfigPackageDataSource | null> {
+  const result = await client.query<{
+    external_key: string;
+    name: string;
+    description: string | null;
+    entity_type: string;
+    source_type: ConfigPackageDataSource['source_type'];
+    source_config: Record<string, unknown>;
+    column_mapping: Record<string, unknown>;
+    schedule_cron: string;
+    schedule_enabled: boolean;
+    import_mode: ConfigPackageDataSource['import_mode'];
+    upsert_key: string | null;
+  }>(
+    `SELECT external_key, name, description, entity_type, source_type,
+            source_config, column_mapping, schedule_cron, schedule_enabled,
+            import_mode, upsert_key
+     FROM data_sources
+     WHERE tenant_id = $1 AND id = $2
+     LIMIT 1`,
+    [tenantId, sourceId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    external_key: row.external_key,
+    name: row.name,
+    description: row.description,
+    entity_type: row.entity_type,
+    source_type: row.source_type,
+    source_config: sanitizeSourceConfigForExport(row.source_config || {}),
+    column_mapping: row.column_mapping || {},
+    schedule_cron: row.schedule_cron,
+    schedule_enabled: row.schedule_enabled,
+    import_mode: row.import_mode,
+    upsert_key: row.upsert_key,
+  };
+}
+
 function summarize(changes: PackageChange[], issues: ValidationIssue[]): ValidationReport['summary'] {
   return {
     create: changes.filter((change) => change.action === 'create').length,
@@ -559,6 +653,12 @@ async function validateBundle(
     bundle.contents.notifications.rules,
     'notification rule',
     'contents.notifications.rules',
+  );
+  addDuplicateKeyIssues(
+    issues,
+    bundle.contents.data_sources.sources,
+    'data source',
+    'contents.data_sources.sources',
   );
 
   const packagedCategoryKeys = new Set(bundle.contents.catalog.categories.map((category) => category.external_key));
@@ -721,6 +821,53 @@ async function validateBundle(
       external_key: rule.external_key,
       name: rule.name,
       action: await existsByExternalKey(client, 'notification_rules', tenantId, rule.external_key) ? 'update' : 'create',
+    });
+  }
+
+  for (const [sourceIndex, source] of bundle.contents.data_sources.sources.entries()) {
+    if (!ENTITY_DEFS[source.entity_type]) {
+      issues.push({
+        severity: 'error',
+        path: `contents.data_sources.sources.${sourceIndex}.entity_type`,
+        message: `Unknown entity type "${source.entity_type}" on target`,
+      });
+    }
+    if ((source.import_mode === 'upsert' || source.import_mode === 'full_sync') && !source.upsert_key) {
+      issues.push({
+        severity: 'warning',
+        path: `contents.data_sources.sources.${sourceIndex}.upsert_key`,
+        message: `Data source "${source.name}" uses ${source.import_mode} without upsert_key`,
+      });
+    }
+    const credentialSlug = typeof source.source_config.credential_slug === 'string'
+      ? source.source_config.credential_slug.trim()
+      : '';
+    if (credentialSlug) {
+      const found = await client.query<{ slug: string }>(
+        `SELECT slug FROM tenant_credentials
+         WHERE tenant_id = $1 AND slug = $2
+         LIMIT 1`,
+        [tenantId, credentialSlug],
+      );
+      if (found.rows.length === 0) {
+        issues.push({
+          severity: 'error',
+          path: `contents.data_sources.sources.${sourceIndex}.source_config.credential_slug`,
+          message: `Missing credential slug "${credentialSlug}" on target`,
+        });
+      }
+    } else if (dataSourceNeedsCredentialHint(source.source_config)) {
+      issues.push({
+        severity: 'warning',
+        path: `contents.data_sources.sources.${sourceIndex}.source_config`,
+        message: `Data source "${source.name}" references auth without credential_slug; inline secrets are not exported and must be configured on the target`,
+      });
+    }
+    changes.push({
+      type: 'data_source',
+      external_key: source.external_key,
+      name: source.name,
+      action: await existsByExternalKey(client, 'data_sources', tenantId, source.external_key) ? 'update' : 'create',
     });
   }
 
@@ -1010,6 +1157,86 @@ async function upsertNotificationRule(
   return ruleId;
 }
 
+async function upsertDataSource(
+  client: PoolClient,
+  tenantId: string,
+  userId: string,
+  source: ConfigPackageDataSource,
+): Promise<{ id: string; previousScheduleEnabled: boolean }> {
+  const existing = await client.query<{
+    id: string;
+    source_config: Record<string, unknown>;
+    schedule_enabled: boolean;
+  }>(
+    `SELECT id, source_config, schedule_enabled FROM data_sources
+     WHERE tenant_id = $1 AND external_key = $2
+     LIMIT 1`,
+    [tenantId, source.external_key],
+  );
+
+  const mergedConfig: Record<string, unknown> = {
+    ...sanitizeSourceConfigForExport(source.source_config || {}),
+  };
+  if (typeof source.source_config.credential_slug === 'string') {
+    mergedConfig.credential_slug = source.source_config.credential_slug;
+  }
+
+  const previous = existing.rows[0]?.source_config || {};
+  for (const key of DATA_SOURCE_SECRET_KEYS) {
+    const incoming = source.source_config?.[key];
+    if (typeof incoming === 'string' && incoming.length > 0) {
+      mergedConfig[key] = incoming;
+    } else if (typeof previous[key] === 'string' && previous[key]) {
+      // Preserve secrets already stored on the target when the package omits them.
+      mergedConfig[key] = previous[key];
+    }
+  }
+
+  const row = await client.query<{ id: string }>(
+    `INSERT INTO data_sources (
+       tenant_id, external_key, name, description, entity_type, source_type,
+       source_config, column_mapping, schedule_cron, schedule_enabled,
+       import_mode, upsert_key, created_by
+     ) VALUES (
+       $1, $2, $3, $4, $5, $6,
+       $7::jsonb, $8::jsonb, $9, $10,
+       $11, $12, $13
+     )
+     ON CONFLICT (tenant_id, external_key) DO UPDATE SET
+       name = EXCLUDED.name,
+       description = EXCLUDED.description,
+       entity_type = EXCLUDED.entity_type,
+       source_type = EXCLUDED.source_type,
+       source_config = EXCLUDED.source_config,
+       column_mapping = EXCLUDED.column_mapping,
+       schedule_cron = EXCLUDED.schedule_cron,
+       schedule_enabled = EXCLUDED.schedule_enabled,
+       import_mode = EXCLUDED.import_mode,
+       upsert_key = EXCLUDED.upsert_key,
+       updated_at = now()
+     RETURNING id`,
+    [
+      tenantId,
+      source.external_key,
+      source.name,
+      source.description || null,
+      source.entity_type,
+      source.source_type,
+      JSON.stringify(mergedConfig),
+      JSON.stringify(source.column_mapping || {}),
+      source.schedule_cron,
+      source.schedule_enabled,
+      source.import_mode,
+      source.upsert_key || null,
+      userId,
+    ],
+  );
+  return {
+    id: row.rows[0].id,
+    previousScheduleEnabled: existing.rows[0]?.schedule_enabled === true,
+  };
+}
+
 async function applyBundle(
   tenantId: string,
   userId: string,
@@ -1029,6 +1256,7 @@ async function applyBundle(
       service_items: 0,
       catalog_tasks: 0,
       notification_rules: 0,
+      data_sources: 0,
     };
 
     for (const item of bundle.contents.catalog.service_items) {
@@ -1055,6 +1283,24 @@ async function applyBundle(
     for (const rule of bundle.contents.notifications.rules) {
       await upsertNotificationRule(client, tenantId, rule);
       applied.notification_rules += 1;
+    }
+
+    for (const source of bundle.contents.data_sources.sources) {
+      const upserted = await upsertDataSource(client, tenantId, userId, source);
+      applied.data_sources += 1;
+      try {
+        if (source.schedule_enabled) {
+          await enqueueDataSourceScheduleStartJob({
+            dataSourceId: upserted.id,
+            tenantId,
+            cronSchedule: source.schedule_cron,
+          });
+        } else if (upserted.previousScheduleEnabled) {
+          await cancelDataSourceSchedule(upserted.id);
+        }
+      } catch {
+        // Don't fail package apply if Temporal is unavailable.
+      }
     }
 
     // Touch the validation object so future maintainers see apply is gated by it.
@@ -1164,6 +1410,58 @@ router.get('/export/notifications', async (req: Request, res: Response, next: Ne
     for (const row of ruleIds.rows) {
       const rule = await exportNotificationRule(client, tenantId, row.id);
       if (rule) bundle.contents.notifications.rules.push(rule);
+    }
+    res.json({ package: bundle, checksum: checksumBundle(bundle) });
+  } catch (err) {
+    next(err);
+  } finally {
+    if (client) {
+      await db.clearTenantContext(client).catch(() => undefined);
+      client.release();
+    }
+  }
+});
+
+router.get('/export/data-sources/sources/:id', async (req: Request, res: Response, next: NextFunction) => {
+  let client: PoolClient | null = null;
+  try {
+    await ensureConfigPackageSchema();
+    client = await db.getClient();
+    await setRequestTenantContext(client, req);
+    await backfillExternalKeys(client, req.user!.tenant_id);
+    const source = await exportDataSource(client, req.user!.tenant_id, String(req.params.id));
+    if (!source) throw BadRequest('Data source not found');
+    const bundle = emptyBundle(`Data source: ${source.name}`, req.user!.tenant_id);
+    bundle.contents.data_sources.sources.push(source);
+    res.json({ package: bundle, checksum: checksumBundle(bundle) });
+  } catch (err) {
+    next(err);
+  } finally {
+    if (client) {
+      await db.clearTenantContext(client).catch(() => undefined);
+      client.release();
+    }
+  }
+});
+
+router.get('/export/data-sources', async (req: Request, res: Response, next: NextFunction) => {
+  let client: PoolClient | null = null;
+  try {
+    await ensureConfigPackageSchema();
+    client = await db.getClient();
+    await setRequestTenantContext(client, req);
+    const tenantId = req.user!.tenant_id;
+    await backfillExternalKeys(client, tenantId);
+    const sourceIds = await client.query<{ id: string }>(
+      `SELECT id FROM data_sources
+       WHERE tenant_id = $1
+       ORDER BY name`,
+      [tenantId],
+    );
+    const bundle = emptyBundle('Data source configuration', tenantId);
+    for (const row of sourceIds.rows) {
+      const source = await exportDataSource(client, tenantId, row.id);
+      if (source) bundle.contents.data_sources.sources.push(source);
     }
     res.json({ package: bundle, checksum: checksumBundle(bundle) });
   } catch (err) {
