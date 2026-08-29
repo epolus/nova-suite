@@ -1,6 +1,6 @@
 {
   "name": "@nova-suite/engine",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Nova Suite API engine – service management, CMDB, and workflow backend",
   "license": "AGPL-3.0",
   "main": "dist/index.js",
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.5.0",
-    "@nova-suite/shared": "1.0.0",
+    "@nova-suite/shared": "0.1.0",
     "@temporalio/client": "^1.19.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",

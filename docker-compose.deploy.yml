@@ -6,7 +6,7 @@
 #   docker compose -f docker-compose.deploy.yml up -d
 #
 # Every component comes from one Docker Hub repository, distinguished by a tag
-# prefix. Pin NOVA_TAG to a release (e.g. 1.4.2) for anything but a trial.
+# prefix. Pin NOVA_TAG to a release (e.g. 0.1.0) for anything but a trial.
 # Deliberately free of bind mounts so no repository files are needed at runtime.
 
 services:

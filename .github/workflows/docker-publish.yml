@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 45
     env:
       # All five components share one Docker Hub repository and are told apart by
-      # a tag prefix, e.g. nova-suite:engine-1.4.2 and nova-suite:web-1.4.2.
+      # a tag prefix, e.g. nova-suite:engine-0.1.0 and nova-suite:web-0.1.0.
       IMAGE: ${{ vars.DOCKERHUB_NAMESPACE || github.repository_owner }}/nova-suite
     strategy:
       fail-fast: false

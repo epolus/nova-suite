@@ -1,6 +1,6 @@
 {
   "name": "@nova-suite/worker",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Nova Suite Temporal worker – workflow definitions and activity implementations",
   "license": "AGPL-3.0",
   "main": "dist/worker.js",
@@ -11,7 +11,7 @@
     "test": "vitest run src/**/*.test.ts"
   },
   "dependencies": {
-    "@nova-suite/shared": "1.0.0",
+    "@nova-suite/shared": "0.1.0",
     "@temporalio/activity": "^1.19.0",
     "@temporalio/client": "^1.19.0",
     "@temporalio/worker": "^1.19.0",
