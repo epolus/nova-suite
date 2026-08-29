@@ -12,15 +12,23 @@ Nova Suite provides a complete service management solution — service catalog, 
 
 <p align="center">
   <img src="docs/screenshots/portal.png" alt="Employee self-service portal" width="80%">
+  <br>
+  <em>Employee self-service portal — search, service catalog, requests, and knowledge base</em>
 </p>
 <p align="center">
   <img src="docs/screenshots/incident-detail.png" alt="Incident detail" width="80%">
+  <br>
+  <em>Incident detail — assignment, priority, SLA, caller context, and resolution actions</em>
 </p>
 <p align="center">
   <img src="docs/screenshots/cmdb-ci.png" alt="CMDB configuration item" width="80%">
+  <br>
+  <em>CMDB configuration item — attributes, relationships, history, and impact analysis</em>
 </p>
 <p align="center">
   <img src="docs/screenshots/admin-workflow.png" alt="Admin workflow editor" width="80%">
+  <br>
+  <em>Workflow designer — visual Temporal automation with live JSON sync and test runs</em>
 </p>
 
 ## Features
