@@ -100,6 +100,10 @@ export const admin = {
     request<ConfigPackageExportResponse>(`/admin/config-packages/export/notifications/rules/${id}`),
   exportNotificationPackage: () =>
     request<ConfigPackageExportResponse>('/admin/config-packages/export/notifications'),
+  exportDataSourcePackage: (id: string) =>
+    request<ConfigPackageExportResponse>(`/admin/config-packages/export/data-sources/sources/${id}`),
+  exportDataSourcesPackage: () =>
+    request<ConfigPackageExportResponse>('/admin/config-packages/export/data-sources'),
   validateConfigPackage: (bundle: ConfigPackageBundle) =>
     request<ConfigPackageValidateResponse>('/admin/config-packages/validate', {
       method: 'POST',

@@ -12,7 +12,7 @@ import type {
   ConfigPackageValidationReport,
 } from '../../api/client';
 
-type ExportMode = 'catalog' | 'catalog_item' | 'notifications' | 'notification_rule';
+type ExportMode = 'catalog' | 'catalog_item' | 'notifications' | 'notification_rule' | 'data_sources' | 'data_source';
 
 function downloadBundle(bundle: ConfigPackageBundle, checksum: string) {
   const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
@@ -144,7 +144,9 @@ export default function ConfigPackagesPage() {
       let result;
       if (exportMode === 'catalog') result = await admin.exportCatalogPackage();
       else if (exportMode === 'notifications') result = await admin.exportNotificationPackage();
+      else if (exportMode === 'data_sources') result = await admin.exportDataSourcesPackage();
       else if (exportMode === 'catalog_item') result = await admin.exportCatalogItemPackage(objectId.trim());
+      else if (exportMode === 'data_source') result = await admin.exportDataSourcePackage(objectId.trim());
       else result = await admin.exportNotificationRulePackage(objectId.trim());
       downloadBundle(result.package, result.checksum);
       setMessage(t('exported', { name: result.package.name }));
@@ -197,6 +199,7 @@ export default function ConfigPackagesPage() {
         serviceItems: result.applied.service_items,
         catalogTasks: result.applied.catalog_tasks,
         notificationRules: result.applied.notification_rules,
+        dataSources: result.applied.data_sources,
       }));
       await loadRuns();
     } catch (err) {
@@ -206,7 +209,9 @@ export default function ConfigPackagesPage() {
     }
   };
 
-  const needsObjectId = exportMode === 'catalog_item' || exportMode === 'notification_rule';
+  const needsObjectId = exportMode === 'catalog_item'
+    || exportMode === 'notification_rule'
+    || exportMode === 'data_source';
 
   return (
     <>
@@ -240,6 +245,8 @@ export default function ConfigPackagesPage() {
                 <option value="catalog_item">{t('exportModes.catalog_item')}</option>
                 <option value="notifications">{t('exportModes.notifications')}</option>
                 <option value="notification_rule">{t('exportModes.notification_rule')}</option>
+                <option value="data_sources">{t('exportModes.data_sources')}</option>
+                <option value="data_source">{t('exportModes.data_source')}</option>
               </select>
             </div>
             {needsObjectId && (

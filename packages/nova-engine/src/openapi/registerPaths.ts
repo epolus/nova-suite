@@ -487,6 +487,23 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
   });
 
   registry.registerPath({
+    method: 'get',
+    path: '/admin/config-packages/export/data-sources/sources/{id}',
+    tags: ['Config packages'],
+    summary: 'Export one data source as a bundle fragment',
+    request: { params: exportRuleParams },
+    responses: { 200: { description: 'Configuration package JSON' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/admin/config-packages/export/data-sources',
+    tags: ['Config packages'],
+    summary: 'Export all data sources as a configuration package',
+    responses: { 200: { description: 'Configuration package JSON' } },
+  });
+
+  registry.registerPath({
     method: 'post',
     path: '/admin/config-packages/validate',
     tags: ['Config packages'],

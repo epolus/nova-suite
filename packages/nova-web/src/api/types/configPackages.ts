@@ -14,6 +14,9 @@ export interface ConfigPackageBundle {
     notifications: {
       rules: Array<Record<string, unknown>>;
     };
+    data_sources?: {
+      sources: Array<Record<string, unknown>>;
+    };
   };
 }
 
@@ -24,7 +27,7 @@ export interface ConfigPackageValidationIssue {
 }
 
 export interface ConfigPackageChange {
-  type: 'category' | 'service_item' | 'catalog_task' | 'notification_rule';
+  type: 'category' | 'service_item' | 'catalog_task' | 'notification_rule' | 'data_source';
   external_key: string;
   name: string;
   action: 'create' | 'update' | 'skip';
@@ -63,6 +66,7 @@ export interface ConfigPackageApplyResponse {
     service_items: number;
     catalog_tasks: number;
     notification_rules: number;
+    data_sources: number;
   };
 }
 
