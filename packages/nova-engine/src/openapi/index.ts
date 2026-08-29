@@ -19,7 +19,7 @@ export const openApiSpec: OpenAPIObject = generator.generateDocument({
   openapi: '3.0.3',
   info: {
     title: 'Nova Suite API',
-    version: '1.0.0',
+    version: '0.1.0',
     description:
       'Open-source ITSM Suite – Service catalog, incident management and CMDB. ' +
       'Paths and request bodies are generated from the same Zod schemas used by the API. ' +
