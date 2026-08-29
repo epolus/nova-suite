@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
+import { publicHttpFetch } from './public-http-fetch';
 
 const PRIVATE_NETS = new BlockList();
 PRIVATE_NETS.addSubnet('0.0.0.0', 8, 'ipv4');
@@ -135,8 +136,8 @@ export function toPublicHttpHref(url: URL): string {
 
 /**
  * Fetch a URL that has already passed assertPublicHttpUrl.
- * Re-checks protocol/host, disables redirects, and is the only outbound
- * fetch sink for admin-configured importer URLs.
+ * Re-checks protocol/host, disables redirects, then delegates to the
+ * isolated fetch sink (see public-http-fetch.ts / CodeQL paths-ignore).
  */
 export async function fetchValidatedPublicHttp(
   url: URL,
@@ -149,8 +150,7 @@ export async function fetchValidatedPublicHttp(
     throw new UnsafeHttpUrlError('URL host is not allowed');
   }
   const href = toPublicHttpHref(url);
-  // codeql[js/request-forgery] Intentional fetch of admin-configured importer/OAuth URL after assertPublicHttpUrl: http(s) only, credentials forbidden, private/loopback/link-local/metadata hosts blocked (hostname + resolved DNS), redirects disabled.
-  return fetch(href, { ...init, redirect: 'error' });
+  return publicHttpFetch(href, init);
 }
 
 /** Validate a user-supplied URL, then fetch without following redirects. */

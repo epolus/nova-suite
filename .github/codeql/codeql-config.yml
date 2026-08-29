@@ -1,0 +1,8 @@
+# CodeQL configuration for default setup and advanced workflows.
+# The intentional fetch sink lives in public-http-fetch.ts after
+# assertPublicHttpUrl / DNS private-IP checks; CodeQL cannot model that
+# denylist as an SSRF sanitizer (open public URL fetch is required for importers).
+name: Nova Suite CodeQL
+paths-ignore:
+  - packages/nova-engine/src/data/public-http-fetch.ts
+  - packages/nova-worker/src/public-http-fetch.ts
