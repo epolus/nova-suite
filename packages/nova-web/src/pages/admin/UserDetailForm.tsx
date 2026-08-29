@@ -25,12 +25,8 @@ interface UserDetailFormProps {
   roles: RoleItem[];
   managerOptions: AdminUser[];
   toggleRole: (roleId: string) => void;
-  saving: boolean;
-  deleting: boolean;
   error: string;
   onSubmit: (e: React.FormEvent) => void;
-  onDelete: () => void;
-  onCancel: () => void;
 }
 
 export default function UserDetailForm({
@@ -46,15 +42,10 @@ export default function UserDetailForm({
   roles,
   managerOptions,
   toggleRole,
-  saving,
-  deleting,
   error,
   onSubmit,
-  onDelete,
-  onCancel,
 }: UserDetailFormProps) {
   const t = useTranslations('pages.admin.userDetail');
-  const tActions = useTranslations('common.actions');
   const tFields = useTranslations('common.fields');
   const tStates = useTranslations('common.states');
   const tLang = useTranslations('common.language');
@@ -105,7 +96,7 @@ export default function UserDetailForm({
       {!isNew && currentUser && (
         <p className="text-sm text-gray-500 mb-4">{currentUser.display_name} &middot; {currentUser.email}</p>
       )}
-      <form onSubmit={onSubmit} className="space-y-6">
+      <form id="user-detail-form" onSubmit={onSubmit} className="space-y-6">
         {error && (
           <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
             {error}
@@ -362,34 +353,6 @@ export default function UserDetailForm({
             </label>
           </fieldset>
         )}
-
-        <div className="flex items-center gap-3 pt-2">
-          {!isNew && (
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={deleting || saving}
-              className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
-            >
-              {deleting ? t('deleting') : tActions('delete')}
-            </button>
-          )}
-          <div className="flex-1" />
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
-          >
-            {tActions('cancel')}
-          </button>
-          <button
-            type="submit"
-            disabled={saving || deleting}
-            className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-          >
-            {saving ? tActions('saving') : isNew ? t('createUser') : t('saveChanges')}
-          </button>
-        </div>
       </form>
     </Card>
   );

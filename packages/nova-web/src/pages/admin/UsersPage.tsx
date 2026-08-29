@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import {
   admin,
@@ -15,6 +15,8 @@ import { useListParams } from '../../hooks/useListParams';
 import { formatDate } from '../../utils/dateTime';
 
 const DEFAULT_COLS = ['user', 'title', 'user_id', 'department_name', 'manager_name', 'roles', '_status'];
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const DEFAULT_PAGE_SIZE = 20;
 
 function buildColumns(
   tFields: ReturnType<typeof useTranslations<'common.fields'>>,
@@ -180,17 +182,33 @@ export default function UsersPage() {
   const tTable = useTranslations('common.table');
   const tStates = useTranslations('common.states');
 
-  const { params, setSearch, setSort, setCols, setFilter, setColumnFilter } = useListParams({
+  const { params, setSearch, setSort, setCols, setPage, setFilter, setColumnFilter } = useListParams({
     defaultCols: DEFAULT_COLS,
     filterKeys: ['active'],
     storageKey: 'admin_users',
   });
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   const activeFilter = params.filters.active || 'all';
+  const pageSize = useMemo(() => {
+    const raw = Number.parseInt(searchParams.get('limit') || String(DEFAULT_PAGE_SIZE), 10);
+    if (!Number.isFinite(raw) || raw < 1) return DEFAULT_PAGE_SIZE;
+    return PAGE_SIZE_OPTIONS.includes(raw) ? raw : DEFAULT_PAGE_SIZE;
+  }, [searchParams]);
+
+  const setPageSize = useCallback((size: number) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (size === DEFAULT_PAGE_SIZE) next.delete('limit');
+      else next.set('limit', String(size));
+      next.delete('page');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const loadData = useCallback(async () => {
     try {
@@ -250,6 +268,18 @@ export default function UsersPage() {
     });
   }, [filtered, params.sort, params.dir]);
 
+  const total = sorted.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(params.page, pages);
+  const pageRows = useMemo(
+    () => sorted.slice((page - 1) * pageSize, page * pageSize),
+    [sorted, page, pageSize],
+  );
+
+  useEffect(() => {
+    if (params.page !== page) setPage(page);
+  }, [params.page, page, setPage]);
+
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};
     if (activeFilter && activeFilter !== 'all') lp.active = activeFilter;
@@ -258,11 +288,12 @@ export default function UsersPage() {
       lp.sort_by = params.sort;
       lp.sort_dir = params.dir;
     }
+    if (pageSize !== DEFAULT_PAGE_SIZE) lp.limit = String(pageSize);
     for (const [col, val] of Object.entries(params.columnFilters)) {
       if (val) lp[`cf.${col}`] = val;
     }
     return lp;
-  }, [activeFilter, params.search, params.sort, params.dir, params.columnFilters]);
+  }, [activeFilter, params.search, params.sort, params.dir, params.columnFilters, pageSize]);
 
   const columns = useMemo(
     () => buildColumns(tFields, tTable, tStates, tPage),
@@ -310,13 +341,13 @@ export default function UsersPage() {
           ))}
         </div>
         <div className="ml-auto text-sm text-gray-500 self-center">
-          {tPage('count', { count: sorted.length })}
+          {tPage('count', { count: total })}
         </div>
       </div>
 
       <DataTable
         columns={columns}
-        data={sorted}
+        data={pageRows}
         visibleColumns={params.cols}
         onColumnsChange={setCols}
         sortKey={params.sort}
@@ -326,6 +357,15 @@ export default function UsersPage() {
         onColumnFilter={setColumnFilter}
         emptyMessage={params.search ? tPage('emptySearch', { query: params.search }) : tPage('empty')}
         onRowClick={(u) => navigate(`/admin/users/${u.id}`, { state: { listParams: getListParams() } })}
+        pagination={{
+          page,
+          pages,
+          total,
+          onPageChange: setPage,
+          pageSize,
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+          onPageSizeChange: setPageSize,
+        }}
       />
     </>
   );

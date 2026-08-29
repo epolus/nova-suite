@@ -29,6 +29,7 @@ import {
 export default function UserDetailPage() {
   const t = useTranslations('pages.admin.userDetail');
   const tFields = useTranslations('common.fields');
+  const tActions = useTranslations('common.actions');
 
   const { id } = useParams<{ id: string }>();
   const isNew = !id || id === 'new';
@@ -382,12 +383,30 @@ export default function UserDetailPage() {
                 </button>
               </>
             )}
+            {!isNew && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting || saving}
+                className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+              >
+                {deleting ? t('deleting') : tActions('delete')}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => guardNavigate('/admin/users')}
               className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              {t('backToList')}
+              {tActions('cancel')}
+            </button>
+            <button
+              type="submit"
+              form="user-detail-form"
+              disabled={saving || deleting}
+              className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? tActions('saving') : isNew ? t('createUser') : t('saveChanges')}
             </button>
           </div>
         }
@@ -406,12 +425,8 @@ export default function UserDetailPage() {
         roles={roles}
         managerOptions={managerOptions}
         toggleRole={toggleRole}
-        saving={saving}
-        deleting={deleting}
         error={error}
         onSubmit={handleSubmit}
-        onDelete={handleDelete}
-        onCancel={() => guardNavigate('/admin/users')}
       />
     </>
   );

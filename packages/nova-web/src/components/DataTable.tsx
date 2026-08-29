@@ -35,6 +35,9 @@ interface DataTableProps<T extends { id: string }> {
     pages: number;
     total: number;
     onPageChange: (page: number) => void;
+    pageSize?: number;
+    pageSizeOptions?: number[];
+    onPageSizeChange?: (size: number) => void;
   };
   selectable?: boolean;
   selectedIds?: string[];
@@ -245,28 +248,56 @@ export default function DataTable<T extends { id: string }>({
         </div>
       )}
 
-      {pagination && pagination.pages > 1 && (
-        <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between">
-          <p className="text-sm text-gray-500">{tTable('total', { count: pagination.total })}</p>
-          <div className="flex gap-2">
-            <button
-              disabled={pagination.page <= 1}
-              onClick={() => pagination.onPageChange(pagination.page - 1)}
-              className="px-3 py-1 text-sm border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
-            >
-              {tTable('prev')}
-            </button>
-            <span className="px-2 py-1 text-sm text-gray-500">
-              {pagination.page} / {pagination.pages}
-            </span>
-            <button
-              disabled={pagination.page >= pagination.pages}
-              onClick={() => pagination.onPageChange(pagination.page + 1)}
-              className="px-3 py-1 text-sm border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
-            >
-              {tTable('next')}
-            </button>
+      {pagination && (pagination.pages > 1 || pagination.onPageSizeChange) && (
+        <div className="px-6 py-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-gray-500">
+              {pagination.pageSize
+                ? tTable('showing', {
+                    from: pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1,
+                    to: Math.min(pagination.page * pagination.pageSize, pagination.total),
+                    total: pagination.total,
+                  })
+                : tTable('total', { count: pagination.total })}
+            </p>
+            {pagination.onPageSizeChange && pagination.pageSizeOptions && pagination.pageSizeOptions.length > 0 && (
+              <label className="flex items-center gap-2 text-sm text-gray-500">
+                <span>{tTable('rowsPerPage')}</span>
+                <select
+                  value={pagination.pageSize}
+                  onChange={(e) => pagination.onPageSizeChange?.(Number(e.target.value))}
+                  className="px-2 py-1 text-sm border border-gray-200 rounded-md bg-white text-gray-700 focus:ring-1 focus:ring-indigo-500 outline-hidden"
+                >
+                  {pagination.pageSizeOptions.map((size) => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
+          {pagination.pages > 1 && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={pagination.page <= 1}
+                onClick={() => pagination.onPageChange(pagination.page - 1)}
+                className="px-3 py-1 text-sm border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
+              >
+                {tTable('prev')}
+              </button>
+              <span className="px-2 py-1 text-sm text-gray-500">
+                {pagination.page} / {pagination.pages}
+              </span>
+              <button
+                type="button"
+                disabled={pagination.page >= pagination.pages}
+                onClick={() => pagination.onPageChange(pagination.page + 1)}
+                className="px-3 py-1 text-sm border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
+              >
+                {tTable('next')}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </Card>
