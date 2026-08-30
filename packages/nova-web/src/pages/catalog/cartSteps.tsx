@@ -4,12 +4,13 @@ import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { type CartItem } from '../../context/CartContext';
 import { auth } from '../../api/client';
-import type { UserListItem, ServiceRequest } from '../../api/client';
+import type { FormField, UserListItem, ServiceRequest } from '../../api/client';
 import Card from '../../components/Card';
 import UserDateInput from '../../components/UserDateInput';
 import { catalogPictureFrameBaseClass } from './catalogPictureFrame';
 import { formatCurrency } from '../../utils/currency';
 import { useStatusLabel } from '@/i18n/hooks';
+import { ResolvedCmdbRef, ResolvedUserRef } from '../requests/ResolvedRefs';
 
 const STEP_KEYS = ['review', 'delivery', 'confirm'] as const;
 
@@ -84,6 +85,7 @@ export function ReviewStep({ items, onRemove, onUpdate, currencyCode }: {
 }) {
   const t = useTranslations('pages.catalog');
   const tActions = useTranslations('common.actions');
+  const tStates = useTranslations('common.states');
   const statusLabel = useStatusLabel();
   const total = items.reduce((sum, i) => sum + (Number(i.serviceItem.price) || 0), 0);
 
@@ -117,12 +119,29 @@ export function ReviewStep({ items, onRemove, onUpdate, currencyCode }: {
             </div>
 
             {Object.keys(item.formData).length > 0 && (
-              <div className="mt-2 text-xs text-gray-500">
-                {Object.entries(item.formData).map(([k, v]) => (
-                  <span key={k} className="inline-block mr-3">
-                    <span className="font-medium">{k}:</span> {String(v)}
-                  </span>
-                ))}
+              <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+                {Object.entries(item.formData).map(([k, v]) => {
+                  const fieldDef = item.serviceItem.form_schema?.fields?.find(
+                    (f: FormField) => f.name === k,
+                  );
+                  const label = fieldDef?.label || k.replace(/_/g, ' ');
+                  return (
+                    <div key={k} className="flex flex-wrap gap-x-1">
+                      <span className="font-medium">{label}:</span>
+                      <span>
+                        {fieldDef?.type === 'cmdb_ref' && v ? (
+                          <ResolvedCmdbRef ciId={String(v)} />
+                        ) : fieldDef?.type === 'user_ref' && v ? (
+                          <ResolvedUserRef userId={String(v)} />
+                        ) : fieldDef?.type === 'checkbox' ? (
+                          String(v) === 'true' ? tStates('yes') : tStates('no')
+                        ) : (
+                          String(v)
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
