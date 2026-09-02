@@ -154,7 +154,7 @@ export function useChangeDetail() {
         changes.standardTemplates(),
         changes.assignmentGroups(),
         incidents.services(),
-        cmdb.items({ status: 'active' }, 1, 100),
+        cmdb.items({ status: 'installed' }, 1, 100),
         incidents.list({ status: 'new' }, 1, 100),
         problems.list({}, 1, 100),
       ]);

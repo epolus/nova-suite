@@ -91,7 +91,7 @@ export const ENTITY_DEFS: Record<string, EntityDef> = {
       { key: 'name', label: 'Name', required: true, aliases: ['ci_name', 'item_name', 'hostname'] },
       { key: 'class', label: 'CI Class (name)', required: true, resolve: { table: 'ci_classes', matchColumn: 'name' }, aliases: ['ci_class', 'class_name', 'type'] },
       { key: 'display_name', label: 'Display Name', aliases: ['label'] },
-      { key: 'status', label: 'Status', type: 'enum', enumValues: ['active', 'maintenance', 'retired', 'planned'], aliases: ['ci_status'] },
+      { key: 'status', label: 'Status', type: 'enum', enumValues: ['installed', 'in_stock', 'maintenance', 'retired', 'planned'], aliases: ['ci_status'] },
       { key: 'environment', label: 'Environment', type: 'enum', enumValues: ['production', 'staging', 'development', 'test'], aliases: ['env'] },
       { key: 'managed_by', label: 'Managed By (email)', resolve: { table: 'users', matchColumn: 'email' }, aliases: ['owner', 'manager'] },
       { key: 'assigned_to', label: 'Assigned To (email)', resolve: { table: 'users', matchColumn: 'email' }, aliases: ['assignee', 'assigned_to_email'] },

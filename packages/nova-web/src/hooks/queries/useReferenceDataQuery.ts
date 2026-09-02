@@ -41,7 +41,7 @@ export function useReferenceUsers(enabled = true) {
 }
 
 export function useReferenceCmdbItems(
-  params: Record<string, string> = { status: 'active' },
+  params: Record<string, string> = { status: 'installed' },
   page = 1,
   limit = 100,
   enabled = true,

@@ -366,7 +366,7 @@ export default function FormBuilder({ fields, onChange, ciClasses = [] }: Props)
                 <input
                   value={filterVal}
                   onChange={(e) => setFilterVal(e.target.value)}
-                  placeholder={filterKey === 'managed_by' ? '$current_user' : filterKey === 'status' ? 'active' : 'value'}
+                  placeholder={filterKey === 'managed_by' ? '$current_user' : filterKey === 'status' ? 'installed' : 'value'}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFilter(); } }}
                   className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                 />

@@ -451,7 +451,7 @@ export const createCISchema = z.object({
   class_id: uuidSchema,
   name: z.string().min(1).max(255),
   display_name: z.string().max(255).optional().nullable(),
-  status: z.enum(['active', 'maintenance', 'retired', 'planned']).default('active'),
+  status: z.enum(['installed', 'in_stock', 'maintenance', 'retired', 'planned']).default('installed'),
   environment: z.enum(['production', 'staging', 'development', 'test']).default('production'),
   attributes: z.record(z.string(), z.unknown()).default({}),
   managed_by: uuidSchema.optional().nullable(),

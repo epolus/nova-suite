@@ -96,9 +96,25 @@ export default function CIForm() {
         title={isEdit ? tCmdb('editTitle', { name: displayName || name }) : tCmdb('newCi')}
         description={isEdit ? `${selectedClass?.display_name || ''} · ${name}` : tCmdb('createDescription')}
         action={
-          <button onClick={() => guardNavigate(-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-            &larr; {tActions('cancel')}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => guardNavigate(-1)}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {tActions('cancel')}
+            </button>
+            {step === 2 && (
+              <button
+                type="button"
+                onClick={() => { void handleSubmit(); }}
+                disabled={saving || !name.trim() || !classId}
+                className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {saving ? tActions('saving') : isEdit ? tMaster('saveChanges') : tCmdb('createConfigurationItem')}
+              </button>
+            )}
+          </div>
         }
       />
 
@@ -190,7 +206,8 @@ export default function CIForm() {
                     onChange={(e) => setStatus(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="active">{tStates('active')}</option>
+                    <option value="installed">{statusLabel('installed')}</option>
+                    <option value="in_stock">{statusLabel('in_stock')}</option>
                     <option value="planned">{statusLabel('planned')}</option>
                     <option value="maintenance">{statusLabel('maintenance')}</option>
                     <option value="retired">{statusLabel('retired')}</option>
@@ -323,14 +340,6 @@ export default function CIForm() {
                 </div>
               </div>
             </Card>
-
-            <button
-              onClick={() => { void handleSubmit(); }}
-              disabled={saving || !name.trim() || !classId}
-              className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-            >
-              {saving ? tActions('saving') : isEdit ? tMaster('saveChanges') : tCmdb('createConfigurationItem')}
-            </button>
           </div>
         </div>
       )}

@@ -3253,6 +3253,8 @@
     "monitoring": "Monitoring",
     "review": "Review",
     "active": "Active",
+    "installed": "Installed",
+    "in_stock": "In Stock",
     "maintenance": "Maintenance",
     "planned": "Planned",
     "critical": "Critical",

@@ -335,8 +335,8 @@ router.post(
             if (ciCheck.rows.length === 0) {
               throw BadRequest(`${field.label || field.name}: Referenced CI not found`);
             }
-            if (ciCheck.rows[0].status !== 'active') {
-              throw BadRequest(`${field.label || field.name}: Referenced CI is not active (status: ${ciCheck.rows[0].status})`);
+            if (ciCheck.rows[0].status !== 'installed') {
+              throw BadRequest(`${field.label || field.name}: Referenced CI is not installed (status: ${ciCheck.rows[0].status})`);
             }
           }
           if (field.type === 'user_ref') {
@@ -458,8 +458,8 @@ router.post(
                 if (ciCheck.rows.length === 0) {
                   throw BadRequest(`${serviceItem.name} - ${field.label || field.name}: Referenced CI not found`);
                 }
-                if (ciCheck.rows[0].status !== 'active') {
-                  throw BadRequest(`${serviceItem.name} - ${field.label || field.name}: Referenced CI is not active (status: ${ciCheck.rows[0].status})`);
+                if (ciCheck.rows[0].status !== 'installed') {
+                  throw BadRequest(`${serviceItem.name} - ${field.label || field.name}: Referenced CI is not installed (status: ${ciCheck.rows[0].status})`);
                 }
               }
               if (field.type === 'user_ref') {

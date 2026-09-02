@@ -23,7 +23,7 @@ export const EMPTY_CI_FORM: CIFormSnapshot = {
   classId: '',
   name: '',
   displayName: '',
-  status: 'active',
+  status: 'installed',
   environment: 'production',
   managedBy: '',
   assignedTo: '',

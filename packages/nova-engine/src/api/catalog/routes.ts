@@ -196,7 +196,7 @@ router.post(
           tenant_id, class_id, name, display_name, status, environment,
           attributes, managed_by, assigned_to, notes
         ) VALUES (
-          $1, $2, $3, $4, 'active', 'production', $5::jsonb, $6, $6, $7
+          $1, $2, $3, $4, 'installed', 'production', $5::jsonb, $6, $6, $7
         ) RETURNING id, name, display_name, assigned_to`,
         [
           tenantId,
@@ -239,7 +239,7 @@ router.post(
       const className = typeof req.body?.class_name === 'string' ? req.body.class_name.trim() : '';
       const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
       const displayName = typeof req.body?.display_name === 'string' ? req.body.display_name.trim() : '';
-      const status = typeof req.body?.status === 'string' ? req.body.status.trim() : 'active';
+      const status = typeof req.body?.status === 'string' ? req.body.status.trim() : 'installed';
       const environment = typeof req.body?.environment === 'string' ? req.body.environment.trim() : 'production';
       const attributes =
         req.body?.attributes && typeof req.body.attributes === 'object' && !Array.isArray(req.body.attributes)

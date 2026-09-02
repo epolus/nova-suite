@@ -588,7 +588,7 @@ async function commitRow(
         )`,
         [
           data.class_id, data.name, data.display_name || null,
-          data.status || 'active', data.environment || 'production',
+          data.status || 'installed', data.environment || 'production',
           JSON.stringify(attributes),
           data.managed_by_id || null, data.assigned_to_id || null, data.supported_by_id || null,
           data.location_id || null, data.notes || null,

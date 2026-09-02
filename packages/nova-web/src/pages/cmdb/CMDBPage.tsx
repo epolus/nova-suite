@@ -335,9 +335,9 @@ export default function CMDBPage() {
           <button onClick={() => setFilter('status', '')} className={chip(!statusFilter)}>
             {tCmdb('filters.allStatuses')}
           </button>
-          {(['active', 'planned', 'maintenance', 'retired'] as const).map((s) => (
+          {(['installed', 'in_stock', 'planned', 'maintenance', 'retired'] as const).map((s) => (
             <button key={s} onClick={() => setFilter('status', s)} className={chip(statusFilter === s)}>
-              {s === 'active' ? tStates('active') : statusLabel(s)}
+              {statusLabel(s)}
             </button>
           ))}
         </div>

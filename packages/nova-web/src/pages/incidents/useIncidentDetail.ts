@@ -53,7 +53,7 @@ export function useIncidentDetail() {
   // Reference data (fulfiller only, cached via React Query)
   const { data: assignmentGroups = [] } = useReferenceAssignmentGroups(isFulfiller);
   const { data: services = [] } = useReferenceIncidentServices(isFulfiller);
-  const { data: ciOptions = [] } = useReferenceCmdbItems({ status: 'active' }, 1, 100, isFulfiller);
+  const { data: ciOptions = [] } = useReferenceCmdbItems({ status: 'installed' }, 1, 100, isFulfiller);
   const { data: users = [] } = useReferenceUsers(isFulfiller);
   const { data: problemOptions = [] } = useReferenceProblemPicker(isFulfiller);
   const { data: linkedProblems = [] } = useIncidentLinkedProblems(id, isFulfiller);

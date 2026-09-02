@@ -170,7 +170,7 @@ function CmdbRefPicker({ id, name, ariaLabel, value, onChange, ciClass, ciFilter
   const debouncedSearch = useDebounce(inputText, 250);
 
   const buildParams = useCallback((q?: string): Record<string, string> => {
-    const params: Record<string, string> = { context: 'picker', status: 'active' };
+    const params: Record<string, string> = { context: 'picker', status: 'installed' };
     if (q) params.search = q;
     if (ciClass) params.class = ciClass;
     if (ciFilter) {
