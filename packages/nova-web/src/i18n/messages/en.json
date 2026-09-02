@@ -1081,6 +1081,7 @@
       "nextCi": "Next CI (Right arrow)",
       "tabs": {
         "details": "Details",
+        "related": "Related ({count})",
         "relationships": "Relationships ({count})",
         "history": "History ({count})",
         "impact": "Impact ({count})"

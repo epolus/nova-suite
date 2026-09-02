@@ -7,6 +7,7 @@ import { CiClassIcon } from '../../components/CiClassIcon';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { useCIDetail } from './useCIDetail';
 import CiDetailsTab from './CiDetailsTab';
+import CiRelatedWorkTab from './CiRelatedWorkTab';
 import CiRelationshipsTab from './CiRelationshipsTab';
 import CiHistoryTab from './CiHistoryTab';
 import CiImpactTab from './CiImpactTab';
@@ -74,8 +75,10 @@ export default function CIDetail() {
     );
   }
 
+  const relatedCount = relatedProblems.length + relatedIncidents.length;
   const tabs = [
     { key: 'details' as const, label: tCmdb('tabs.details') },
+    { key: 'related' as const, label: tCmdb('tabs.related', { count: relatedCount }) },
     { key: 'relationships' as const, label: tCmdb('tabs.relationships', { count: ci.relationships.outgoing.length + ci.relationships.incoming.length }) },
     { key: 'history' as const, label: tCmdb('tabs.history', { count: history.length }) },
     { key: 'impact' as const, label: tCmdb('tabs.impact', { count: impact.length }) },
@@ -156,9 +159,14 @@ export default function CIDetail() {
         <CiDetailsTab
           ci={ci}
           refNames={refNames}
+          linkedAssets={linkedAssets}
+        />
+      )}
+
+      {activeTab === 'related' && (
+        <CiRelatedWorkTab
           relatedProblems={relatedProblems}
           relatedIncidents={relatedIncidents}
-          linkedAssets={linkedAssets}
         />
       )}
 

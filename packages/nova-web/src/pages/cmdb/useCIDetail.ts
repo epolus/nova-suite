@@ -42,7 +42,7 @@ export function useCIDetail() {
   const [relatedProblems, setRelatedProblems] = useState<Problem[]>([]);
   const [relatedIncidents, setRelatedIncidents] = useState<Incident[]>([]);
   const [linkedAssets, setLinkedAssets] = useState<Asset[]>([]);
-  const [activeTab, setActiveTab] = useState<'details' | 'relationships' | 'history' | 'impact'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'related' | 'relationships' | 'history' | 'impact'>('details');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
