@@ -71,7 +71,7 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     if (!isEss) {
       adminApi.assignmentGroups().then((res) => setAssignmentGroups(res.assignment_groups)).catch(() => {});
       incidentsApi.services().then((res) => setServices(res.services)).catch(() => {});
-      cmdbApi.items({ status: 'active' }, 1, 100).then((res) => setCis(res.items)).catch(() => {});
+      cmdbApi.items({ status: 'installed' }, 1, 100).then((res) => setCis(res.items)).catch(() => {});
       problemsApi.list({}, 1, 100).then((res) => setProblems(res.problems)).catch(() => {});
     }
   }, [user, isEss]);

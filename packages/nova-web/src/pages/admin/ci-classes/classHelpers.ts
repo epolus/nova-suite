@@ -2,20 +2,7 @@
 import type { useTranslations } from 'use-intl';
 import type { CIClass } from '../../../api/client';
 
-export const ICON_VALUES = ['server', 'globe', 'database', 'wifi', 'storage', 'cloud', 'printer', 'phone', 'monitor', 'other'] as const;
-
-export const ICON_EMOJI: Record<string, string> = {
-  server: '🖥️',
-  globe: '🌐',
-  database: '🗄️',
-  wifi: '📡',
-  storage: '💾',
-  cloud: '☁️',
-  printer: '🖨️',
-  phone: '📱',
-  monitor: '🖥️',
-  other: '📦',
-};
+export { CI_CLASS_ICON_VALUES as ICON_VALUES } from '../../../components/CiClassIcon';
 
 export const ATTR_TYPES = ['string', 'integer', 'number', 'boolean', 'reference'];
 
@@ -46,10 +33,6 @@ export const EMPTY_CLASS: ClassDraft = {
   parent_class: '',
   attributes: [],
 };
-
-export function iconEmoji(icon: string): string {
-  return ICON_EMOJI[icon] || '📦';
-}
 
 export function attrsToList(attrs: Record<string, { type: string; reference_table?: string }>): AttrDef[] {
   return Object.entries(attrs).map(([key, val]) => ({

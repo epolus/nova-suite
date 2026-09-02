@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useTranslations } from 'use-intl';
 import type { CIClass } from '../../../api/client';
+import { CiClassIcon } from '../../../components/CiClassIcon';
 import {
   ATTR_TYPES,
   REFERENCE_TABLES,
@@ -9,7 +10,7 @@ import {
   type ClassDraft,
 } from './classHelpers';
 
-type IconOption = { value: string; label: string; emoji: string };
+type IconOption = { value: string; label: string };
 
 export default function ClassEditorModal({
   editing,
@@ -119,14 +120,14 @@ export default function ClassEditorModal({
                   <button
                     key={ic.value}
                     onClick={() => onChange({ ...editing, icon: ic.value })}
-                    className={`p-2 rounded-lg border-2 transition-all text-lg ${
+                    className={`p-2 rounded-lg border-2 transition-all text-gray-600 ${
                       editing.icon === ic.value
-                        ? 'border-indigo-500 bg-indigo-50'
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                         : 'border-gray-100 hover:border-gray-200'
                     }`}
                     title={ic.label}
                   >
-                    {ic.emoji}
+                    <CiClassIcon name={ic.value} className="w-5 h-5" />
                   </button>
                 ))}
               </div>

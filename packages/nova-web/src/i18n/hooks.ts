@@ -57,6 +57,8 @@ type FieldKey =
   | 'participants'
   | 'managedBy'
   | 'supportedBy'
+  | 'externalId1'
+  | 'externalId2'
   | 'task'
   | 'request'
   | 'group'

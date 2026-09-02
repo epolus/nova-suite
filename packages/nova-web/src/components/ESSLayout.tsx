@@ -258,6 +258,7 @@ export default function ESSLayout() {
     { to: '/catalog', label: tNavigation('ess.catalog') },
     { to: '/requests', label: tNavigation('ess.myRequests') },
     { to: '/incidents', label: tNavigation('ess.myIncidents') },
+    { to: '/cmdb', label: tNavigation('ess.cmdb') },
     { to: '/knowledge', label: tNavigation('ess.knowledge') },
     ...(pendingApprovals > 0 ? [{ to: '/ess/approvals', label: tNavigation('ess.approvals'), badge: pendingApprovals }] : []),
   ] as { to: string; label: string; end?: boolean; badge?: number }[];

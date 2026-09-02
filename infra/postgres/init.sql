@@ -740,7 +740,7 @@ CREATE INDEX idx_ci_classes_attributes_gin ON ci_classes USING gin (attributes);
 -- ============================================================
 -- CMDB CONFIGURATION ITEMS
 -- ============================================================
-CREATE TYPE ci_status_enum AS ENUM ('active', 'maintenance', 'retired', 'planned');
+CREATE TYPE ci_status_enum AS ENUM ('installed', 'in_stock', 'maintenance', 'retired', 'planned');
 
 CREATE TABLE configuration_items (
   id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -749,7 +749,7 @@ CREATE TABLE configuration_items (
   name         text NOT NULL,
   display_name text,
   is_active    boolean NOT NULL DEFAULT true,
-  status       ci_status_enum NOT NULL DEFAULT 'active',
+  status       ci_status_enum NOT NULL DEFAULT 'installed',
   environment  text DEFAULT 'production'
                CHECK (environment IN ('production', 'staging', 'development', 'test')),
   attributes   jsonb NOT NULL DEFAULT '{}',
@@ -758,6 +758,8 @@ CREATE TABLE configuration_items (
   supported_by   uuid REFERENCES assignment_groups(id),
   location_id    uuid REFERENCES locations(id) ON DELETE SET NULL,
   notes          text,
+  external_id_1  text,
+  external_id_2  text,
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
@@ -769,6 +771,12 @@ CREATE INDEX idx_ci_assigned ON configuration_items(tenant_id, assigned_to);
 CREATE INDEX idx_ci_supported_by ON configuration_items(tenant_id, supported_by);
 CREATE INDEX idx_ci_location_id ON configuration_items(tenant_id, location_id);
 CREATE INDEX idx_ci_attributes_gin ON configuration_items USING gin (attributes);
+CREATE UNIQUE INDEX uq_ci_tenant_external_id_1
+  ON configuration_items(tenant_id, external_id_1)
+  WHERE external_id_1 IS NOT NULL;
+CREATE UNIQUE INDEX uq_ci_tenant_external_id_2
+  ON configuration_items(tenant_id, external_id_2)
+  WHERE external_id_2 IS NOT NULL;
 
 -- ============================================================
 -- CMDB CI RELATIONSHIPS
@@ -994,7 +1002,8 @@ CREATE TABLE schema_migrations (
 
 INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.00', '001_initial_schema'),
-  ('v00.01.01', 'data_sources_external_key');
+  ('v00.01.01', 'data_sources_external_key'),
+  ('v00.01.02', 'configuration_items_external_ids_and_status');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1672,27 +1681,27 @@ INSERT INTO configuration_items (id, tenant_id, class_id, name, display_name, st
   ('f0000000-0000-0000-0000-000000000001',
    'a0000000-0000-0000-0000-000000000001',
    'e0000000-0000-0000-0000-000000000001',
-   'web-prod-01', 'Production Web Server 1', 'active', 'production',
+   'web-prod-01', 'Production Web Server 1', 'installed', 'production',
    '{"os": "Ubuntu 22.04", "cpu_cores": 8, "ram_gb": 32, "ip_address": "10.0.1.10"}'),
   ('f0000000-0000-0000-0000-000000000002',
    'a0000000-0000-0000-0000-000000000001',
    'e0000000-0000-0000-0000-000000000001',
-   'web-prod-02', 'Production Web Server 2', 'active', 'production',
+   'web-prod-02', 'Production Web Server 2', 'installed', 'production',
    '{"os": "Ubuntu 22.04", "cpu_cores": 8, "ram_gb": 32, "ip_address": "10.0.1.11"}'),
   ('f0000000-0000-0000-0000-000000000003',
    'a0000000-0000-0000-0000-000000000001',
    'e0000000-0000-0000-0000-000000000003',
-   'db-prod-01', 'Production PostgreSQL', 'active', 'production',
+   'db-prod-01', 'Production PostgreSQL', 'installed', 'production',
    '{"engine": "PostgreSQL", "version": "16.2", "port": 5432, "max_connections": 200}'),
   ('f0000000-0000-0000-0000-000000000004',
    'a0000000-0000-0000-0000-000000000001',
    'e0000000-0000-0000-0000-000000000002',
-   'nova-api', 'Nova Suite API', 'active', 'production',
+   'nova-api', 'Nova Suite API', 'installed', 'production',
    '{"version": "1.0.0", "language": "TypeScript", "port": 4000, "url": "https://api.acme.local"}'),
   ('f0000000-0000-0000-0000-000000000005',
    'a0000000-0000-0000-0000-000000000001',
    'e0000000-0000-0000-0000-000000000004',
-   'fw-prod-01', 'Production Firewall', 'active', 'production',
+   'fw-prod-01', 'Production Firewall', 'installed', 'production',
    '{"device_type": "firewall", "ip_address": "10.0.0.1", "firmware_version": "7.4.1"}');
 
 -- CMDB RELATIONSHIPS (SEED)

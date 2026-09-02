@@ -160,7 +160,8 @@
       "myRequests": "Meine Wünsche",
       "myIncidents": "Meine Vorfälle",
       "knowledge": "Wissensdatenbank",
-      "approvals": "Bewilligungen"
+      "approvals": "Bewilligungen",
+      "cmdb": "CMDB"
     },
     "adminSections": {
       "administration": "Verwaltung",
@@ -441,18 +442,54 @@
           "incidents": "Incidents"
         },
         "colors": {
-          "primaryColor": { "label": "Primärfarbe", "description": "Buttons, aktive Navigation, Links und Akzente" },
-          "sidebarBg": { "label": "Seitenleisten-Hintergrund", "description": "Hintergrundfarbe der Haupt-Seitenleiste" },
-          "sidebarActiveBg": { "label": "Aktiver Navigationspunkt", "description": "Hintergrund des aktiven Navigationseintrags" },
-          "contentBg": { "label": "Seitenhintergrund", "description": "Hintergrundfarbe des Hauptinhaltsbereichs" },
-          "loginBgFrom": { "label": "Login-Hintergrund (Start)", "description": "Gradient-Startfarbe der Login-Seite" },
-          "loginBgTo": { "label": "Login-Hintergrund (Ende)", "description": "Gradient-Endfarbe der Login-Seite" },
-          "darkContentBg": { "label": "Dark Content-Hintergrund", "description": "Hauptanwendungshintergrund im Dark Mode" },
-          "darkSurfaceBg": { "label": "Dark Surface", "description": "Karten, Modals und helle Panels im Dark Mode" },
-          "darkMutedBg": { "label": "Dark Muted-Hintergrund", "description": "Eingaben und dezente neutrale Hintergründe" },
-          "darkBorderColor": { "label": "Dark Rahmenfarbe", "description": "Rahmen und Trennlinien im Dark Mode" },
-          "darkTextPrimary": { "label": "Dark Primärtext", "description": "Haupttextfarbe im Dark Mode" },
-          "darkTextMuted": { "label": "Dark Sekundärtext", "description": "Sekundäre Labels und Hilfetexte" }
+          "primaryColor": {
+            "label": "Primärfarbe",
+            "description": "Buttons, aktive Navigation, Links und Akzente"
+          },
+          "sidebarBg": {
+            "label": "Seitenleisten-Hintergrund",
+            "description": "Hintergrundfarbe der Haupt-Seitenleiste"
+          },
+          "sidebarActiveBg": {
+            "label": "Aktiver Navigationspunkt",
+            "description": "Hintergrund des aktiven Navigationseintrags"
+          },
+          "contentBg": {
+            "label": "Seitenhintergrund",
+            "description": "Hintergrundfarbe des Hauptinhaltsbereichs"
+          },
+          "loginBgFrom": {
+            "label": "Login-Hintergrund (Start)",
+            "description": "Gradient-Startfarbe der Login-Seite"
+          },
+          "loginBgTo": {
+            "label": "Login-Hintergrund (Ende)",
+            "description": "Gradient-Endfarbe der Login-Seite"
+          },
+          "darkContentBg": {
+            "label": "Dark Content-Hintergrund",
+            "description": "Hauptanwendungshintergrund im Dark Mode"
+          },
+          "darkSurfaceBg": {
+            "label": "Dark Surface",
+            "description": "Karten, Modals und helle Panels im Dark Mode"
+          },
+          "darkMutedBg": {
+            "label": "Dark Muted-Hintergrund",
+            "description": "Eingaben und dezente neutrale Hintergründe"
+          },
+          "darkBorderColor": {
+            "label": "Dark Rahmenfarbe",
+            "description": "Rahmen und Trennlinien im Dark Mode"
+          },
+          "darkTextPrimary": {
+            "label": "Dark Primärtext",
+            "description": "Haupttextfarbe im Dark Mode"
+          },
+          "darkTextMuted": {
+            "label": "Dark Sekundärtext",
+            "description": "Sekundäre Labels und Hilfetexte"
+          }
         },
         "saved": "Änderungen gespeichert und angewendet!",
         "saveFailed": "Theme-Einstellungen konnten nicht gespeichert werden",

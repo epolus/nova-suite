@@ -451,7 +451,7 @@ export const createCISchema = z.object({
   class_id: uuidSchema,
   name: z.string().min(1).max(255),
   display_name: z.string().max(255).optional().nullable(),
-  status: z.enum(['active', 'maintenance', 'retired', 'planned']).default('active'),
+  status: z.enum(['installed', 'in_stock', 'maintenance', 'retired', 'planned']).default('installed'),
   environment: z.enum(['production', 'staging', 'development', 'test']).default('production'),
   attributes: z.record(z.string(), z.unknown()).default({}),
   managed_by: uuidSchema.optional().nullable(),
@@ -459,6 +459,9 @@ export const createCISchema = z.object({
   supported_by: uuidSchema.optional().nullable(),
   location_id: uuidSchema.optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
+  external_id_1: z.string().max(255).optional().nullable(),
+  external_id_2: z.string().max(255).optional().nullable(),
+  is_active: z.boolean().optional().default(true),
 });
 
 export const updateCISchema = createCISchema.partial();

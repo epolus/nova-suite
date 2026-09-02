@@ -63,9 +63,10 @@ DECLARE
   pending_reason_val text;
   envs text[] := ARRAY['production','staging','development','test'];
   ci_statuses ci_status_enum[] := ARRAY[
-    'active'::ci_status_enum,
-    'active'::ci_status_enum,
-    'active'::ci_status_enum,
+    'installed'::ci_status_enum,
+    'installed'::ci_status_enum,
+    'installed'::ci_status_enum,
+    'in_stock'::ci_status_enum,
     'maintenance'::ci_status_enum,
     'retired'::ci_status_enum,
     'planned'::ci_status_enum

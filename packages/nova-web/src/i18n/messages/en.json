@@ -157,6 +157,8 @@
       "scheduledStart": "Scheduled Start",
       "managedBy": "Managed By",
       "supportedBy": "Supported By",
+      "externalId1": "External ID 1",
+      "externalId2": "External ID 2",
       "task": "Task",
       "request": "Request",
       "group": "Group",
@@ -320,7 +322,8 @@
       "myRequests": "My Requests",
       "myIncidents": "My Incidents",
       "knowledge": "Knowledge",
-      "approvals": "Approvals"
+      "approvals": "Approvals",
+      "cmdb": "CMDB"
     },
     "adminSections": {
       "administration": "Administration",
@@ -1063,9 +1066,6 @@
       "searchPlaceholder": "Search CIs by name...",
       "empty": "No configuration items found.",
       "emptySearch": "No CIs matching \"{query}\"",
-      "filters": {
-        "allTypes": "All Types"
-      },
       "bulk": {
         "openSelected": "Open Selected"
       },
@@ -1081,6 +1081,7 @@
       "nextCi": "Next CI (Right arrow)",
       "tabs": {
         "details": "Details",
+        "related": "Related ({count})",
         "relationships": "Relationships ({count})",
         "history": "History ({count})",
         "impact": "Impact ({count})"
@@ -1092,6 +1093,22 @@
       "noAttributes": "No attributes defined",
       "relatedProblems": "Related Problems",
       "noRelatedProblems": "No problems linked to this CI.",
+      "relatedIncidents": "Related Incidents",
+      "noRelatedIncidents": "No incidents linked to this CI.",
+      "linkedAssets": "Linked Assets",
+      "noLinkedAssets": "No assets linked to this CI.",
+      "externalId1Placeholder": "ID in external system 1",
+      "externalId2Placeholder": "ID in external system 2",
+      "activeCi": "Active (visible in search)",
+      "inactiveCi": "Inactive (hidden from ESS search)",
+      "filters": {
+        "allTypes": "All Types",
+        "allStatuses": "All statuses",
+        "allEnvironments": "All environments",
+        "activeOnly": "Active only",
+        "inactiveOnly": "Inactive only",
+        "allActive": "Active & inactive"
+      },
       "relationshipFlow": "Relationship Flow",
       "removeSelectedEdge": "Remove selected edge",
       "flowHint": "Click a node to open that CI. Click an edge to select it for deletion.",
@@ -1430,6 +1447,7 @@
           "printer": "Printer",
           "phone": "Phone",
           "monitor": "Monitor",
+          "laptop": "Laptop",
           "other": "Other"
         }
       },
@@ -3235,6 +3253,8 @@
     "monitoring": "Monitoring",
     "review": "Review",
     "active": "Active",
+    "installed": "Installed",
+    "in_stock": "In Stock",
     "maintenance": "Maintenance",
     "planned": "Planned",
     "critical": "Critical",

@@ -75,7 +75,7 @@ export function useProblemDetail() {
     try {
       const [gRes, ciRes] = await Promise.all([
         problemsApi.assignmentGroups(),
-        cmdb.items({ status: 'active' }, 1, 100),
+        cmdb.items({ status: 'installed' }, 1, 100),
       ]);
       setGroups(gRes.assignment_groups);
       setCiItems(ciRes.items);

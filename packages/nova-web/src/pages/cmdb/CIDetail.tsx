@@ -3,9 +3,11 @@ import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
+import { CiClassIcon } from '../../components/CiClassIcon';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { useCIDetail } from './useCIDetail';
 import CiDetailsTab from './CiDetailsTab';
+import CiRelatedWorkTab from './CiRelatedWorkTab';
 import CiRelationshipsTab from './CiRelationshipsTab';
 import CiHistoryTab from './CiHistoryTab';
 import CiImpactTab from './CiImpactTab';
@@ -20,6 +22,8 @@ export default function CIDetail() {
     history,
     impact,
     relatedProblems,
+    relatedIncidents,
+    linkedAssets,
     activeTab,
     setActiveTab,
     loading,
@@ -71,8 +75,10 @@ export default function CIDetail() {
     );
   }
 
+  const relatedCount = relatedProblems.length + relatedIncidents.length;
   const tabs = [
     { key: 'details' as const, label: tCmdb('tabs.details') },
+    { key: 'related' as const, label: tCmdb('tabs.related', { count: relatedCount }) },
     { key: 'relationships' as const, label: tCmdb('tabs.relationships', { count: ci.relationships.outgoing.length + ci.relationships.incoming.length }) },
     { key: 'history' as const, label: tCmdb('tabs.history', { count: history.length }) },
     { key: 'impact' as const, label: tCmdb('tabs.impact', { count: impact.length }) },
@@ -86,7 +92,12 @@ export default function CIDetail() {
         onLeave={leaveWithoutSaving}
       />
       <PageHeader
-        title={ci.display_name || ci.name}
+        title={
+          <span className="inline-flex items-center gap-2">
+            <CiClassIcon name={ci.class_icon} className="w-6 h-6 text-gray-500" />
+            <span>{ci.display_name || ci.name}</span>
+          </span>
+        }
         description={`${ci.class_display_name} · ${ci.name}`}
         action={
           <div className="flex gap-2 items-center">
@@ -145,7 +156,18 @@ export default function CIDetail() {
       </div>
 
       {activeTab === 'details' && (
-        <CiDetailsTab ci={ci} refNames={refNames} relatedProblems={relatedProblems} />
+        <CiDetailsTab
+          ci={ci}
+          refNames={refNames}
+          linkedAssets={linkedAssets}
+        />
+      )}
+
+      {activeTab === 'related' && (
+        <CiRelatedWorkTab
+          relatedProblems={relatedProblems}
+          relatedIncidents={relatedIncidents}
+        />
       )}
 
       {activeTab === 'relationships' && (

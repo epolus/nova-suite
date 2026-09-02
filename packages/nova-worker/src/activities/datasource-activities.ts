@@ -605,6 +605,9 @@ const ENTITY_FK_FIELDS: Record<string, { field: string; table: string; matchCol:
   cmdb: [
     { field: 'class', table: 'ci_classes', matchCol: 'name', idField: 'class_id' },
     { field: 'managed_by', table: 'users', matchCol: 'email', idField: 'managed_by_id' },
+    { field: 'assigned_to', table: 'users', matchCol: 'email', idField: 'assigned_to_id' },
+    { field: 'supported_by', table: 'assignment_groups', matchCol: 'name', idField: 'supported_by_id' },
+    { field: 'location', table: 'locations', matchCol: 'name', idField: 'location_id' },
   ],
   incidents: [
     { field: 'assigned_to', table: 'users', matchCol: 'email', idField: 'assigned_to_id' },
@@ -746,7 +749,7 @@ function getUpdateFields(
       'cost_center_id', 'is_active',
     ],
     assignment_groups: ['name', 'description', 'manager_id', 'cost_center_id', 'parent_group_id', 'is_active'],
-    cmdb: ['name', 'display_name', 'class_id', 'status', 'environment', 'managed_by_id', 'location', 'notes'],
+    cmdb: ['name', 'display_name', 'class_id', 'status', 'environment', 'managed_by_id', 'assigned_to_id', 'supported_by_id', 'location_id', 'external_id_1', 'external_id_2', 'is_active', 'notes'],
   };
 
   const allowed = fieldMap[entityType] || [];
@@ -847,12 +850,20 @@ async function insertRow(
 
     case 'cmdb':
       await client.query(
-        `INSERT INTO configuration_items (tenant_id, class_id, name, display_name, status, environment, managed_by, location, notes)
-         VALUES (current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8)`,
+        `INSERT INTO configuration_items (
+          tenant_id, class_id, name, display_name, status, environment,
+          managed_by, assigned_to, supported_by, location_id, notes,
+          external_id_1, external_id_2, is_active
+        ) VALUES (
+          current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+        )`,
         [
           data.class_id, data.name, data.display_name || null,
-          data.status || 'active', data.environment || 'production',
-          data.managed_by_id || null, data.location || null, data.notes || null,
+          data.status || 'installed', data.environment || 'production',
+          data.managed_by_id || null, data.assigned_to_id || null, data.supported_by_id || null,
+          data.location_id || null, data.notes || null,
+          data.external_id_1 || null, data.external_id_2 || null,
+          data.is_active ?? true,
         ],
       );
       break;
