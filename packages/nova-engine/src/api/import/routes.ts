@@ -579,13 +579,21 @@ async function commitRow(
           }
         }
       await client.query(
-        `INSERT INTO configuration_items (tenant_id, class_id, name, display_name, status, environment, attributes, managed_by, location, notes)
-         VALUES (current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        `INSERT INTO configuration_items (
+          tenant_id, class_id, name, display_name, status, environment, attributes,
+          managed_by, assigned_to, supported_by, location_id, notes,
+          external_id_1, external_id_2, is_active
+        ) VALUES (
+          current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+        )`,
         [
           data.class_id, data.name, data.display_name || null,
           data.status || 'active', data.environment || 'production',
           JSON.stringify(attributes),
-          data.managed_by_id || null, data.location || null, data.notes || null,
+          data.managed_by_id || null, data.assigned_to_id || null, data.supported_by_id || null,
+          data.location_id || null, data.notes || null,
+          data.external_id_1 || null, data.external_id_2 || null,
+          data.is_active ?? true,
         ],
       );
       break;

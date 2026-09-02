@@ -51,6 +51,7 @@ export const incidents = {
       body: JSON.stringify({ ids, action, value }),
     }),
   stats: () => request<IncidentStats>('/incidents/stats'),
+  byCi: (ciId: string) => request<{ incidents: Incident[] }>(`/incidents/by-ci/${ciId}`),
   linkMajorIncident: (incidentId: string, body: { major_incident_id: string }) =>
     request<{ success: boolean; major_incident_id: string }>(`/incidents/${incidentId}/link-major-incident`, {
       method: 'POST',

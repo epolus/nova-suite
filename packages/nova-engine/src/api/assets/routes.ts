@@ -17,13 +17,20 @@ function canManageAssets(req: Request): boolean {
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
+    const conditions = ['a.tenant_id = current_tenant_id()'];
+    const params: unknown[] = [];
+    if (typeof req.query.linked_ci_id === 'string' && req.query.linked_ci_id) {
+      params.push(req.query.linked_ci_id);
+      conditions.push(`a.linked_ci_id = $${params.length}`);
+    }
     const rows = await client.query(
       `SELECT a.*, u.display_name AS owner_name, ci.display_name AS linked_ci_name
        FROM assets a
        LEFT JOIN users u ON u.id = a.owner_user_id
        LEFT JOIN configuration_items ci ON ci.id = a.linked_ci_id
-       WHERE a.tenant_id = current_tenant_id()
+       WHERE ${conditions.join(' AND ')}
        ORDER BY a.updated_at DESC`,
+      params,
     );
     res.json({ assets: rows.rows });
   } catch (err) {

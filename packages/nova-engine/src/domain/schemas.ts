@@ -459,6 +459,9 @@ export const createCISchema = z.object({
   supported_by: uuidSchema.optional().nullable(),
   location_id: uuidSchema.optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
+  external_id_1: z.string().max(255).optional().nullable(),
+  external_id_2: z.string().max(255).optional().nullable(),
+  is_active: z.boolean().optional().default(true),
 });
 
 export const updateCISchema = createCISchema.partial();

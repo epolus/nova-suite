@@ -7,15 +7,14 @@ import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import ClassEditorModal from './ci-classes/ClassEditorModal';
+import { CiClassIcon } from '../../components/CiClassIcon';
 import {
   EMPTY_CLASS,
   ICON_VALUES,
-  ICON_EMOJI,
   attrsToList,
   attrsToRecord,
   formatAttrType,
   getInheritedAttrs,
-  iconEmoji,
   type ClassDraft,
 } from './ci-classes/classHelpers';
 
@@ -28,7 +27,6 @@ export default function CIClassesPage() {
     () => ICON_VALUES.map((value) => ({
       value,
       label: t(`icons.${value}`),
-      emoji: ICON_EMOJI[value] ?? '📦',
     })),
     [t],
   );
@@ -146,7 +144,7 @@ export default function CIClassesPage() {
         {classes.map((cls) => (
           <Card key={cls.id} className="relative group">
             <div className="flex items-start gap-3">
-              <span className="text-2xl">{iconEmoji(cls.icon)}</span>
+              <span className="text-gray-600"><CiClassIcon name={cls.icon} className="w-7 h-7" /></span>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-gray-900">{cls.display_name}</h3>
                 <p className="text-xs text-gray-400 font-mono">{cls.name}</p>

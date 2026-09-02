@@ -3,6 +3,7 @@ import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
+import { CiClassIcon } from '../../components/CiClassIcon';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { useCIDetail } from './useCIDetail';
 import CiDetailsTab from './CiDetailsTab';
@@ -20,6 +21,8 @@ export default function CIDetail() {
     history,
     impact,
     relatedProblems,
+    relatedIncidents,
+    linkedAssets,
     activeTab,
     setActiveTab,
     loading,
@@ -86,7 +89,12 @@ export default function CIDetail() {
         onLeave={leaveWithoutSaving}
       />
       <PageHeader
-        title={ci.display_name || ci.name}
+        title={
+          <span className="inline-flex items-center gap-2">
+            <CiClassIcon name={ci.class_icon} className="w-6 h-6 text-gray-500" />
+            <span>{ci.display_name || ci.name}</span>
+          </span>
+        }
         description={`${ci.class_display_name} · ${ci.name}`}
         action={
           <div className="flex gap-2 items-center">
@@ -145,7 +153,13 @@ export default function CIDetail() {
       </div>
 
       {activeTab === 'details' && (
-        <CiDetailsTab ci={ci} refNames={refNames} relatedProblems={relatedProblems} />
+        <CiDetailsTab
+          ci={ci}
+          refNames={refNames}
+          relatedProblems={relatedProblems}
+          relatedIncidents={relatedIncidents}
+          linkedAssets={linkedAssets}
+        />
       )}
 
       {activeTab === 'relationships' && (

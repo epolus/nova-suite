@@ -7,6 +7,7 @@ export interface CIClass {
   parent_class: string | null;
   attributes: Record<string, { type: string; reference_table?: string }>;
   icon: string;
+  is_active?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -16,6 +17,7 @@ export interface CI {
   class_id: string;
   name: string;
   display_name: string;
+  is_active: boolean;
   status: string;
   environment: string;
   attributes: Record<string, unknown>;
@@ -26,6 +28,8 @@ export interface CI {
   location: string | null;
   location_name?: string | null;
   notes: string | null;
+  external_id_1: string | null;
+  external_id_2: string | null;
   created_at: string;
   updated_at: string;
   class_display_name?: string;

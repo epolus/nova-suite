@@ -859,6 +859,24 @@ router.get('/similar-by-text', async (req: Request, res: Response, next: NextFun
   }
 });
 
+// ─── GET /api/incidents/by-ci/:ciId ───
+router.get('/by-ci/:ciId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const rows = await client.query(
+      `SELECT id, number, title, status, priority, updated_at
+       FROM incidents
+       WHERE tenant_id = current_tenant_id()
+         AND configuration_item_id = $1
+       ORDER BY updated_at DESC`,
+      [req.params.ciId],
+    );
+    res.json({ incidents: rows.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── GET /api/incidents/:id ───
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {

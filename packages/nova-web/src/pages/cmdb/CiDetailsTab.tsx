@@ -1,20 +1,29 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
-import type { Problem } from '../../api/client';
+import type { Asset, Incident, Problem } from '../../api/client';
 import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import { formatDateTime } from '../../utils/dateTime';
 import { useFieldLabel } from '@/i18n/hooks';
 import type { CIData } from './useCIDetail';
 
-export default function CiDetailsTab({ ci, refNames, relatedProblems }: {
+export default function CiDetailsTab({
+  ci,
+  refNames,
+  relatedProblems,
+  relatedIncidents,
+  linkedAssets,
+}: {
   ci: CIData;
   refNames: Record<string, string>;
   relatedProblems: Problem[];
+  relatedIncidents: Incident[];
+  linkedAssets: Asset[];
 }) {
   const tCmdb = useTranslations('pages.cmdb');
   const tTable = useTranslations('common.table');
+  const tStates = useTranslations('common.states');
   const fieldLabel = useFieldLabel();
 
   return (
@@ -25,6 +34,10 @@ export default function CiDetailsTab({ ci, refNames, relatedProblems }: {
           <div className="flex justify-between">
             <dt className="text-gray-500">{fieldLabel('status')}</dt>
             <dd><Badge value={ci.status} /></dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-gray-500">{tStates('active')}</dt>
+            <dd className="text-gray-900">{ci.is_active === false ? tStates('inactive') : tStates('active')}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-gray-500">{fieldLabel('environment')}</dt>
@@ -46,6 +59,18 @@ export default function CiDetailsTab({ ci, refNames, relatedProblems }: {
             <dt className="text-gray-500">{tCmdb('supportedBy')}</dt>
             <dd className="text-gray-900">{ci.supported_by_name || tTable('emDash')}</dd>
           </div>
+          {(ci.external_id_1 || ci.external_id_2) && (
+            <>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">{fieldLabel('externalId1')}</dt>
+                <dd className="text-gray-900 font-mono text-xs">{ci.external_id_1 || tTable('emDash')}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">{fieldLabel('externalId2')}</dt>
+                <dd className="text-gray-900 font-mono text-xs">{ci.external_id_2 || tTable('emDash')}</dd>
+              </div>
+            </>
+          )}
           {ci.location && (
             <div className="flex justify-between">
               <dt className="text-gray-500">{fieldLabel('location')}</dt>
@@ -91,10 +116,10 @@ export default function CiDetailsTab({ ci, refNames, relatedProblems }: {
         </Card>
       )}
 
-      <Card className="lg:col-span-2">
-          <h3 className="font-semibold text-gray-900 mb-2">{tCmdb('relatedProblems')}</h3>
-          {relatedProblems.length === 0 ? (
-            <p className="text-sm text-gray-400">{tCmdb('noRelatedProblems')}</p>
+      <Card>
+        <h3 className="font-semibold text-gray-900 mb-2">{tCmdb('relatedProblems')}</h3>
+        {relatedProblems.length === 0 ? (
+          <p className="text-sm text-gray-400">{tCmdb('noRelatedProblems')}</p>
         ) : (
           <div className="space-y-2">
             {relatedProblems.map((p) => (
@@ -106,6 +131,48 @@ export default function CiDetailsTab({ ci, refNames, relatedProblems }: {
                 <p className="text-xs text-indigo-600 font-medium">{p.number}</p>
                 <p className="text-sm text-gray-900">{p.title}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{p.status} • {p.priority}</p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <h3 className="font-semibold text-gray-900 mb-2">{tCmdb('relatedIncidents')}</h3>
+        {relatedIncidents.length === 0 ? (
+          <p className="text-sm text-gray-400">{tCmdb('noRelatedIncidents')}</p>
+        ) : (
+          <div className="space-y-2">
+            {relatedIncidents.map((inc) => (
+              <Link
+                key={inc.id}
+                to={`/incidents/${inc.id}`}
+                className="block p-3 rounded-lg border border-gray-200 hover:bg-gray-50"
+              >
+                <p className="text-xs text-indigo-600 font-medium">{inc.number}</p>
+                <p className="text-sm text-gray-900">{inc.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{inc.status} • P{inc.priority}</p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="lg:col-span-2">
+        <h3 className="font-semibold text-gray-900 mb-2">{tCmdb('linkedAssets')}</h3>
+        {linkedAssets.length === 0 ? (
+          <p className="text-sm text-gray-400">{tCmdb('noLinkedAssets')}</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {linkedAssets.map((asset) => (
+              <Link
+                key={asset.id}
+                to={`/assets/${asset.id}`}
+                className="block p-3 rounded-lg border border-gray-200 hover:bg-gray-50"
+              >
+                <p className="text-xs text-indigo-600 font-medium">{asset.asset_tag}</p>
+                <p className="text-sm text-gray-900">{asset.name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{asset.status} • {asset.category}</p>
               </Link>
             ))}
           </div>

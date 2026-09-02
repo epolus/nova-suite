@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useLocation } from 'react-router';
-import { cmdb, auth, admin, problems } from '../../api/client';
-import type { CI, CIClass, CIRelationship, CIHistoryEntry, ImpactedCI, Problem } from '../../api/client';
+import { cmdb, auth, admin, problems, incidents, assets } from '../../api/client';
+import type { CI, CIClass, CIRelationship, CIHistoryEntry, ImpactedCI, Problem, Incident, Asset } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { hasConfigurationRole } from '../../utils/roles';
 import { useTranslations } from 'use-intl';
@@ -40,6 +40,8 @@ export function useCIDetail() {
   const [history, setHistory] = useState<CIHistoryEntry[]>([]);
   const [impact, setImpact] = useState<ImpactedCI[]>([]);
   const [relatedProblems, setRelatedProblems] = useState<Problem[]>([]);
+  const [relatedIncidents, setRelatedIncidents] = useState<Incident[]>([]);
+  const [linkedAssets, setLinkedAssets] = useState<Asset[]>([]);
   const [activeTab, setActiveTab] = useState<'details' | 'relationships' | 'history' | 'impact'>('details');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -57,7 +59,9 @@ export function useCIDetail() {
       cmdb.classes(),
       cmdb.nav(ciId, listParams),
       problems.byCi(ciId).catch(() => ({ problems: [] as Problem[] })),
-    ]).then(async ([ciRes, histRes, impactRes, classRes, navRes, problemRes]) => {
+      incidents.byCi(ciId).catch(() => ({ incidents: [] as Incident[] })),
+      assets.list({ linked_ci_id: ciId }).catch(() => ({ assets: [] as Asset[] })),
+    ]).then(async ([ciRes, histRes, impactRes, classRes, navRes, problemRes, incidentRes, assetRes]) => {
       setPrevId(navRes.prev_id);
       setNextId(navRes.next_id);
       setCi(ciRes);
@@ -65,6 +69,8 @@ export function useCIDetail() {
       setImpact(impactRes.impacted_items);
       setClasses(classRes.classes);
       setRelatedProblems(problemRes.problems);
+      setRelatedIncidents(incidentRes.incidents);
+      setLinkedAssets(assetRes.assets);
 
       // Resolve reference attributes to display names
       const allAttrs = resolveClassAttrs(ciRes.class_id, classRes.classes);
@@ -244,6 +250,8 @@ export function useCIDetail() {
     history,
     impact,
     relatedProblems,
+    relatedIncidents,
+    linkedAssets,
     activeTab,
     setActiveTab,
     loading,

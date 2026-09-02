@@ -32,10 +32,44 @@ import {
   createCIRelationshipSchema,
   paginationSchema,
 } from '../../domain/schemas';
-import { NotFound, Conflict } from '../../middleware/errorHandler';
-import { hasConfigurationRole, isFulfillerRole } from '../roles';
+import { NotFound, Conflict, Forbidden } from '../../middleware/errorHandler';
+import { hasConfigurationRole } from '../roles';
 
 const router = Router();
+
+async function assertCiAccess(req: Request, ciId: string): Promise<{ managed_by: string | null; assigned_to: string | null }> {
+  const client = getRequestClient(req);
+  const result = await client.query(
+    'SELECT managed_by, assigned_to FROM configuration_items WHERE id = $1',
+    [ciId],
+  );
+  if (result.rows.length === 0) {
+    throw NotFound('Configuration item not found');
+  }
+  const ci = result.rows[0] as { managed_by: string | null; assigned_to: string | null };
+  if (
+    !hasConfigurationRole(req)
+    && ci.managed_by !== req.user!.id
+    && ci.assigned_to !== req.user!.id
+  ) {
+    throw Forbidden('Insufficient permissions');
+  }
+  return ci;
+}
+
+function applyCiVisibilityFilter(
+  req: Request,
+  conditions: string[],
+  params: unknown[],
+  idx: number,
+  isPicker = false,
+): number {
+  if (hasConfigurationRole(req) || isPicker) return idx;
+  idx++;
+  conditions.push(`(ci.managed_by = $${idx} OR ci.assigned_to = $${idx})`);
+  params.push(req.user!.id);
+  return idx;
+}
 
 // All CMDB routes require auth + tenant context
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -172,15 +206,10 @@ router.get(
       const params: unknown[] = [];
       let idx = 0;
 
-      // Non-fulfiller users can only see CIs managed by them,
+      // Non-config users see CIs they manage or are assigned to,
       // unless context=picker (used by form reference pickers in catalog)
-      const isFulfiller = isFulfillerRole(req);
       const isPicker = req.query.context === 'picker';
-      if (!isFulfiller && !isPicker) {
-        idx++;
-        conditions.push(`ci.managed_by = $${idx}`);
-        params.push(req.user!.id);
-      }
+      idx = applyCiVisibilityFilter(req, conditions, params, idx, isPicker);
 
       if (req.query.class_id) {
         idx++;
@@ -208,6 +237,11 @@ router.get(
         conditions.push(`ci.environment = $${idx}`);
         params.push(req.query.environment);
       }
+      if (req.query.is_active === 'true' || req.query.is_active === 'false') {
+        idx++;
+        conditions.push(`ci.is_active = $${idx}`);
+        params.push(req.query.is_active === 'true');
+      }
       if (req.query.search) {
         idx++;
         conditions.push(`(ci.name ILIKE $${idx} OR ci.display_name ILIKE $${idx})`);
@@ -223,6 +257,8 @@ router.get(
         assigned_to_name: 'ua.display_name',
         supported_by_name: 'ag.name',
         location: 'l.name',
+        external_id_1: 'ci.external_id_1',
+        external_id_2: 'ci.external_id_2',
       };
       let needsExtraJoins = false;
       for (const [qKey, qVal] of Object.entries(req.query)) {
@@ -232,7 +268,15 @@ router.get(
             idx++;
             conditions.push(`${col} ILIKE $${idx}`);
             params.push(`${qVal}%`);
-            if (col.startsWith('cc.') || col.startsWith('u.') || col.startsWith('ua.') || col.startsWith('ag.') || col.startsWith('COALESCE(l.')) needsExtraJoins = true;
+            if (
+              col.startsWith('cc.')
+              || col.startsWith('u.')
+              || col.startsWith('ua.')
+              || col.startsWith('ag.')
+              || col.startsWith('l.')
+            ) {
+              needsExtraJoins = true;
+            }
           }
         }
       }
@@ -263,6 +307,8 @@ router.get(
         assigned_to_name: 'ua.display_name',
         supported_by_name: 'ag.name',
         location: 'l.name',
+        external_id_1: 'ci.external_id_1',
+        external_id_2: 'ci.external_id_2',
         created_at: 'ci.created_at',
         updated_at: 'ci.updated_at',
       };
@@ -319,12 +365,7 @@ router.get('/items/nav', async (req: Request, res: Response, next: NextFunction)
     const params: unknown[] = [];
     let idx = 0;
 
-    const isFulfiller = isFulfillerRole(req);
-    if (!isFulfiller) {
-      idx++;
-      conditions.push(`ci.managed_by = $${idx}`);
-      params.push(req.user!.id);
-    }
+    idx = applyCiVisibilityFilter(req, conditions, params, idx);
 
     if (req.query.class_id) {
       idx++;
@@ -421,19 +462,22 @@ router.post(
       const {
         class_id, name, display_name, status, environment,
         attributes, managed_by, assigned_to, supported_by, location_id, notes,
+        external_id_1, external_id_2, is_active,
       } = req.body;
 
       const result = await client.query(
         `INSERT INTO configuration_items (
           tenant_id, class_id, name, display_name, status, environment,
-          attributes, managed_by, assigned_to, supported_by, location_id, notes
+          attributes, managed_by, assigned_to, supported_by, location_id, notes,
+          external_id_1, external_id_2, is_active
         ) VALUES (
-          current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+          current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
         ) RETURNING *`,
         [
           class_id, name, display_name || name, status, environment,
           JSON.stringify(attributes), managed_by || null, assigned_to || null,
           supported_by || null, location_id || null, notes || null,
+          external_id_1 || null, external_id_2 || null, is_active ?? true,
         ],
       );
 
@@ -477,9 +521,12 @@ router.get('/items/:id', async (req: Request, res: Response, next: NextFunction)
     }
 
     const ci = result.rows[0];
-    const hasAccess = hasConfigurationRole(req);
-    if (!hasAccess && ci.managed_by !== req.user!.id && ci.assigned_to !== req.user!.id) {
-      res.status(403).json({ error: 'Insufficient permissions' }); return;
+    if (
+      !hasConfigurationRole(req)
+      && ci.managed_by !== req.user!.id
+      && ci.assigned_to !== req.user!.id
+    ) {
+      throw Forbidden('Insufficient permissions');
     }
 
     // Get relationships
@@ -578,6 +625,8 @@ router.patch(
 // ─── GET /api/cmdb/items/:id/history ───
 router.get('/items/:id/history', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const ciId = String(req.params.id);
+    await assertCiAccess(req, ciId);
     const client = getRequestClient(req);
     const result = await client.query(
       `SELECT h.*, u.display_name AS changed_by_name
@@ -585,7 +634,7 @@ router.get('/items/:id/history', async (req: Request, res: Response, next: NextF
        JOIN users u ON u.id = h.changed_by
        WHERE h.ci_id = $1
        ORDER BY h.created_at DESC`,
-      [req.params.id],
+      [ciId],
     );
 
     res.json({ history: result.rows });
@@ -597,16 +646,18 @@ router.get('/items/:id/history', async (req: Request, res: Response, next: NextF
 // ─── GET /api/cmdb/items/:id/impact ───
 router.get('/items/:id/impact', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const ciId = String(req.params.id);
+    await assertCiAccess(req, ciId);
     const client = getRequestClient(req);
     const depth = parseInt((req.query.depth as string) || '5', 10);
 
     const result = await client.query(
       'SELECT * FROM cmdb_impact_analysis($1, $2)',
-      [req.params.id, depth],
+      [ciId, depth],
     );
 
     res.json({
-      source_ci_id: req.params.id,
+      source_ci_id: ciId,
       depth,
       impacted_items: result.rows,
       total: result.rows.length,
@@ -623,6 +674,9 @@ router.get('/items/:id/impact', async (req: Request, res: Response, next: NextFu
 // ─── GET /api/cmdb/relationships ───
 router.get('/relationships', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    if (!hasConfigurationRole(req)) {
+      throw Forbidden('Insufficient permissions');
+    }
     const client = getRequestClient(req);
     const result = await client.query(
       `SELECT r.*,

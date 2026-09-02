@@ -88,7 +88,7 @@ Everything else has a working default. The most commonly changed settings:
 | `NOVA_TAG` | `latest` | Pin to a release for production. |
 | `HTTP_PORT` / `HTTPS_PORT` | `80` / `443` | Edge proxy ports. |
 | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | `nova_runtime` | Restricted runtime role used by the API and worker. Must stay `NOSUPERUSER NOBYPASSRLS` — Row-Level Security is the tenant boundary, and a superuser would bypass it. |
-| `DB_SCHEMA_VERSION` | `v00.01.00` | Must match the highest applied migration. A mismatch puts the API in degraded mode and stops the worker. |
+| `DB_SCHEMA_VERSION` | `v00.01.02` | Must match the highest applied migration. A mismatch puts the API in degraded mode and stops the worker. |
 | `AUTH_LOCAL_LOGIN_ENABLED` | `true` | Set `false` for SSO-only mode. |
 | `OIDC_ISSUER` and related | — | OpenID Connect SSO with auto-provisioning. Tested with Google and Microsoft Entra ID. |
 | `MAIL_NOTIFICATIONS_ENABLED`, `SMTP_*` | `false` | Email notifications. In-app notifications work without SMTP. |

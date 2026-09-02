@@ -160,7 +160,8 @@
       "myRequests": "Mes demandes",
       "myIncidents": "Mes incidents",
       "knowledge": "Connaissance",
-      "approvals": "Approbations"
+      "approvals": "Approbations",
+      "cmdb": "CMDB"
     },
     "adminSections": {
       "administration": "Administration",
@@ -441,18 +442,54 @@
           "incidents": "Incidents"
         },
         "colors": {
-          "primaryColor": { "label": "Couleur primaire", "description": "Boutons, navigation active, liens et accents" },
-          "sidebarBg": { "label": "Fond de la barre latérale", "description": "Couleur de fond de la barre latérale principale" },
-          "sidebarActiveBg": { "label": "Élément de navigation actif", "description": "Fond de l'élément de navigation actif" },
-          "contentBg": { "label": "Fond de page", "description": "Couleur de fond de la zone de contenu principale" },
-          "loginBgFrom": { "label": "Fond de connexion (début)", "description": "Couleur de début du dégradé de la page de connexion" },
-          "loginBgTo": { "label": "Fond de connexion (fin)", "description": "Couleur de fin du dégradé de la page de connexion" },
-          "darkContentBg": { "label": "Fond de contenu sombre", "description": "Fond principal de l'application en mode sombre" },
-          "darkSurfaceBg": { "label": "Surface sombre", "description": "Cartes, modales et panneaux en mode sombre" },
-          "darkMutedBg": { "label": "Fond atténué sombre", "description": "Champs et fonds neutres subtils" },
-          "darkBorderColor": { "label": "Bordure sombre", "description": "Bordures et séparateurs en mode sombre" },
-          "darkTextPrimary": { "label": "Texte principal sombre", "description": "Couleur du texte principal en mode sombre" },
-          "darkTextMuted": { "label": "Texte secondaire sombre", "description": "Libellés secondaires et textes d'aide" }
+          "primaryColor": {
+            "label": "Couleur primaire",
+            "description": "Boutons, navigation active, liens et accents"
+          },
+          "sidebarBg": {
+            "label": "Fond de la barre latérale",
+            "description": "Couleur de fond de la barre latérale principale"
+          },
+          "sidebarActiveBg": {
+            "label": "Élément de navigation actif",
+            "description": "Fond de l'élément de navigation actif"
+          },
+          "contentBg": {
+            "label": "Fond de page",
+            "description": "Couleur de fond de la zone de contenu principale"
+          },
+          "loginBgFrom": {
+            "label": "Fond de connexion (début)",
+            "description": "Couleur de début du dégradé de la page de connexion"
+          },
+          "loginBgTo": {
+            "label": "Fond de connexion (fin)",
+            "description": "Couleur de fin du dégradé de la page de connexion"
+          },
+          "darkContentBg": {
+            "label": "Fond de contenu sombre",
+            "description": "Fond principal de l'application en mode sombre"
+          },
+          "darkSurfaceBg": {
+            "label": "Surface sombre",
+            "description": "Cartes, modales et panneaux en mode sombre"
+          },
+          "darkMutedBg": {
+            "label": "Fond atténué sombre",
+            "description": "Champs et fonds neutres subtils"
+          },
+          "darkBorderColor": {
+            "label": "Bordure sombre",
+            "description": "Bordures et séparateurs en mode sombre"
+          },
+          "darkTextPrimary": {
+            "label": "Texte principal sombre",
+            "description": "Couleur du texte principal en mode sombre"
+          },
+          "darkTextMuted": {
+            "label": "Texte secondaire sombre",
+            "description": "Libellés secondaires et textes d'aide"
+          }
         },
         "saved": "Modifications enregistrées et appliquées !",
         "saveFailed": "Échec de l'enregistrement des paramètres du thème",

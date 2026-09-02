@@ -5,9 +5,9 @@ import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { hasConfigurationRole } from '../../utils/roles';
+import { CiClassIcon } from '../../components/CiClassIcon';
 import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
-import { classEmoji } from './cmdbHelpers';
 import { CiAttributeFields, UserPicker } from './cmdbFormFields';
 import { useCIForm } from './useCIForm';
 
@@ -51,6 +51,12 @@ export default function CIForm() {
     setLocationId,
     notes,
     setNotes,
+    externalId1,
+    setExternalId1,
+    externalId2,
+    setExternalId2,
+    isActive,
+    setIsActive,
     attributes,
     setAttributes,
     selectedClass,
@@ -121,7 +127,7 @@ export default function CIForm() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{classEmoji(cls.icon)}</span>
+                      <span className="text-gray-600"><CiClassIcon name={cls.icon} className="w-7 h-7" /></span>
                       <div>
                         <h4 className="font-semibold text-gray-900">{cls.display_name}</h4>
                         {cls.description && <p className="text-xs text-gray-500 mt-0.5">{cls.description}</p>}
@@ -153,7 +159,7 @@ export default function CIForm() {
 
               {selectedClass && (
                 <div className="flex items-center gap-2 mb-4 p-2 bg-indigo-50 rounded-lg">
-                  <span className="text-lg">{classEmoji(selectedClass.icon)}</span>
+                  <span className="text-indigo-600"><CiClassIcon name={selectedClass.icon} className="w-5 h-5" /></span>
                   <span className="text-sm font-medium text-indigo-700">{selectedClass.display_name}</span>
                 </div>
               )}
@@ -230,6 +236,41 @@ export default function CIForm() {
                     </select>
                   </div>
                 )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('externalId1')}</label>
+                  <input
+                    value={externalId1}
+                    onChange={(e) => setExternalId1(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
+                    placeholder={tCmdb('externalId1Placeholder')}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('externalId2')}</label>
+                  <input
+                    value={externalId2}
+                    onChange={(e) => setExternalId2(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
+                    placeholder={tCmdb('externalId2Placeholder')}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={isActive}
+                        onChange={(e) => setIsActive(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-gray-200 rounded-full peer-checked:bg-indigo-600 transition-colors" />
+                      <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform" />
+                    </div>
+                    <span className="text-sm text-gray-700">
+                      {isActive ? tCmdb('activeCi') : tCmdb('inactiveCi')}
+                    </span>
+                  </label>
+                </div>
               </div>
             </Card>
 

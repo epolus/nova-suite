@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { cmdb } from '../../api/client';
 import type { CI, CIClass, Pagination } from '../../api/client';
@@ -13,18 +13,23 @@ import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { hasConfigurationRole, isAgentRole } from '../../utils/roles';
-import { useFieldLabel } from '@/i18n/hooks';
+import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import { CMDB_BULK_ACTIONS } from './cmdbListConfig';
 import { buildColumns, type CmdbListLabels } from './cmdbColumns';
 
 const DEFAULT_COLS = ['name', 'class_display_name', 'status', 'environment', 'managed_by_name', 'assigned_to_name', 'supported_by_name', 'updated_at'];
 const PRESETS_KEY = 'nova_filter_presets_cmdb';
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const DEFAULT_PAGE_SIZE = 20;
 
 interface FilterPreset {
   id: string;
   name: string;
   search: string;
   class_id: string;
+  status: string;
+  environment: string;
+  is_active: string;
   columnFilters: Record<string, string>;
 }
 
@@ -35,17 +40,20 @@ export default function CMDBPage() {
   const tActions = useTranslations('common.actions');
   const tMaster = useTranslations('common.masterData');
   const tTable = useTranslations('common.table');
+  const tStates = useTranslations('common.states');
   const fieldLabel = useFieldLabel();
+  const statusLabel = useStatusLabel();
   const listLabels = useMemo<CmdbListLabels>(
-    () => ({ field: fieldLabel, emDash: tTable('emDash') }),
-    [fieldLabel, tTable],
+    () => ({ field: fieldLabel, emDash: tTable('emDash'), inactive: tStates('inactive') }),
+    [fieldLabel, tTable, tStates],
   );
 
   const { params, setSearch, setSort, setCols, setPage, setFilter, setColumnFilter, update } = useListParams({
     defaultCols: DEFAULT_COLS,
-    filterKeys: ['class_id'],
+    filterKeys: ['class_id', 'status', 'environment', 'is_active'],
     storageKey: 'cmdb',
   });
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
   const [classes, setClasses] = useState<CIClass[]>([]);
@@ -67,10 +75,28 @@ export default function CMDBPage() {
   const canCreate = hasConfigurationRole(user?.roles);
 
   const classFilter = params.filters.class_id || '';
+  const statusFilter = params.filters.status || '';
+  const environmentFilter = params.filters.environment || '';
+  const isActiveFilter = params.filters.is_active || '';
   const cfKey = JSON.stringify(params.columnFilters);
 
+  const pageSize = useMemo(() => {
+    const raw = Number.parseInt(searchParams.get('limit') || String(DEFAULT_PAGE_SIZE), 10);
+    return PAGE_SIZE_OPTIONS.includes(raw) ? raw : DEFAULT_PAGE_SIZE;
+  }, [searchParams]);
+
+  const setPageSize = useCallback((size: number) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (size === DEFAULT_PAGE_SIZE) next.delete('limit');
+      else next.set('limit', String(size));
+      next.set('page', '1');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
   useEffect(() => {
-    cmdb.classes().then((res) => setClasses(res.classes));
+    cmdb.classes().then((res) => setClasses(res.classes.filter((c) => c.is_active !== false)));
   }, []);
 
   useEffect(() => {
@@ -78,6 +104,9 @@ export default function CMDBPage() {
     setSelectedIds([]);
     const apiParams: Record<string, string> = {};
     if (classFilter) apiParams.class_id = classFilter;
+    if (statusFilter) apiParams.status = statusFilter;
+    if (environmentFilter) apiParams.environment = environmentFilter;
+    if (isActiveFilter === 'true' || isActiveFilter === 'false') apiParams.is_active = isActiveFilter;
     if (params.search) apiParams.search = params.search;
     if (params.sort) {
       apiParams.sort_by = params.sort;
@@ -86,35 +115,49 @@ export default function CMDBPage() {
     for (const [col, val] of Object.entries(params.columnFilters)) {
       if (val) apiParams[`cf.${col}`] = val;
     }
-    cmdb.items(apiParams, params.page, 20).then((res) => {
+    cmdb.items(apiParams, params.page, pageSize).then((res) => {
       setItems(res.items);
       setPagination(res.pagination);
       setLoading(false);
     }).catch(() => setLoading(false));
     // params.columnFilters is depended on by value via cfKey (stringified), not by identity
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.page, classFilter, params.search, params.sort, params.dir, cfKey]);
+  }, [params.page, pageSize, classFilter, statusFilter, environmentFilter, isActiveFilter, params.search, params.sort, params.dir, cfKey]);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};
     if (classFilter) lp.class_id = classFilter;
+    if (statusFilter) lp.status = statusFilter;
+    if (environmentFilter) lp.environment = environmentFilter;
+    if (isActiveFilter) lp.is_active = isActiveFilter;
     if (params.search) lp.search = params.search;
     if (params.sort) {
       lp.sort_by = params.sort;
       lp.sort_dir = params.dir;
     }
+    if (pageSize !== DEFAULT_PAGE_SIZE) lp.limit = String(pageSize);
     for (const [col, val] of Object.entries(params.columnFilters)) {
       if (val) lp[`cf.${col}`] = val;
     }
     return lp;
-  }, [classFilter, params.search, params.sort, params.dir, params.columnFilters]);
+  }, [classFilter, statusFilter, environmentFilter, isActiveFilter, params.search, params.sort, params.dir, params.columnFilters, pageSize]);
 
   const columns = useMemo(() => buildColumns(listLabels), [listLabels]);
-  const hasActiveFilter = !!params.search || classFilter !== '' || Object.values(params.columnFilters).some(Boolean);
+  const hasActiveFilter = !!params.search
+    || classFilter !== ''
+    || statusFilter !== ''
+    || environmentFilter !== ''
+    || isActiveFilter !== ''
+    || Object.values(params.columnFilters).some(Boolean);
   const applyPreset = (preset: FilterPreset) => {
     update({
       search: preset.search,
-      filters: { class_id: preset.class_id },
+      filters: {
+        class_id: preset.class_id,
+        status: preset.status || '',
+        environment: preset.environment || '',
+        is_active: preset.is_active || '',
+      },
       columnFilters: preset.columnFilters,
       page: 1,
     });
@@ -126,6 +169,9 @@ export default function CMDBPage() {
       name: savePresetName.trim(),
       search: params.search,
       class_id: classFilter,
+      status: statusFilter,
+      environment: environmentFilter,
+      is_active: isActiveFilter,
       columnFilters: { ...params.columnFilters },
     }];
     setPresets(next);
@@ -145,6 +191,9 @@ export default function CMDBPage() {
         : await (async () => {
             const apiParams: Record<string, string> = {};
             if (classFilter) apiParams.class_id = classFilter;
+            if (statusFilter) apiParams.status = statusFilter;
+            if (environmentFilter) apiParams.environment = environmentFilter;
+            if (isActiveFilter === 'true' || isActiveFilter === 'false') apiParams.is_active = isActiveFilter;
             if (params.search) apiParams.search = params.search;
             if (params.sort) {
               apiParams.sort_by = params.sort;
@@ -161,7 +210,11 @@ export default function CMDBPage() {
             }
             return rows;
           })();
-      const headers = ['name', 'display_name', 'class_display_name', 'status', 'environment', 'managed_by_name', 'assigned_to_name', 'supported_by_name', 'location', 'updated_at', 'created_at'];
+      const headers = [
+        'name', 'display_name', 'class_display_name', 'status', 'environment', 'is_active',
+        'managed_by_name', 'assigned_to_name', 'supported_by_name', 'location',
+        'external_id_1', 'external_id_2', 'updated_at', 'created_at',
+      ];
       const getField = (row: CI, header: string): unknown => {
         switch (header) {
           case 'name': return row.name;
@@ -169,10 +222,13 @@ export default function CMDBPage() {
           case 'class_display_name': return row.class_display_name;
           case 'status': return row.status;
           case 'environment': return row.environment;
+          case 'is_active': return row.is_active;
           case 'managed_by_name': return row.managed_by_name;
           case 'assigned_to_name': return row.assigned_to_name;
           case 'supported_by_name': return row.supported_by_name;
           case 'location': return row.location;
+          case 'external_id_1': return row.external_id_1;
+          case 'external_id_2': return row.external_id_2;
           case 'updated_at': return row.updated_at;
           case 'created_at': return row.created_at;
           default: return '';
@@ -197,6 +253,11 @@ export default function CMDBPage() {
       setExporting(false);
     }
   };
+
+  const chip = (active: boolean) =>
+    `px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+      active ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+    }`;
 
   return (
     <>
@@ -245,40 +306,64 @@ export default function CMDBPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="w-full sm:w-80">
-          <SearchBar
-            value={params.search}
-            onChange={setSearch}
-            placeholder={tCmdb('searchPlaceholder')}
-          />
-        </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <button
-            onClick={() => setFilter('class_id', '')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              !classFilter ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            {tCmdb('filters.allTypes')}
-          </button>
-          {classes.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setFilter('class_id', c.id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                classFilter === c.id ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {c.display_name}
-            </button>
-          ))}
+      <div className="flex flex-col gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="w-full sm:w-80">
+            <SearchBar
+              value={params.search}
+              onChange={setSearch}
+              placeholder={tCmdb('searchPlaceholder')}
+            />
+          </div>
           {isAgent && (
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
               {exporting ? tList('exporting') : tList('exportCsv')}
             </Button>
           )}
         </div>
+        <div className="flex gap-2 flex-wrap items-center">
+          <button onClick={() => setFilter('class_id', '')} className={chip(!classFilter)}>
+            {tCmdb('filters.allTypes')}
+          </button>
+          {classes.map((c) => (
+            <button key={c.id} onClick={() => setFilter('class_id', c.id)} className={chip(classFilter === c.id)}>
+              {c.display_name}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 flex-wrap items-center">
+          <button onClick={() => setFilter('status', '')} className={chip(!statusFilter)}>
+            {tCmdb('filters.allStatuses')}
+          </button>
+          {(['active', 'planned', 'maintenance', 'retired'] as const).map((s) => (
+            <button key={s} onClick={() => setFilter('status', s)} className={chip(statusFilter === s)}>
+              {s === 'active' ? tStates('active') : statusLabel(s)}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 flex-wrap items-center">
+          <button onClick={() => setFilter('environment', '')} className={chip(!environmentFilter)}>
+            {tCmdb('filters.allEnvironments')}
+          </button>
+          {(['production', 'staging', 'development', 'test'] as const).map((env) => (
+            <button key={env} onClick={() => setFilter('environment', env)} className={chip(environmentFilter === env)}>
+              {statusLabel(env)}
+            </button>
+          ))}
+        </div>
+        {canCreate && (
+          <div className="flex gap-2 flex-wrap items-center">
+            <button onClick={() => setFilter('is_active', '')} className={chip(!isActiveFilter)}>
+              {tCmdb('filters.allActive')}
+            </button>
+            <button onClick={() => setFilter('is_active', 'true')} className={chip(isActiveFilter === 'true')}>
+              {tCmdb('filters.activeOnly')}
+            </button>
+            <button onClick={() => setFilter('is_active', 'false')} className={chip(isActiveFilter === 'false')}>
+              {tCmdb('filters.inactiveOnly')}
+            </button>
+          </div>
+        )}
       </div>
 
       {isAgent && CMDB_BULK_ACTIONS.length > 0 && selectedIds.length > 0 && (
@@ -332,12 +417,15 @@ export default function CMDBPage() {
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
           pagination={
-            pagination && pagination.pages > 1
+            pagination
               ? {
                   page: params.page,
-                  pages: pagination.pages,
+                  pages: Math.max(1, pagination.pages),
                   total: pagination.total,
                   onPageChange: setPage,
+                  pageSize,
+                  pageSizeOptions: PAGE_SIZE_OPTIONS,
+                  onPageSizeChange: setPageSize,
                 }
               : undefined
           }

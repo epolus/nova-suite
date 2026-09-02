@@ -758,6 +758,8 @@ CREATE TABLE configuration_items (
   supported_by   uuid REFERENCES assignment_groups(id),
   location_id    uuid REFERENCES locations(id) ON DELETE SET NULL,
   notes          text,
+  external_id_1  text,
+  external_id_2  text,
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
@@ -769,6 +771,12 @@ CREATE INDEX idx_ci_assigned ON configuration_items(tenant_id, assigned_to);
 CREATE INDEX idx_ci_supported_by ON configuration_items(tenant_id, supported_by);
 CREATE INDEX idx_ci_location_id ON configuration_items(tenant_id, location_id);
 CREATE INDEX idx_ci_attributes_gin ON configuration_items USING gin (attributes);
+CREATE UNIQUE INDEX uq_ci_tenant_external_id_1
+  ON configuration_items(tenant_id, external_id_1)
+  WHERE external_id_1 IS NOT NULL;
+CREATE UNIQUE INDEX uq_ci_tenant_external_id_2
+  ON configuration_items(tenant_id, external_id_2)
+  WHERE external_id_2 IS NOT NULL;
 
 -- ============================================================
 -- CMDB CI RELATIONSHIPS
@@ -994,7 +1002,8 @@ CREATE TABLE schema_migrations (
 
 INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.00', '001_initial_schema'),
-  ('v00.01.01', 'data_sources_external_key');
+  ('v00.01.01', 'data_sources_external_key'),
+  ('v00.01.02', 'configuration_items_external_ids');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT

@@ -13,6 +13,9 @@ export type CIFormSnapshot = {
   supportedBy: string;
   locationId: string;
   notes: string;
+  externalId1: string;
+  externalId2: string;
+  isActive: boolean;
   attributes: Record<string, string>;
 };
 
@@ -27,6 +30,9 @@ export const EMPTY_CI_FORM: CIFormSnapshot = {
   supportedBy: '',
   locationId: '',
   notes: '',
+  externalId1: '',
+  externalId2: '',
+  isActive: true,
   attributes: {},
 };
 
@@ -46,6 +52,9 @@ export function buildFormFromCI(ci: CI): CIFormSnapshot {
     supportedBy: ci.supported_by || '',
     locationId: ci.location_id || '',
     notes: ci.notes || '',
+    externalId1: ci.external_id_1 || '',
+    externalId2: ci.external_id_2 || '',
+    isActive: ci.is_active !== false,
     attributes: attrMap,
   };
 }
@@ -68,6 +77,8 @@ function normalizeSnapshot(snapshot: CIFormSnapshot): CIFormSnapshot {
     name: snapshot.name.trim(),
     displayName: snapshot.displayName.trim(),
     notes: snapshot.notes.trim(),
+    externalId1: snapshot.externalId1.trim(),
+    externalId2: snapshot.externalId2.trim(),
     attributes,
   };
 }

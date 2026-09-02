@@ -24,11 +24,3 @@ export function resolveClassAttrs(
   }
   return result;
 }
-
-export function classEmoji(icon?: string): string {
-  return icon === 'server' ? '🖥️'
-    : icon === 'network' ? '🌐'
-      : icon === 'database' ? '🗄️'
-        : icon === 'application' ? '📱'
-          : icon === 'storage' ? '💾' : '📦';
-}

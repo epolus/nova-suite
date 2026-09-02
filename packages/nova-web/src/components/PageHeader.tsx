@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type { ReactNode } from 'react';
+
 interface Props {
-  title: string;
+  title: ReactNode;
   description?: string;
   action?: React.ReactNode;
 }

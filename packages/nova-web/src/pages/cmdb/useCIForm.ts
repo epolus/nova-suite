@@ -40,6 +40,9 @@ export function useCIForm(tCmdb: (key: string) => string) {
   const [supportedBy, setSupportedBy] = useState('');
   const [locationId, setLocationId] = useState('');
   const [notes, setNotes] = useState('');
+  const [externalId1, setExternalId1] = useState('');
+  const [externalId2, setExternalId2] = useState('');
+  const [isActive, setIsActive] = useState(true);
   const [attributes, setAttributes] = useState<Record<string, string>>({});
   const [baseline, setBaseline] = useState<CIFormSnapshot | null>(null);
 
@@ -57,6 +60,9 @@ export function useCIForm(tCmdb: (key: string) => string) {
     supportedBy,
     locationId,
     notes,
+    externalId1,
+    externalId2,
+    isActive,
     attributes,
   }), [
     assignedTo,
@@ -64,6 +70,9 @@ export function useCIForm(tCmdb: (key: string) => string) {
     classId,
     displayName,
     environment,
+    externalId1,
+    externalId2,
+    isActive,
     locationId,
     managedBy,
     name,
@@ -108,7 +117,16 @@ export function useCIForm(tCmdb: (key: string) => string) {
       const typedGroupRes = groupRes as Awaited<ReturnType<typeof admin.assignmentGroups>>;
       const typedLocationRes = locationRes as Awaited<ReturnType<typeof admin.locations>>;
 
-      setClasses(typedClassRes.classes);
+      const allClasses = typedClassRes.classes;
+      const activeClasses = allClasses.filter((c) => c.is_active !== false);
+      if (ciRes) {
+        const currentClassId = (ciRes as CI).class_id;
+        const currentClass = allClasses.find((c) => c.id === currentClassId);
+        if (currentClass && !activeClasses.some((c) => c.id === currentClass.id)) {
+          activeClasses.push(currentClass);
+        }
+      }
+      setClasses(activeClasses);
       const userList = typedUserRes.users.map((u) => ({
         id: u.id,
         display_name: u.display_name || u.email,
@@ -170,6 +188,9 @@ export function useCIForm(tCmdb: (key: string) => string) {
         setSupportedBy(snapshot.supportedBy);
         setLocationId(snapshot.locationId);
         setNotes(snapshot.notes);
+        setExternalId1(snapshot.externalId1);
+        setExternalId2(snapshot.externalId2);
+        setIsActive(snapshot.isActive);
         setAttributes(snapshot.attributes);
         setBaseline(snapshot);
       }
@@ -217,6 +238,9 @@ export function useCIForm(tCmdb: (key: string) => string) {
       supported_by: supportedBy || null,
       location_id: locationId || null,
       notes: notes || null,
+      external_id_1: externalId1.trim() || null,
+      external_id_2: externalId2.trim() || null,
+      is_active: isActive,
     };
 
     try {
@@ -243,8 +267,11 @@ export function useCIForm(tCmdb: (key: string) => string) {
     classId,
     displayName,
     environment,
+    externalId1,
+    externalId2,
     id,
     invalidateReference,
+    isActive,
     isEdit,
     locationId,
     managedBy,
@@ -289,6 +316,12 @@ export function useCIForm(tCmdb: (key: string) => string) {
     setLocationId,
     notes,
     setNotes,
+    externalId1,
+    setExternalId1,
+    externalId2,
+    setExternalId2,
+    isActive,
+    setIsActive,
     attributes,
     setAttributes,
     selectedClass,
