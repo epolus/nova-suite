@@ -69,7 +69,7 @@ See `.env.deploy.example` for the annotated baseline.
 | Variable | Default | Notes |
 |----------|---------|--------|
 | `NOVA_IMAGE` | `epolus/nova-suite` | Docker Hub repository holding all five components. |
-| `NOVA_TAG` | `latest` | Version applied to every component. Tags are prefixed per component (`engine-0.1.0`, `web-0.1.0`, …), so this value is the part after the prefix. Pin a release in production. |
+| `NOVA_TAG` | `latest` | Version applied to every component. Tags are prefixed per component (`engine-0.1.2`, `web-0.1.2`, …), so this value is the part after the prefix. Pin a release in production. |
 | `NOVA_LOAD_DEMO_DATA` | `false` | Loads the bulk demo dataset (~500 incidents, ~200 requests, ~80 CIs) during **database initialization only**. Ignored on an existing volume. |
 | `HTTP_PORT` / `HTTPS_PORT` | `80` / `443` | Host ports published by the edge proxy. |
 

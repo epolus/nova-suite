@@ -59,14 +59,14 @@ For each component you get:
 | Tag | Meaning |
 | --- | --- |
 | `engine-latest` | Latest commit on `main`. Moves often — pin a version for production. |
-| `engine-0.1.0` | Exact release. Immutable. |
+| `engine-0.1.2` | Exact release. Immutable. |
 | `engine-0.1`, `engine-0` | Moving tags following the newest patch / minor in that line. |
 | `engine-sha-a1b2c3d` | Exact commit, for traceability. |
 
 There is deliberately **no bare `latest`**, since five different components share the repository. Pin a release by setting a single variable:
 
 ```bash
-NOVA_TAG=0.1.0
+NOVA_TAG=0.1.2
 ```
 
 Always run every component on the same version. Platform: `linux/amd64`.

@@ -103,7 +103,7 @@ app.get('/health', async (_req, res) => {
   const status = dbOk && temporalOk && workerRecent && schemaCompatible ? 'healthy' : 'degraded';
   res.status(status === 'healthy' ? 200 : 503).json({
     status,
-    version: '0.1.0',
+    version: '0.1.2',
     timestamp: new Date().toISOString(),
     checks: {
       database: dbOk ? 'connected' : 'disconnected',
