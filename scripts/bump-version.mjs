@@ -117,7 +117,7 @@ function setWorkspaceVersion(relDir, version) {
 }
 
 function versionTokenRe(version) {
-  const escaped = version.replace(/\./g, '\\.');
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Allow a trailing sentence period (`web-0.1.2.`) but not a longer number (`0.1.2.3`).
   return new RegExp(`(?<![0-9.vV])${escaped}(?!\\.\\d)`, 'g');
 }
