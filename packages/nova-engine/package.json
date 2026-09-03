@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^8.5.0",
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@nova-suite/shared": "0.1.0",
     "@temporalio/client": "^1.23.0",
     "bcrypt": "^6.0.0",
