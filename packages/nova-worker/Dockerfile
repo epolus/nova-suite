@@ -1,6 +1,6 @@
 # ─── Nova Worker – Multi-stage Docker Build ───
 # Uses node:24-slim (Debian) because @temporalio/worker requires glibc
-FROM node:24-slim AS base
+FROM node:26-slim AS base
 WORKDIR /app
 
 # ─── Dependencies ───
