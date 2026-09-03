@@ -21,7 +21,6 @@ import {
 } from './temporal/workflow-start-queue';
 import { checkTemporalHealth, startDbSizeSnapshotSchedule, startMetricSnapshotSchedule } from './temporal/workflows';
 import { metricsHandler, metricsMiddleware } from './observability/metrics';
-import { APP_VERSION } from './app-version';
 
 type SchemaRuntimeStatus = {
   compatible: boolean;
@@ -104,7 +103,7 @@ app.get('/health', async (_req, res) => {
   const status = dbOk && temporalOk && workerRecent && schemaCompatible ? 'healthy' : 'degraded';
   res.status(status === 'healthy' ? 200 : 503).json({
     status,
-    version: APP_VERSION,
+    version: '0.1.2',
     timestamp: new Date().toISOString(),
     checks: {
       database: dbOk ? 'connected' : 'disconnected',

@@ -25,7 +25,6 @@ import {
 import { loadCredentialSecretsBySlugs } from '../../credentials/vault';
 import { logger } from '../../logger';
 import { sendAutomationEmail } from './automation-send-email';
-import { APP_VERSION } from '../../app-version';
 
 const router = Router();
 const processStartedAtMs = Date.now();
@@ -215,7 +214,7 @@ router.get('/runtime-health', async (_req: Request, res: Response) => {
   // operational probes should continue using /health which returns 503 when degraded.
   res.json({
     status,
-    version: APP_VERSION,
+    version: '0.1.2',
     timestamp: new Date().toISOString(),
     checks: {
       database: dbOk ? 'connected' : 'disconnected',
@@ -446,7 +445,7 @@ router.get('/system-metrics', async (req: Request, res: Response) => {
     },
     runtime: {
       uptimeSec: Math.floor((Date.now() - processStartedAtMs) / 1000),
-      version: APP_VERSION,
+      version: '0.1.2',
       appStatus,
       dbStatus: dbOk ? 'connected' : 'disconnected',
       redisStatus: redis.enabled ? (redis.connected ? 'connected' : 'disconnected') : 'disabled',

@@ -74,8 +74,7 @@ jobs:
             --title "chore(release): bump version to ${VERSION}" \
             --body "$(cat <<EOF
           ## Summary
-          - Bump all workspace packages and release docs to **${VERSION}**
-          - Runtime health/OpenAPI versions are read from \`package.json\`
+          - Bump workspace packages, engine/web version strings, and release docs to **${VERSION}**
 
           Merge this PR, then the tag job on \`main\` will create \`v${VERSION}\` and a GitHub release (which publishes Docker images).
           EOF
