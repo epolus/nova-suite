@@ -4,6 +4,7 @@
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
 import type { OpenAPIObject } from 'openapi3-ts/oas30';
 import { registerApiPaths } from './registerPaths';
+import { APP_VERSION } from '../app-version';
 
 const registry = new OpenAPIRegistry();
 registry.registerComponent('securitySchemes', 'bearerAuth', {
@@ -19,7 +20,7 @@ export const openApiSpec: OpenAPIObject = generator.generateDocument({
   openapi: '3.0.3',
   info: {
     title: 'Nova Suite API',
-    version: '0.1.2',
+    version: APP_VERSION,
     description:
       'Open-source ITSM Suite – Service catalog, incident management and CMDB. ' +
       'Paths and request bodies are generated from the same Zod schemas used by the API. ' +

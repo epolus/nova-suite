@@ -21,7 +21,8 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "docker:reset": "docker compose down -v && docker compose up -d"
+    "docker:reset": "docker compose down -v && docker compose up -d",
+    "release:bump": "node scripts/bump-version.mjs"
   },
   "overrides": {
     "react": "19.2.8",
