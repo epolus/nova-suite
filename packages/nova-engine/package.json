@@ -19,7 +19,7 @@
     "@temporalio/client": "^1.23.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
-    "csv-parse": "^6.1.0",
+    "csv-parse": "^7.0.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.0.0",
