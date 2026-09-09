@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { createContext, useContext, useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import type { AiConversationContext } from '../../api/client';
+import { useLatestRef } from '../../hooks/useLatestRef';
 
 export interface AiAssistantContextValue {
   setPageContext: (ctx: AiConversationContext | undefined) => void;
@@ -25,12 +26,11 @@ export function useSetAiContext(context: AiConversationContext | undefined) {
   const contextKey = context
     ? `${context.incidentId ?? ''}:${context.catalogTaskId ?? ''}:${context.serviceItemId ?? ''}`
     : '';
-  const contextRef = useRef(context);
-  contextRef.current = context;
+  const contextRef = useLatestRef(context);
 
   useEffect(() => {
     if (!ctx) return;
     ctx.setPageContext(contextRef.current);
     return () => ctx.setPageContext(undefined);
-  }, [ctx, contextKey]);
+  }, [ctx, contextKey, contextRef]);
 }

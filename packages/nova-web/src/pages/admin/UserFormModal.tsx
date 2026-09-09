@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import {
   admin,
@@ -69,12 +69,16 @@ export default function UserFormModal({
   const [deleting, setDeleting] = useState(false);
 
   const [displayNameTouched, setDisplayNameTouched] = useState(!!user);
-  useEffect(() => {
-    if (!displayNameTouched) {
-      const auto = buildDisplayName(form.first_name, form.last_name, form.user_id);
-      if (auto) setForm((prev) => ({ ...prev, display_name: auto }));
+  const autoDisplayName = displayNameTouched
+    ? null
+    : buildDisplayName(form.first_name, form.last_name, form.user_id);
+  const [prevAutoDisplayName, setPrevAutoDisplayName] = useState(autoDisplayName);
+  if (autoDisplayName !== prevAutoDisplayName) {
+    setPrevAutoDisplayName(autoDisplayName);
+    if (autoDisplayName) {
+      setForm((prev) => (prev.display_name === autoDisplayName ? prev : { ...prev, display_name: autoDisplayName }));
     }
-  }, [form.first_name, form.last_name, form.user_id, displayNameTouched]);
+  }
 
   const set = (field: string, value: unknown) =>
     setForm((prev) => ({ ...prev, [field]: value }));

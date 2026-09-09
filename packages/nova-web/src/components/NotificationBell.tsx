@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { notifications as notificationsApi, type AppNotification } from '@/api/client';
@@ -18,23 +18,28 @@ export default function NotificationBell() {
   const stopPollingRef = useRef(false);
   const navigate = useNavigate();
 
-  const fetchCount = useCallback(async () => {
-    if (stopPollingRef.current) return;
-    try {
-      const { count } = await notificationsApi.unreadCount();
-      setUnread(count);
-      failuresRef.current = 0;
-    } catch {
-      failuresRef.current += 1;
-      if (failuresRef.current >= 2) stopPollingRef.current = true;
-    }
-  }, []);
-
   useEffect(() => {
-    fetchCount();
-    const id = setInterval(fetchCount, 30_000);
-    return () => clearInterval(id);
-  }, [fetchCount]);
+    let cancelled = false;
+    const load = () => {
+      if (stopPollingRef.current) return;
+      notificationsApi.unreadCount()
+        .then(({ count }) => {
+          if (cancelled) return;
+          setUnread(count);
+          failuresRef.current = 0;
+        })
+        .catch(() => {
+          failuresRef.current += 1;
+          if (failuresRef.current >= 2) stopPollingRef.current = true;
+        });
+    };
+    load();
+    const id = setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;

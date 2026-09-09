@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'use-intl';
+import { useSyncedState } from '../hooks/useSyncedState';
 import { useFieldControl } from './ui/fieldControl';
 
 type DateFormat = 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
@@ -99,13 +100,9 @@ export default function UserDateInput({
     const now = new Date();
     return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
   });
-  const [text, setText] = useState('');
+  const [text, setText] = useSyncedState(value ? toDisplay(value, fmt) : '');
   const [error, setError] = useState('');
   const pickerRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setText(value ? toDisplay(value, fmt) : '');
-  }, [value, fmt]);
 
   const commit = (disallowPast = false) => {
     const iso = toIso(text, fmt);

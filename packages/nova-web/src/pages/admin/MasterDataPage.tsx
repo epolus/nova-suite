@@ -95,15 +95,17 @@ export default function MasterDataPage<T extends { id: string; is_active: boolea
 
   const activeFilter = params.filters.active || 'all';
 
-  const load = useCallback(async () => {
-    try {
-      const data = await fetchItems();
-      setItems(data);
-    } catch (err) {
-      console.error('Failed to load:', err);
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(() => {
+    fetchItems()
+      .then((data) => {
+        setItems(data);
+      })
+      .catch((err) => {
+        console.error('Failed to load:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [fetchItems]);
 
   useEffect(() => {

@@ -60,40 +60,52 @@ export default function WorkflowsPage() {
 
   // Load overview
   useEffect(() => {
-    setOverviewLoading(true);
     temporalApi.overview()
       .then(setOverview)
       .catch((err) => console.error('Failed to load overview:', err))
       .finally(() => setOverviewLoading(false));
   }, []);
 
-  // Load workflows
-  const loadWorkflows = useCallback(async (pageToken?: string) => {
+  const filterKey = `${statusFilter}\0${searchQuery}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
     setLoading(true);
-    setError('');
-    try {
-      const params: Record<string, string> = { limit: '20' };
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (searchQuery) params.search = searchQuery;
-      if (pageToken) params.pageToken = pageToken;
+  }
 
-      const res = await temporalApi.workflows(params);
-      if (pageToken) {
-        setWorkflows((prev) => [...prev, ...res.workflows]);
-      } else {
-        setWorkflows(res.workflows);
-      }
-      setNextPageToken(res.nextPageToken);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('loadFailed'));
-    } finally {
-      setLoading(false);
-    }
+  // Load workflows
+  const fetchWorkflows = useCallback((pageToken?: string) => {
+    const params: Record<string, string> = { limit: '20' };
+    if (statusFilter !== 'all') params.status = statusFilter;
+    if (searchQuery) params.search = searchQuery;
+    if (pageToken) params.pageToken = pageToken;
+
+    return temporalApi.workflows(params)
+      .then((res) => {
+        setError('');
+        if (pageToken) {
+          setWorkflows((prev) => [...prev, ...res.workflows]);
+        } else {
+          setWorkflows(res.workflows);
+        }
+        setNextPageToken(res.nextPageToken);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : t('loadFailed'));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [statusFilter, searchQuery, t]);
 
+  const loadWorkflows = useCallback((pageToken?: string) => {
+    setLoading(true);
+    return fetchWorkflows(pageToken);
+  }, [fetchWorkflows]);
+
   useEffect(() => {
-    loadWorkflows();
-  }, [loadWorkflows]);
+    void fetchWorkflows();
+  }, [fetchWorkflows]);
 
   const setFilter = (status: string) => {
     const params = new URLSearchParams(searchParams);

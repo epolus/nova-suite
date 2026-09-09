@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { attachments } from '../../api/client';
 import type { KnowledgeArticle } from '../../api/client';
 
@@ -13,7 +13,7 @@ type KnowledgeFormState = {
 
 type FormSetter = Dispatch<SetStateAction<KnowledgeFormState>>;
 
-export function createKnowledgeEditorInsertHandlers(
+export function useKnowledgeEditorInsertHandlers(
   contentRef: RefObject<HTMLTextAreaElement | null>,
   formContent: string,
   setForm: FormSetter,
@@ -21,7 +21,7 @@ export function createKnowledgeEditorInsertHandlers(
   setError: (message: string) => void,
   t: (key: string) => string,
 ) {
-  const insertAtLineStart = (prefix: string) => {
+  const insertAtLineStart = useCallback((prefix: string) => {
     const el = contentRef.current;
     if (!el) return;
     const start = el.selectionStart ?? 0;
@@ -29,9 +29,9 @@ export function createKnowledgeEditorInsertHandlers(
     const next = `${formContent.slice(0, lineStart)}${prefix}${formContent.slice(lineStart)}`;
     setForm((p) => ({ ...p, content: next }));
     setTimeout(() => { el.focus(); const pos = start + prefix.length; el.setSelectionRange(pos, pos); }, 0);
-  };
+  }, [contentRef, formContent, setForm]);
 
-  const insertAroundSelection = (before: string, after = '') => {
+  const insertAroundSelection = useCallback((before: string, after = '') => {
     const el = contentRef.current;
     if (!el) return;
     const start = el.selectionStart ?? 0;
@@ -44,11 +44,11 @@ export function createKnowledgeEditorInsertHandlers(
       const pos = start + before.length + selectedText.length + after.length;
       el.setSelectionRange(pos, pos);
     }, 0);
-  };
+  }, [contentRef, formContent, setForm]);
 
-  const insertLink = () => insertAroundSelection('[link text](', ')');
+  const insertLink = useCallback(() => insertAroundSelection('[link text](', ')'), [insertAroundSelection]);
 
-  const insertImage = async () => {
+  const insertImage = useCallback(async () => {
     if (!selectedId || selectedId === 'new') { setError(t('createFirstForImages')); return; }
     const input = document.createElement('input');
     input.type = 'file';
@@ -64,9 +64,9 @@ export function createKnowledgeEditorInsertHandlers(
       }
     };
     input.click();
-  };
+  }, [insertAroundSelection, selectedId, setError, t]);
 
-  const insertAttachment = async () => {
+  const insertAttachment = useCallback(async () => {
     if (!selectedId || selectedId === 'new') { setError(t('createFirstForAttachments')); return; }
     const input = document.createElement('input');
     input.type = 'file';
@@ -81,7 +81,7 @@ export function createKnowledgeEditorInsertHandlers(
       }
     };
     input.click();
-  };
+  }, [insertAroundSelection, selectedId, setError, t]);
 
   return {
     insertAtLineStart,

@@ -70,13 +70,28 @@ export default function ReportsLibraryPage() {
     }
   }, [t]);
 
+  const [prevCanView, setPrevCanView] = useState(canView);
+  if (canView !== prevCanView) {
+    setPrevCanView(canView);
+    setLoading(canView);
+    if (!canView) setError(null);
+  }
+
   useEffect(() => {
-    if (!canView) {
-      setLoading(false);
-      return;
-    }
-    void load();
-  }, [canView, load]);
+    if (!canView) return;
+    let cancelled = false;
+    reports.listDefinitions()
+      .then((res) => {
+        if (!cancelled) setItems(res.reports);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [canView, t]);
 
   const privateCount = useMemo(() => items.filter((item) => !item.is_shared).length, [items]);
 

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { changes } from '../../api/client';
@@ -12,6 +12,7 @@ import SearchBar from '../../components/SearchBar';
 import DataTable, { type DataColumnDef } from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
+import { useResettingState } from '../../hooks/useSyncedState';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { formatDate } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
@@ -90,7 +91,6 @@ export default function ChangesPage() {
     storageKey: 'changes',
   });
   const [exporting, setExporting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const invalidateChanges = useInvalidateChanges();
@@ -123,10 +123,8 @@ export default function ChangesPage() {
   const { data: listResult, isLoading: loading, isFetching } = useChangesList(apiParams, params.page);
   const data: Change[] = listResult?.changes ?? [];
   const pagination = listResult?.pagination ?? null;
-
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [params.page, apiParams, isFetching]);
+  const selectionKey = `${params.page}|${isFetching}|${JSON.stringify(apiParams)}`;
+  const [selectedIds, setSelectedIds] = useResettingState<string[]>([], selectionKey);
 
   const columns = useMemo(() => buildColumns(apiParams, listLabels), [apiParams, listLabels]);
   const hasActiveFilter = !!params.search || status !== 'all' || risk !== 'all' || Object.values(params.columnFilters).some(Boolean);

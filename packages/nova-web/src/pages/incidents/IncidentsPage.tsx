@@ -15,6 +15,7 @@ import SearchBar from '../../components/SearchBar';
 import DataTable from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
+import { useResettingState } from '../../hooks/useSyncedState';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
@@ -64,7 +65,6 @@ export default function IncidentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Bulk selection
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkGroupId, setBulkGroupId] = useState('');
   const [confirmClose, setConfirmClose] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -109,10 +109,8 @@ export default function IncidentsPage() {
   const data: Incident[] = listResult?.incidents ?? [];
   const pagination = listResult?.pagination ?? null;
   const { data: groups = [] } = useIncidentAssignmentGroups();
-
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [params.page, apiParams, isFetching]);
+  const selectionKey = `${params.page}|${isFetching}|${JSON.stringify(apiParams)}`;
+  const [selectedIds, setSelectedIds] = useResettingState<string[]>([], selectionKey);
 
   useEffect(() => {
     // Dashboard SLA card should not inherit stale priority column filter state.

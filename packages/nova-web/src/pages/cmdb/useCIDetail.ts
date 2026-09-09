@@ -147,10 +147,116 @@ export function useCIDetail() {
       .finally(() => setLoading(false));
   }, [listParams, tCmdb]);
 
+  const [prevFetchId, setPrevFetchId] = useState(id);
+  if (id !== prevFetchId) {
+    setPrevFetchId(id);
+    setLoading(true);
+    setLoadError('');
+    setCi(null);
+  }
+
   useEffect(() => {
     if (!id) return;
-    loadCi(id);
-  }, [id, loadCi]);
+    let cancelled = false;
+    Promise.all([
+      cmdb.item(id),
+      cmdb.itemHistory(id),
+      cmdb.impact(id),
+      cmdb.classes(),
+      cmdb.nav(id, listParams),
+      problems.byCi(id).catch(() => ({ problems: [] as Problem[] })),
+      incidents.byCi(id).catch(() => ({ incidents: [] as Incident[] })),
+      assets.list({ linked_ci_id: id }).catch(() => ({ assets: [] as Asset[] })),
+    ]).then(async ([ciRes, histRes, impactRes, classRes, navRes, problemRes, incidentRes, assetRes]) => {
+      if (cancelled) return;
+      setPrevId(navRes.prev_id);
+      setNextId(navRes.next_id);
+      setCi(ciRes);
+      setHistory(histRes.history);
+      setImpact(impactRes.impacted_items);
+      setClasses(classRes.classes);
+      setRelatedProblems(problemRes.problems);
+      setRelatedIncidents(incidentRes.incidents);
+      setLinkedAssets(assetRes.assets);
+
+      const allAttrs = resolveClassAttrs(ciRes.class_id, classRes.classes);
+      const refAttrs = Object.entries(allAttrs).filter(([, v]) => v.type === 'reference' && v.reference_table);
+      if (refAttrs.length > 0) {
+        const neededTables = new Set(refAttrs.map(([, v]) => v.reference_table!));
+        const lookups: Record<string, Record<string, string>> = {};
+
+        if (neededTables.has('users')) {
+          try {
+            const res = await auth.users();
+            const map: Record<string, string> = {};
+            for (const u of res.users) map[u.id] = u.display_name || u.email;
+            lookups.users = map;
+          } catch { /* ignore */ }
+        }
+        if (neededTables.has('assignment_groups')) {
+          try {
+            const res = await admin.assignmentGroups();
+            const map: Record<string, string> = {};
+            for (const g of res.assignment_groups) map[g.id] = g.name;
+            lookups.assignment_groups = map;
+          } catch { /* ignore */ }
+        }
+        if (neededTables.has('departments')) {
+          try {
+            const res = await admin.departments();
+            const map: Record<string, string> = {};
+            for (const d of res.departments) map[d.id] = d.name;
+            lookups.departments = map;
+          } catch { /* ignore */ }
+        }
+        if (neededTables.has('cost_centers')) {
+          try {
+            const res = await admin.costCenters();
+            const map: Record<string, string> = {};
+            for (const c of res.cost_centers) map[c.id] = `${c.code} – ${c.name}`;
+            lookups.cost_centers = map;
+          } catch { /* ignore */ }
+        }
+        if (neededTables.has('services')) {
+          try {
+            const res = await admin.services();
+            const map: Record<string, string> = {};
+            for (const s of res.services) map[s.id] = s.name;
+            lookups.services = map;
+          } catch { /* ignore */ }
+        }
+        if (cancelled) return;
+
+        const names: Record<string, string> = {};
+        for (const [attrKey, attrDef] of refAttrs) {
+          const val = String(ciRes.attributes[attrKey] || '');
+          const table = attrDef.reference_table;
+          if (val && table && lookups[table]) {
+            names[attrKey] = lookups[table]![val] || val;
+          }
+        }
+        setRefNames(names);
+      } else {
+        setRefNames({});
+      }
+    })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setCi(null);
+        setHistory([]);
+        setImpact([]);
+        setClasses([]);
+        setRelatedProblems([]);
+        setRefNames({});
+        setPrevId(null);
+        setNextId(null);
+        setLoadError(err instanceof Error ? err.message : tCmdb('loadFailed'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [id, listParams, tCmdb]);
 
   // Relationship management
   const [showRelForm, setShowRelForm] = useState(false);
@@ -190,8 +296,14 @@ export function useCIDetail() {
     return () => window.removeEventListener('keydown', handler);
   }, [prevId, nextId, navigateTo]);
 
+  const [prevCiSearch, setPrevCiSearch] = useState(ciSearch);
+  if (ciSearch !== prevCiSearch) {
+    setPrevCiSearch(ciSearch);
+    if (ciSearch.length < 2) setCiSearchResults([]);
+  }
+
   useEffect(() => {
-    if (ciSearch.length < 2) { setCiSearchResults([]); return; }
+    if (ciSearch.length < 2) return;
     const timer = setTimeout(() => {
       setCiSearching(true);
       cmdb.items({ search: ciSearch, context: 'picker' }, 1, 10).then((res) => {

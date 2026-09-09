@@ -283,7 +283,9 @@ export function useCIForm(tCmdb: (key: string) => string) {
     tCmdb,
   ]);
 
-  saveRef.current = handleSubmit;
+  useEffect(() => {
+    saveRef.current = handleSubmit;
+  });
 
   return {
     isEdit,

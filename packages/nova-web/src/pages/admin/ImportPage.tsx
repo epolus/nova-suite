@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslations } from 'use-intl';
 import { Link } from 'react-router';
 import { importer } from '../../api/client';
@@ -91,25 +91,30 @@ export default function ImportPage() {
     }
   };
 
-  const loadRows = useCallback(async () => {
-    if (!uploadResult) return;
-    setLoadingRows(true);
-    try {
-      const res = await importer.getRows(uploadResult.id, {
-        page: String(rowPage),
-        limit: '50',
-        ...(rowFilter !== 'all' ? { status: rowFilter } : {}),
-      });
-      setRows(res.rows);
-      setRowTotal(res.pagination.total);
-    } finally {
-      setLoadingRows(false);
-    }
-  }, [uploadResult, rowPage, rowFilter]);
+  const rowsKey = step === 'review' && uploadResult
+    ? `${uploadResult.id}\0${rowPage}\0${rowFilter}`
+    : null;
+  const [prevRowsKey, setPrevRowsKey] = useState(rowsKey);
+  if (rowsKey !== prevRowsKey) {
+    setPrevRowsKey(rowsKey);
+    if (rowsKey) setLoadingRows(true);
+  }
 
   useEffect(() => {
-    if (step === 'review') loadRows();
-  }, [step, loadRows]);
+    if (step !== 'review' || !uploadResult) return;
+    importer.getRows(uploadResult.id, {
+      page: String(rowPage),
+      limit: '50',
+      ...(rowFilter !== 'all' ? { status: rowFilter } : {}),
+    })
+      .then((res) => {
+        setRows(res.rows);
+        setRowTotal(res.pagination.total);
+      })
+      .finally(() => {
+        setLoadingRows(false);
+      });
+  }, [step, uploadResult, rowPage, rowFilter]);
 
   const handleCommit = async () => {
     if (!uploadResult) return;

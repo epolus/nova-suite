@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslations } from 'use-intl';
 import type { UserDashboard } from '@/api/domains/dashboards';
 import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useResettingState } from '@/hooks/useSyncedState';
 import { autoRefreshOptionLabel } from './autoRefreshLabels';
 import { DASHBOARD_AUTO_REFRESH_OPTIONS } from './constants';
 
@@ -44,13 +45,10 @@ export default function DashboardSettingsPanel({
   const [newName, setNewName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [layoutDashboardId, setLayoutDashboardId] = useState(activeId ?? '');
-
-  useEffect(() => {
-    if (open && activeId) {
-      setLayoutDashboardId(activeId);
-    }
-  }, [open, activeId]);
+  const [layoutDashboardId, setLayoutDashboardId] = useResettingState(
+    activeId ?? '',
+    open ? activeId : 'closed',
+  );
 
   if (!open) return null;
 
