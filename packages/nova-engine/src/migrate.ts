@@ -59,6 +59,7 @@ async function latestSchemaVersion(client: Client): Promise<string | null> {
       throw new Error(
         'schema_migrations table is missing; this is not a Nova database. '
         + 'Empty volumes are initialized by init.sql, not by this job.',
+        { cause: err },
       );
     }
     throw err;

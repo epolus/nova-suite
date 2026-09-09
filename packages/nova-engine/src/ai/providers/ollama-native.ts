@@ -129,6 +129,7 @@ export class OllamaNativeProvider implements LlmProvider {
       if (/not found/i.test(msg) && /model/i.test(msg)) {
         throw new Error(
           `The Ollama model "${this.model}" is not available. Run \`ollama pull ${this.model}\` on the Ollama host, or set OLLAMA_MODEL to a model from \`ollama list\`.`,
+          { cause: err },
         );
       }
       throw err;
