@@ -235,7 +235,8 @@ const UnifiedAutomationDesignerInner = forwardRef(function UnifiedAutomationDesi
   const centerViewRef = useRef<(() => void) | null>(null);
   const [builderError, setBuilderError] = useState('');
   const [editorKey, setEditorKey] = useState(0);
-  const skipNextRemountRef = useRef(false);
+  const [lastEmittedJson, setLastEmittedJson] = useState('');
+  const [skipNextRemount, setSkipNextRemount] = useState(false);
 
   const formatError = useCallback(
     (error: BuilderError) => tErrors(error.code as never, error.params as never),
@@ -254,26 +255,28 @@ const UnifiedAutomationDesignerInner = forwardRef(function UnifiedAutomationDesi
     }
   }, [initialConfigJson]);
 
-  useEffect(() => {
-    if (initialConfigJson && initialConfigJson === lastEmittedJsonRef.current) return;
-    if (skipNextRemountRef.current) {
-      skipNextRemountRef.current = false;
-      lastEmittedJsonRef.current = initialConfigJson;
-      return;
-    }
-    if (loaded.error) {
+  const [prevConfigJson, setPrevConfigJson] = useState<string | null>(null);
+  if (initialConfigJson !== prevConfigJson) {
+    setPrevConfigJson(initialConfigJson);
+    if (initialConfigJson && initialConfigJson === lastEmittedJson) {
+      // Echo of our own apply — keep editor mounted.
+    } else if (skipNextRemount) {
+      setSkipNextRemount(false);
+      setLastEmittedJson(initialConfigJson);
+    } else if (loaded.error) {
       setBuilderError(formatError(loaded.error));
-      return;
+    } else {
+      setBuilderError('');
+      setEditorKey((k) => k + 1);
     }
-    setBuilderError('');
-    setEditorKey((k) => k + 1);
-  }, [formatError, initialConfigJson, loaded]);
+  }
 
   const applySerializedConfig = useCallback(
     (cfg: Record<string, unknown>) => {
       const json = JSON.stringify(cfg, null, 2);
       lastEmittedJsonRef.current = json;
-      skipNextRemountRef.current = true;
+      setLastEmittedJson(json);
+      setSkipNextRemount(true);
       onApply(cfg);
       return cfg;
     },

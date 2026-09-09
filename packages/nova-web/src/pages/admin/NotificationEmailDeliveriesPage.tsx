@@ -26,30 +26,42 @@ export default function NotificationEmailDeliveriesPage() {
   const [recipient, setRecipient] = useState('');
   const [limit, setLimit] = useState(100);
 
-  const load = useCallback(async (background = false) => {
-    if (background) setRefreshing(true);
-    else setLoading(true);
-    try {
-      const res = await adminApi.notificationEmailDeliveries({
-        status: status || undefined,
-        trigger_key: triggerKey.trim() || undefined,
-        recipient: recipient.trim() || undefined,
-        limit,
+  const filterKey = `${status}\0${triggerKey}\0${recipient}\0${limit}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setLoading(true);
+  }
+
+  const fetchDeliveries = useCallback(() => {
+    return adminApi.notificationEmailDeliveries({
+      status: status || undefined,
+      trigger_key: triggerKey.trim() || undefined,
+      recipient: recipient.trim() || undefined,
+      limit,
+    })
+      .then((res) => {
+        setDeliveries(res.deliveries);
+        setSummary(res.summary);
+        setError('');
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : t('loadFailed'));
+      })
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
       });
-      setDeliveries(res.deliveries);
-      setSummary(res.summary);
-      setError('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('loadFailed'));
-    } finally {
-      if (background) setRefreshing(false);
-      else setLoading(false);
-    }
   }, [status, triggerKey, recipient, limit, t]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void fetchDeliveries();
+  }, [fetchDeliveries]);
+
+  const refresh = () => {
+    setRefreshing(true);
+    void fetchDeliveries();
+  };
 
   const summaryByStatus = useMemo(() => {
     const byStatus = new Map<string, number>();
@@ -125,7 +137,7 @@ export default function NotificationEmailDeliveriesPage() {
           </div>
           <button
             type="button"
-            onClick={() => void load(true)}
+            onClick={refresh}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
           >
             {refreshing ? t('refreshing') : t('refresh')}

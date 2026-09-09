@@ -37,15 +37,19 @@ export default function CIClassesPage() {
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState('');
 
-  const load = () => {
-    setLoading(true);
+  const fetchClasses = () => {
     cmdb.classes().then((res) => {
       setClasses(res.classes);
       setLoading(false);
     });
   };
 
-  useEffect(() => { load(); }, []);
+  const load = () => {
+    setLoading(true);
+    fetchClasses();
+  };
+
+  useEffect(() => { fetchClasses(); }, []);
 
   const openNew = () => {
     setEditing({ ...EMPTY_CLASS, attributes: [] });

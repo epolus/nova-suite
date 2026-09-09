@@ -56,11 +56,39 @@ export default function MajorIncidentWarRoom() {
     }
   }, [id, t]);
 
+  const [prevId, setPrevId] = useState(id);
+  if (id !== prevId) {
+    setPrevId(id);
+    setLoading(true);
+    setData(null);
+    setErr('');
+  }
+
   useEffect(() => {
-    void load();
-    const timer = setInterval(() => void load(), 15_000);
-    return () => clearInterval(timer);
-  }, [load]);
+    if (!id) return;
+    let cancelled = false;
+    const fetchDetail = () => {
+      majorIncidentsApi.get(id)
+        .then((d) => {
+          if (cancelled) return;
+          setData(d);
+          setErr('');
+          setLoading(false);
+        })
+        .catch((e: unknown) => {
+          if (cancelled) return;
+          setErr(e instanceof Error ? e.message : t('loadFailed'));
+          setData(null);
+          setLoading(false);
+        });
+    };
+    fetchDetail();
+    const timer = setInterval(fetchDetail, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [id, t]);
 
   const invalidateSummaries = useCallback(() => {
     invalidateMajorIncidents.summaries();

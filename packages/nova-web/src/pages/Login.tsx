@@ -17,28 +17,38 @@ export default function Login() {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const ssoErrorParam = searchParams.get('sso_error');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() =>
+    ssoErrorParam ? decodeURIComponent(ssoErrorParam) : '',
+  );
+  const [seenSsoError, setSeenSsoError] = useState(ssoErrorParam);
   const [loading, setLoading] = useState(false);
   const [logoSrc, setLogoSrc] = useState(DEFAULT_LOGO_SRC);
+  const [prevLogoUrl, setPrevLogoUrl] = useState(theme.logo_url);
   const [ssoEnabled, setSsoEnabled] = useState(false);
   const [ssoProvider, setSsoProvider] = useState('OpenID');
   const [localLoginEnabled, setLocalLoginEnabled] = useState(true);
+
+  if (ssoErrorParam && ssoErrorParam !== seenSsoError) {
+    setSeenSsoError(ssoErrorParam);
+    setError(decodeURIComponent(ssoErrorParam));
+  }
+  if (theme.logo_url !== prevLogoUrl) {
+    setPrevLogoUrl(theme.logo_url);
+    if (!theme.logo_url) setLogoSrc(DEFAULT_LOGO_SRC);
+  }
 
   // If user is already logged in (e.g. from sso_token), redirect
   useEffect(() => {
     if (user) navigate('/', { replace: true });
   }, [user, navigate]);
 
-  // Check for SSO error in URL
   useEffect(() => {
-    const ssoError = searchParams.get('sso_error');
-    if (ssoError) {
-      setError(decodeURIComponent(ssoError));
-      window.history.replaceState({}, '', '/login');
-    }
-  }, [searchParams]);
+    if (!ssoErrorParam) return;
+    window.history.replaceState({}, '', '/login');
+  }, [ssoErrorParam]);
 
   // Load SSO config
   useEffect(() => {
@@ -54,11 +64,20 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    if (!theme.logo_url) { setLogoSrc(DEFAULT_LOGO_SRC); return; }
+    if (!theme.logo_url) return;
+    let cancelled = false;
+    let objectUrl = '';
     fetch('/api/settings/logo')
       .then((r) => { if (r.ok) return r.blob(); throw new Error(); })
-      .then((blob) => setLogoSrc(URL.createObjectURL(blob)))
-      .catch(() => setLogoSrc(DEFAULT_LOGO_SRC));
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setLogoSrc(objectUrl);
+      })
+      .catch(() => { if (!cancelled) setLogoSrc(DEFAULT_LOGO_SRC); });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [theme.logo_url]);
 
   const appNameParts = (theme.app_name || 'Nova Suite').split(' ');

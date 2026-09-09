@@ -54,18 +54,15 @@ export default function AssignmentGroupDetailPage() {
     return map;
   }, [listParams]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError('');
-    try {
-      const [agRes, uRes, ccRes, pRes, rolesRes] = await Promise.allSettled([
-        admin.assignmentGroups(),
-        auth.users(),
-        admin.costCenters(),
-        admin.processes(),
-        admin.roles(),
-      ]);
-
+  const fetchGroupData = useCallback(() => {
+    return Promise.allSettled([
+      admin.assignmentGroups(),
+      auth.users(),
+      admin.costCenters(),
+      admin.processes(),
+      admin.roles(),
+    ]).then(([agRes, uRes, ccRes, pRes, rolesRes]) => {
+      setLoadError('');
       if (agRes.status === 'fulfilled') {
         setGroups(agRes.value.assignment_groups);
       } else {
@@ -84,16 +81,21 @@ export default function AssignmentGroupDetailPage() {
 
       if (rolesRes.status === 'fulfilled') setRoles(rolesRes.value.roles);
       else setRoles([]);
-    } catch (err) {
+    }).catch((err) => {
       setLoadError(err instanceof Error ? err.message : t('loadDataFailed'));
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [t]);
 
+  const load = useCallback(() => {
+    setLoading(true);
+    return fetchGroupData();
+  }, [fetchGroupData]);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    void fetchGroupData();
+  }, [fetchGroupData]);
 
   const sorted = useMemo(
     () => sortAssignmentGroups(groups, { activeFilter, search, colFilters, sortBy, sortDir }),
@@ -126,7 +128,10 @@ export default function AssignmentGroupDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const syncKey = isNew ? 'new' : (currentGroup?.id ?? null);
+  const [prevSyncKey, setPrevSyncKey] = useState<string | null | undefined>(undefined);
+  if (syncKey !== prevSyncKey) {
+    setPrevSyncKey(syncKey);
     if (isNew || !currentGroup) {
       setName('');
       setDescription('');
@@ -137,18 +142,18 @@ export default function AssignmentGroupDetailPage() {
       setMemberIds([]);
       setProcessIds([]);
       setRoleIds([]);
-      return;
+    } else {
+      setName(currentGroup.name ?? '');
+      setDescription(currentGroup.description ?? '');
+      setManagerId(currentGroup.manager_id ?? '');
+      setCostCenterId(currentGroup.cost_center_id ?? '');
+      setParentGroupId(currentGroup.parent_group_id ?? '');
+      setIsActive(currentGroup.is_active ?? true);
+      setMemberIds(currentGroup.members?.map((m) => m.id) ?? []);
+      setProcessIds(currentGroup.processes?.map((p) => p.id) ?? []);
+      setRoleIds(currentGroup.roles?.map((r) => r.id) ?? []);
     }
-    setName(currentGroup.name ?? '');
-    setDescription(currentGroup.description ?? '');
-    setManagerId(currentGroup.manager_id ?? '');
-    setCostCenterId(currentGroup.cost_center_id ?? '');
-    setParentGroupId(currentGroup.parent_group_id ?? '');
-    setIsActive(currentGroup.is_active ?? true);
-    setMemberIds(currentGroup.members?.map((m) => m.id) ?? []);
-    setProcessIds(currentGroup.processes?.map((p) => p.id) ?? []);
-    setRoleIds(currentGroup.roles?.map((r) => r.id) ?? []);
-  }, [isNew, currentGroup]);
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -10,7 +10,7 @@ import {
   type KnowledgeCategory,
 } from '../../api/client';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
-import { createKnowledgeEditorInsertHandlers } from './knowledgeEditorInsert';
+import { useKnowledgeEditorInsertHandlers } from './knowledgeEditorInsert';
 import type { StatusFilter } from './knowledgeSections';
 
 export const EMPTY_KNOWLEDGE_FORM = {
@@ -107,7 +107,30 @@ export function useKnowledgePage(
     }
   }, [canManageKnowledge, t]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [aRes, cRes] = await Promise.all([
+          knowledge.articles(),
+          knowledge.categories(),
+        ]);
+        if (cancelled) return;
+        const gRes = canManageKnowledge
+          ? await knowledge.assignmentGroups()
+          : { assignment_groups: [] as AssignmentGroupItem[] };
+        if (cancelled) return;
+        setArticles(aRes.articles);
+        setCategories(cRes.categories.filter((c) => c.is_active));
+        setGroups(gRes.assignment_groups.filter((g) => g.is_active));
+      } catch (err: unknown) {
+        if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [canManageKnowledge, t]);
 
   const filtered = useMemo(() => {
     const effectiveStatus = isReadOnlyView ? 'published' : statusFilter;
@@ -189,20 +212,23 @@ export function useKnowledgePage(
     });
   }, [requestArticleSwitch, t]);
 
+  const articleIdParam = searchParams.get('articleId');
   useEffect(() => {
-    const articleId = searchParams.get('articleId');
-    if (!articleId || loading) return;
-    if (selectedId === articleId) return;
-    if (!articles.some((a) => a.id === articleId)) return;
+    if (!articleIdParam || loading) return;
+    if (selectedId === articleIdParam) return;
+    if (!articles.some((a) => a.id === articleIdParam)) return;
 
-    openArticle(articleId).finally(() => {
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete('articleId');
-        return next;
-      }, { replace: true });
-    });
-  }, [searchParams, setSearchParams, loading, selectedId, articles, openArticle]);
+    const timer = window.setTimeout(() => {
+      openArticle(articleIdParam).finally(() => {
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('articleId');
+          return next;
+        }, { replace: true });
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [articleIdParam, setSearchParams, loading, selectedId, articles, openArticle]);
 
   const handleSave = useCallback(async (): Promise<boolean> => {
     setSaving(true);
@@ -248,7 +274,9 @@ export function useKnowledgePage(
     }
   }, [form, load, selectedId, t]);
 
-  saveRef.current = handleSave;
+  useEffect(() => {
+    saveRef.current = handleSave;
+  });
 
   const handleSubmitReview = async () => {
     if (!selected || !selectedId || selectedId === 'new') return;
@@ -282,6 +310,19 @@ export function useKnowledgePage(
 
   const isPublished = selected?.status === 'published';
 
+  const [prevContent, setPrevContent] = useState(form.content);
+  if (form.content !== prevContent) {
+    setPrevContent(form.content);
+    const imageMatches = Array.from(form.content.matchAll(/!\[[^\]]*]\(attachment:([^)]+)\)/g));
+    const linkMatches = Array.from(form.content.matchAll(/\[[^\]]+]\(attachment:([^)]+)\)/g));
+    const ids = Array.from(new Set(
+      [...imageMatches, ...linkMatches]
+        .map((m) => m[1])
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    ));
+    if (ids.length === 0) setAttachmentUrls({});
+  }
+
   useEffect(() => {
     let cancelled = false;
     const imageMatches = Array.from(form.content.matchAll(/!\[[^\]]*]\(attachment:([^)]+)\)/g));
@@ -292,7 +333,7 @@ export function useKnowledgePage(
         .map((m) => m[1])
         .filter((id): id is string => typeof id === 'string' && id.length > 0),
     ));
-    if (ids.length === 0) { setAttachmentUrls({}); return; }
+    if (ids.length === 0) return;
     Promise.all(ids.map(async (id) => ({ id, url: await attachments.previewUrl(id) })))
       .then((pairs) => {
         if (cancelled) return;
@@ -310,10 +351,7 @@ export function useKnowledgePage(
     insertLink,
     insertImage,
     insertAttachment,
-  } = useMemo(
-    () => createKnowledgeEditorInsertHandlers(contentRef, form.content, setForm, selectedId, setError, t),
-    [form.content, selectedId, t],
-  );
+  } = useKnowledgeEditorInsertHandlers(contentRef, form.content, setForm, selectedId, setError, t);
 
   return {
     isReadOnlyView,

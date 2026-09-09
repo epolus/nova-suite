@@ -122,18 +122,25 @@ export default function ConfigPackagesPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const loadRuns = async () => {
+  const loadRuns = () => {
     setLoadingRuns(true);
-    try {
-      const result = await admin.configPackageRuns();
-      setRuns(result.runs);
-    } finally {
-      setLoadingRuns(false);
-    }
+    return admin.configPackageRuns()
+      .then((result) => {
+        setRuns(result.runs);
+      })
+      .finally(() => {
+        setLoadingRuns(false);
+      });
   };
 
   useEffect(() => {
-    void loadRuns();
+    admin.configPackageRuns()
+      .then((result) => {
+        setRuns(result.runs);
+      })
+      .finally(() => {
+        setLoadingRuns(false);
+      });
   }, []);
 
   const handleExport = async () => {

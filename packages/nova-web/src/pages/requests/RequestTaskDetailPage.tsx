@@ -30,18 +30,29 @@ export default function RequestTaskDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [prevTaskId, setPrevTaskId] = useState(taskId);
+  if (taskId !== prevTaskId) {
+    setPrevTaskId(taskId);
+    setLoading(true);
+    setError('');
+    setTask(null);
+  }
+
   useEffect(() => {
     if (!taskId) return;
-    setLoading(true);
+    let cancelled = false;
     requestsApi.task(taskId)
       .then((res) => {
+        if (cancelled) return;
         setTask(res);
         setLoading(false);
       })
       .catch((err: Error) => {
+        if (cancelled) return;
         setError(err.message || tRequests('loadTaskFailed'));
         setLoading(false);
       });
+    return () => { cancelled = true; };
   }, [taskId, tRequests]);
 
   const refresh = async () => {

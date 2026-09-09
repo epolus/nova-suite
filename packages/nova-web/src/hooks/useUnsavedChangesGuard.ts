@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, type NavigateOptions, type To } from 'react-router';
+import { useLatestRef } from './useLatestRef';
 
 type PendingNavigation =
   | { kind: 'to'; to: To; options?: NavigateOptions }
@@ -47,10 +48,9 @@ export function useUnsavedChangesGuard({
   const [saving, setSaving] = useState(false);
   const pendingNavigation = useRef<PendingNavigation | null>(null);
   const skipGuardRef = useRef(false);
-  const shouldGuardRef = useRef(false);
 
   const shouldGuard = enabled && isDirty;
-  shouldGuardRef.current = shouldGuard;
+  const shouldGuardRef = useLatestRef(shouldGuard);
 
   const completeNavigation = useCallback(() => {
     const pending = pendingNavigation.current;
@@ -156,7 +156,7 @@ export function useUnsavedChangesGuard({
 
     document.addEventListener('click', onDocumentClick, true);
     return () => document.removeEventListener('click', onDocumentClick, true);
-  }, [location.hash, location.pathname, location.search, queueNavigation]);
+  }, [location.hash, location.pathname, location.search, queueNavigation, shouldGuardRef]);
 
   const allowNextNavigation = useCallback(() => {
     skipGuardRef.current = true;

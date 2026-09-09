@@ -70,6 +70,19 @@ export function useProblemDetail() {
 
   const { data: problem, isLoading: problemLoading, refetch: refetchProblem } = useProblem(isNew ? undefined : id);
 
+  const refKey = `${id}|${isNew}|${JSON.stringify(listParams)}`;
+  const [prevRefKey, setPrevRefKey] = useState(refKey);
+  if (refKey !== prevRefKey) {
+    setPrevRefKey(refKey);
+    setRefLoading(true);
+  }
+
+  const [prevProblem, setPrevProblem] = useState(problem);
+  if (problem !== prevProblem) {
+    setPrevProblem(problem);
+    if (problem) setForm(formFromDetail(problem));
+  }
+
   const loadReferenceData = useCallback(async () => {
     setRefLoading(true);
     try {
@@ -109,13 +122,47 @@ export function useProblemDetail() {
   }, [id, isNew, listParams]);
 
   useEffect(() => {
-    loadReferenceData();
-  }, [loadReferenceData]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const [gRes, ciRes] = await Promise.all([
+          problemsApi.assignmentGroups(),
+          cmdb.items({ status: 'installed' }, 1, 100),
+        ]);
+        if (cancelled) return;
+        setGroups(gRes.assignment_groups);
+        setCiItems(ciRes.items);
 
-  useEffect(() => {
-    if (!problem) return;
-    setForm(formFromDetail(problem));
-  }, [problem]);
+        if (isNew) {
+          setForm(EMPTY_PROBLEM_FORM);
+          setLinkedIncidents([]);
+          setTasks([]);
+          setKnownErrors([]);
+          setPrevId(null);
+          setNextId(null);
+          setFileAttachments([]);
+        } else if (id) {
+          const [lRes, tRes, keRes, navRes, aRes] = await Promise.all([
+            problemsApi.linkedIncidents(id),
+            problemsApi.tasks(id),
+            problemsApi.knownErrors(id),
+            problemsApi.nav(id, listParams),
+            attachmentsApi.list('problem', id),
+          ]);
+          if (cancelled) return;
+          setLinkedIncidents(lRes.incidents);
+          setTasks(tRes.tasks);
+          setKnownErrors(keRes.known_errors);
+          setPrevId(navRes.prev_id);
+          setNextId(navRes.next_id);
+          setFileAttachments(aRes.attachments);
+        }
+      } finally {
+        if (!cancelled) setRefLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id, isNew, listParams]);
 
   const loading = problemLoading || refLoading;
 
@@ -195,7 +242,9 @@ export function useProblemDetail() {
     refetchProblem,
   ]);
 
-  saveRef.current = save;
+  useEffect(() => {
+    saveRef.current = save;
+  });
 
   const goTo = useCallback(
     (targetId: string) => {

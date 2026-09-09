@@ -46,11 +46,18 @@ export default function RequestTasksTab({ filterKey }: Props) {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
   const statusFilter = params.filters.status || '';
-
-  const fetchTasks = useCallback(() => {
+  const fetchKey = `${filterKey}|${params.page}|${statusFilter}|${params.search}|${params.sort}|${params.dir}|${refreshNonce}`;
+  const [prevFetchKey, setPrevFetchKey] = useState(fetchKey);
+  if (fetchKey !== prevFetchKey) {
+    setPrevFetchKey(fetchKey);
     setLoading(true);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     const apiParams: Record<string, string> = filterKey === 'assigned_to_me_in_my_groups'
       ? { assigned_to_me: 'true', my_groups: 'true' }
       : { [filterKey]: 'true' };
@@ -61,15 +68,17 @@ export default function RequestTasksTab({ filterKey }: Props) {
       apiParams.sort_dir = params.dir;
     }
     requestsApi.taskQueue(apiParams, params.page, 20).then((res) => {
+      if (cancelled) return;
       setData(res.tasks);
       setPagination(res.pagination);
       setLoading(false);
     });
-  }, [filterKey, params.page, statusFilter, params.search, params.sort, params.dir]);
+    return () => { cancelled = true; };
+  }, [fetchKey, filterKey, params.page, statusFilter, params.search, params.sort, params.dir]);
 
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+  const fetchTasks = useCallback(() => {
+    setRefreshNonce((n) => n + 1);
+  }, []);
 
   const handleComplete = useCallback(async (task: RequestTaskListItem, outcome: string) => {
     setActionLoadingId(task.id);

@@ -95,12 +95,22 @@ export default function CatalogItemPage() {
   const [notes, setNotes] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
+  const [prevId, setPrevId] = useState(id);
+
+  if (id !== prevId) {
+    setPrevId(id);
+    setLoading(true);
+    setItem(null);
+    setError('');
+    setFormData({});
+  }
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
+    let cancelled = false;
     catalog.item(id)
       .then((res) => {
+        if (cancelled) return;
         setItem(res);
         const initial: Record<string, string> = {};
         const fields = res.form_schema?.fields || [];
@@ -110,9 +120,12 @@ export default function CatalogItemPage() {
         setFormData(initial);
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : t('loadFailed'));
+        if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [id, t]);
 
   const fields = useMemo<FormField[]>(() => item?.form_schema?.fields || [], [item]);

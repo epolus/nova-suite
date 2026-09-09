@@ -122,7 +122,20 @@ export default function ESSApprovalsPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    approvalsApi.list()
+      .then(({ approvals }) => {
+        if (!cancelled) setItems(approvals);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleDecision = async (notes: string) => {
     if (!modal) return;

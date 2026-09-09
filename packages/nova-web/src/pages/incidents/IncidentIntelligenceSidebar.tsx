@@ -31,17 +31,26 @@ export function IncidentIntelligenceSidebar({ d }: { d: IncidentDetailState }) {
     }
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!previewArticle?.content) { setPreviewAttachmentUrls({}); return; }
-    const imageMatches = Array.from(previewArticle.content.matchAll(/!\[[^\]]*]\(attachment:([^)]+)\)/g));
-    const linkMatches = Array.from(previewArticle.content.matchAll(/\[[^\]]+]\(attachment:([^)]+)\)/g));
-    const ids = Array.from(new Set(
+  const previewContent = previewArticle?.content || '';
+  const previewIdsKey = (() => {
+    const imageMatches = Array.from(previewContent.matchAll(/!\[[^\]]*]\(attachment:([^)]+)\)/g));
+    const linkMatches = Array.from(previewContent.matchAll(/\[[^\]]+]\(attachment:([^)]+)\)/g));
+    return Array.from(new Set(
       [...imageMatches, ...linkMatches]
         .map((m) => m[1])
         .filter((id): id is string => typeof id === 'string' && id.length > 0),
-    ));
-    if (ids.length === 0) { setPreviewAttachmentUrls({}); return; }
+    )).join(',');
+  })();
+  const [prevPreviewIdsKey, setPrevPreviewIdsKey] = useState(previewIdsKey);
+  if (previewIdsKey !== prevPreviewIdsKey) {
+    setPrevPreviewIdsKey(previewIdsKey);
+    if (!previewIdsKey) setPreviewAttachmentUrls({});
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!previewIdsKey) return;
+    const ids = previewIdsKey.split(',');
     Promise.all(ids.map(async (id) => ({ id, url: await attachmentsApi.previewUrl(id) })))
       .then((pairs) => {
         if (cancelled) return;
@@ -51,7 +60,7 @@ export function IncidentIntelligenceSidebar({ d }: { d: IncidentDetailState }) {
       })
       .catch(() => { if (!cancelled) setPreviewAttachmentUrls({}); });
     return () => { cancelled = true; };
-  }, [previewArticle?.content]);
+  }, [previewIdsKey]);
 
   return (
     <div className="mt-6 xl:mt-0 xl:w-[320px] xl:shrink-0">

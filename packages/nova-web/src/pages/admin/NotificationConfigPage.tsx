@@ -46,20 +46,23 @@ export default function NotificationConfigPage() {
   const [form, setForm] = useState<NotificationRuleForm>(emptyForm);
   const [activeTemplateLocale, setActiveTemplateLocale] = useState<TemplateLocale>('en');
 
-  const load = async () => {
-    const [rRes, uRes, gRes] = await Promise.all([
+  const load = () => {
+    Promise.all([
       adminApi.notificationRules(),
       adminApi.users(),
       adminApi.assignmentGroups(),
-    ]);
-    setRules(rRes.notification_rules);
-    setUsers(uRes.users);
-    setGroups(gRes.assignment_groups.filter((g) => g.is_active));
-    setLoading(false);
+    ])
+      .then(([rRes, uRes, gRes]) => {
+        setRules(rRes.notification_rules);
+        setUsers(uRes.users);
+        setGroups(gRes.assignment_groups.filter((g) => g.is_active));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   };
 
   useEffect(() => {
-    load().catch(() => setLoading(false));
+    load();
   }, []);
 
   const isFormOpen = creating || editing !== null;

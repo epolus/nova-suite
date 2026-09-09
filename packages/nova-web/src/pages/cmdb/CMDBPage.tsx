@@ -11,6 +11,7 @@ import SearchBar from '../../components/SearchBar';
 import DataTable from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
+import { useResettingState } from '../../hooks/useSyncedState';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { hasConfigurationRole, isAgentRole } from '../../utils/roles';
 import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
@@ -61,7 +62,6 @@ export default function CMDBPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
     `presets:${PRESETS_KEY}`,
     [],
@@ -99,9 +99,15 @@ export default function CMDBPage() {
     cmdb.classes().then((res) => setClasses(res.classes.filter((c) => c.is_active !== false)));
   }, []);
 
-  useEffect(() => {
+  const listKey = `${params.page}|${pageSize}|${classFilter}|${statusFilter}|${environmentFilter}|${isActiveFilter}|${params.search}|${params.sort}|${params.dir}|${cfKey}`;
+  const [selectedIds, setSelectedIds] = useResettingState<string[]>([], listKey);
+  const [prevListKey, setPrevListKey] = useState(listKey);
+  if (listKey !== prevListKey) {
+    setPrevListKey(listKey);
     setLoading(true);
-    setSelectedIds([]);
+  }
+
+  useEffect(() => {
     const apiParams: Record<string, string> = {};
     if (classFilter) apiParams.class_id = classFilter;
     if (statusFilter) apiParams.status = statusFilter;

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect } from 'react';
 import { useTranslations } from 'use-intl';
+import { useSyncedState } from '../hooks/useSyncedState';
 import { useFieldControl } from './ui/fieldControl';
 
 interface Props {
@@ -16,9 +16,7 @@ export default function SearchBar({ value, onChange, placeholder, id, name, aria
   const t = useTranslations('common.filters');
   const resolvedPlaceholder = placeholder ?? t('searchPlaceholder');
   const field = useFieldControl(name ?? 'list-search', id);
-  const [local, setLocal] = useState(value);
-
-  useEffect(() => { setLocal(value); }, [value]);
+  const [local, setLocal] = useSyncedState(value);
 
   const apply = () => {
     if (local !== value) onChange(local);

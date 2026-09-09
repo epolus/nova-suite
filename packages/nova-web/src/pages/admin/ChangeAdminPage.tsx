@@ -21,7 +21,6 @@ export default function ChangeAdminPage() {
   const [newBlackout, setNewBlackout] = useState({ name: '', start_date: '', end_date: '', reason: '' });
 
   const load = useCallback(() => {
-    setLoadError('');
     Promise.all([
       changes.types(),
       changes.standardTemplates(),
@@ -29,6 +28,7 @@ export default function ChangeAdminPage() {
       changes.blackouts(),
     ])
       .then(([typesRes, s, m, b]) => {
+        setLoadError('');
         setTypes(typesRes.change_types);
         setTemplates(s.templates);
         setMeetings(m.meetings);

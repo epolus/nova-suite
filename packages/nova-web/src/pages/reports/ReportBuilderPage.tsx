@@ -85,9 +85,45 @@ export default function ReportBuilderPage() {
     }
   }, [isExistingReport, reportId, canCreate, t]);
 
+  const builderKey = `${reportId}|${isExistingReport}|${canCreate}`;
+  const [prevBuilderKey, setPrevBuilderKey] = useState(builderKey);
+  if (builderKey !== prevBuilderKey) {
+    setPrevBuilderKey(builderKey);
+    setLoading(true);
+    setError(null);
+    if (!isExistingReport) {
+      setCanEdit(canCreate);
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!isExistingReport) return;
+    let cancelled = false;
+    reports.getDefinition(reportId)
+      .then((res) => {
+        if (cancelled) return;
+        const components = Array.isArray(res.report.components)
+          ? ensureComponentIds(res.report.components)
+          : [];
+        setCanEdit(res.can_edit && canCreate);
+        setState({
+          name: res.report.name,
+          description: res.report.description || '',
+          is_shared: res.report.is_shared,
+          allowed_roles: (res.report.allowed_roles || []).join(', '),
+          components,
+        });
+        setSelectedComponentId(components[0]?.id ?? null);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isExistingReport, reportId, canCreate, t]);
 
   const addComponent = (kind: 'table' | 'kpi' | 'bar_chart' | 'pie_chart') => {
     if (!canEdit) return;

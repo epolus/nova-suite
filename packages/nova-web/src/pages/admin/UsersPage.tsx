@@ -210,15 +210,17 @@ export default function UsersPage() {
     }, { replace: true });
   }, [setSearchParams]);
 
-  const loadData = useCallback(async () => {
-    try {
-      const usersRes = await admin.users();
-      setUsers(usersRes.users);
-    } catch (err) {
-      console.error('Failed to load admin data:', err);
-    } finally {
-      setLoading(false);
-    }
+  const loadData = useCallback(() => {
+    admin.users()
+      .then((usersRes) => {
+        setUsers(usersRes.users);
+      })
+      .catch((err) => {
+        console.error('Failed to load admin data:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {

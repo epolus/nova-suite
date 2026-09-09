@@ -76,10 +76,9 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     }
   }, [user, isEss]);
 
-  useEffect(() => {
-    if (!user || callerId) return;
+  if (user && !callerId) {
     setCallerId(user.id);
-  }, [user, callerId]);
+  }
 
   const selectedCaller = users.find((u) => u.id === callerId);
   const groupMembers = useMemo(() => {
@@ -145,10 +144,22 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     onSave: useCallback(() => saveRef.current(), []),
   });
 
+  const sidebarText = (title + ' ' + description).trim();
+  const [prevSidebarText, setPrevSidebarText] = useState(sidebarText);
+  const [prevSidebarOpen, setPrevSidebarOpen] = useState(sidebarOpen);
+  if (sidebarText !== prevSidebarText || sidebarOpen !== prevSidebarOpen) {
+    setPrevSidebarText(sidebarText);
+    setPrevSidebarOpen(sidebarOpen);
+    if (sidebarOpen && !sidebarText) {
+      setSimilarIncidents([]);
+      setKbSuggestions([]);
+    }
+  }
+
   useEffect(() => {
     if (!sidebarOpen) return;
     const text = (title + ' ' + description).trim();
-    if (!text) { setSimilarIncidents([]); setKbSuggestions([]); return; }
+    if (!text) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setLoadingSidebar(true);
@@ -238,7 +249,9 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     user,
   ]);
 
-  saveRef.current = handleSubmit;
+  useEffect(() => {
+    saveRef.current = handleSubmit;
+  });
 
   return {
     isEss,

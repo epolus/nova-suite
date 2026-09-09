@@ -43,9 +43,37 @@ export default function MajorIncidentPostmortemPage() {
     }
   }, [id, t]);
 
+  const [prevId, setPrevId] = useState(id);
+  if (id !== prevId) {
+    setPrevId(id);
+    setLoading(true);
+    setPm(null);
+    setErr('');
+    setRootText('');
+    setContribText('');
+  }
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!id) return;
+    let cancelled = false;
+    majorIncidentsApi.getPostmortem(id)
+      .then(({ postmortem }) => {
+        if (cancelled) return;
+        setPm(postmortem);
+        if (postmortem) {
+          setRootText(((postmortem.root_causes as string[]) || []).join('\n'));
+          setContribText(((postmortem.contributing_factors as string[]) || []).join('\n'));
+        }
+        setErr('');
+        setLoading(false);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setErr(e instanceof Error ? e.message : t('loadFailed'));
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [id, t]);
 
   const ensureDraft = async () => {
     if (!id || pm) return;

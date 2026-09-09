@@ -84,16 +84,26 @@ export default function ChangeCalendarPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(toDateKey(now));
 
   // Fetch wider range so navigating months doesn't require extra fetch
-  useEffect(() => {
+  const viewKey = `${viewYear}|${viewMonth}`;
+  const [prevViewKey, setPrevViewKey] = useState(viewKey);
+  if (viewKey !== prevViewKey) {
+    setPrevViewKey(viewKey);
     setLoading(true);
-    // Fetch ±2 months around current view
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     const from = new Date(viewYear, viewMonth - 1, 1).toISOString();
     const to = new Date(viewYear, viewMonth + 2, 0).toISOString();
     changes.calendar({ from, to }).then((res) => {
+      if (cancelled) return;
       setItems(res.changes);
       setBlackouts(res.blackouts);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, [viewYear, viewMonth]);
 
   // Map day key → changes (change appears on every day it spans)

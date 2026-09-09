@@ -8,6 +8,7 @@ import UnifiedAutomationDesigner, {
 import AutomationDryRunPanel from '../../components/workflow/AutomationDryRunPanel';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
+import { useLatestRef } from '../../hooks/useLatestRef';
 import { admin, type WorkflowDefinition } from '../../api/client';
 import { formatDateTime } from '../../utils/dateTime';
 import { diffObjects, formatDiffValue } from './workflow-editor/diff';
@@ -39,24 +40,30 @@ export default function WorkflowEditorPage() {
   const absorbNextConfigRef = useRef(true);
   const loadingDefinitionRef = useRef(false);
   const pendingLocalAction = useRef<(() => void) | null>(null);
-  const saveRef = useRef<(cfg?: Record<string, unknown>) => Promise<boolean>>(async () => false);
   const designerRef = useRef<UnifiedAutomationDesignerHandle | null>(null);
   const [designerEpoch, setDesignerEpoch] = useState(0);
   const [designerMounted, setDesignerMounted] = useState(true);
 
-  const refreshDefinitions = useCallback(async () => {
+  const refreshDefinitions = useCallback(() => {
     setLoadingDefinitions(true);
-    try {
-      const result = await admin.workflowDefinitions();
-      setDefinitions(result.workflow_definitions);
-    } finally {
-      setLoadingDefinitions(false);
-    }
+    return admin.workflowDefinitions()
+      .then((result) => {
+        setDefinitions(result.workflow_definitions);
+      })
+      .finally(() => {
+        setLoadingDefinitions(false);
+      });
   }, []);
 
   useEffect(() => {
-    void refreshDefinitions();
-  }, [refreshDefinitions]);
+    admin.workflowDefinitions()
+      .then((result) => {
+        setDefinitions(result.workflow_definitions);
+      })
+      .finally(() => {
+        setLoadingDefinitions(false);
+      });
+  }, []);
 
   const parsedAutomationConfig = useMemo(() => {
     try {
@@ -166,11 +173,11 @@ export default function WorkflowEditorPage() {
     workflowType,
   ]);
 
-  saveRef.current = saveDraft;
+  const saveRef = useLatestRef(saveDraft);
 
   const persistFromDesigner = useCallback(
     (cfg: Record<string, unknown>) => saveRef.current(cfg),
-    [],
+    [saveRef],
   );
 
   const {
@@ -181,7 +188,7 @@ export default function WorkflowEditorPage() {
     saveAndLeave,
   } = useUnsavedChangesGuard({
     isDirty,
-    onSave: useCallback(() => saveRef.current(), []),
+    onSave: useCallback(() => saveRef.current(), [saveRef]),
   });
 
   const confirmIfDirty = useCallback((action: () => void) => {
@@ -221,7 +228,7 @@ export default function WorkflowEditorPage() {
       return;
     }
     await saveAndLeave?.();
-  }, [localDialogOpen, saveAndLeave]);
+  }, [localDialogOpen, saveAndLeave, saveRef]);
 
   const handleDesignerApply = useCallback((cfg: Record<string, unknown>) => {
     // Ignore canvas sync while a definition is loading — a pending SyncBridge can

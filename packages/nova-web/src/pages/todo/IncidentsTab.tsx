@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { incidents as incidentsApi } from '@/api/client';
@@ -9,6 +9,7 @@ import SearchBar from '@/components/SearchBar';
 import DataTable from '@/components/DataTable';
 import { Button } from '@/components/ui/button';
 import { useListParams } from '@/hooks/useListParams';
+import { useResettingState } from '@/hooks/useSyncedState';
 import { useUserPreferenceState } from '@/hooks/useUserPreferenceState';
 import { useIncidentsList, useIncidentAssignmentGroups, useInvalidateIncidents } from '@/hooks/queries';
 import { useAuth } from '@/context/AuthContext';
@@ -58,7 +59,6 @@ export function IncidentsTab({ config }: { config: TodoScopeConfig }) {
 
   const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkGroupId, setBulkGroupId] = useState('');
   const [confirmClose, setConfirmClose] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -92,10 +92,8 @@ export function IncidentsTab({ config }: { config: TodoScopeConfig }) {
   const data: Incident[] = listResult?.incidents ?? [];
   const pagination = listResult?.pagination ?? null;
   const { data: groups = [] } = useIncidentAssignmentGroups();
-
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [params.page, apiParams, isFetching]);
+  const selectionKey = `${params.page}|${isFetching}|${JSON.stringify(apiParams)}`;
+  const [selectedIds, setSelectedIds] = useResettingState<string[]>([], selectionKey);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = { ...config.incidentFilter };

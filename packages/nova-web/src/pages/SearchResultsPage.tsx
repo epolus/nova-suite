@@ -24,16 +24,23 @@ export default function SearchResultsPage() {
   const requestedType = (searchParams.get('type') || '').trim() as SearchResult['type'] | '';
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const searchKey = `${q}|${requestedType}`;
+  const [prevSearchKey, setPrevSearchKey] = useState(searchKey);
+  if (searchKey !== prevSearchKey) {
+    setPrevSearchKey(searchKey);
+    if (!q) {
+      setResults([]);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }
 
   const typeLabel = (type: SearchResult['type']) => tSearch(`types.${type}` as 'types.incident');
 
   useEffect(() => {
+    if (!q) return;
     let alive = true;
-    if (!q) {
-      setResults([]);
-      return () => { alive = false; };
-    }
-    setLoading(true);
 
     const types = requestedType ? [requestedType] : TYPE_ORDER;
     Promise.all(types.map((t) => search.query(q, 50, t)))

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import type { ServiceItem } from '../api/client';
+import { useResettingState } from '../hooks/useSyncedState';
 
 const RECENT_STORAGE_KEY = 'nova_admin_recent_catalog_items';
 const RECENT_MAX = 5;
@@ -53,7 +54,7 @@ export default function ServiceItemCombobox({
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [highlightIdx, setHighlightIdx] = useState(0);
+  if (disabled && open) setOpen(false);
 
   const selected = useMemo(() => items.find((i) => i.id === value), [items, value]);
 
@@ -136,15 +137,11 @@ export default function ServiceItemCombobox({
     [rows],
   );
 
-  useEffect(() => {
-    if (!open) return;
-    const first = itemIndices[0];
-    setHighlightIdx(first ?? 0);
-  }, [open, query, rows, itemIndices]);
-
-  useEffect(() => {
-    if (disabled) setOpen(false);
-  }, [disabled]);
+  const highlightResetKey = open ? `${query}\0${itemIndices.join(',')}` : 'closed';
+  const [highlightIdx, setHighlightIdx] = useResettingState(
+    itemIndices[0] ?? 0,
+    highlightResetKey,
+  );
 
   useEffect(() => {
     if (!open) return;

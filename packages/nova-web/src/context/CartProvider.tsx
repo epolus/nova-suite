@@ -11,32 +11,36 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartCount, setCartCount] = useState(0);
   const [cartTotal, setCartTotal] = useState(0);
 
-  const refreshCart = useCallback(() => {
-    if (!user) {
+  const userId = user?.id ?? null;
+  const [prevUserId, setPrevUserId] = useState(userId);
+  if (userId !== prevUserId) {
+    setPrevUserId(userId);
+    if (!userId) {
       setItems([]);
       setCartCount(0);
       setCartTotal(0);
-      return;
     }
+  }
 
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
     cartApi
       .get()
       .then((res) => {
+        if (cancelled) return;
         setItems(res.items);
         setCartCount(res.cartCount);
         setCartTotal(res.cartTotal);
       })
       .catch(() => {
-        // If cart fetch fails for any reason, keep UI consistent.
+        if (cancelled) return;
         setItems([]);
         setCartCount(0);
         setCartTotal(0);
       });
+    return () => { cancelled = true; };
   }, [user]);
-
-  useEffect(() => {
-    refreshCart();
-  }, [refreshCart]);
 
   const addItem = useCallback(
     (

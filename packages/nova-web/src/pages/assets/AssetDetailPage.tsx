@@ -31,12 +31,24 @@ export default function AssetDetailPage() {
   const [error, setError] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
   const [baseline, setBaseline] = useState(EMPTY_FORM);
+  const [prevId, setPrevId] = useState(id);
+
+  if (id !== prevId) {
+    setPrevId(id);
+    setLoading(!isNew);
+    setError('');
+    if (isNew) {
+      setForm(EMPTY_FORM);
+      setBaseline(EMPTY_FORM);
+    }
+  }
 
   useEffect(() => {
     if (isNew || !id) return;
-    setLoading(true);
+    let cancelled = false;
     assets.get(id)
       .then((asset) => {
+        if (cancelled) return;
         const next = {
           asset_tag: asset.asset_tag,
           name: asset.name,
@@ -48,8 +60,13 @@ export default function AssetDetailPage() {
         setForm(next);
         setBaseline(next);
       })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : t('loadFailed')))
-      .finally(() => setLoading(false));
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [id, isNew, t]);
 
   const isDirty = useMemo(
@@ -104,7 +121,9 @@ export default function AssetDetailPage() {
     }
   }, [allowNextNavigation, form, id, isNew, navigate, t]);
 
-  saveRef.current = handleSave;
+  useEffect(() => {
+    saveRef.current = handleSave;
+  });
 
   if (loading) return <Spinner />;
 

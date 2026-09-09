@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -38,24 +38,28 @@ function NotificationBell() {
   const stopPollingRef = useRef(false);
   const navigate = useNavigate();
 
-  const fetchCount = useCallback(async () => {
-    if (stopPollingRef.current) return;
-    try {
-      const { count } = await notificationsApi.unreadCount();
-      setUnread(count);
-      failuresRef.current = 0;
-    } catch {
-      // Avoid spamming the console when API isn't reachable.
-      failuresRef.current += 1;
-      if (failuresRef.current >= 2) stopPollingRef.current = true;
-    }
-  }, []);
-
   useEffect(() => {
-    fetchCount();
-    const id = setInterval(fetchCount, 30_000);
-    return () => clearInterval(id);
-  }, [fetchCount]);
+    let cancelled = false;
+    const load = () => {
+      if (stopPollingRef.current) return;
+      notificationsApi.unreadCount()
+        .then(({ count }) => {
+          if (cancelled) return;
+          setUnread(count);
+          failuresRef.current = 0;
+        })
+        .catch(() => {
+          failuresRef.current += 1;
+          if (failuresRef.current >= 2) stopPollingRef.current = true;
+        });
+    };
+    load();
+    const id = setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   const handleOpen = async () => {
     setOpen((v) => !v);
@@ -217,32 +221,49 @@ export default function ESSLayout() {
   const contentContainerClass = isFullWidthPage ? 'w-full max-w-none' : 'max-w-6xl mx-auto';
 
   const [logoSrc, setLogoSrc] = useState(DEFAULT_LOGO_SRC);
+  const logoUrl = theme.logo_url;
+  const [prevLogoUrl, setPrevLogoUrl] = useState(logoUrl);
+  if (logoUrl !== prevLogoUrl) {
+    setPrevLogoUrl(logoUrl);
+    if (!logoUrl) setLogoSrc(DEFAULT_LOGO_SRC);
+  }
   useEffect(() => {
-    if (!theme.logo_url) { setLogoSrc(DEFAULT_LOGO_SRC); return; }
+    if (!logoUrl) return;
     const token = localStorage.getItem('nova_token');
+    let cancelled = false;
     fetch('/api/settings/logo', {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => { if (r.ok) return r.blob(); throw new Error(); })
-      .then((blob) => setLogoSrc(URL.createObjectURL(blob)))
-      .catch(() => setLogoSrc(DEFAULT_LOGO_SRC));
-  }, [theme.logo_url]);
+      .then((blob) => {
+        if (!cancelled) setLogoSrc(URL.createObjectURL(blob));
+      })
+      .catch(() => {
+        if (!cancelled) setLogoSrc(DEFAULT_LOGO_SRC);
+      });
+    return () => { cancelled = true; };
+  }, [logoUrl]);
 
   // Pending approvals count (poll every 60s)
   const [pendingApprovals, setPendingApprovals] = useState(0);
-  const fetchApprovalCount = useCallback(async () => {
-    try {
-      const { count } = await approvalsApi.pendingCount();
-      setPendingApprovals(count);
-    } catch {
-      // non-critical
-    }
-  }, []);
   useEffect(() => {
-    fetchApprovalCount();
-    const id = setInterval(fetchApprovalCount, 60_000);
-    return () => clearInterval(id);
-  }, [fetchApprovalCount]);
+    let cancelled = false;
+    const load = () => {
+      approvalsApi.pendingCount()
+        .then(({ count }) => {
+          if (!cancelled) setPendingApprovals(count);
+        })
+        .catch(() => {
+          // non-critical
+        });
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   const appNameParts = (theme.app_name || 'Nova Suite').split(' ');
   const firstName = appNameParts[0];
