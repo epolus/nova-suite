@@ -124,15 +124,17 @@ export default function AssignmentGroupsPage() {
   const [loading, setLoading] = useState(true);
   const activeFilter = params.filters.active || 'all';
 
-  const load = useCallback(async () => {
-    try {
-      const agRes = await admin.assignmentGroups();
-      setItems(agRes.assignment_groups);
-    } catch (err) {
-      console.error('Failed to load:', err);
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(() => {
+    admin.assignmentGroups()
+      .then((agRes) => {
+        setItems(agRes.assignment_groups);
+      })
+      .catch((err) => {
+        console.error('Failed to load:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {

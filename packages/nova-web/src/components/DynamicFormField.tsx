@@ -183,35 +183,55 @@ function CmdbRefPicker({ id, name, ariaLabel, value, onChange, ciClass, ciFilter
 
   // Resolve the initial UUID to a display name
   useEffect(() => {
-    if (value && !resolved) {
-      cmdb.items(buildParams(), 1, 200).then((res) => {
-        const found = res.items.find((ci: any) => ci.id === value);
-        if (found) {
-          const label = `${found.name} (${(found as any).class_display_name || (found as any).class_name || ''})`;
-          setSelectedLabel(label);
-          setInputText(label);
-        }
-        setResolved(true);
-      }).catch(() => setResolved(true));
-    } else if (!value) {
+    if (!value || resolved) return;
+    let cancelled = false;
+    cmdb.items(buildParams(), 1, 200).then((res) => {
+      if (cancelled) return;
+      const found = res.items.find((ci: any) => ci.id === value);
+      if (found) {
+        const label = `${found.name} (${(found as any).class_display_name || (found as any).class_name || ''})`;
+        setSelectedLabel(label);
+        setInputText(label);
+      }
+      setResolved(true);
+    }).catch(() => {
+      if (!cancelled) setResolved(true);
+    });
+    return () => { cancelled = true; };
+  }, [value, buildParams, resolved]);
+
+  if (!value) {
+    if (selectedLabel !== '' || inputText !== '' || !resolved) {
       setSelectedLabel('');
       setInputText('');
       setResolved(true);
     }
-  }, [value, buildParams, resolved]);
+  }
 
   // Fetch matching CIs when debounced search changes
+  const fetchKey = open ? debouncedSearch : null;
+  const [prevFetchKey, setPrevFetchKey] = useState(fetchKey);
+  if (fetchKey !== prevFetchKey) {
+    setPrevFetchKey(fetchKey);
+    if (fetchKey !== null) setLoading(true);
+  }
+
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
+    let cancelled = false;
     cmdb.items(buildParams(debouncedSearch), 1, 25).then((res) => {
+      if (cancelled) return;
       setOptions(res.items.map((ci: any) => ({
         id: ci.id,
         name: ci.name,
         class_name: (ci as any).class_display_name || (ci as any).class_name || '',
       })));
-    }).catch(() => setOptions([]))
-      .finally(() => setLoading(false));
+    }).catch(() => {
+      if (!cancelled) setOptions([]);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, [debouncedSearch, open, buildParams]);
 
   // Close dropdown when clicking outside

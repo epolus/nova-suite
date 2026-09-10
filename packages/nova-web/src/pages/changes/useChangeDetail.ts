@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { changes, cmdb, incidents, problems } from '@/api/client';
 import type {
@@ -145,6 +146,24 @@ export function useChangeDetail() {
 
   const { data: change, isLoading: changeLoading, refetch: refetchChange } = useChange(isNew ? undefined : id);
 
+  const metaKey = `${id}|${isNew}|${JSON.stringify(listParams)}`;
+  const [prevMetaKey, setPrevMetaKey] = useState(metaKey);
+  if (metaKey !== prevMetaKey) {
+    setPrevMetaKey(metaKey);
+    setMetaLoading(true);
+    setError('');
+  }
+
+  const [prevChange, setPrevChange] = useState(change);
+  if (change !== prevChange) {
+    setPrevChange(change);
+    if (change) {
+      setForm(formFromDetail(change));
+      setApprovals(change.approvals || []);
+      setConflicts(change.conflicts || []);
+    }
+  }
+
   const loadMeta = useCallback(async () => {
     setMetaLoading(true);
     setError('');
@@ -189,15 +208,51 @@ export function useChangeDetail() {
   }, [id, isNew, listParams]);
 
   useEffect(() => {
-    loadMeta();
-  }, [loadMeta]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const [typesRes, templatesRes, groupsRes, servicesRes, ciRes, incRes, prbRes] = await Promise.all([
+          changes.types(),
+          changes.standardTemplates(),
+          changes.assignmentGroups(),
+          incidents.services(),
+          cmdb.items({ status: 'installed' }, 1, 100),
+          incidents.list({ status: 'new' }, 1, 100),
+          problems.list({}, 1, 100),
+        ]);
+        if (cancelled) return;
+        setTypes(typesRes.change_types);
+        setTemplates(templatesRes.templates);
+        setGroups(groupsRes.assignment_groups);
+        setServices(servicesRes.services);
+        setCis(ciRes.items);
+        setIncidentsList(incRes.incidents);
+        setProblemsList(prbRes.problems);
 
-  useEffect(() => {
-    if (!change) return;
-    setForm(formFromDetail(change));
-    setApprovals(change.approvals || []);
-    setConflicts(change.conflicts || []);
-  }, [change]);
+        if (isNew) {
+          setForm({ ...EMPTY_CHANGE_FORM, change_type_id: typesRes.change_types[0]?.id || '' });
+          setApprovals([]);
+          setConflicts([]);
+          setPrevId(null);
+          setNextId(null);
+        } else if (id) {
+          const [navRes, conflictRes] = await Promise.all([
+            changes.nav(id, listParams),
+            changes.conflicts(id),
+          ]);
+          if (cancelled) return;
+          setConflicts(conflictRes.conflicts || []);
+          setPrevId(navRes.prev_id);
+          setNextId(navRes.next_id);
+        }
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load change');
+      } finally {
+        if (!cancelled) setMetaLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id, isNew, listParams]);
 
   const loading = changeLoading || metaLoading;
 
@@ -292,7 +347,9 @@ export function useChangeDetail() {
     refetchChange,
   ]);
 
-  saveRef.current = save;
+  useEffect(() => {
+    saveRef.current = save;
+  });
 
   const goTo = useCallback(
     (targetId: string) => {

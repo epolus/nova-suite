@@ -26,13 +26,19 @@ export default function ByItemView({
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<CatalogTask[]>([]);
   const [taskLoading, setTaskLoading] = useState(false);
-
-  useEffect(() => {
+  const [prevSelectedItem, setPrevSelectedItem] = useState(selectedItem);
+  if (selectedItem !== prevSelectedItem) {
+    setPrevSelectedItem(selectedItem);
     if (!selectedItem) {
       setTasks([]);
-      return;
+      setTaskLoading(false);
+    } else {
+      setTaskLoading(true);
     }
-    setTaskLoading(true);
+  }
+
+  useEffect(() => {
+    if (!selectedItem) return;
     catalog.itemTasks(selectedItem).then((res) => {
       setTasks(res.tasks);
       setTaskLoading(false);

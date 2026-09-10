@@ -9,10 +9,18 @@ export function useIncidentSidebar(id: string | undefined, intelligenceOpen: boo
   const [loadingSidebar, setLoadingSidebar] = useState(false);
   const [sidebarError, setSidebarError] = useState<string | null>(null);
 
+  const sidebarKey = `${id}|${intelligenceOpen}`;
+  const [prevSidebarKey, setPrevSidebarKey] = useState(sidebarKey);
+  if (sidebarKey !== prevSidebarKey) {
+    setPrevSidebarKey(sidebarKey);
+    if (id && intelligenceOpen) {
+      setLoadingSidebar(true);
+      setSidebarError(null);
+    }
+  }
+
   useEffect(() => {
     if (!id || !intelligenceOpen) return;
-    setLoadingSidebar(true);
-    setSidebarError(null);
     Promise.all([
       incidentsApi.similar(id, { limit: 6 }),
       knowledgeApi.suggestionsForIncident(id, { limit: 6 }),

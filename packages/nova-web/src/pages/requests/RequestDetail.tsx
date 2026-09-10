@@ -51,11 +51,18 @@ export default function RequestDetail() {
     isDirty: isNotesDirty,
   });
 
+  const [prevFetchId, setPrevFetchId] = useState(id);
+  if (id !== prevFetchId) {
+    setPrevFetchId(id);
+    setLoading(true);
+    setLoadError('');
+    setReq(null);
+    setTasks([]);
+  }
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    setLoading(true);
-    setLoadError('');
     Promise.all([
       requestsApi.get(id),
       requestsApi.tasks(id).catch(() => ({ tasks: [] as RequestTask[] })),

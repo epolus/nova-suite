@@ -4,6 +4,7 @@ import { useTranslations } from 'use-intl';
 import Card from './Card';
 import EmptyState from './EmptyState';
 import type { SortDir } from '../hooks/useListParams';
+import { useSyncedState } from '../hooks/useSyncedState';
 
 // ─── Types ───
 
@@ -318,9 +319,7 @@ function ColumnFilterInput({
   onChange: (v: string) => void;
 }) {
   const tTable = useTranslations('common.table');
-  const [local, setLocal] = useState(value);
-
-  useEffect(() => { setLocal(value); }, [value]);
+  const [local, setLocal] = useSyncedState(value);
 
   const apply = () => {
     if (local !== value) onChange(local);

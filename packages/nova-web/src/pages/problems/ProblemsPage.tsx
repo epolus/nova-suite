@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { problems as problemsApi } from '../../api/client';
@@ -12,6 +12,7 @@ import SearchBar from '../../components/SearchBar';
 import DataTable, { type DataColumnDef } from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
+import { useResettingState } from '../../hooks/useSyncedState';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { formatDate } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
@@ -90,7 +91,6 @@ export default function ProblemsPage() {
   });
   const navigate = useNavigate();
   const [exporting, setExporting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const invalidateProblems = useInvalidateProblems();
@@ -124,10 +124,8 @@ export default function ProblemsPage() {
   const { data: listResult, isLoading: loading, isFetching } = useProblemsList(apiParams, params.page);
   const data: Problem[] = listResult?.problems ?? [];
   const pagination = listResult?.pagination ?? null;
-
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [params.page, apiParams, isFetching]);
+  const selectionKey = `${params.page}|${isFetching}|${JSON.stringify(apiParams)}`;
+  const [selectedIds, setSelectedIds] = useResettingState<string[]>([], selectionKey);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};

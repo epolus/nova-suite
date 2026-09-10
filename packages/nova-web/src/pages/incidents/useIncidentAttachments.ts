@@ -13,11 +13,16 @@ export function useIncidentAttachments(id: string | undefined) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState('');
 
+  const [prevId, setPrevId] = useState(id);
+  if (id !== prevId) {
+    setPrevId(id);
+    setFileAttachments([]);
+    setAttachmentsLoading(!!id);
+  }
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    setFileAttachments([]);
-    setAttachmentsLoading(true);
     void attachmentsApi
       .list('incident', id)
       .then((res) => {

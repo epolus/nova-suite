@@ -74,23 +74,29 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
     return map;
   }, [listParams]);
 
-  const load = useCallback(async (): Promise<T[]> => {
-    setLoading(true);
-    try {
-      const data = await fetchItems();
-      setItems(data);
-      return data;
-    } catch (err) {
-      console.error('Failed to load data:', err);
-      return [];
-    } finally {
-      setLoading(false);
-    }
+  const fetchData = useCallback((): Promise<T[]> => {
+    return fetchItems()
+      .then((data) => {
+        setItems(data);
+        return data;
+      })
+      .catch((err) => {
+        console.error('Failed to load data:', err);
+        return [] as T[];
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [fetchItems]);
 
+  const load = useCallback((): Promise<T[]> => {
+    setLoading(true);
+    return fetchData();
+  }, [fetchData]);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    void fetchData();
+  }, [fetchData]);
 
   const sorted = useMemo(() => {
     let list = items;
@@ -136,21 +142,24 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
   const [isActive, setIsActive] = useState(true);
   const [baselineActive, setBaselineActive] = useState(true);
 
-  useEffect(() => {
+  const syncKey = isNew ? 'new' : (currentItem?.id ?? null);
+  const [prevSyncKey, setPrevSyncKey] = useState<string | null | undefined>(undefined);
+  if (syncKey !== prevSyncKey) {
+    setPrevSyncKey(syncKey);
     if (isNew || !currentItem) {
       const defaults = getDefaults(null);
       setForm(defaults);
       setBaselineForm(defaults);
       setIsActive(true);
       setBaselineActive(true);
-      return;
+    } else {
+      const defaults = getDefaults(currentItem);
+      setForm(defaults);
+      setBaselineForm(defaults);
+      setIsActive(currentItem.is_active);
+      setBaselineActive(currentItem.is_active);
     }
-    const defaults = getDefaults(currentItem);
-    setForm(defaults);
-    setBaselineForm(defaults);
-    setIsActive(currentItem.is_active);
-    setBaselineActive(currentItem.is_active);
-  }, [isNew, currentItem, getDefaults]);
+  }
 
   const isFormDirty = useMemo(
     () => JSON.stringify(form) !== JSON.stringify(baselineForm) || isActive !== baselineActive,
@@ -169,7 +178,7 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
     saveAndLeave,
   } = useUnsavedChangesGuard({
     isDirty: isFormDirty,
-    onSave: useCallback(() => saveRef.current(), []),
+    onSave: () => saveRef.current(),
   });
 
   const goToItem = useCallback((itemId: string) => {
@@ -237,7 +246,9 @@ export default function MasterDataDetailPage<T extends { id: string; is_active: 
     await performSave();
   }, [performSave]);
 
-  saveRef.current = performSave;
+  useEffect(() => {
+    saveRef.current = performSave;
+  });
 
   if (loading) return <Spinner />;
   if (!isNew && !currentItem) return <Navigate to={basePath} replace />;

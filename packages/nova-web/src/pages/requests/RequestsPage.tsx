@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { requests as requestsApi } from '../../api/client';
@@ -11,6 +11,7 @@ import SearchBar from '../../components/SearchBar';
 import DataTable from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
+import { useResettingState } from '../../hooks/useSyncedState';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
@@ -53,7 +54,6 @@ export default function RequestsPage() {
   const [pendingBulkAction, setPendingBulkAction] = useState<'approve' | 'reject' | null>(null);
   const invalidateRequests = useInvalidateRequests();
   const navigate = useNavigate();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
     `presets:${PRESETS_KEY}`,
     [],
@@ -85,10 +85,8 @@ export default function RequestsPage() {
   const { data: listResult, isLoading: loading, isFetching } = useRequestsList(apiParams, params.page);
   const data: ServiceRequest[] = listResult?.requests ?? [];
   const pagination = listResult?.pagination ?? null;
-
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [params.page, apiParams, isFetching]);
+  const selectionKey = `${params.page}|${isFetching}|${JSON.stringify(apiParams)}`;
+  const [selectedIds, setSelectedIds] = useResettingState<string[]>([], selectionKey);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};

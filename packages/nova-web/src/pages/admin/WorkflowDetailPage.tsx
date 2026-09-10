@@ -74,9 +74,15 @@ export default function WorkflowDetailPage() {
   const [actionReason, setActionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
+  const detailKey = `${workflowId ?? ''}:${runId ?? ''}`;
+  const [prevDetailKey, setPrevDetailKey] = useState(detailKey);
+  if (detailKey !== prevDetailKey) {
+    setPrevDetailKey(detailKey);
+    setLoading(true);
+  }
+
   useEffect(() => {
     if (!workflowId || !runId) return;
-    setLoading(true);
     Promise.all([
       temporalApi.workflow(workflowId, runId),
       temporalApi.history(workflowId, runId, { limit: '50' }),

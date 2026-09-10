@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { AllCatalogTask } from '../../../api/client';
@@ -174,16 +174,19 @@ export default function AllTasksView({ tasks }: { tasks: AllCatalogTask[] }) {
     });
   }, [rows, search, itemActivityFilter, automationFilter, typeFilter, groupFilter, sortBy]);
 
-  useEffect(() => {
+  const visibleKey = filteredRows.map((r) => r.service_item_id).join('\0');
+  const [prevVisibleKey, setPrevVisibleKey] = useState(visibleKey);
+  if (visibleKey !== prevVisibleKey) {
+    setPrevVisibleKey(visibleKey);
+    const visibleIds = new Set(filteredRows.map((r) => r.service_item_id));
     setExpandedItems((prev) => {
-      const visibleIds = new Set(filteredRows.map((r) => r.service_item_id));
       const next = new Set<string>();
       for (const id of prev) {
         if (visibleIds.has(id)) next.add(id);
       }
       return next;
     });
-  }, [filteredRows]);
+  }
 
   const totalTasks = useMemo(
     () => filteredRows.reduce((acc, row) => acc + row.taskCount, 0),

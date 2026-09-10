@@ -84,16 +84,20 @@ export default function ProblemDetail() {
     is_active: true,
   });
 
+  const canSearchIncidents = !!incidentSearch.trim() && !!id && !isNew;
+  const [prevCanSearch, setPrevCanSearch] = useState(canSearchIncidents);
+  if (canSearchIncidents !== prevCanSearch) {
+    setPrevCanSearch(canSearchIncidents);
+    if (!canSearchIncidents) setIncidentResults([]);
+  }
+
   useEffect(() => {
-    if (!incidentSearch.trim() || !id || isNew) {
-      setIncidentResults([]);
-      return;
-    }
+    if (!canSearchIncidents) return;
     const t = setTimeout(() => {
       problemsApi.searchIncidents(incidentSearch).then((r) => setIncidentResults(r.incidents));
     }, 200);
     return () => clearTimeout(t);
-  }, [incidentSearch, id, isNew]);
+  }, [canSearchIncidents, incidentSearch]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

@@ -36,8 +36,7 @@ export default function KnowledgeWorkflowsPage() {
     is_active: true,
   });
 
-  const load = () => {
-    setLoading(true);
+  const fetchAll = () => {
     Promise.all([
       knowledge.workflows(),
       knowledge.categories(),
@@ -48,6 +47,11 @@ export default function KnowledgeWorkflowsPage() {
       setGroups(g.assignment_groups.filter((x) => x.is_active));
       setLoading(false);
     });
+  };
+
+  const load = () => {
+    setLoading(true);
+    fetchAll();
   };
 
   const categoryLabelById = useMemo(() => {
@@ -69,7 +73,7 @@ export default function KnowledgeWorkflowsPage() {
   }, [categories]);
 
   useEffect(() => {
-    load();
+    fetchAll();
   }, []);
 
   const selected = useMemo(
@@ -77,7 +81,10 @@ export default function KnowledgeWorkflowsPage() {
     [editingId, workflows],
   );
 
-  useEffect(() => {
+  const formKey = editingId === 'new' ? 'new' : (selected?.id ?? null);
+  const [prevFormKey, setPrevFormKey] = useState<string | null | undefined>(undefined);
+  if (formKey !== prevFormKey) {
+    setPrevFormKey(formKey);
     if (editingId === 'new') {
       setForm({ name: '', category_id: '', is_active: true, sort_order: 100, steps: [{ assignment_group_id: '' }] });
     } else if (selected) {
@@ -89,7 +96,7 @@ export default function KnowledgeWorkflowsPage() {
         steps: selected.steps?.length ? selected.steps.map((s) => ({ assignment_group_id: s.assignment_group_id })) : [{ assignment_group_id: '' }],
       });
     }
-  }, [editingId, selected]);
+  }
 
   const save = async () => {
     setSaving(true);

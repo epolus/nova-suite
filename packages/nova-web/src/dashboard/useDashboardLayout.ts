@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLatestRef } from '../hooks/useLatestRef';
 import { buildDefaultDashboardLayout } from './defaults';
 import {
   DASHBOARD_LAYOUT_SAVE_DEBOUNCE_MS,
@@ -42,14 +43,10 @@ export function useDashboardLayout({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingRef = useRef(false);
   const loadedDashboardIdRef = useRef<string | null>(null);
-  const layoutRef = useRef(layout);
-  const editModeRef = useRef(editMode);
-  const onSaveLayoutRef = useRef(onSaveLayout);
-  const dashboardIdRef = useRef(dashboardId);
-  layoutRef.current = layout;
-  editModeRef.current = editMode;
-  onSaveLayoutRef.current = onSaveLayout;
-  dashboardIdRef.current = dashboardId;
+  const layoutRef = useLatestRef(layout);
+  const editModeRef = useLatestRef(editMode);
+  const onSaveLayoutRef = useLatestRef(onSaveLayout);
+  const dashboardIdRef = useLatestRef(dashboardId);
 
   useEffect(() => {
     if (isLayoutLoading || !dashboardId || !sanitizedServerLayout) return;
@@ -79,7 +76,7 @@ export function useDashboardLayout({
         onSaveLayoutRef.current(next);
       }
     }, DASHBOARD_LAYOUT_SAVE_DEBOUNCE_MS);
-  }, []);
+  }, [dashboardIdRef, onSaveLayoutRef]);
 
   const updateLayout = useCallback((next: DashboardLayout) => {
     const sanitized = sanitizeDashboardLayout(next, roles);
@@ -92,13 +89,13 @@ export function useDashboardLayout({
 
     isDraggingRef.current = true;
     setLayout((prev) => applyGridLayout(prev, grid));
-  }, []);
+  }, [editModeRef]);
 
   const handleDragStop = useCallback(() => {
     isDraggingRef.current = false;
     if (!editModeRef.current) return;
     persistLayout(layoutRef.current);
-  }, [persistLayout]);
+  }, [editModeRef, layoutRef, persistLayout]);
 
   const addWidget = useCallback((type: DashboardWidgetType, initialConfig?: Record<string, unknown>) => {
     setLayout((prev) => {
@@ -135,7 +132,7 @@ export function useDashboardLayout({
     setLayout(next);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     onSaveLayoutRef.current(next);
-  }, [defaultLayout, roles]);
+  }, [defaultLayout, onSaveLayoutRef, roles]);
 
   useEffect(() => () => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

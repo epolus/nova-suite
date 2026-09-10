@@ -79,7 +79,9 @@ export default function GlobalSearch() {
   const totalItems = isPalette
     ? cmdSuggestions.length
     : navResults.length + results.length;
-  const selectedIndex = hasExplicitSelection ? activeIndex : -1;
+  const selectedIndex = hasExplicitSelection
+    ? (totalItems <= 0 || activeIndex < 0 ? -1 : Math.min(activeIndex, totalItems - 1))
+    : -1;
 
   // Open on Ctrl+K / Cmd+K
   useEffect(() => {
@@ -108,12 +110,18 @@ export default function GlobalSearch() {
   }, [open]);
 
   // Focus input when opening
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) {
       setQuery('');
       setResults([]);
       setActiveIndex(-1);
       setHasExplicitSelection(false);
+    }
+  }
+  useEffect(() => {
+    if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
@@ -217,14 +225,6 @@ export default function GlobalSearch() {
       setHasExplicitSelection(false);
     }
   };
-
-  useEffect(() => {
-    setActiveIndex((i) => {
-      if (totalItems <= 0) return -1;
-      if (i < 0) return -1;
-      return Math.min(i, totalItems - 1);
-    });
-  }, [totalItems]);
 
   const selectNav = (item: NavItem) => {
     navigate(item.path);

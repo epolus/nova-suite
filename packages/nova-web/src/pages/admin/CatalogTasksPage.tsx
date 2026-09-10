@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslations } from 'use-intl';
 import { useLocation, useNavigate } from 'react-router';
 import { catalog } from '../../api/client';
@@ -45,13 +45,21 @@ export default function CatalogTasksPage() {
     });
   }, []);
 
-  useLayoutEffect(() => {
+  const navState = location.state as CatalogTasksListLocationState | null | undefined;
+  const [prevNavState, setPrevNavState] = useState(navState);
+  if (navState !== prevNavState) {
+    setPrevNavState(navState);
+    if (navState && (navState.catalogTasksTab === 'by-item' || navState.focusServiceItemId)) {
+      setViewMode('by-item');
+      if (typeof navState.focusServiceItemId === 'string' && navState.focusServiceItemId) {
+        setByItemSelection(navState.focusServiceItemId);
+      }
+    }
+  }
+
+  useEffect(() => {
     const st = location.state as CatalogTasksListLocationState | null | undefined;
     if (!st || (st.catalogTasksTab !== 'by-item' && !st.focusServiceItemId)) return;
-    setViewMode('by-item');
-    if (typeof st.focusServiceItemId === 'string' && st.focusServiceItemId) {
-      setByItemSelection(st.focusServiceItemId);
-    }
     navigate('.', { replace: true, state: {} });
   }, [location.state, navigate]);
 

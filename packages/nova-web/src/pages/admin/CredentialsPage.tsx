@@ -42,22 +42,28 @@ export default function CredentialsPage() {
   const [saving, setSaving] = useState(false);
   const [tokenTestResult, setTokenTestResult] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await credentialsApi.list();
-      setItems(res.credentials);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('loadFailed'));
-    } finally {
-      setLoading(false);
-    }
+  const fetchCredentials = useCallback(() => {
+    return credentialsApi.list()
+      .then((res) => {
+        setError('');
+        setItems(res.credentials);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : t('loadFailed'));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [t]);
 
+  const load = useCallback(() => {
+    setLoading(true);
+    return fetchCredentials();
+  }, [fetchCredentials]);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    void fetchCredentials();
+  }, [fetchCredentials]);
 
   const openCreate = () => {
     setMode('create');

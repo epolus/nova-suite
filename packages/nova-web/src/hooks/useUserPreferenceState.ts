@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { auth } from '../api/client';
+import { useLatestRef } from './useLatestRef';
 
 interface WrappedPreference<T> {
   value: T;
@@ -32,8 +33,7 @@ export function useUserPreferenceState<T>(
   legacyStorageKey?: string,
 ): [T, (next: T | ((prev: T) => T)) => void] {
   const [value, setValue] = useState<T>(() => readLegacyValue(legacyStorageKey, fallback));
-  const fallbackRef = useRef(fallback);
-  fallbackRef.current = fallback;
+  const fallbackRef = useLatestRef(fallback);
 
   useEffect(() => {
     let alive = true;
@@ -60,7 +60,7 @@ export function useUserPreferenceState<T>(
     return () => {
       alive = false;
     };
-  }, [scope, legacyStorageKey]);
+  }, [scope, legacyStorageKey, fallbackRef]);
 
   const setAndPersist = useCallback((next: T | ((prev: T) => T)) => {
     setValue((prev) => {

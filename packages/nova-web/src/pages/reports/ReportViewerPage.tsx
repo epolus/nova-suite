@@ -238,34 +238,54 @@ export default function ReportViewerPage() {
     }
   };
 
-  const load = async () => {
-    setLoading(true);
+  const viewerKey = `${canView}|${reportId}`;
+  const [prevViewerKey, setPrevViewerKey] = useState(viewerKey);
+  if (viewerKey !== prevViewerKey) {
+    setPrevViewerKey(viewerKey);
+    setLoading(!!(canView && reportId));
     setError(null);
-    try {
-      const detail = await reports.getDefinition(reportId);
-      setTitle(detail.report.name);
-      setDescription(detail.report.description);
-      await runNow();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('loadFailed'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  }
+
+  const [prevAutoRefresh, setPrevAutoRefresh] = useState(autoRefreshSeconds);
+  if (autoRefreshSeconds !== prevAutoRefresh) {
+    setPrevAutoRefresh(autoRefreshSeconds);
+    setSecondsUntilRefresh(autoRefreshSeconds > 0 ? autoRefreshSeconds : 0);
+  }
 
   useEffect(() => {
-    if (!canView || !reportId) {
-      setLoading(false);
-      return;
-    }
-    void load();
-    // load/runNow intentionally re-run only on view permission or report id change
+    if (!canView || !reportId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const detail = await reports.getDefinition(reportId);
+        if (cancelled) return;
+        setTitle(detail.report.name);
+        setDescription(detail.report.description);
+        setRunning(true);
+        try {
+          const run = await reports.runDefinition(reportId);
+          if (cancelled) return;
+          setResults(run.results);
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : t('runFailed'));
+        } finally {
+          if (!cancelled) {
+            setRunning(false);
+            if (autoRefreshSeconds > 0) setSecondsUntilRefresh(autoRefreshSeconds);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canView, reportId]);
 
   useEffect(() => {
     if (!canView || !reportId || autoRefreshSeconds <= 0) return;
-    setSecondsUntilRefresh(autoRefreshSeconds);
     const timer = window.setInterval(() => {
       setSecondsUntilRefresh((prev) => {
         if (prev <= 1) {
@@ -278,15 +298,8 @@ export default function ReportViewerPage() {
       });
     }, 1000);
     return () => window.clearInterval(timer);
-    // runNow is stable for this effect's purpose; timer restarts only on these inputs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefreshSeconds, canView, reportId, running, loading]);
-
-  useEffect(() => {
-    if (autoRefreshSeconds <= 0) {
-      setSecondsUntilRefresh(0);
-    }
-  }, [autoRefreshSeconds]);
 
   if (!canView) {
     return (

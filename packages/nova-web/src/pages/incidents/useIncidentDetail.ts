@@ -118,10 +118,13 @@ export function useIncidentDetail() {
     setFields(buildFieldsFromIncident(i));
   }, []);
 
-  useEffect(() => {
-    if (!id || !isFulfiller) return;
-    setField('relatedProblemId', linkedProblemIds[0] || '');
-  }, [id, isFulfiller, linkedProblemIds, setField]);
+  const relatedProblemSync = linkedProblemIds[0] || '';
+  const relatedSyncKey = `${id}|${isFulfiller}|${relatedProblemSync}`;
+  const [prevRelatedSyncKey, setPrevRelatedSyncKey] = useState(relatedSyncKey);
+  if (relatedSyncKey !== prevRelatedSyncKey) {
+    setPrevRelatedSyncKey(relatedSyncKey);
+    if (id && isFulfiller) setField('relatedProblemId', relatedProblemSync);
+  }
 
   const loadJournal = useCallback(async (incidentId: string) => {
     setJournalLoading(true);

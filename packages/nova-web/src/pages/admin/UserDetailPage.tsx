@@ -61,33 +61,39 @@ export default function UserDetailPage() {
     return map;
   }, [listParams]);
 
-  const loadData = useCallback(async (): Promise<AdminUser[]> => {
-    setLoading(true);
-    try {
-      const [usersRes, rolesRes, deptRes, ccRes, companiesRes] = await Promise.all([
-        admin.users(),
-        admin.roles(),
-        admin.departments(),
-        admin.costCenters(),
-        admin.companies(),
-      ]);
-      setUsers(usersRes.users);
-      setRoles(rolesRes.roles);
-      setDepartments(deptRes.departments);
-      setCostCenters(ccRes.cost_centers);
-      setCompanies(companiesRes.companies);
-      return usersRes.users;
-    } catch (err) {
-      console.error('Failed to load user admin data:', err);
-      return [];
-    } finally {
-      setLoading(false);
-    }
+  const fetchData = useCallback((): Promise<AdminUser[]> => {
+    return Promise.all([
+      admin.users(),
+      admin.roles(),
+      admin.departments(),
+      admin.costCenters(),
+      admin.companies(),
+    ])
+      .then(([usersRes, rolesRes, deptRes, ccRes, companiesRes]) => {
+        setUsers(usersRes.users);
+        setRoles(rolesRes.roles);
+        setDepartments(deptRes.departments);
+        setCostCenters(ccRes.cost_centers);
+        setCompanies(companiesRes.companies);
+        return usersRes.users;
+      })
+      .catch((err) => {
+        console.error('Failed to load user admin data:', err);
+        return [] as AdminUser[];
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
+  const loadData = useCallback((): Promise<AdminUser[]> => {
+    setLoading(true);
+    return fetchData();
+  }, [fetchData]);
+
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    void fetchData();
+  }, [fetchData]);
 
   const filteredSortedUsers = useMemo(() => {
     let list = users;
@@ -147,18 +153,32 @@ export default function UserDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const syncKey = isNew ? 'new' : (currentUser?.id ?? null);
+  const [prevSyncKey, setPrevSyncKey] = useState<string | null | undefined>(undefined);
+  if (syncKey !== prevSyncKey) {
+    setPrevSyncKey(syncKey);
     if (isNew || !currentUser) {
       setForm(EMPTY_USER_FORM);
       setBaseline(EMPTY_USER_FORM);
       setDisplayNameTouched(false);
-      return;
+    } else {
+      const next = userToForm(currentUser);
+      setForm(next);
+      setBaseline(next);
+      setDisplayNameTouched(true);
     }
-    const next = userToForm(currentUser);
-    setForm(next);
-    setBaseline(next);
-    setDisplayNameTouched(true);
-  }, [isNew, currentUser]);
+  }
+
+  const autoDisplayName = displayNameTouched
+    ? null
+    : buildDisplayName(form.first_name, form.last_name, form.user_id);
+  const [prevAutoDisplayName, setPrevAutoDisplayName] = useState(autoDisplayName);
+  if (autoDisplayName !== prevAutoDisplayName) {
+    setPrevAutoDisplayName(autoDisplayName);
+    if (autoDisplayName) {
+      setForm((prev) => (prev.display_name === autoDisplayName ? prev : { ...prev, display_name: autoDisplayName }));
+    }
+  }
 
   const isFormDirty = useMemo(
     () => hasUserFormChanges(form, baseline, isNew),
@@ -177,19 +197,12 @@ export default function UserDetailPage() {
     saveAndLeave,
   } = useUnsavedChangesGuard({
     isDirty: isFormDirty,
-    onSave: useCallback(() => saveRef.current(), []),
+    onSave: () => saveRef.current(),
   });
 
   const goToUser = useCallback((userId: string) => {
     guardNavigate(`/admin/users/${userId}`, { state: location.state });
   }, [guardNavigate, location.state]);
-
-  useEffect(() => {
-    if (!displayNameTouched) {
-      const auto = buildDisplayName(form.first_name, form.last_name, form.user_id);
-      if (auto) setForm((prev) => ({ ...prev, display_name: auto }));
-    }
-  }, [form.first_name, form.last_name, form.user_id, displayNameTouched]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -319,7 +332,9 @@ export default function UserDetailPage() {
     tFields,
   ]);
 
-  saveRef.current = handleSubmit;
+  useEffect(() => {
+    saveRef.current = handleSubmit;
+  });
 
   const handleDelete = async () => {
     if (!currentUser) return;

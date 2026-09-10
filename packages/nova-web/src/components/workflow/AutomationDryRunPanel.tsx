@@ -25,7 +25,7 @@ export default function AutomationDryRunPanel({
       setError(loaded.error || t('invalidConfig'));
       return;
     }
-    let form_data: Record<string, unknown> = {};
+    let form_data: Record<string, unknown>;
     try {
       const parsed = JSON.parse(formDataJson || '{}') as unknown;
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {

@@ -10,6 +10,7 @@ import SearchBar from '../../components/SearchBar';
 import DataTable, { type DataColumnDef } from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
+import { useResettingState } from '../../hooks/useSyncedState';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import { useAuth } from '../../context/AuthContext';
 import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
@@ -55,7 +56,6 @@ export default function RequestTasksPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
@@ -69,10 +69,15 @@ export default function RequestTasksPage() {
   const rawStatusFilter = params.filters.status || '';
   const statusFilter = rawStatusFilter;
   const cfKey = JSON.stringify(params.columnFilters);
+  const listKey = `${params.page}|${statusFilter}|${params.search}|${params.sort}|${params.dir}|${cfKey}|${refreshKey}`;
+  const [selectedIds, setSelectedIds] = useResettingState<string[]>([], listKey);
+  const [prevListKey, setPrevListKey] = useState(listKey);
+  if (listKey !== prevListKey) {
+    setPrevListKey(listKey);
+    setLoading(true);
+  }
 
   useEffect(() => {
-    setLoading(true);
-    setSelectedIds([]);
     const apiParams = createRequestTaskListParams({
       statusFilter,
       search: params.search,

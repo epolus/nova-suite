@@ -137,16 +137,28 @@ export default function Layout() {
   const location = useLocation();
 
   const [logoSrc, setLogoSrc] = useState(DEFAULT_LOGO_SRC);
+  const logoUrl = theme.logo_url;
+  const [prevLogoUrl, setPrevLogoUrl] = useState(logoUrl);
+  if (logoUrl !== prevLogoUrl) {
+    setPrevLogoUrl(logoUrl);
+    if (!logoUrl) setLogoSrc(DEFAULT_LOGO_SRC);
+  }
   useEffect(() => {
-    if (!theme.logo_url) { setLogoSrc(DEFAULT_LOGO_SRC); return; }
+    if (!logoUrl) return;
     const token = localStorage.getItem('nova_token');
+    let cancelled = false;
     fetch('/api/settings/logo', {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => { if (r.ok) return r.blob(); throw new Error(); })
-      .then((blob) => setLogoSrc(URL.createObjectURL(blob)))
-      .catch(() => setLogoSrc(DEFAULT_LOGO_SRC));
-  }, [theme.logo_url]);
+      .then((blob) => {
+        if (!cancelled) setLogoSrc(URL.createObjectURL(blob));
+      })
+      .catch(() => {
+        if (!cancelled) setLogoSrc(DEFAULT_LOGO_SRC);
+      });
+    return () => { cancelled = true; };
+  }, [logoUrl]);
 
   const appNameParts = (theme.app_name || 'Nova Suite').split(' ');
   const firstName = appNameParts[0];
@@ -209,12 +221,13 @@ export default function Layout() {
   );
 
   const activeSectionKey = activeSection?.key;
-  useEffect(() => {
-    if (!activeSectionKey) return;
-    setExpandedSections((prev) =>
-      prev.has(activeSectionKey) ? prev : new Set([...prev, activeSectionKey]),
-    );
-  }, [activeSectionKey]);
+  const [prevActiveSectionKey, setPrevActiveSectionKey] = useState(activeSectionKey);
+  if (activeSectionKey !== prevActiveSectionKey) {
+    setPrevActiveSectionKey(activeSectionKey);
+    if (activeSectionKey && !expandedSections.has(activeSectionKey)) {
+      setExpandedSections(new Set([...expandedSections, activeSectionKey]));
+    }
+  }
 
   const toggleSection = (key: string) => {
     setExpandedSections((prev) => {

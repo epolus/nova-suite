@@ -58,7 +58,7 @@ function parseResult(data: {
 }): AiChatResult {
   const message = data.choices?.[0]?.message;
   const toolCalls = (message?.tool_calls ?? []).map((tc) => {
-    let args: Record<string, unknown> = {};
+    let args: Record<string, unknown>;
     try {
       args = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
     } catch {
@@ -210,7 +210,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
     }
 
     const toolCalls = [...toolCallsByIndex.values()].map((tc) => {
-      let args: Record<string, unknown> = {};
+      let args: Record<string, unknown>;
       try {
         args = JSON.parse(tc.arguments || '{}') as Record<string, unknown>;
       } catch {
