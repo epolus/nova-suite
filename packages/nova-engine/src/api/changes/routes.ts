@@ -1051,6 +1051,9 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
     }).catch(() => {});
     res.status(201).json(change);
   } catch (err) {
+    if ((err as { code?: string }).code === '23505') {
+      return next(new AppError(409, 'Change number conflict; retry create'));
+    }
     next(err);
   }
 });
