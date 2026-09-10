@@ -1003,7 +1003,8 @@ CREATE TABLE schema_migrations (
 INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.00', '001_initial_schema'),
   ('v00.01.01', 'data_sources_external_key'),
-  ('v00.01.02', 'configuration_items_external_ids_and_status');
+  ('v00.01.02', 'configuration_items_external_ids_and_status'),
+  ('v00.01.03', 'change_number_seq_after_seed');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2856,6 +2857,24 @@ INSERT INTO changes (
   'medium',
   'Stabilize SLA performance for critical reports.',
   1200.00
+);
+
+-- Seeded CHG0000001 must advance the sequence or the first create collides (unique tenant+number → 500).
+-- Releases share change_number_seq for REL… numbers, so include both tables.
+SELECT setval(
+  'change_number_seq',
+  GREATEST(
+    1,
+    COALESCE((
+      SELECT MAX(NULLIF(regexp_replace(number, '[^0-9]', '', 'g'), '')::bigint)
+      FROM (
+        SELECT number FROM changes
+        UNION ALL
+        SELECT number FROM releases
+      ) nums
+    ), 1)
+  ),
+  true
 );
 
 INSERT INTO change_approvals (
