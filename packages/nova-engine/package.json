@@ -16,7 +16,7 @@
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@nova-suite/shared": "0.1.2",
-    "@temporalio/client": "^1.23.0",
+    "@temporalio/client": "^1.24.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "csv-parse": "^7.0.2",
@@ -25,8 +25,8 @@
     "helmet": "^8.0.0",
     "jose": "^6.2.12",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.3.0",
-    "nodemailer": "^10.0.1",
+    "multer": "^2.4.0",
+    "nodemailer": "^10.0.10",
     "pg": "^8.23.0",
     "pino": "^10.3.1",
     "pino-pretty": "^13.0.0",
@@ -35,7 +35,7 @@
     "ssh2-sftp-client": "^12.1.0",
     "swagger-ui-express": "^5.0.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.5.4"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
