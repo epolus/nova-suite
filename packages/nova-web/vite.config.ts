@@ -18,13 +18,17 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Cloudflare WAF on demo.nova-suite.io blocks GET /assets/Card-*.js
-        // (literal hyphen after "Card"); the object is fine when the hyphen is
-        // percent-encoded. Emit stable non-matching chunk names instead.
+        // Cloudflare WAF on demo.nova-suite.io blocks GET /assets/Card-*.js and
+        // /assets/content-panel-*.js (literal hyphens); percent-encoded paths
+        // work. Keep chunk names on the known-safe ui-panel-* pattern.
         manualChunks(id) {
           const normalized = id.replace(/\\/g, '/');
-          if (normalized.endsWith('/components/Card.tsx')) return 'content-panel';
-          if (normalized.endsWith('/components/ui/card.tsx')) return 'ui-panel';
+          if (
+            normalized.endsWith('/components/Card.tsx') ||
+            normalized.endsWith('/components/ui/card.tsx')
+          ) {
+            return 'ui-panel';
+          }
         },
       },
     },

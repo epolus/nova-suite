@@ -7,11 +7,6 @@ import './index.css';
 
 ensureCryptoRandomUUID();
 
-// Eagerly pull shared panels into the entry graph so list routes do not depend
-// on a separately fetched /assets/Card-*.js chunk (blocked on demo CF WAF).
-void import('@/components/Card');
-void import('@/components/ui/card');
-
 // After a deploy, open tabs may still reference old hashed chunks. Reload once
 // so the browser picks up the new index.html → asset map.
 window.addEventListener('vite:preloadError', (event) => {
