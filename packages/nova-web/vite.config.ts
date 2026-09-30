@@ -18,9 +18,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Cloudflare WAF on demo.nova-suite.io blocks GET /assets/Card-*.js and
-        // /assets/content-panel-*.js (literal hyphens); percent-encoded paths
-        // work. Keep chunk names on the known-safe ui-panel-* pattern.
+        // Avoid /assets/Card-*.js chunk names: Cloudflare has repeatedly served
+        // poisoned 404/502 responses for that pattern on demo. Keep both card
+        // modules on the stable ui-panel-* name instead.
         manualChunks(id) {
           const normalized = id.replace(/\\/g, '/');
           if (
