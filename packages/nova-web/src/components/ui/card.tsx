@@ -5,7 +5,6 @@ import { cn } from './utils';
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      data-nova-ui-card=""
       className={cn('rounded-lg border border-gray-200 bg-white text-gray-900 shadow-xs', className)}
       {...props}
     />

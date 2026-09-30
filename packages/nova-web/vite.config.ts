@@ -15,24 +15,6 @@ export default defineConfig({
     },
   },
   plugins: [react(), tailwindcss()],
-  build: {
-    rollupOptions: {
-      output: {
-        // Avoid /assets/Card-*.js chunk names: Cloudflare has repeatedly served
-        // poisoned 404/502 responses for that pattern on demo. Keep both card
-        // modules on the stable ui-panel-* name instead.
-        manualChunks(id) {
-          const normalized = id.replace(/\\/g, '/');
-          if (
-            normalized.endsWith('/components/Card.tsx') ||
-            normalized.endsWith('/components/ui/card.tsx')
-          ) {
-            return 'ui-panel';
-          }
-        },
-      },
-    },
-  },
   server: {
     proxy: {
       '/api': 'http://localhost:4000',
