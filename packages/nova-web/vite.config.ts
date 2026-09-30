@@ -15,6 +15,20 @@ export default defineConfig({
     },
   },
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Cloudflare WAF on demo.nova-suite.io blocks GET /assets/Card-*.js
+        // (literal hyphen after "Card"); the object is fine when the hyphen is
+        // percent-encoded. Emit stable non-matching chunk names instead.
+        manualChunks(id) {
+          const normalized = id.replace(/\\/g, '/');
+          if (normalized.endsWith('/components/Card.tsx')) return 'content-panel';
+          if (normalized.endsWith('/components/ui/card.tsx')) return 'ui-panel';
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': 'http://localhost:4000',
