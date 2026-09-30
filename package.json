@@ -29,7 +29,7 @@
     "picomatch": "4.0.4",
     "protobufjs": "8.8.0",
     "serialize-javascript": "7.0.5",
-    "fast-uri": "3.1.6",
+    "fast-uri": "3.1.8",
     "qs": "6.16.0"
   }
 }
