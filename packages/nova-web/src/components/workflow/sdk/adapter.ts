@@ -119,6 +119,7 @@ export function toSdkNodes(nodes: Node<UnifiedBuilderNodeData>[]): WorkflowBuild
         type: nodeType,
         icon: NODE_TYPE_ICONS[nodeType],
         templateType: sdkCanvasType(nodeType),
+        ...(nodeType === 'start' ? { isStartNode: true } : {}),
         properties: props,
       },
     };

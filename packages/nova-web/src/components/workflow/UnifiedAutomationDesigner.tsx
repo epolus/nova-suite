@@ -346,12 +346,12 @@ const UnifiedAutomationDesignerInner = forwardRef(function UnifiedAutomationDesi
 
   return (
     <div
-      className={`catalog-automation-builder workflow-builder-sdk border border-gray-200 rounded-lg p-3 bg-white ${
+      className={`catalog-automation-builder workflow-builder-sdk border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-900 ${
         fillAvailableSpace ? 'h-full min-h-0 flex flex-col' : ''
       }`}
     >
       <div className="flex flex-wrap items-center gap-2 mb-2 justify-between shrink-0">
-        <span className="text-[11px] text-gray-500">{t('jsonSyncAutomatic')}</span>
+        <span className="text-[11px] text-gray-500 dark:text-gray-400">{t('jsonSyncAutomatic')}</span>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
@@ -376,7 +376,7 @@ const UnifiedAutomationDesignerInner = forwardRef(function UnifiedAutomationDesi
       )}
       <div
         ref={canvasRootRef}
-        className={`border border-gray-200 rounded-md overflow-hidden relative workflow-builder-sdk__canvas ${
+        className={`border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden relative workflow-builder-sdk__canvas ${
           fillAvailableSpace ? 'flex-1 min-h-[280px]' : 'h-[520px]'
         }`}
       >
