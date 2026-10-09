@@ -182,11 +182,16 @@
   }
 }
 
-/* Contain Workflow Builder SDK viewport styles when embedded in admin pages */
+/* Contain Workflow Builder SDK viewport styles when embedded in admin pages.
+   SDK 3.0 renamed --wb-background-color → --wb-public-background-color. */
 .workflow-builder-sdk__canvas {
-  --wb-background-color: #f8fafc;
+  --wb-public-background-color: #f8fafc;
   isolation: isolate;
   position: relative;
+}
+
+html.dark .workflow-builder-sdk__canvas {
+  --wb-public-background-color: var(--color-dark-content-bg);
 }
 
 .workflow-builder-sdk__canvas .react-flow,
@@ -195,8 +200,9 @@
   height: 100%;
 }
 
-/* Hide SDK app bar — theme is driven by Nova Suite's dark-mode toggle instead. */
-.workflow-builder-sdk__canvas .workflow-builder-root > div:first-child {
+/* Hide SDK app bar (DefaultLayout header) — theme is driven by Nova Suite's dark-mode toggle.
+   SDK 3 puts `workflow-builder-root` on the layout container; first child is the header. */
+.workflow-builder-sdk__canvas .workflow-builder-root > [class*="_header_"] {
   display: none;
 }
 

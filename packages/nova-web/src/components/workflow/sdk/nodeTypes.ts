@@ -98,6 +98,7 @@ function defineNode(
     type,
     icon: NODE_TYPE_ICONS[type],
     templateType: opts.templateType ?? NodeType.Node,
+    ...(type === 'start' ? { isStartNode: true } : {}),
     defaultPropertiesData: {
       label: builtDefaults.label || label,
       description: opts.description,
