@@ -9,9 +9,30 @@
 		reverse_proxy nova-engine:4000
 	}
 
+	root * /srv
+
+	# Hashed Vite chunks must 404 when missing — never SPA-fallback to index.html
+	# (that makes dynamic import() fail with an opaque module error after deploys).
+	# Only cache successful asset responses. Caching 404s (previous behaviour)
+	# lets Cloudflare keep a blank-page poison for hours after a deploy race.
+	handle /assets/* {
+		@found file {path}
+		handle @found {
+			header Cache-Control "public, max-age=31536000, immutable"
+			file_server
+		}
+		handle {
+			header Cache-Control "no-store"
+			respond "Not Found" 404
+		}
+	}
+
+	# index.html (and other entry files) must revalidate so open tabs pick up new chunk hashes
+	@html path / /index.html /favicon.svg
+	header @html Cache-Control "no-cache, must-revalidate"
+
 	# SPA fallback for frontend routes
 	handle {
-		root * /srv
 		try_files {path} /index.html
 		file_server
 	}
