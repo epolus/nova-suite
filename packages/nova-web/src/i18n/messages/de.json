@@ -359,7 +359,21 @@
       "description": "Planen, bewerten und verfolgen Sie Änderungen.",
       "newChange": "Neue Veränderung",
       "calendar": "Kalender ändern",
-      "detailTitle": "Detail ändern"
+      "detailTitle": "Detail ändern",
+      "conflictTypes": {
+        "scheduleOverlap": "Terminüberschneidung",
+        "ciOverlap": "Gleicher CI-Konflikt",
+        "blackoutWindow": "Blackout-Fenster",
+        "dependencyConflict": "Abhängigkeitskonflikt"
+      },
+      "dependencyConflictSummary": "{count, plural, one {# Abhängigkeitskonflikt mit verwandtem CI} other {# Abhängigkeitskonflikte mit verwandten CIs}}",
+      "riskQuestionnaire": "Risikofragebogen",
+      "riskQuestionnaireHint": "Bewerten Sie jede Frage von 0 (niedrigstes Risiko) bis 5 (höchstes). Speichern wendet den gewichteten Score und die vorgeschlagene Risikostufe an.",
+      "riskScore": "Score: {score}",
+      "suggestedRisk": "Vorschlag: {level}",
+      "noRiskQuestions": "Keine aktiven Risikofragen. Admins können sie unter Change-Administration konfigurieren.",
+      "riskWeight": "Gewicht {weight}",
+      "selectScore": "Score wählen"
     },
     "problems": {
       "title": "Probleme",
@@ -496,7 +510,22 @@
         "saveFailed": "Theme-Einstellungen konnten nicht gespeichert werden",
         "resetDefaults": "Auf Standardwerte zurücksetzen"
       },
-      "imports": "Externe Daten importieren und synchronisieren."
+      "imports": "Externe Daten importieren und synchronisieren.",
+      "changeAdmin": {
+        "title": "Change-Administration",
+        "description": "Change-Typen, Vorlagen, CAB, Blackouts und Risikofragen konfigurieren.",
+        "loadFailed": "Laden fehlgeschlagen",
+        "riskQuestions": "Risikofragebogen",
+        "noRiskQuestions": "Noch keine Risikofragen.",
+        "riskPromptPlaceholder": "Fragetext",
+        "weightPlaceholder": "Gewicht",
+        "sortOrderPlaceholder": "Sortierung",
+        "riskWeightLabel": "Gewicht {weight}",
+        "sortOrderLabel": "Reihenfolge {order}",
+        "addRiskQuestion": "Frage hinzufügen",
+        "deactivate": "Deaktivieren",
+        "active": "aktiv"
+      }
     }
   },
   "status": {

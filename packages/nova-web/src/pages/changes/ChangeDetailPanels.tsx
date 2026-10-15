@@ -44,14 +44,35 @@ export function ChangeApprovalsPanel({
 
 export function ChangePlanningPanel({ conflicts }: { conflicts: ChangeConflict[] }) {
   const tChanges = useTranslations('pages.changes');
+  const dependencyCount = conflicts.filter((c) => c.conflict_type === 'dependency_conflict').length;
+  const typeLabel = (type: ChangeConflict['conflict_type']) => {
+    const labels: Record<ChangeConflict['conflict_type'], string> = {
+      dependency_conflict: tChanges('conflictTypes.dependencyConflict'),
+      ci_overlap: tChanges('conflictTypes.ciOverlap'),
+      blackout_window: tChanges('conflictTypes.blackoutWindow'),
+      schedule_overlap: tChanges('conflictTypes.scheduleOverlap'),
+    };
+    return labels[type] || type;
+  };
   return (
     <Card>
       <h3 className="font-semibold text-gray-900 mb-4">{tChanges('conflictsScheduling')}</h3>
+      {dependencyCount > 0 && (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+          {tChanges('dependencyConflictSummary', { count: dependencyCount })}
+        </p>
+      )}
       <div className="space-y-2">
         {conflicts.map((c) => (
           <div key={c.id} className={`p-3 rounded-lg border ${c.severity === 'blocking' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
-            <p className="text-sm font-medium capitalize">{c.conflict_type.replace('_', ' ')}</p>
+            <p className="text-sm font-medium">{typeLabel(c.conflict_type)}</p>
             <p className="text-xs text-gray-600 mt-0.5">{c.details || tChanges('conflictDetected')}</p>
+            {c.conflicting_change_number && (
+              <p className="text-xs text-gray-500 mt-1">
+                {c.conflicting_change_number}
+                {c.conflicting_change_title ? ` — ${c.conflicting_change_title}` : ''}
+              </p>
+            )}
           </div>
         ))}
         {conflicts.length === 0 && <p className="text-sm text-gray-500 text-center py-4">{tChanges('noConflicts')}</p>}
