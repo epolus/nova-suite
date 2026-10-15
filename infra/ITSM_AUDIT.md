@@ -32,7 +32,7 @@
 | **Major Incident Management** | Declare/promote, war room, participants, stakeholder cadence, postmortem | `packages/nova-engine/src/api/major-incidents/`, `packages/nova-worker/src/workflows/major-incident.ts`, `packages/nova-web/src/pages/major-incidents/` | MVP Ready |
 | **Service Request Management** | Catalog, dynamic forms, cart, approvals, fulfillment tasks, automation | `packages/nova-engine/src/api/catalog/`, `packages/nova-engine/src/api/requests/`, `packages/nova-web/src/pages/catalog/`, `packages/nova-web/src/pages/requests/` | MVP Ready |
 | **Change Enablement** | Standard/Normal/Emergency types, CAB meetings/approvals, schedule + same-CI conflicts, blackouts | `packages/nova-engine/src/api/changes/`, `packages/nova-web/src/pages/changes/`, `packages/nova-web/src/pages/admin/ChangeAdminPage.tsx` | MVP Ready |
-| **Problem Management** | Problem CRUD, RCA fields, incident linking, KEDB CRUD, problem tasks | `packages/nova-engine/src/api/problems/`, `packages/nova-web/src/pages/problems/`, `known_errors` in `init.sql` | MVP Ready |
+| **Problem Management** | Problem CRUD, RCA fields, incident linking, KEDB CRUD + KB article link, recurrence→problem, problem tasks | `packages/nova-engine/src/api/problems/`, `packages/nova-web/src/pages/problems/`, `known_errors` (+ `kb_article_id`) in `init.sql` / migrations | MVP Ready |
 | **IT Asset Management (ITAM)** | Hardware/software inventory, asset↔CI link, statuses (in_use/in_stock/retired/disposed) | `packages/nova-engine/src/api/assets/`, `packages/nova-web/src/pages/assets/` | In Progress |
 | **CMDB** | CI classes, relationships, impact analysis, history, external IDs, data-source ingest | `packages/nova-engine/src/api/cmdb/`, `packages/nova-web/src/pages/cmdb/`, `cmdb_impact_analysis()` | MVP Ready |
 | **Service Level Management** | SLA definitions (response + resolution hours stored), resolution due-at runtime, warning_pct / breach flags | `packages/nova-engine/src/domain/sla.ts`, `packages/nova-web/src/pages/admin/sla/`, `sla_definitions` | In Progress |
@@ -59,9 +59,9 @@
 - [ ] Collision detection (preventing simultaneous changes on connected assets). *(partial: schedule/blackout/same-CI; no dependency-tree walk)*
 
 ### C. Problem Management
-- [ ] Problem log creation from recurring incidents. *(partial: manual incident linking only)*
+- [x] Problem log creation from recurring incidents. *(GET recurrence-candidates + POST from-recurring-incidents; UI on Problems list)*
 - [x] Root Cause Analysis (RCA) documentation tab.
-- [ ] Known Error Database (KEDB) linking to KB articles. *(partial: KEDB CRUD exists; no `kb_article_id`)*
+- [x] Known Error Database (KEDB) linking to KB articles. *(`known_errors.kb_article_id` + link/unlink API + Known Errors tab)*
 
 ### D. IT Asset Management (ITAM) & CMDB
 - [ ] Asset lifecycle state tracking (Ordered -> In Use -> Maintenance -> Retired). *(partial: in_use/in_stock/retired/disposed; CI has maintenance)*

@@ -2417,10 +2417,12 @@ CREATE TABLE known_errors (
   tags              text[] NOT NULL DEFAULT '{}',
   severity          text CHECK (severity IN ('low', 'medium', 'high', 'critical')),
   is_active         boolean NOT NULL DEFAULT true,
+  kb_article_id     uuid REFERENCES knowledge_articles(id) ON DELETE SET NULL,
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_known_errors_problem ON known_errors(tenant_id, problem_id, is_active);
+CREATE INDEX idx_known_errors_kb_article ON known_errors(tenant_id, kb_article_id);
 CREATE INDEX idx_known_errors_tags_gin ON known_errors USING gin (tags);
 
 CREATE TABLE problem_tasks (

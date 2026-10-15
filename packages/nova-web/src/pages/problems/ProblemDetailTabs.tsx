@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { Dispatch, SetStateAction } from 'react';
+import { Link } from 'react-router';
 import type { KnownError, ProblemIncidentLink, ProblemTask } from '@/api/client';
 import Card from '../../components/Card';
 import { Button } from '../../components/ui/button';
@@ -23,7 +24,11 @@ export type KnownErrorFormState = {
   tags: string;
   severity: string;
   is_active: boolean;
+  kb_article_id: string;
+  kb_article_label: string;
 };
+
+export type KbArticleSearchResult = { id: string; number: string; title: string };
 
 type IncidentSearchResult = { id: string; number: string; title: string; status: string };
 
@@ -146,6 +151,18 @@ export function ProblemKnownErrorsPanel({
   createKnownError,
   knownErrors,
   toggleKnownError,
+  kbSearch,
+  setKbSearch,
+  kbResults,
+  selectKbArticle,
+  clearKbArticle,
+  linkKbArticle,
+  unlinkKbArticle,
+  linkingKeId,
+  setLinkingKeId,
+  linkKbSearch,
+  setLinkKbSearch,
+  linkKbResults,
   inputCls,
   selectCls,
   textareaCls,
@@ -155,12 +172,25 @@ export function ProblemKnownErrorsPanel({
   createKnownError: () => void;
   knownErrors: KnownError[];
   toggleKnownError: (ke: KnownError) => void;
+  kbSearch: string;
+  setKbSearch: Dispatch<SetStateAction<string>>;
+  kbResults: KbArticleSearchResult[];
+  selectKbArticle: (article: KbArticleSearchResult) => void;
+  clearKbArticle: () => void;
+  linkKbArticle: (ke: KnownError, articleId: string) => void;
+  unlinkKbArticle: (ke: KnownError) => void;
+  linkingKeId: string | null;
+  setLinkingKeId: Dispatch<SetStateAction<string | null>>;
+  linkKbSearch: string;
+  setLinkKbSearch: Dispatch<SetStateAction<string>>;
+  linkKbResults: KbArticleSearchResult[];
   inputCls: string;
   selectCls: string;
   textareaCls: string;
 }) {
   const tProblems = useTranslations('pages.problems');
   const tStates = useTranslations('common.states');
+  const tActions = useTranslations('common.actions');
   const statusLabel = useStatusLabel();
   return (
     <Card>
@@ -176,23 +206,96 @@ export function ProblemKnownErrorsPanel({
           </select>
           <input type="date" value={keForm.permanent_fix_eta} onChange={(e) => setKeForm((p) => ({ ...p, permanent_fix_eta: e.target.value }))} className={inputCls} />
         </div>
-        <div className="flex justify-end">
+        <div className="space-y-2">
+          {keForm.kb_article_id ? (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-indigo-700 font-medium truncate">{keForm.kb_article_label}</span>
+              <Button variant="ghost" size="sm" onClick={clearKbArticle} className="text-red-500 hover:text-red-700 shrink-0">{tActions('remove')}</Button>
+            </div>
+          ) : (
+            <>
+              <input
+                value={kbSearch}
+                onChange={(e) => setKbSearch(e.target.value)}
+                placeholder={tProblems('searchKbArticlePlaceholder')}
+                className={inputCls}
+              />
+              {kbResults.length > 0 && (
+                <div className="space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                  {kbResults.map((a) => (
+                    <button key={a.id} type="button" onClick={() => selectKbArticle(a)} className="w-full text-left px-2 py-1.5 hover:bg-gray-50">
+                      <span className="text-xs text-gray-500 mr-2">{a.number}</span>
+                      <span className="text-sm text-gray-900">{a.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        <div className="md:col-span-2 flex justify-end">
           <Button onClick={createKnownError} disabled={!keForm.title.trim() || !keForm.symptoms.trim() || !keForm.workaround.trim()}>{tProblems('addKnownError')}</Button>
         </div>
       </div>
       <div className="space-y-2">
         {knownErrors.map((ke) => (
-          <div key={ke.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">{ke.title}</p>
-              <p className="text-xs text-gray-500">{ke.severity || 'n/a'} · {ke.tags.join(', ') || tProblems('noTags')}</p>
+          <div key={ke.id} className="p-2.5 rounded-lg bg-gray-50 space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900">{ke.title}</p>
+                <p className="text-xs text-gray-500">{ke.severity || 'n/a'} · {ke.tags.join(', ') || tProblems('noTags')}</p>
+                {ke.kb_article_id ? (
+                  <p className="text-xs text-indigo-700 mt-1">
+                    {tProblems('linkedKbArticle')}:{' '}
+                    <Link to={`/knowledge?articleId=${ke.kb_article_id}`} className="hover:underline">
+                      {ke.kb_article_number || ke.kb_article_id} — {ke.kb_article_title || ''}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => unlinkKbArticle(ke)}
+                      className="ml-2 text-red-500 hover:text-red-700"
+                    >
+                      {tProblems('unlinkKbArticle')}
+                    </button>
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setLinkingKeId(linkingKeId === ke.id ? null : ke.id)}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 mt-1"
+                  >
+                    {tProblems('linkKbArticle')}
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => toggleKnownError(ke)}
+                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${ke.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              >
+                {ke.is_active ? tStates('active') : tStates('inactive')}
+              </button>
             </div>
-            <button
-              onClick={() => toggleKnownError(ke)}
-              className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${ke.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-            >
-              {ke.is_active ? tStates('active') : tStates('inactive')}
-            </button>
+            {linkingKeId === ke.id && !ke.kb_article_id && (
+              <div className="space-y-1">
+                <input
+                  value={linkKbSearch}
+                  onChange={(e) => setLinkKbSearch(e.target.value)}
+                  placeholder={tProblems('searchKbArticlePlaceholder')}
+                  className={inputCls}
+                  autoFocus
+                />
+                {linkKbResults.length > 0 && (
+                  <div className="space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                    {linkKbResults.map((a) => (
+                      <button key={a.id} type="button" onClick={() => linkKbArticle(ke, a.id)} className="w-full text-left px-2 py-1.5 hover:bg-gray-50">
+                        <span className="text-xs text-gray-500 mr-2">{a.number}</span>
+                        <span className="text-sm text-gray-900">{a.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
         {knownErrors.length === 0 && <p className="text-sm text-gray-400 text-center py-4">{tProblems('noKnownErrors')}</p>}
