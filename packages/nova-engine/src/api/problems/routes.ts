@@ -395,7 +395,7 @@ router.post('/', validateBody(createProblemSchema), async (req: Request, res: Re
 
     const seq = await client.query(`SELECT nextval('problem_number_seq') AS n`);
     const number = `PRB${String(seq.rows[0].n).padStart(7, '0')}`;
-    const slaDueAt = await resolveSlaDueAt(client, 'problem', {
+    const sla = await resolveSlaDueAt(client, 'problem', {
       priority: b.priority || 'medium',
       impact: b.impact || 'medium',
       category: b.category || null,
@@ -429,7 +429,7 @@ router.post('/', validateBody(createProblemSchema), async (req: Request, res: Re
         b.assignment_group_id || null,
         b.affected_ci || null,
         b.resolution_notes || null,
-        slaDueAt,
+        sla.resolutionDueAt,
       ],
     );
     const createdProblem = created.rows[0];
@@ -503,14 +503,14 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
     ) {
       const nextStatus = String(updates.status ?? current.status);
       if (!['resolved', 'closed'].includes(nextStatus)) {
-        const dueAt = await resolveSlaDueAt(client, 'problem', {
+        const due = await resolveSlaDueAt(client, 'problem', {
           priority: updates.priority ?? current.priority,
           impact: updates.impact ?? current.impact,
           category: updates.category ?? current.category,
           serviceId: null,
         });
         sets.push(`sla_due_at = $${i++}`);
-        vals.push(dueAt);
+        vals.push(due.resolutionDueAt);
         sets.push('sla_breached = false');
       }
     }

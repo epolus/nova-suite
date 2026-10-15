@@ -54,6 +54,7 @@ export async function startIncidentEscalation(params: {
   tenantId: string;
   priority: number;
   slaDueAt: string;
+  responseDueAt?: string | null;
 }): Promise<string> {
   const workflowId = `incident-escalation-${params.incidentId}`;
   try {
