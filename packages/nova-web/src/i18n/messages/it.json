@@ -522,6 +522,21 @@
         "deflectThreshold": "Soglia di confidenza deflessione ESS",
         "deflectThresholdHelp": "Valore da 0 a 1. La deflessione automatica parte solo se la confidenza KB raggiunge la soglia.",
         "saved": "Impostazioni salvate"
+      },
+      "changeAdmin": {
+        "title": "Amministrazione Change",
+        "description": "Configura tipi, modelli, CAB, blackout e domande di rischio.",
+        "loadFailed": "Caricamento non riuscito",
+        "riskQuestions": "Questionario di rischio",
+        "noRiskQuestions": "Nessuna domanda di rischio.",
+        "riskPromptPlaceholder": "Testo della domanda",
+        "weightPlaceholder": "Peso",
+        "sortOrderPlaceholder": "Ordine",
+        "riskWeightLabel": "Peso {weight}",
+        "sortOrderLabel": "Ordine {order}",
+        "addRiskQuestion": "Aggiungi domanda",
+        "deactivate": "Disattiva",
+        "active": "attivo"
       }
     }
   },

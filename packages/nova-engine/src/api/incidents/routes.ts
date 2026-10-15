@@ -28,6 +28,12 @@ import { AppError, NotFound } from '../../middleware/errorHandler';
 import { createEssIncident } from '../../domain/incidents/create-ess-incident';
 import { schedulePostCreateAiAssist } from '../../ai/post-create';
 import {
+  pauseSlaClock,
+  resolveSlaDueAt,
+  resumeSlaClock,
+  shouldPauseSlaForPending,
+} from '../../domain/sla';
+import {
   signalIncidentResolved,
   cancelIncidentAutoClose,
 } from '../../temporal/workflows';
@@ -289,10 +295,13 @@ router.post(
       const seqResult = await client.query("SELECT nextval('incident_number_seq')");
       const number = `INC${seqResult.rows[0].nextval.toString().padStart(7, '0')}`;
 
-      // Default SLA: priority-based hours
-      const slaHoursMap: Record<number, number> = { 1: 4, 2: 8, 3: 24, 4: 48, 5: 72 };
-      const slaDueAt = new Date();
-      slaDueAt.setHours(slaDueAt.getHours() + (slaHoursMap[priority] || 24));
+      const sla = await resolveSlaDueAt(client, 'incident', {
+        priority,
+        impact,
+        urgency,
+        category: category || null,
+        serviceId: service_id || null,
+      });
 
       const result = await client.query(
         `INSERT INTO incidents (
@@ -300,20 +309,20 @@ router.post(
           status, impact, urgency, priority,
           assigned_to, assignment_group_id, caller_id,
           contact_info, service_id, configuration_item_id,
-          category, subcategory, sla_due_at
+          category, subcategory, sla_due_at, response_due_at
         ) VALUES (
           current_tenant_id(), $1, $2, $3, $4,
           $5, $6, $7, $8,
           $9, $10, $11,
           $12, $13, $14,
-          $15, $16, $17
+          $15, $16, $17, $18
         ) RETURNING *`,
         [
           number, request_id || null, title, description || null,
           'new', impact, urgency, priority,
           assigned_to || null, assignment_group_id || null, caller_id || null,
           contact_info || null, service_id || null, configuration_item_id || null,
-          category || null, subcategory || null, slaDueAt.toISOString(),
+          category || null, subcategory || null, sla.resolutionDueAt, sla.responseDueAt,
         ],
       );
 
@@ -325,12 +334,15 @@ router.post(
       );
 
       // Fire-and-forget via durable queue: start SLA escalation workflow
-      enqueueIncidentEscalationStartJob({
-        incidentId: result.rows[0].id,
-        tenantId: req.user!.tenant_id,
-        priority,
-        slaDueAt: slaDueAt.toISOString(),
-      }).catch(() => {});
+      if (sla.resolutionDueAt || sla.responseDueAt) {
+        enqueueIncidentEscalationStartJob({
+          incidentId: result.rows[0].id,
+          tenantId: req.user!.tenant_id,
+          priority,
+          slaDueAt: sla.resolutionDueAt || sla.responseDueAt!,
+          responseDueAt: sla.responseDueAt,
+        }).catch(() => {});
+      }
 
       enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
@@ -1311,6 +1323,41 @@ router.patch(
           res.status(400).json({ error: 'Pending reason is required when setting status to pending' });
           return;
         }
+      }
+
+      // Pause/resume SLA clock on pending transitions with waiting_* reasons.
+      const nextStatus = updates.status !== undefined ? updates.status : current.status;
+      const nextReason = updates.resolution_code !== undefined
+        ? updates.resolution_code
+        : current.resolution_code;
+      const enteringPendingPause = nextStatus === 'pending'
+        && current.status !== 'pending'
+        && shouldPauseSlaForPending(nextReason);
+      const leavingPending = current.status === 'pending'
+        && updates.status !== undefined
+        && updates.status !== 'pending'
+        && current.sla_paused_at;
+
+      if (enteringPendingPause) {
+        const paused = pauseSlaClock({
+          sla_paused_at: current.sla_paused_at,
+          sla_paused_ms: current.sla_paused_ms,
+          response_due_at: current.response_due_at,
+          sla_due_at: current.sla_due_at,
+        });
+        updates.sla_paused_at = paused.sla_paused_at;
+        updates.sla_paused_ms = paused.sla_paused_ms;
+      } else if (leavingPending) {
+        const resumed = resumeSlaClock({
+          sla_paused_at: current.sla_paused_at,
+          sla_paused_ms: current.sla_paused_ms,
+          response_due_at: current.response_due_at,
+          sla_due_at: current.sla_due_at,
+        });
+        updates.sla_paused_at = resumed.sla_paused_at;
+        updates.sla_paused_ms = resumed.sla_paused_ms;
+        updates.response_due_at = resumed.response_due_at;
+        updates.sla_due_at = resumed.sla_due_at;
       }
 
       // Resolved requires solution notes.

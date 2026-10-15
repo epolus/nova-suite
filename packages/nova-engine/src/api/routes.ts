@@ -31,6 +31,7 @@ import configPackageRoutes from './config-packages/routes';
 import majorIncidentRoutes from './major-incidents/routes';
 import aiRoutes from './ai/routes';
 import analyticsRoutes from './analytics/routes';
+import inboundWebhookRoutes from './webhooks/inbound';
 
 const router = Router();
 
@@ -64,5 +65,6 @@ router.use('/releases', releaseRoutes);
 router.use('/reports', reportRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/ai', aiRoutes);
+router.use('/webhooks', inboundWebhookRoutes);
 
 export default router;

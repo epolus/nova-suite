@@ -522,6 +522,21 @@
         "deflectThreshold": "ESS-Ablenkungs-Konfidenzschwelle",
         "deflectThresholdHelp": "Wert von 0 bis 1. Auto-Ablenkung nur bei ausreichender KB-Treffer-Konfidenz.",
         "saved": "Einstellungen gespeichert"
+      },
+      "changeAdmin": {
+        "title": "Change-Administration",
+        "description": "Change-Typen, Vorlagen, CAB, Blackouts und Risikofragen konfigurieren.",
+        "loadFailed": "Laden fehlgeschlagen",
+        "riskQuestions": "Risikofragebogen",
+        "noRiskQuestions": "Noch keine Risikofragen.",
+        "riskPromptPlaceholder": "Fragetext",
+        "weightPlaceholder": "Gewicht",
+        "sortOrderPlaceholder": "Sortierung",
+        "riskWeightLabel": "Gewicht {weight}",
+        "sortOrderLabel": "Reihenfolge {order}",
+        "addRiskQuestion": "Frage hinzufügen",
+        "deactivate": "Deaktivieren",
+        "active": "aktiv"
       }
     }
   },

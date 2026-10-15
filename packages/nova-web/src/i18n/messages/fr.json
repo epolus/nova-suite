@@ -522,6 +522,21 @@
         "deflectThreshold": "Seuil de confiance de déflexion ESS",
         "deflectThresholdHelp": "Valeur de 0 à 1. La déflexion auto ne s'exécute que si la confiance KB atteint ce seuil.",
         "saved": "Paramètres enregistrés"
+      },
+      "changeAdmin": {
+        "title": "Administration des changements",
+        "description": "Configurer types, modèles, CAB, blackouts et questions de risque.",
+        "loadFailed": "Échec du chargement",
+        "riskQuestions": "Questionnaire de risque",
+        "noRiskQuestions": "Aucune question de risque.",
+        "riskPromptPlaceholder": "Libellé de la question",
+        "weightPlaceholder": "Poids",
+        "sortOrderPlaceholder": "Ordre",
+        "riskWeightLabel": "Poids {weight}",
+        "sortOrderLabel": "Ordre {order}",
+        "addRiskQuestion": "Ajouter une question",
+        "deactivate": "Désactiver",
+        "active": "actif"
       }
     }
   },

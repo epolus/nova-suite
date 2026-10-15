@@ -2,6 +2,7 @@
 export {
   getIncident,
   markSlaBreached,
+  markResponseBreached,
   escalateIncident,
   autoAssignIncident,
   autoCloseIncident,

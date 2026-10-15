@@ -2,6 +2,7 @@
 import { log } from '@temporalio/activity';
 import { withTenantContext } from '../db';
 import { getIncidentJournalAuthorHint, insertWorkflowJournalEntry } from './workflow-journal';
+import { dispatchTenantWebhookNotifications } from './webhook-dispatcher';
 
 export interface IncidentInfo {
   id: string;
@@ -14,6 +15,10 @@ export interface IncidentInfo {
   assignmentGroupId: string | null;
   slaDueAt: string | null;
   slaBreached: boolean;
+  responseDueAt: string | null;
+  responseBreached: boolean;
+  slaPausedAt: string | null;
+  slaPausedMs: number;
 }
 
 export async function getIncident(incidentId: string, tenantId: string): Promise<IncidentInfo | null> {
@@ -21,7 +26,10 @@ export async function getIncident(incidentId: string, tenantId: string): Promise
   const rows = await withTenantContext(tenantId, async (client) => {
     const result = await client.query(
       `SELECT id, tenant_id, number, title, status, priority,
-              assigned_to, assignment_group_id, sla_due_at, sla_breached
+              assigned_to, assignment_group_id,
+              sla_due_at, sla_breached,
+              response_due_at, response_breached,
+              sla_paused_at, sla_paused_ms
        FROM incidents WHERE id = $1`,
       [incidentId],
     );
@@ -42,11 +50,15 @@ export async function getIncident(incidentId: string, tenantId: string): Promise
     assignmentGroupId: row.assignment_group_id as string | null,
     slaDueAt: row.sla_due_at ? (row.sla_due_at as Date).toISOString() : null,
     slaBreached: row.sla_breached as boolean,
+    responseDueAt: row.response_due_at ? (row.response_due_at as Date).toISOString() : null,
+    responseBreached: Boolean(row.response_breached),
+    slaPausedAt: row.sla_paused_at ? (row.sla_paused_at as Date).toISOString() : null,
+    slaPausedMs: Number(row.sla_paused_ms ?? 0),
   };
 }
 
 export async function markSlaBreached(incidentId: string, tenantId: string): Promise<void> {
-  log.info('Marking SLA breached', { incidentId });
+  log.info('Marking resolution SLA breached', { incidentId });
   await withTenantContext(tenantId, async (client) => {
     await client.query(
       'UPDATE incidents SET sla_breached = true WHERE id = $1',
@@ -57,7 +69,25 @@ export async function markSlaBreached(incidentId: string, tenantId: string): Pro
       tenantId,
       incidentId,
       entryType: 'state_change',
-      content: 'SLA breached — automated escalation triggered',
+      content: 'Resolution SLA breached — automated escalation triggered',
+      preferredAuthorId,
+    });
+  });
+}
+
+export async function markResponseBreached(incidentId: string, tenantId: string): Promise<void> {
+  log.info('Marking response SLA breached', { incidentId });
+  await withTenantContext(tenantId, async (client) => {
+    await client.query(
+      'UPDATE incidents SET response_breached = true WHERE id = $1',
+      [incidentId],
+    );
+    const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
+    await insertWorkflowJournalEntry(client, {
+      tenantId,
+      incidentId,
+      entryType: 'state_change',
+      content: 'Response SLA breached',
       preferredAuthorId,
     });
   });
@@ -131,7 +161,6 @@ export async function sendNotification(
   tenantId: string,
   message: string,
 ): Promise<void> {
-  // In production this would send email/Slack/webhook — for now, log a journal entry
   log.info('Sending notification', { incidentId, message });
   await withTenantContext(tenantId, async (client) => {
     const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
@@ -141,6 +170,29 @@ export async function sendNotification(
       entryType: 'work_note',
       content: `[Notification] ${message}`,
       preferredAuthorId,
+    });
+
+    const incidentRes = await client.query<{ number: string; title: string }>(
+      `SELECT number, title FROM incidents WHERE id = $1::uuid`,
+      [incidentId],
+    );
+    const incident = incidentRes.rows[0];
+    const title = incident
+      ? `Incident ${incident.number}`
+      : 'Nova Suite notification';
+    const text = incident
+      ? `${message}\n${incident.title}`
+      : message;
+
+    const webhookResults = await dispatchTenantWebhookNotifications(
+      client,
+      ['slack', 'teams'],
+      { title, text },
+    );
+    log.info('Webhook notification dispatch complete', {
+      incidentId,
+      attempted: webhookResults.length,
+      succeeded: webhookResults.filter((r) => r.ok).length,
     });
   });
 }

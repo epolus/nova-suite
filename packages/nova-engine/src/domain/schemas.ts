@@ -154,7 +154,7 @@ export const configPackageNotificationRuleSchema = z.object({
   recipient_type: z.string().min(1).max(100),
   recipient_user_email: z.string().email().nullable().optional(),
   recipient_group_name: z.string().min(1).max(255).nullable().optional(),
-  channels: z.array(z.enum(['in_app', 'email'])).min(1).default(['in_app']),
+  channels: z.array(z.enum(['in_app', 'email', 'slack', 'teams'])).min(1).default(['in_app']),
   templates: z.array(configPackageNotificationRuleTemplateSchema).min(1),
   title_template: z.string().min(1).optional(),
   body_template: z.string().nullable().optional(),
@@ -421,6 +421,24 @@ export const createBlackoutSchema = z.object({
 });
 
 export const updateBlackoutSchema = createBlackoutSchema.partial();
+
+export const createChangeRiskQuestionSchema = z.object({
+  prompt: z.string().min(1).max(2000),
+  weight: z.number().positive().max(100).default(1),
+  sort_order: z.number().int().min(0).max(100000).default(0),
+  is_active: z.boolean().optional().default(true),
+});
+
+export const updateChangeRiskQuestionSchema = createChangeRiskQuestionSchema.partial();
+
+export const submitChangeRiskAssessmentSchema = z.object({
+  answers: z.array(z.object({
+    question_id: uuidSchema,
+    score: z.number().int().min(0).max(5),
+    answer_text: z.string().max(2000).optional().nullable(),
+  })).min(1),
+  apply_suggested_risk_level: z.boolean().optional().default(true),
+});
 
 export const incidentLinkMajorIncidentSchema = z.object({
   major_incident_id: uuidSchema,

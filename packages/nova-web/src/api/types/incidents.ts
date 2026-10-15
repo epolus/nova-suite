@@ -23,6 +23,10 @@ export interface Incident {
   closed_at: string | null;
   sla_due_at: string | null;
   sla_breached: boolean;
+  response_due_at?: string | null;
+  response_breached?: boolean;
+  sla_paused_at?: string | null;
+  sla_paused_ms?: number;
   created_at: string;
   updated_at: string;
   assigned_to_name?: string;

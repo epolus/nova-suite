@@ -545,6 +545,10 @@ CREATE TABLE incidents (
   closed_at       timestamptz,
   sla_due_at      timestamptz,
   sla_breached    boolean NOT NULL DEFAULT false,
+  response_due_at timestamptz,
+  response_breached boolean NOT NULL DEFAULT false,
+  sla_paused_at   timestamptz,
+  sla_paused_ms   bigint NOT NULL DEFAULT 0,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, number)
@@ -555,6 +559,7 @@ CREATE INDEX idx_incidents_status ON incidents(tenant_id, status);
 CREATE INDEX idx_incidents_assigned ON incidents(assigned_to);
 CREATE INDEX idx_incidents_assignment_group ON incidents(assignment_group_id);
 CREATE INDEX idx_incidents_sla ON incidents(tenant_id, sla_breached, sla_due_at);
+CREATE INDEX idx_incidents_response_due ON incidents(tenant_id, response_breached, response_due_at);
 CREATE INDEX idx_incidents_request ON incidents(request_id);
 
 CREATE SEQUENCE incident_number_seq START 1000;
@@ -1024,6 +1029,10 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.01', 'data_sources_external_key'),
   ('v00.01.02', 'configuration_items_external_ids_and_status'),
   ('v00.01.03', 'change_number_seq_after_seed'),
+  ('v00.01.04', 'sla_hardening'),
+  ('v00.01.05', 'known_errors_kb_article'),
+  ('v00.01.11', 'change_risk_questionnaire'),
+  ('v00.01.12', 'notification_webhooks'),
   ('v00.01.13', 'ai_triage_suggestions');
 
 -- ============================================================
@@ -2045,6 +2054,51 @@ CREATE TRIGGER trg_sla_definitions_updated_at
   BEFORE UPDATE ON sla_definitions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+-- ============================================================
+-- BUSINESS CALENDARS (SLA business-hours clock)
+-- ============================================================
+
+CREATE TABLE business_calendars (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name        text NOT NULL,
+  timezone    text NOT NULL DEFAULT 'UTC',
+  is_default  boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_business_calendars_tenant ON business_calendars(tenant_id);
+
+CREATE UNIQUE INDEX uq_business_calendars_tenant_default
+  ON business_calendars(tenant_id)
+  WHERE is_default = true;
+
+CREATE TRIGGER trg_business_calendars_updated_at
+  BEFORE UPDATE ON business_calendars
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE business_hours (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  calendar_id  uuid NOT NULL REFERENCES business_calendars(id) ON DELETE CASCADE,
+  day_of_week  integer NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  start_time   time NOT NULL,
+  end_time     time NOT NULL,
+  CHECK (end_time > start_time)
+);
+
+CREATE INDEX idx_business_hours_calendar ON business_hours(calendar_id, day_of_week);
+
+CREATE TABLE holidays (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  calendar_id   uuid NOT NULL REFERENCES business_calendars(id) ON DELETE CASCADE,
+  holiday_date  date NOT NULL,
+  name          text NOT NULL,
+  UNIQUE (calendar_id, holiday_date)
+);
+
+CREATE INDEX idx_holidays_calendar ON holidays(calendar_id, holiday_date);
+
 -- Seed SLA definitions
 INSERT INTO sla_definitions (tenant_id, name, description, process_type, condition_priority, resolution_hours, response_hours, auto_close_days, warning_pct, on_warning, on_breach, sort_order) VALUES
   ('a0000000-0000-0000-0000-000000000001',
@@ -2441,10 +2495,12 @@ CREATE TABLE known_errors (
   tags              text[] NOT NULL DEFAULT '{}',
   severity          text CHECK (severity IN ('low', 'medium', 'high', 'critical')),
   is_active         boolean NOT NULL DEFAULT true,
+  kb_article_id     uuid REFERENCES knowledge_articles(id) ON DELETE SET NULL,
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_known_errors_problem ON known_errors(tenant_id, problem_id, is_active);
+CREATE INDEX idx_known_errors_kb_article ON known_errors(tenant_id, kb_article_id);
 CREATE INDEX idx_known_errors_tags_gin ON known_errors USING gin (tags);
 
 CREATE TABLE problem_tasks (
@@ -2596,6 +2652,7 @@ CREATE TABLE changes (
   stage                     change_stage_enum NOT NULL DEFAULT 'request',
   status                    change_status_enum NOT NULL DEFAULT 'draft',
   risk_level                change_risk_enum NOT NULL DEFAULT 'medium',
+  risk_score                numeric(10, 2),
   impact                    text NOT NULL DEFAULT 'medium',
   impact_description        text,
   implementation_plan       text NOT NULL,
@@ -2681,10 +2738,33 @@ CREATE TABLE change_conflicts (
   tenant_id          uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   change_id          uuid NOT NULL REFERENCES changes(id) ON DELETE CASCADE,
   conflicting_change_id uuid REFERENCES changes(id) ON DELETE CASCADE,
-  conflict_type      text NOT NULL CHECK (conflict_type IN ('schedule_overlap', 'ci_overlap', 'blackout_window')),
+  conflict_type      text NOT NULL CHECK (conflict_type IN ('schedule_overlap', 'ci_overlap', 'blackout_window', 'dependency_conflict')),
   severity           text NOT NULL DEFAULT 'warning' CHECK (severity IN ('warning', 'blocking')),
   details            text,
   created_at         timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE change_risk_questions (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  prompt      text NOT NULL,
+  weight      numeric(8, 2) NOT NULL DEFAULT 1 CHECK (weight > 0),
+  sort_order  integer NOT NULL DEFAULT 0,
+  is_active   boolean NOT NULL DEFAULT true,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE change_risk_answers (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  change_id    uuid NOT NULL REFERENCES changes(id) ON DELETE CASCADE,
+  question_id  uuid NOT NULL REFERENCES change_risk_questions(id) ON DELETE CASCADE,
+  score        integer NOT NULL CHECK (score >= 0 AND score <= 5),
+  answer_text  text,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, change_id, question_id)
 );
 
 CREATE INDEX idx_change_types_tenant_name ON change_types(tenant_id, name, is_active);
@@ -2716,6 +2796,9 @@ CREATE INDEX idx_cab_meeting_changes_meeting ON cab_meeting_changes(tenant_id, c
 CREATE INDEX idx_cab_meeting_changes_change ON cab_meeting_changes(tenant_id, change_id);
 CREATE INDEX idx_change_blackouts_window ON change_blackouts(tenant_id, start_date, end_date);
 CREATE INDEX idx_change_conflicts_change ON change_conflicts(tenant_id, change_id, severity, created_at DESC);
+CREATE INDEX idx_change_risk_questions_tenant ON change_risk_questions(tenant_id, is_active, sort_order);
+CREATE INDEX idx_change_risk_answers_change ON change_risk_answers(tenant_id, change_id);
+CREATE INDEX idx_changes_risk_score ON changes(tenant_id, risk_score);
 
 CREATE TRIGGER trg_change_types_updated_at
   BEFORE UPDATE ON change_types
@@ -2731,6 +2814,14 @@ CREATE TRIGGER trg_changes_updated_at
 
 CREATE TRIGGER trg_change_approvals_updated_at
   BEFORE UPDATE ON change_approvals
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_change_risk_questions_updated_at
+  BEFORE UPDATE ON change_risk_questions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_change_risk_answers_updated_at
+  BEFORE UPDATE ON change_risk_answers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER trg_change_blackouts_updated_at
@@ -2803,6 +2894,14 @@ INSERT INTO change_types (
     'high', 4,
     '{"required_approvals": 1, "allow_emergency_bypass": true, "required_steps": ["request", "assessment", "implementation", "review"]}'::jsonb
   );
+
+
+INSERT INTO change_risk_questions (tenant_id, prompt, weight, sort_order, is_active) VALUES
+  ('a0000000-0000-0000-0000-000000000001', 'How severe is the business impact if this change fails?', 2.0, 10, true),
+  ('a0000000-0000-0000-0000-000000000001', 'How many users or services are affected?', 1.5, 20, true),
+  ('a0000000-0000-0000-0000-000000000001', 'How complex or novel is the implementation?', 1.5, 30, true),
+  ('a0000000-0000-0000-0000-000000000001', 'How weak is the backout / test coverage? (0 = strong, 5 = none)', 1.0, 40, true),
+  ('a0000000-0000-0000-0000-000000000001', 'How risky is the timing (peak hours, freeze window, dependencies)?', 1.0, 50, true);
 
 INSERT INTO standard_changes (
   id, tenant_id, change_type_id, name, description, category,
@@ -3000,6 +3099,26 @@ CREATE INDEX IF NOT EXISTS idx_notification_email_deliveries_entity
   ON notification_email_deliveries(tenant_id, entity_type, entity_id, trigger_key);
 CREATE TRIGGER trg_notification_email_deliveries_updated_at
   BEFORE UPDATE ON notification_email_deliveries
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TYPE notification_webhook_channel AS ENUM ('slack', 'teams');
+
+CREATE TABLE tenant_notification_webhooks (
+  id           uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id    uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  channel      notification_webhook_channel NOT NULL,
+  name         text        NOT NULL,
+  webhook_url  text        NOT NULL,
+  is_active    boolean     NOT NULL DEFAULT true,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT tenant_notification_webhooks_name_nonempty CHECK (char_length(trim(name)) > 0),
+  CONSTRAINT tenant_notification_webhooks_url_nonempty CHECK (char_length(trim(webhook_url)) > 0)
+);
+CREATE INDEX idx_tenant_notification_webhooks_tenant_channel
+  ON tenant_notification_webhooks(tenant_id, channel, is_active);
+CREATE TRIGGER trg_tenant_notification_webhooks_updated_at
+  BEFORE UPDATE ON tenant_notification_webhooks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 INSERT INTO notification_rules (

@@ -50,6 +50,8 @@ ALTER TABLE cab_meetings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cab_meeting_changes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE change_blackouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE change_risk_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE change_risk_answers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations ENABLE ROW LEVEL SECURITY;
@@ -67,6 +69,9 @@ ALTER TABLE report_exports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_calendars ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_hours ENABLE ROW LEVEL SECURITY;
+ALTER TABLE holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
@@ -79,6 +84,7 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_rule_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_email_deliveries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_notification_webhooks ENABLE ROW LEVEL SECURITY;
 
 -- ─── Departments ───
 CREATE POLICY tenant_isolation_departments ON departments
@@ -398,6 +404,12 @@ CREATE POLICY tenant_isolation_change_blackouts ON change_blackouts
 CREATE POLICY tenant_isolation_change_conflicts ON change_conflicts
   FOR ALL USING (tenant_id = current_tenant_id());
 
+CREATE POLICY tenant_isolation_change_risk_questions ON change_risk_questions
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+CREATE POLICY tenant_isolation_change_risk_answers ON change_risk_answers
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Workflow Definitions ───
 CREATE POLICY tenant_isolation_workflow_definitions ON workflow_definitions
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -497,6 +509,26 @@ CREATE POLICY tenant_isolation_report_activity_events ON report_activity_events
 CREATE POLICY tenant_isolation_sla_definitions ON sla_definitions
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Business Calendars ───
+CREATE POLICY tenant_isolation_business_calendars ON business_calendars
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Business Hours (scoped via parent calendar) ───
+CREATE POLICY tenant_isolation_business_hours ON business_hours
+  FOR ALL USING (
+    calendar_id IN (
+      SELECT id FROM business_calendars WHERE tenant_id = current_tenant_id()
+    )
+  );
+
+-- ─── Holidays (scoped via parent calendar) ───
+CREATE POLICY tenant_isolation_holidays ON holidays
+  FOR ALL USING (
+    calendar_id IN (
+      SELECT id FROM business_calendars WHERE tenant_id = current_tenant_id()
+    )
+  );
+
 -- ─── Tenant Settings ───
 CREATE POLICY tenant_isolation_tenant_settings ON tenant_settings
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -589,6 +621,17 @@ CREATE POLICY tenant_isolation_notification_email_deliveries ON notification_ema
     AND current_user_has_role('admin', 'fulfiller', 'system')
   );
 
+-- ─── Tenant Notification Webhooks (Slack / Teams) ───
+CREATE POLICY tenant_isolation_tenant_notification_webhooks ON tenant_notification_webhooks
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  );
+
 -- ============================================================
 -- Force RLS even for the table owner
 -- This is critical – without it the table owner bypasses RLS.
@@ -640,6 +683,8 @@ ALTER TABLE cab_meetings FORCE ROW LEVEL SECURITY;
 ALTER TABLE cab_meeting_changes FORCE ROW LEVEL SECURITY;
 ALTER TABLE change_blackouts FORCE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts FORCE ROW LEVEL SECURITY;
+ALTER TABLE change_risk_questions FORCE ROW LEVEL SECURITY;
+ALTER TABLE change_risk_answers FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs FORCE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations FORCE ROW LEVEL SECURITY;
@@ -657,6 +702,9 @@ ALTER TABLE report_exports FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions FORCE ROW LEVEL SECURITY;
+ALTER TABLE business_calendars FORCE ROW LEVEL SECURITY;
+ALTER TABLE business_hours FORCE ROW LEVEL SECURITY;
+ALTER TABLE holidays FORCE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles FORCE ROW LEVEL SECURITY;
@@ -669,6 +717,7 @@ ALTER TABLE notifications FORCE ROW LEVEL SECURITY;
 ALTER TABLE notification_rules FORCE ROW LEVEL SECURITY;
 ALTER TABLE notification_rule_templates FORCE ROW LEVEL SECURITY;
 ALTER TABLE notification_email_deliveries FORCE ROW LEVEL SECURITY;
+ALTER TABLE tenant_notification_webhooks FORCE ROW LEVEL SECURITY;
 
 -- Import staging tables
 ALTER TABLE import_jobs ENABLE ROW LEVEL SECURITY;
