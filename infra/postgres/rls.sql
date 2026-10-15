@@ -81,6 +81,7 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_rule_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_email_deliveries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_notification_webhooks ENABLE ROW LEVEL SECURITY;
 
 -- ─── Departments ───
 CREATE POLICY tenant_isolation_departments ON departments
@@ -608,6 +609,17 @@ CREATE POLICY tenant_isolation_notification_email_deliveries ON notification_ema
     AND current_user_has_role('admin', 'fulfiller', 'system')
   );
 
+-- ─── Tenant Notification Webhooks (Slack / Teams) ───
+CREATE POLICY tenant_isolation_tenant_notification_webhooks ON tenant_notification_webhooks
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  );
+
 -- ============================================================
 -- Force RLS even for the table owner
 -- This is critical – without it the table owner bypasses RLS.
@@ -690,6 +702,7 @@ ALTER TABLE notifications FORCE ROW LEVEL SECURITY;
 ALTER TABLE notification_rules FORCE ROW LEVEL SECURITY;
 ALTER TABLE notification_rule_templates FORCE ROW LEVEL SECURITY;
 ALTER TABLE notification_email_deliveries FORCE ROW LEVEL SECURITY;
+ALTER TABLE tenant_notification_webhooks FORCE ROW LEVEL SECURITY;
 
 -- Import staging tables
 ALTER TABLE import_jobs ENABLE ROW LEVEL SECURITY;

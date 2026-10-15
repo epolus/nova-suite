@@ -25,6 +25,8 @@ import {
 import { loadCredentialSecretsBySlugs } from '../../credentials/vault';
 import { logger } from '../../logger';
 import { sendAutomationEmail } from './automation-send-email';
+import { postNotificationWebhook } from '../../notifications/webhook-dispatcher';
+import { assertPublicHttpUrl, UnsafeHttpUrlError } from '../../data/public-http-url';
 
 const router = Router();
 const processStartedAtMs = Date.now();
@@ -1518,7 +1520,8 @@ router.delete('/business-calendars/:id', async (req: Request, res: Response, nex
 // NOTIFICATION RULES
 // ════════════════════════════════════════════
 
-type NotificationRuleChannel = 'in_app' | 'email';
+type NotificationRuleChannel = 'in_app' | 'email' | 'slack' | 'teams';
+type NotificationWebhookChannel = 'slack' | 'teams';
 type NotificationRuleTemplateInput = {
   locale: string;
   title_template: string;
@@ -1529,11 +1532,19 @@ type NotificationRuleTemplateInput = {
 function normalizeNotificationChannels(raw: unknown): NotificationRuleChannel[] {
   if (raw === undefined || raw === null) return ['in_app'];
   if (!Array.isArray(raw)) throw new AppError(400, 'channels must be an array');
-  const allowed = new Set<NotificationRuleChannel>(['in_app', 'email']);
+  const allowed = new Set<NotificationRuleChannel>(['in_app', 'email', 'slack', 'teams']);
   const channels = Array.from(new Set(raw.map((v) => String(v).trim())))
     .filter((v): v is NotificationRuleChannel => allowed.has(v as NotificationRuleChannel));
   if (channels.length === 0) throw new AppError(400, 'at least one valid channel is required');
   return channels;
+}
+
+function normalizeWebhookChannel(raw: unknown): NotificationWebhookChannel {
+  const value = String(raw || '').trim().toLowerCase();
+  if (value !== 'slack' && value !== 'teams') {
+    throw new AppError(400, 'channel must be slack or teams');
+  }
+  return value;
 }
 
 function normalizeNotificationTemplates(raw: unknown, legacyTitle?: unknown, legacyBody?: unknown): NotificationRuleTemplateInput[] {
@@ -1837,6 +1848,138 @@ router.post('/notification-rules/:id/test', async (req: Request, res: Response, 
     });
 
     res.json({ success: true, workflow_id: workflowId, entity_id: entityId });
+  } catch (err) { next(err); }
+});
+
+// ════════════════════════════════════════════
+// NOTIFICATION WEBHOOKS (Slack / Teams)
+// ════════════════════════════════════════════
+
+router.get('/notification-webhooks', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const rows = await db.getMany(
+      `SELECT id, channel, name, webhook_url, is_active, created_at, updated_at
+       FROM tenant_notification_webhooks
+       WHERE tenant_id = $1
+       ORDER BY channel, name`,
+      [tenantId],
+    );
+    res.json({ notification_webhooks: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/notification-webhooks', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const channel = normalizeWebhookChannel(req.body?.channel);
+    const name = String(req.body?.name || '').trim();
+    const webhookUrl = String(req.body?.webhook_url || '').trim();
+    if (!name) throw new AppError(400, 'name is required');
+    if (!webhookUrl) throw new AppError(400, 'webhook_url is required');
+    try {
+      await assertPublicHttpUrl(webhookUrl);
+    } catch (err) {
+      if (err instanceof UnsafeHttpUrlError) throw new AppError(400, err.message);
+      throw err;
+    }
+
+    const row = await db.getOne(
+      `INSERT INTO tenant_notification_webhooks (
+        tenant_id, channel, name, webhook_url, is_active
+      ) VALUES ($1, $2::notification_webhook_channel, $3, $4, $5)
+      RETURNING id, channel, name, webhook_url, is_active, created_at, updated_at`,
+      [tenantId, channel, name, webhookUrl, req.body?.is_active !== false],
+    );
+    res.status(201).json(row);
+  } catch (err) { next(err); }
+});
+
+router.patch('/notification-webhooks/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const webhookId = String(req.params.id);
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    let i = 1;
+
+    if (req.body?.channel !== undefined) {
+      sets.push(`channel = $${i++}::notification_webhook_channel`);
+      vals.push(normalizeWebhookChannel(req.body.channel));
+    }
+    if (req.body?.name !== undefined) {
+      const name = String(req.body.name || '').trim();
+      if (!name) throw new AppError(400, 'name is required');
+      sets.push(`name = $${i++}`);
+      vals.push(name);
+    }
+    if (req.body?.webhook_url !== undefined) {
+      const webhookUrl = String(req.body.webhook_url || '').trim();
+      if (!webhookUrl) throw new AppError(400, 'webhook_url is required');
+      try {
+        await assertPublicHttpUrl(webhookUrl);
+      } catch (err) {
+        if (err instanceof UnsafeHttpUrlError) throw new AppError(400, err.message);
+        throw err;
+      }
+      sets.push(`webhook_url = $${i++}`);
+      vals.push(webhookUrl);
+    }
+    if (req.body?.is_active !== undefined) {
+      sets.push(`is_active = $${i++}`);
+      vals.push(Boolean(req.body.is_active));
+    }
+    if (sets.length === 0) { res.json({ success: true }); return; }
+
+    vals.push(webhookId, tenantId);
+    const result = await db.query(
+      `UPDATE tenant_notification_webhooks
+       SET ${sets.join(', ')}
+       WHERE id = $${i++} AND tenant_id = $${i}
+       RETURNING id`,
+      vals,
+    );
+    if (result.rowCount === 0) throw new AppError(404, 'Notification webhook not found');
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/notification-webhooks/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const result = await db.query(
+      'DELETE FROM tenant_notification_webhooks WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, tenantId],
+    );
+    if (result.rowCount === 0) throw new AppError(404, 'Notification webhook not found');
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.post('/notification-webhooks/:id/test', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const webhook = await db.getOne<{
+      id: string;
+      channel: NotificationWebhookChannel;
+      webhook_url: string;
+      name: string;
+    }>(
+      `SELECT id, channel, webhook_url, name
+       FROM tenant_notification_webhooks
+       WHERE id = $1 AND tenant_id = $2`,
+      [req.params.id, tenantId],
+    );
+    if (!webhook) throw new AppError(404, 'Notification webhook not found');
+
+    const result = await postNotificationWebhook(webhook.channel, webhook.webhook_url, {
+      title: 'Nova Suite connection test',
+      text: `Test message from webhook "${webhook.name}".`,
+    });
+    if (!result.ok) {
+      throw new AppError(502, result.error || 'Webhook test failed');
+    }
+    res.json({ success: true, status: result.status });
   } catch (err) { next(err); }
 });
 

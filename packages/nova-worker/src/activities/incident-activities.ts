@@ -2,6 +2,7 @@
 import { log } from '@temporalio/activity';
 import { withTenantContext } from '../db';
 import { getIncidentJournalAuthorHint, insertWorkflowJournalEntry } from './workflow-journal';
+import { dispatchTenantWebhookNotifications } from './webhook-dispatcher';
 
 export interface IncidentInfo {
   id: string;
@@ -160,7 +161,6 @@ export async function sendNotification(
   tenantId: string,
   message: string,
 ): Promise<void> {
-  // In production this would send email/Slack/webhook — for now, log a journal entry
   log.info('Sending notification', { incidentId, message });
   await withTenantContext(tenantId, async (client) => {
     const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
@@ -170,6 +170,29 @@ export async function sendNotification(
       entryType: 'work_note',
       content: `[Notification] ${message}`,
       preferredAuthorId,
+    });
+
+    const incidentRes = await client.query<{ number: string; title: string }>(
+      `SELECT number, title FROM incidents WHERE id = $1::uuid`,
+      [incidentId],
+    );
+    const incident = incidentRes.rows[0];
+    const title = incident
+      ? `Incident ${incident.number}`
+      : 'Nova Suite notification';
+    const text = incident
+      ? `${message}\n${incident.title}`
+      : message;
+
+    const webhookResults = await dispatchTenantWebhookNotifications(
+      client,
+      ['slack', 'teams'],
+      { title, text },
+    );
+    log.info('Webhook notification dispatch complete', {
+      incidentId,
+      attempted: webhookResults.length,
+      succeeded: webhookResults.filter((r) => r.ok).length,
     });
   });
 }

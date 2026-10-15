@@ -23,7 +23,7 @@ export interface NotificationRule {
   recipient_user_name?: string | null;
   recipient_group_id: string | null;
   recipient_group_name?: string | null;
-  channels: Array<'in_app' | 'email'>;
+  channels: Array<'in_app' | 'email' | 'slack' | 'teams'>;
   templates?: NotificationRuleTemplate[];
   title_template: string;
   body_template: string | null;
@@ -68,4 +68,16 @@ export interface NotificationEmailDelivery {
 export interface NotificationEmailDeliverySummary {
   status: 'queued' | 'sent' | 'failed';
   count: number;
+}
+
+export type NotificationWebhookChannel = 'slack' | 'teams';
+
+export interface NotificationWebhook {
+  id: string;
+  channel: NotificationWebhookChannel;
+  name: string;
+  webhook_url: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }

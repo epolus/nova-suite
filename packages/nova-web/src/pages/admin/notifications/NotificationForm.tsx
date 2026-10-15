@@ -64,7 +64,7 @@ export default function NotificationForm({
     ? form.templates.findIndex((template) => template.locale === activeTemplate.locale)
     : -1;
 
-  const toggleChannel = (channel: 'in_app' | 'email') => {
+  const toggleChannel = (channel: 'in_app' | 'email' | 'slack' | 'teams') => {
     const has = form.channels.includes(channel);
     const next = has ? form.channels.filter((c) => c !== channel) : [...form.channels, channel];
     setForm({ ...form, channels: next.length > 0 ? next : ['in_app'] });
@@ -145,7 +145,7 @@ export default function NotificationForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">{t('channelsLabel')}</label>
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center gap-3 pt-2 flex-wrap">
             <label className="inline-flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
@@ -161,6 +161,22 @@ export default function NotificationForm({
                 onChange={() => toggleChannel('email')}
               />
               {t('channelEmail')}
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.channels.includes('slack')}
+                onChange={() => toggleChannel('slack')}
+              />
+              {t('channelSlack')}
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.channels.includes('teams')}
+                onChange={() => toggleChannel('teams')}
+              />
+              {t('channelTeams')}
             </label>
           </div>
         </div>
