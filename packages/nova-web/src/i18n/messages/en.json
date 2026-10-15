@@ -2026,6 +2026,21 @@
         "channelsLabel": "Channels",
         "channelInApp": "In-app",
         "channelEmail": "Email",
+        "channelSlack": "Slack",
+        "channelTeams": "Teams",
+        "webhooksTitle": "Slack / Teams Webhooks",
+        "webhooksDescription": "Configure incoming webhook URLs used when a notification rule includes Slack or Teams channels.",
+        "newWebhook": "+ New Webhook",
+        "webhookChannel": "Channel *",
+        "webhookName": "Name *",
+        "webhookNamePlaceholder": "e.g. IT Alerts channel",
+        "webhookUrl": "Webhook URL *",
+        "webhookUrlPlaceholder": "https://hooks.slack.com/services/… or Teams webhook URL",
+        "createWebhook": "Create Webhook",
+        "noWebhooks": "No Slack or Teams webhooks configured yet.",
+        "testWebhook": "Test Webhook",
+        "webhookTestOk": "Test message sent successfully.",
+        "confirmDeleteWebhook": "Delete webhook \"{name}\"?",
         "sortOrder": "Sort Order",
         "recipientUser": "Recipient User *",
         "selectUser": "Select user",
@@ -2064,7 +2079,9 @@
         },
         "channels": {
           "in_app": "in_app",
-          "email": "email"
+          "email": "email",
+          "slack": "slack",
+          "teams": "teams"
         },
         "triggers": {
           "incident.created": "Incident created",

@@ -65,7 +65,7 @@ export type NotificationRuleForm = {
   recipient_type: NotificationRule['recipient_type'];
   recipient_user_id: string | null;
   recipient_group_id: string | null;
-  channels: Array<'in_app' | 'email'>;
+  channels: Array<'in_app' | 'email' | 'slack' | 'teams'>;
   templates: NotificationRuleTemplate[];
   sort_order: number;
 };

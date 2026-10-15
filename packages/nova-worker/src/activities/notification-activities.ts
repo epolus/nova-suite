@@ -2,6 +2,7 @@
 import { log } from '@temporalio/activity';
 import { withTenantContext } from '../db';
 import { getEmailProvider } from './email-provider';
+import { dispatchTenantWebhookNotifications } from './webhook-dispatcher';
 
 export interface NotificationDispatchInput {
   tenantId: string;
@@ -11,7 +12,7 @@ export interface NotificationDispatchInput {
   actorUserId?: string | null;
 }
 
-type NotificationRuleChannel = 'in_app' | 'email';
+type NotificationRuleChannel = 'in_app' | 'email' | 'slack' | 'teams';
 type NotificationRuleTemplate = {
   locale: string;
   title_template: string;
@@ -244,6 +245,9 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
     let emailFailed = 0;
     let emailSuppressedByIdempotency = 0;
     let localeFallbackCount = 0;
+    let webhookAttempted = 0;
+    let webhookSent = 0;
+    let webhookFailed = 0;
     for (const rule of rules) {
       const recipients = new Set<string>();
       const recipientType = String(rule.recipient_type);
@@ -291,7 +295,35 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       }
 
       if (input.actorUserId) recipients.delete(input.actorUserId);
-      if (recipients.size === 0) continue;
+
+      const channelSet = new Set<NotificationRuleChannel>((rule.channels || ['in_app']) as NotificationRuleChannel[]);
+      const localizedTemplates = templatesByRule.get(rule.id) || [{
+        locale: 'en',
+        title_template: String(rule.title_template || ''),
+        body_template: rule.body_template,
+        body_html_template: null,
+      }];
+
+      const webhookChannels = (['slack', 'teams'] as const).filter((c) => channelSet.has(c));
+      if (webhookChannels.length > 0) {
+        const webhookResolved = resolveTemplateForLocale(localizedTemplates, tenantDefaultLocale || 'en');
+        const webhookSubject = renderTemplate(String(webhookResolved.template.title_template || ''), vars).trim()
+          || `${input.entityType} ${vars.entity_number} update`;
+        const webhookBody = webhookResolved.template.body_template
+          ? renderTemplate(webhookResolved.template.body_template, vars)
+          : vars.entity_title;
+        const webhookResults = await dispatchTenantWebhookNotifications(
+          client,
+          [...webhookChannels],
+          { title: webhookSubject, text: webhookBody || webhookSubject },
+        );
+        webhookAttempted += webhookResults.length;
+        webhookSent += webhookResults.filter((r) => r.ok).length;
+        webhookFailed += webhookResults.filter((r) => !r.ok).length;
+      }
+
+      const needsUserChannels = channelSet.has('in_app') || channelSet.has('email');
+      if (!needsUserChannels || recipients.size === 0) continue;
 
       const recipientIds = Array.from(recipients);
       const recipientRes = await client.query<RecipientRow>(
@@ -305,14 +337,6 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
            AND u.id = ANY($1::uuid[])`,
         [recipientIds],
       );
-
-      const channelSet = new Set<NotificationRuleChannel>((rule.channels || ['in_app']) as NotificationRuleChannel[]);
-      const localizedTemplates = templatesByRule.get(rule.id) || [{
-        locale: 'en',
-        title_template: String(rule.title_template || ''),
-        body_template: rule.body_template,
-        body_html_template: null,
-      }];
 
       for (const recipient of recipientRes.rows) {
         const recipientLocale = resolveRecipientLocale(recipient, tenantDefaultLocale);
@@ -410,7 +434,7 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       }
     }
 
-    if (inserted === 0 && emailQueued === 0 && rules.length > 0) {
+    if (inserted === 0 && emailQueued === 0 && webhookAttempted === 0 && rules.length > 0) {
       log.warn('Notification dispatch: rules matched but no deliveries (recipients empty or actor-only)', {
         entityType: input.entityType,
         entityId: input.entityId,
@@ -429,6 +453,9 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       emailFailed,
       emailSuppressedByIdempotency,
       localeFallbackCount,
+      webhookAttempted,
+      webhookSent,
+      webhookFailed,
     });
     return inserted;
   });

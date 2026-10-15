@@ -37,7 +37,7 @@
 | **CMDB** | CI classes, relationships, impact analysis, history, external IDs, data-source ingest | `packages/nova-engine/src/api/cmdb/`, `packages/nova-web/src/pages/cmdb/`, `cmdb_impact_analysis()` | MVP Ready |
 | **Service Level Management** | SLA definitions (response + resolution hours stored), resolution due-at runtime, warning_pct / breach flags | `packages/nova-engine/src/domain/sla.ts`, `packages/nova-web/src/pages/admin/sla/`, `sla_definitions` | In Progress |
 | **Knowledge Base** | Articles, categories, versioning, approvals, ratings, incident→KB resolutions | `packages/nova-engine/src/api/knowledge/`, `packages/nova-web/src/pages/knowledge/` | MVP Ready |
-| **Notifications** | In-app + email channels, rule admin UI | `packages/nova-engine/src/api/notifications/`, `packages/nova-web/src/pages/admin/notifications/` | In Progress |
+| **Notifications** | In-app + email + Slack/Teams webhook channels, rule admin UI, webhook CRUD/test, inbound journal stub | `packages/nova-engine/src/notifications/webhook-dispatcher.ts`, `packages/nova-engine/src/api/webhooks/inbound.ts`, `tenant_notification_webhooks`, `packages/nova-web/src/pages/admin/notifications/` | In Progress |
 | **AI Assist** | Agent + ESS copilots with KB/catalog tools | `packages/nova-engine/src/ai/`, `packages/nova-engine/src/api/ai/` | In Progress |
 
 ---
@@ -81,7 +81,7 @@
 - [ ] **AI Ticket Triaging:** Natural language auto-tagging, sentiment detection, and SLA prediction. *(partial: agent/ESS copilots exist; no create-time auto-triage)*
 - [ ] **AI Agent Deflection:** Self-service bot auto-answering tickets using Knowledge Base context. *(partial: ESS proposes create/search; no autonomous deflect/close)*
 - [ ] **Automated RCA:** AI correlation of recent system alerts/deployments to open incidents.
-- [ ] **Modern Webhooks/Integrations:** Native Slack/Microsoft Teams bi-directional ticket management.
+- [x] **Modern Webhooks/Integrations:** Native Slack/Microsoft Teams outbound notifications via incoming webhooks (CRUD, connection test, rule channels, worker delivery). *(partial bi-directional: inbound `POST /api/webhooks/inbound/journal` posts a journal comment by incident number; rich Slack/Teams interactive ticket management still follow-up)*
 
 ---
 
