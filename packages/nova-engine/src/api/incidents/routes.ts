@@ -26,6 +26,7 @@ import {
 } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { createEssIncident } from '../../domain/incidents/create-ess-incident';
+import { schedulePostCreateAiAssist } from '../../ai/post-create';
 import {
   signalIncidentResolved,
   cancelIncidentAutoClose,
@@ -338,6 +339,15 @@ router.post(
         entityId: result.rows[0].id,
         actorUserId: req.user!.id,
       }).catch(() => {});
+
+      schedulePostCreateAiAssist({
+        tenantId: req.user!.tenant_id,
+        actorUserId: req.user!.id,
+        incidentId: result.rows[0].id,
+        title,
+        description: description || null,
+        essChannel: false,
+      });
 
       res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -1015,6 +1025,140 @@ router.post(
     } catch (err) {
       next(err);
       return;
+    }
+  },
+);
+
+// ─── GET /api/incidents/:id/ai-suggestions ───
+router.get(
+  '/:id/ai-suggestions',
+  requireRole('admin', 'fulfiller'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const incident = await client.query(`SELECT id FROM incidents WHERE id = $1`, [req.params.id]);
+      if (incident.rows.length === 0) throw NotFound('Incident not found');
+
+      const result = await client.query(
+        `SELECT id, incident_id, tenant_id, suggested_category, suggested_impact, suggested_urgency,
+                suggested_tags, sentiment, confidence, raw_json, status, created_at
+         FROM incident_ai_suggestions
+         WHERE incident_id = $1 AND tenant_id = current_tenant_id()
+         ORDER BY created_at DESC`,
+        [req.params.id],
+      );
+      res.json({ suggestions: result.rows });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/incidents/:id/ai-suggestions/:suggestionId/accept ───
+router.post(
+  '/:id/ai-suggestions/:suggestionId/accept',
+  requireRole('admin', 'fulfiller'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const incidentId = String(req.params.id);
+      const suggestionId = String(req.params.suggestionId);
+
+      const sug = await client.query(
+        `SELECT * FROM incident_ai_suggestions
+         WHERE id = $1 AND incident_id = $2 AND tenant_id = current_tenant_id()`,
+        [suggestionId, incidentId],
+      );
+      if (sug.rows.length === 0) throw NotFound('Suggestion not found');
+      const suggestion = sug.rows[0] as {
+        status: string;
+        suggested_category: string | null;
+        suggested_impact: string | null;
+        suggested_urgency: string | null;
+        suggested_tags: string[] | null;
+      };
+      if (suggestion.status !== 'pending') {
+        throw new AppError(400, `Suggestion is already ${suggestion.status}`);
+      }
+
+      const updates: Record<string, unknown> = {};
+      if (suggestion.suggested_category) updates.category = suggestion.suggested_category;
+      if (suggestion.suggested_impact) updates.impact = suggestion.suggested_impact;
+      if (suggestion.suggested_urgency) updates.urgency = suggestion.suggested_urgency;
+
+      if (suggestion.suggested_impact || suggestion.suggested_urgency) {
+        const existing = await client.query(
+          `SELECT impact, urgency FROM incidents WHERE id = $1`,
+          [incidentId],
+        );
+        const impact = suggestion.suggested_impact || existing.rows[0]?.impact;
+        const urgency = suggestion.suggested_urgency || existing.rows[0]?.urgency;
+        const priorityResult = await client.query(
+          'SELECT calculate_priority($1, $2) AS priority',
+          [impact, urgency],
+        );
+        updates.priority = priorityResult.rows[0]?.priority;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        const setClauses = Object.keys(updates).map((k, i) => `${k} = $${i + 2}`);
+        await client.query(
+          `UPDATE incidents SET ${setClauses.join(', ')} WHERE id = $1`,
+          [incidentId, ...Object.values(updates)],
+        );
+      }
+
+      await client.query(
+        `UPDATE incident_ai_suggestions SET status = 'accepted' WHERE id = $1`,
+        [suggestionId],
+      );
+      await client.query(
+        `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
+         VALUES (current_tenant_id(), $1, $2, 'state_change', $3)`,
+        [incidentId, req.user!.id, 'Accepted AI triage suggestion'],
+      );
+
+      const incident = await client.query(`SELECT * FROM incidents WHERE id = $1`, [incidentId]);
+      res.json({ suggestion_id: suggestionId, status: 'accepted', incident: incident.rows[0] });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/incidents/:id/ai-suggestions/:suggestionId/reject ───
+router.post(
+  '/:id/ai-suggestions/:suggestionId/reject',
+  requireRole('admin', 'fulfiller'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const incidentId = String(req.params.id);
+      const suggestionId = String(req.params.suggestionId);
+
+      const sug = await client.query(
+        `SELECT id, status FROM incident_ai_suggestions
+         WHERE id = $1 AND incident_id = $2 AND tenant_id = current_tenant_id()`,
+        [suggestionId, incidentId],
+      );
+      if (sug.rows.length === 0) throw NotFound('Suggestion not found');
+      if (sug.rows[0].status !== 'pending') {
+        throw new AppError(400, `Suggestion is already ${sug.rows[0].status}`);
+      }
+
+      await client.query(
+        `UPDATE incident_ai_suggestions SET status = 'rejected' WHERE id = $1`,
+        [suggestionId],
+      );
+      await client.query(
+        `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
+         VALUES (current_tenant_id(), $1, $2, 'work_note', $3)`,
+        [incidentId, req.user!.id, 'Rejected AI triage suggestion'],
+      );
+
+      res.json({ suggestion_id: suggestionId, status: 'rejected' });
+    } catch (err) {
+      next(err);
     }
   },
 );

@@ -38,7 +38,7 @@
 | **Service Level Management** | SLA definitions (response + resolution hours stored), resolution due-at runtime, warning_pct / breach flags | `packages/nova-engine/src/domain/sla.ts`, `packages/nova-web/src/pages/admin/sla/`, `sla_definitions` | In Progress |
 | **Knowledge Base** | Articles, categories, versioning, approvals, ratings, incident→KB resolutions | `packages/nova-engine/src/api/knowledge/`, `packages/nova-web/src/pages/knowledge/` | MVP Ready |
 | **Notifications** | In-app + email channels, rule admin UI | `packages/nova-engine/src/api/notifications/`, `packages/nova-web/src/pages/admin/notifications/` | In Progress |
-| **AI Assist** | Agent + ESS copilots with KB/catalog tools | `packages/nova-engine/src/ai/`, `packages/nova-engine/src/api/ai/` | In Progress |
+| **AI Assist** | Agent + ESS copilots; create-time triage suggestions; ESS KB deflection settings; RCA correlation stub | `packages/nova-engine/src/ai/`, `packages/nova-engine/src/api/ai/`, `incident_ai_suggestions`, `packages/nova-web/src/pages/admin/AiSettingsPage.tsx` | In Progress |
 
 ---
 
@@ -78,9 +78,9 @@
 
 ## 4. Competitive Differentiator Wishlist (AI & Automation)
 
-- [ ] **AI Ticket Triaging:** Natural language auto-tagging, sentiment detection, and SLA prediction. *(partial: agent/ESS copilots exist; no create-time auto-triage)*
-- [ ] **AI Agent Deflection:** Self-service bot auto-answering tickets using Knowledge Base context. *(partial: ESS proposes create/search; no autonomous deflect/close)*
-- [ ] **Automated RCA:** AI correlation of recent system alerts/deployments to open incidents.
+- [x] **AI Ticket Triaging:** Create-time suggestions (category, impact, urgency, tags, sentiment) stored in `incident_ai_suggestions`; agent accept/reject UI; optional auto-apply via `ai_auto_apply_priority`. *(SLA prediction still open)*
+- [x] **AI Agent Deflection:** ESS KB confidence proposal + optional auto-resolve via `ess_auto_deflect` / `ess_deflect_confidence_threshold` (writes `incident_kb_resolutions`). *(chat-bot conversational deflect still partial via ESS copilot)*
+- [ ] **Automated RCA:** AI correlation of recent system alerts/deployments to open incidents. *(stub: `packages/nova-engine/src/ai/rca-correlation.ts` `NoopRcaAdapter` / `correlateAlerts` — discovery/events plug-in later)*
 - [ ] **Modern Webhooks/Integrations:** Native Slack/Microsoft Teams bi-directional ticket management.
 
 ---

@@ -891,6 +891,25 @@ CREATE TABLE ai_audit_log (
 );
 CREATE INDEX idx_ai_audit_log_tenant ON ai_audit_log(tenant_id, created_at DESC);
 
+CREATE TABLE incident_ai_suggestions (
+  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  incident_id         uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  tenant_id           uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  suggested_category  text,
+  suggested_impact    text CHECK (suggested_impact IS NULL OR suggested_impact IN ('low', 'medium', 'high')),
+  suggested_urgency   text CHECK (suggested_urgency IS NULL OR suggested_urgency IN ('low', 'medium', 'high')),
+  suggested_tags      text[] NOT NULL DEFAULT '{}',
+  sentiment           text,
+  confidence          numeric(5, 4) CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+  raw_json            jsonb NOT NULL DEFAULT '{}'::jsonb,
+  status              text NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending', 'accepted', 'rejected')),
+  created_at          timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_incident_ai_suggestions_incident ON incident_ai_suggestions(incident_id, created_at DESC);
+CREATE INDEX idx_incident_ai_suggestions_tenant_status ON incident_ai_suggestions(tenant_id, status, created_at DESC);
+
+
 -- ============================================================
 -- WORKFLOW START JOBS
 -- ============================================================
@@ -1004,7 +1023,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.00', '001_initial_schema'),
   ('v00.01.01', 'data_sources_external_key'),
   ('v00.01.02', 'configuration_items_external_ids_and_status'),
-  ('v00.01.03', 'change_number_seq_after_seed');
+  ('v00.01.03', 'change_number_seq_after_seed'),
+  ('v00.01.13', 'ai_triage_suggestions');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2233,7 +2253,11 @@ INSERT INTO tenant_settings (tenant_id, key, value) VALUES
   ('a0000000-0000-0000-0000-000000000001', 'dark_text_primary', '#f1f5f9'),
   ('a0000000-0000-0000-0000-000000000001', 'dark_text_muted', '#94a3b8'),
   ('a0000000-0000-0000-0000-000000000001', 'catalog_currency', 'CHF'),
-  ('a0000000-0000-0000-0000-000000000001', 'logo_url', '');
+  ('a0000000-0000-0000-0000-000000000001', 'logo_url', ''),
+  ('a0000000-0000-0000-0000-000000000001', 'ai_triage_on_create', 'true'),
+  ('a0000000-0000-0000-0000-000000000001', 'ai_auto_apply_priority', 'false'),
+  ('a0000000-0000-0000-0000-000000000001', 'ess_auto_deflect', 'false'),
+  ('a0000000-0000-0000-0000-000000000001', 'ess_deflect_confidence_threshold', '0.65');
 
 -- ============================================================
 -- KNOWLEDGE BASE

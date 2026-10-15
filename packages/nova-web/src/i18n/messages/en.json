@@ -28,6 +28,7 @@
       "open": "Open",
       "submit": "Submit",
       "approve": "Approve",
+      "accept": "Accept",
       "reject": "Reject",
       "reopen": "Reopen",
       "resolve": "Resolve",
@@ -359,6 +360,7 @@
       "configPackages": "Config Packages",
       "importData": "Import Data",
       "theming": "Theming",
+      "aiSettings": "AI Settings",
       "status": "Status"
     }
   },
@@ -581,6 +583,18 @@
       "noActivity": "No activity yet",
       "intelligentSidebar": "Intelligent Sidebar",
       "intelligentSidebarDescription": "Similar incidents and suggested knowledge articles.",
+      "aiTriageTitle": "AI Triage Suggestions",
+      "aiTriageDescription": "Review suggested category, impact, urgency, and sentiment before applying.",
+      "aiTriageNonePending": "No pending AI triage suggestions.",
+      "aiTriageCategory": "Category",
+      "aiTriageImpact": "Impact",
+      "aiTriageUrgency": "Urgency",
+      "aiTriageSentiment": "Sentiment",
+      "aiTriageConfidence": "Confidence",
+      "aiTriageTags": "Tags",
+      "aiTriageLoadFailed": "Failed to load AI triage suggestions",
+      "aiTriageAcceptFailed": "Failed to accept AI triage suggestion",
+      "aiTriageRejectFailed": "Failed to reject AI triage suggestion",
       "loadingRecommendations": "Loading recommendations...",
       "knowledgePreview": "Knowledge Preview",
       "loadingArticle": "Loading article...",
@@ -2372,6 +2386,19 @@
           "ipAddress": "IP address",
           "action": "Action"
         }
+      },
+      "aiSettings": {
+        "title": "AI Triage & Deflection",
+        "description": "Control create-time AI triage and ESS knowledge deflection.",
+        "triageOnCreate": "Run AI triage on incident create",
+        "triageOnCreateHelp": "Stores category, impact, urgency, tags, and sentiment suggestions for agents.",
+        "autoApplyPriority": "Auto-apply suggested impact/urgency",
+        "autoApplyPriorityHelp": "When enabled, suggestions update the incident immediately (default off).",
+        "essAutoDeflect": "ESS auto-deflect with knowledge articles",
+        "essAutoDeflectHelp": "When confidence is high enough, resolve the ESS ticket with the matching KB article.",
+        "deflectThreshold": "ESS deflect confidence threshold",
+        "deflectThresholdHelp": "Value from 0 to 1. Auto-deflect runs only when KB match confidence meets this threshold.",
+        "saved": "Settings saved"
       },
       "theming": {
         "title": "Theming & Branding",
