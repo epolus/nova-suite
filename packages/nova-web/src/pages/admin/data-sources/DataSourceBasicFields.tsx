@@ -21,6 +21,7 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
     { value: 'json_url', label: t('sourceTypes.jsonUrl') },
     { value: 'rest_api', label: t('sourceTypes.restApi') },
     { value: 'sftp', label: t('sourceTypes.sftp') },
+    { value: 'intune', label: t('sourceTypes.intune') },
   ], [t]);
 
   const IMPORT_MODES = useMemo(() => [
@@ -129,8 +130,56 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
             </select>
           </div>
 
+          {/* ── Intune discovery connector ── */}
+          {form.source_type === 'intune' && (
+            <>
+              <p className="text-xs text-gray-500">
+                Uses Microsoft Graph managedDevices (client credentials). Generic CSV/JSON/REST import remains the fallback for other MDMs.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Azure tenant ID</label>
+                <input
+                  type="text"
+                  value={form.azure_tenant_id}
+                  onChange={(e) => setField('azure_tenant_id', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">App client ID</label>
+                <input
+                  type="text"
+                  value={form.intune_client_id}
+                  onChange={(e) => setField('intune_client_id', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">App client secret</label>
+                <input
+                  type="password"
+                  value={form.intune_client_secret}
+                  onChange={(e) => setField('intune_client_secret', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CI class name</label>
+                <input
+                  type="text"
+                  value={form.intune_class_name}
+                  onChange={(e) => setField('intune_class_name', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
+                  placeholder="laptop"
+                />
+              </div>
+            </>
+          )}
+
           {/* ── HTTP-based sources (csv_url, json_url, rest_api) ── */}
-          {form.source_type !== 'sftp' && (
+          {form.source_type !== 'sftp' && form.source_type !== 'intune' && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('url')}</label>

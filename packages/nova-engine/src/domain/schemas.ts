@@ -167,7 +167,7 @@ export const configPackageDataSourceSchema = z.object({
   name: z.string().min(1).max(255),
   description: nullableStringSchema,
   entity_type: z.string().min(1).max(100),
-  source_type: z.enum(['csv_url', 'json_url', 'rest_api', 'sftp']).default('csv_url'),
+  source_type: z.enum(['csv_url', 'json_url', 'rest_api', 'sftp', 'intune']).default('csv_url'),
   /** Connection config without inline secrets (credential_slug is preferred). */
   source_config: z.record(z.string(), z.unknown()).default({}),
   column_mapping: z.record(z.string(), z.unknown()).default({}),
@@ -545,7 +545,14 @@ export const majorIncidentListQuerySchema = paginationSchema.extend({
 
 // ─── Assets ───
 const assetCategorySchema = z.enum(['hardware', 'software', 'license', 'consumable']);
-const assetStatusSchema = z.enum(['in_use', 'in_stock', 'retired', 'disposed']);
+const assetStatusSchema = z.enum([
+  'ordered',
+  'in_stock',
+  'in_use',
+  'maintenance',
+  'retired',
+  'disposed',
+]);
 
 export const createAssetSchema = z.object({
   asset_tag: z.string().min(1).max(255),
@@ -562,6 +569,8 @@ export const createAssetSchema = z.object({
   contract_ref: z.string().max(255).nullable().optional(),
   depreciation_months: z.number().int().nullable().optional(),
   notes: z.string().max(10000).nullable().optional(),
+  external_id_1: z.string().max(255).nullable().optional(),
+  external_id_2: z.string().max(255).nullable().optional(),
 });
 
 export const updateAssetSchema = createAssetSchema.partial();

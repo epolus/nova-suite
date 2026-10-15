@@ -30,12 +30,15 @@ const colorMap: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
   review: 'bg-yellow-100 text-yellow-800',
   published: 'bg-emerald-100 text-emerald-800',
-  // CI status
+  // CI / asset status
   active: 'bg-green-100 text-green-800',
   installed: 'bg-green-100 text-green-800',
+  ordered: 'bg-indigo-100 text-indigo-800',
   in_stock: 'bg-teal-100 text-teal-800',
+  in_use: 'bg-green-100 text-green-800',
   maintenance: 'bg-yellow-100 text-yellow-800',
   retired: 'bg-gray-100 text-gray-500',
+  disposed: 'bg-stone-200 text-stone-700',
   planned: 'bg-blue-100 text-blue-800',
   // Environments
   production: 'bg-red-100 text-red-700',

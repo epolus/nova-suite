@@ -2,22 +2,38 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../../data/db';
 import { config } from '../../config';
-import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
+import {
+  authenticate,
+  requireRole,
+  setTenantRLS,
+  releaseTenantClient,
+  getRequestClient,
+} from '../../middleware/auth';
 import { AppError, BadRequest } from '../../middleware/errorHandler';
 import { ENTITY_DEFS } from '../import/entity-defs';
 import { startDataSourceSync, cancelDataSourceSchedule } from '../../temporal/workflows';
 import { enqueueDataSourceScheduleStartJob } from '../../temporal/workflow-start-queue';
 import { assertPublicHttpUrl, fetchPublicHttp, fetchValidatedPublicHttp, UnsafeHttpUrlError } from '../../data/public-http-url';
+import { createIntuneConnector } from '../../discovery/intune';
+import { syncDiscoveredDevices } from '../../discovery/sync';
+import { loadCredentialSecretsBySlugs } from '../../credentials/vault';
 
 const router = Router();
 router.use(authenticate, requireRole('admin'), setTenantRLS, releaseTenantClient);
 
-type SourceType = 'csv_url' | 'json_url' | 'rest_api' | 'sftp';
+type SourceType = 'csv_url' | 'json_url' | 'rest_api' | 'sftp' | 'intune';
 type SourceConfig = {
   url?: string;
   headers?: Record<string, string>;
   json_path?: string;
   credential_slug?: string;
+  /** Entra tenant id for Intune (alias: azure_tenant_id). */
+  tenant_id?: string;
+  azure_tenant_id?: string;
+  client_id?: string;
+  client_secret?: string;
+  class_name?: string;
+  create_assets?: boolean;
   auth_type?: 'none' | 'bearer' | 'basic' | 'oauth2';
   bearer_token?: string;
   basic_username?: string;
@@ -327,6 +343,8 @@ async function resolveCredentialForDataSourcePreview(
         next.bearer_token = secret;
         if (!next.auth_type || next.auth_type === 'none') next.auth_type = 'bearer';
       }
+      // Intune (and similar) store the app client_secret under credential_slug.
+      if (!next.client_secret) next.client_secret = secret;
       if (next.sftp_host && !next.sftp_private_key) {
         next.sftp_password = secret;
       }
@@ -338,6 +356,67 @@ async function resolveCredentialForDataSourcePreview(
     throw BadRequest(`Failed to resolve credential "${slug}": ${message}`);
   }
 }
+
+function intuneConnectorFromConfig(cfg: SourceConfig) {
+  return createIntuneConnector({
+    tenantId: cfg.azure_tenant_id || cfg.tenant_id || '',
+    clientId: cfg.client_id || cfg.oauth2_client_id || '',
+    clientSecret: cfg.client_secret || cfg.oauth2_client_secret || '',
+  });
+}
+
+function devicesToPreviewRows(
+  devices: Awaited<ReturnType<ReturnType<typeof createIntuneConnector>['fetchDevices']>>,
+): Record<string, string>[] {
+  return devices.slice(0, 5).map((d) => ({
+    id: d.externalId,
+    deviceName: d.name,
+    serialNumber: d.serialNumber || '',
+    manufacturer: d.manufacturer || '',
+    model: d.model || '',
+    operatingSystem: d.operatingSystem || '',
+    azureADDeviceId: d.externalIdSecondary || '',
+  }));
+}
+
+// ─── POST /api/datasources/discovery/intune/sync ───
+// Admin-triggered Intune discovery. Prefer this connector over ad-hoc REST;
+// generic CSV/JSON/REST data-source import remains the fallback for other MDMs.
+router.post('/discovery/intune/sync', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = req.body || {};
+    const dryRun = body.dry_run === true;
+    const createAssets = body.create_assets !== false;
+    const className = typeof body.class_name === 'string' && body.class_name.trim()
+      ? body.class_name.trim()
+      : 'laptop';
+
+    let clientSecret = typeof body.client_secret === 'string' ? body.client_secret : '';
+    const slug = typeof body.credential_slug === 'string' ? body.credential_slug.trim() : '';
+    if (slug) {
+      const secrets = await loadCredentialSecretsBySlugs(
+        getRequestClient(req),
+        req.user!.tenant_id,
+        [slug],
+      );
+      clientSecret = secrets[slug] || clientSecret;
+    }
+
+    const connector = createIntuneConnector({
+      tenantId: body.azure_tenant_id || body.tenant_id || '',
+      clientId: body.client_id || '',
+      clientSecret,
+    });
+    const result = await syncDiscoveredDevices(getRequestClient(req), connector, {
+      dryRun,
+      createAssets,
+      className,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── POST /api/datasources/test-source ───
 // Returns HTTP 200 with either `{ result }` or `{ error }` so the browser does
@@ -360,7 +439,12 @@ router.post('/test-source', async (req: Request, res: Response, next: NextFuncti
     if (!sourceType) { fail('source_type is required'); return; }
     let rows: Record<string, string>[] = [];
     let contentType = '';
-    if (sourceType === 'sftp') {
+    if (sourceType === 'intune') {
+      const connector = intuneConnectorFromConfig(sourceConfig);
+      const devices = await connector.fetchDevices({ dryRun: true });
+      rows = devicesToPreviewRows(devices);
+      contentType = 'application/json; connector=intune';
+    } else if (sourceType === 'sftp') {
       const r = await fetchSftpPreview(sourceConfig);
       rows = r.rows;
       contentType = r.contentType;
@@ -493,6 +577,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       res.status(400).json({ error: 'name and entity_type are required' }); return;
     }
 
+    // Intune sync is engine-side (discovery connector); Temporal schedule is unsupported.
+    const resolvedType = source_type || 'csv_url';
+    const resolvedSchedule = resolvedType === 'intune' ? false : !!schedule_enabled;
+
     const result = await db.getOne<{ id: string }>(
       `INSERT INTO data_sources (
         tenant_id, name, description, entity_type, source_type, source_config,
@@ -501,18 +589,18 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       RETURNING id`,
       [
         tenantId, name, description || null, entity_type,
-        source_type || 'csv_url',
+        resolvedType,
         JSON.stringify(source_config || {}),
         JSON.stringify(column_mapping || {}),
         schedule_cron || '0 2 * * *',
-        schedule_enabled || false,
+        resolvedSchedule,
         import_mode || 'insert',
         upsert_key || null,
         req.user!.id,
       ],
     );
 
-    if (schedule_enabled && result) {
+    if (resolvedSchedule && result) {
       try {
         await enqueueDataSourceScheduleStartJob({
           dataSourceId: result.id,
@@ -604,11 +692,38 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
 router.post('/:id/run', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const tenantId = req.user!.tenant_id;
-    const ds = await db.getOne<{ id: string; schedule_cron: string }>(
-      `SELECT id, schedule_cron FROM data_sources WHERE id = $1 AND tenant_id = $2`,
+    const ds = await db.getOne<{
+      id: string;
+      schedule_cron: string;
+      source_type: string;
+      source_config: SourceConfig;
+    }>(
+      `SELECT id, schedule_cron, source_type, source_config
+       FROM data_sources WHERE id = $1 AND tenant_id = $2`,
       [req.params.id, tenantId],
     );
     if (!ds) { res.status(404).json({ error: 'Data source not found' }); return; }
+
+    // Intune runs through the discovery connector (engine-side), not Temporal fetch.
+    if (ds.source_type === 'intune') {
+      let cfg = (ds.source_config || {}) as SourceConfig;
+      cfg = await resolveCredentialForDataSourcePreview(cfg, tenantId, req.user!.id);
+      const dryRun = req.body?.dry_run === true;
+      const connector = intuneConnectorFromConfig(cfg);
+      const result = await syncDiscoveredDevices(getRequestClient(req), connector, {
+        dryRun,
+        createAssets: cfg.create_assets !== false,
+        className: cfg.class_name || 'laptop',
+      });
+      await db.query(
+        `UPDATE data_sources
+         SET last_run_at = now(), last_run_status = $2
+         WHERE id = $1 AND tenant_id = $3`,
+        [ds.id, result.errors.length > 0 ? 'failed' : 'completed', tenantId],
+      );
+      res.json(result);
+      return;
+    }
 
     const workflowId = await startDataSourceSync({
       dataSourceId: ds.id,

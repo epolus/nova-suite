@@ -119,6 +119,10 @@ export default function DataSourcesPage() {
       sftp_file_type: cfg.sftp_file_type || 'csv',
       csv_delimiter: cfg.csv_delimiter || 'auto',
       csv_has_headers: cfg.csv_has_headers !== false,
+      azure_tenant_id: cfg.azure_tenant_id || cfg.tenant_id || '',
+      intune_client_id: cfg.client_id || '',
+      intune_client_secret: cfg.client_secret || '',
+      intune_class_name: cfg.class_name || 'laptop',
     });
     setView('form');
   };

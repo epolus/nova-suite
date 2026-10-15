@@ -33,8 +33,8 @@
 | **Service Request Management** | Catalog, dynamic forms, cart, approvals, fulfillment tasks, automation | `packages/nova-engine/src/api/catalog/`, `packages/nova-engine/src/api/requests/`, `packages/nova-web/src/pages/catalog/`, `packages/nova-web/src/pages/requests/` | MVP Ready |
 | **Change Enablement** | Standard/Normal/Emergency types, CAB meetings/approvals, schedule + same-CI conflicts, blackouts | `packages/nova-engine/src/api/changes/`, `packages/nova-web/src/pages/changes/`, `packages/nova-web/src/pages/admin/ChangeAdminPage.tsx` | MVP Ready |
 | **Problem Management** | Problem CRUD, RCA fields, incident linking, KEDB CRUD, problem tasks | `packages/nova-engine/src/api/problems/`, `packages/nova-web/src/pages/problems/`, `known_errors` in `init.sql` | MVP Ready |
-| **IT Asset Management (ITAM)** | Hardware/software inventory, asset↔CI link, statuses (in_use/in_stock/retired/disposed) | `packages/nova-engine/src/api/assets/`, `packages/nova-web/src/pages/assets/` | In Progress |
-| **CMDB** | CI classes, relationships, impact analysis, history, external IDs, data-source ingest | `packages/nova-engine/src/api/cmdb/`, `packages/nova-web/src/pages/cmdb/`, `cmdb_impact_analysis()` | MVP Ready |
+| **IT Asset Management (ITAM)** | Hardware/software inventory, asset↔CI link, lifecycle statuses (ordered/in_stock/in_use/maintenance/retired/disposed), external IDs, Intune discovery sync | `packages/nova-engine/src/api/assets/`, `packages/nova-engine/src/discovery/`, `packages/nova-web/src/pages/assets/` | In Progress |
+| **CMDB** | CI classes, relationships, impact analysis, history, external IDs, data-source ingest + Intune connector | `packages/nova-engine/src/api/cmdb/`, `packages/nova-engine/src/discovery/`, `packages/nova-web/src/pages/cmdb/`, `cmdb_impact_analysis()` | MVP Ready |
 | **Service Level Management** | SLA definitions (response + resolution hours stored), resolution due-at runtime, warning_pct / breach flags | `packages/nova-engine/src/domain/sla.ts`, `packages/nova-web/src/pages/admin/sla/`, `sla_definitions` | In Progress |
 | **Knowledge Base** | Articles, categories, versioning, approvals, ratings, incident→KB resolutions | `packages/nova-engine/src/api/knowledge/`, `packages/nova-web/src/pages/knowledge/` | MVP Ready |
 | **Notifications** | In-app + email channels, rule admin UI | `packages/nova-engine/src/api/notifications/`, `packages/nova-web/src/pages/admin/notifications/` | In Progress |
@@ -64,9 +64,9 @@
 - [ ] Known Error Database (KEDB) linking to KB articles. *(partial: KEDB CRUD exists; no `kb_article_id`)*
 
 ### D. IT Asset Management (ITAM) & CMDB
-- [ ] Asset lifecycle state tracking (Ordered -> In Use -> Maintenance -> Retired). *(partial: in_use/in_stock/retired/disposed; CI has maintenance)*
+- [x] Asset lifecycle state tracking (Ordered -> In Use -> Maintenance -> Retired). *(Zod + UI: ordered/in_stock/in_use/maintenance/retired/disposed; no DB CHECK on assets.status)*
 - [x] CI (Configuration Item) relationship mapping (Dependency tree).
-- [ ] Agentless network discovery / API integrations (e.g., Jamf, Intune). *(partial: generic data-source/import only)*
+- [ ] Agentless network discovery / API integrations (e.g., Jamf, Intune). *(partial: Intune Graph connector + admin sync / `source_type=intune`; Jamf and Temporal-scheduled Intune still open — generic CSV/JSON/REST data-source import remains the fallback)*
 
 ### E. Service Level Management (SLA)
 - [ ] Multi-tier SLAs (Response Time vs. Resolution Time). *(partial: both hours stored; runtime uses resolution only)*

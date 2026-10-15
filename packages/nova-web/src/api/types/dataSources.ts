@@ -4,13 +4,20 @@ export interface DataSource {
   name: string;
   description: string | null;
   entity_type: string;
-  source_type: 'csv_url' | 'json_url' | 'rest_api' | 'sftp';
+  source_type: 'csv_url' | 'json_url' | 'rest_api' | 'sftp' | 'intune';
   source_config: {
     url?: string;
     headers?: Record<string, string>;
     json_path?: string;
     /** Resolved from tenant_credentials at import time (same slugs as catalog {{cred.slug}}). */
     credential_slug?: string;
+    /** Intune / Entra app credentials (client_secret preferably via credential_slug). */
+    azure_tenant_id?: string;
+    tenant_id?: string;
+    client_id?: string;
+    client_secret?: string;
+    class_name?: string;
+    create_assets?: boolean;
     // OAuth2
     auth_type?: 'none' | 'bearer' | 'basic' | 'oauth2';
     bearer_token?: string;
