@@ -1,6 +1,14 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
-import type { AssignmentGroupItem, KnownError, Pagination, Problem, ProblemIncidentLink, ProblemTask } from '../types';
+import type {
+  AssignmentGroupItem,
+  KnownError,
+  Pagination,
+  Problem,
+  ProblemIncidentLink,
+  ProblemTask,
+  RecurrenceCandidate,
+} from '../types';
 
 export const problems = {
   list: (params: Record<string, string> = {}, page = 1, limit = 20) => {
@@ -19,6 +27,28 @@ export const problems = {
   assignmentGroups: () => request<{ assignment_groups: AssignmentGroupItem[] }>('/problems/assignment-groups'),
   searchIncidents: (q: string) =>
     request<{ incidents: Array<{ id: string; number: string; title: string; status: string }> }>(`/problems/incidents/search?q=${encodeURIComponent(q)}`),
+  recurrenceCandidates: (params: { threshold?: number; similarity?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.threshold !== undefined) qs.set('threshold', String(params.threshold));
+    if (params.similarity !== undefined) qs.set('similarity', String(params.similarity));
+    return request<{ candidates: RecurrenceCandidate[]; threshold: number; similarity: number }>(
+      `/problems/incidents/recurrence-candidates${qs.size ? `?${qs}` : ''}`,
+    );
+  },
+  createFromRecurringIncidents: (data: {
+    incident_ids: string[];
+    assignment_group_id: string;
+    title?: string;
+    description?: string;
+    priority?: Problem['priority'];
+    impact?: Problem['impact'];
+    category?: string | null;
+    affected_ci?: string | null;
+  }) =>
+    request<Problem & { linked_incident_ids: string[] }>('/problems/from-recurring-incidents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   linkedIncidents: (problemId: string) =>
     request<{ incidents: ProblemIncidentLink[] }>(`/problems/${problemId}/incidents`),
   linkIncident: (problemId: string, incidentId: string, relationshipType = 'caused_by') =>
@@ -42,5 +72,12 @@ export const problems = {
     request<KnownError>(`/problems/${problemId}/known-errors`, { method: 'POST', body: JSON.stringify(data) }),
   updateKnownError: (problemId: string, knownErrorId: string, data: Partial<KnownError>) =>
     request<KnownError>(`/problems/${problemId}/known-errors/${knownErrorId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  linkKnownErrorKbArticle: (problemId: string, knownErrorId: string, kbArticleId: string) =>
+    request<KnownError>(`/problems/${problemId}/known-errors/${knownErrorId}/kb-article`, {
+      method: 'POST',
+      body: JSON.stringify({ kb_article_id: kbArticleId }),
+    }),
+  unlinkKnownErrorKbArticle: (problemId: string, knownErrorId: string) =>
+    request<KnownError>(`/problems/${problemId}/known-errors/${knownErrorId}/kb-article`, { method: 'DELETE' }),
   byCi: (ciId: string) => request<{ problems: Problem[] }>(`/problems/by-ci/${ciId}`),
 };

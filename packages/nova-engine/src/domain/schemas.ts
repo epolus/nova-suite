@@ -154,7 +154,7 @@ export const configPackageNotificationRuleSchema = z.object({
   recipient_type: z.string().min(1).max(100),
   recipient_user_email: z.string().email().nullable().optional(),
   recipient_group_name: z.string().min(1).max(255).nullable().optional(),
-  channels: z.array(z.enum(['in_app', 'email'])).min(1).default(['in_app']),
+  channels: z.array(z.enum(['in_app', 'email', 'slack', 'teams'])).min(1).default(['in_app']),
   templates: z.array(configPackageNotificationRuleTemplateSchema).min(1),
   title_template: z.string().min(1).optional(),
   body_template: z.string().nullable().optional(),

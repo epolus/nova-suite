@@ -441,7 +441,7 @@ async function exportNotificationRule(
     recipient_type: string;
     recipient_user_email: string | null;
     recipient_group_name: string | null;
-    channels: Array<'in_app' | 'email'>;
+    channels: Array<'in_app' | 'email' | 'slack' | 'teams'>;
     title_template: string;
     body_template: string | null;
     is_active: boolean;

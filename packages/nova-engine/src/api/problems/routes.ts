@@ -136,6 +136,210 @@ router.get('/incidents/search', async (req: Request, res: Response, next: NextFu
   }
 });
 
+const DEFAULT_RECURRENCE_THRESHOLD = 3;
+const DEFAULT_TITLE_SIMILARITY = 0.3;
+
+router.get('/incidents/recurrence-candidates', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!hasElevatedProblemRole(req)) throw new AppError(403, 'Insufficient permissions');
+    const client = getRequestClient(req);
+    const threshold = Math.max(2, Number(req.query.threshold) || DEFAULT_RECURRENCE_THRESHOLD);
+    const similarity = Math.min(1, Math.max(0.1, Number(req.query.similarity) || DEFAULT_TITLE_SIMILARITY));
+
+    const rows = await client.query(
+      `WITH open_inc AS (
+         SELECT i.id, i.number, i.title, i.status, i.priority, i.configuration_item_id, i.service_id, i.created_at
+         FROM incidents i
+         WHERE i.tenant_id = current_tenant_id()
+           AND i.status NOT IN ('resolved', 'closed', 'cancelled')
+           AND (i.configuration_item_id IS NOT NULL OR i.service_id IS NOT NULL)
+           AND NOT EXISTS (
+             SELECT 1 FROM problem_incidents pi
+             JOIN problems p ON p.id = pi.problem_id
+             WHERE pi.tenant_id = current_tenant_id()
+               AND pi.incident_id = i.id
+               AND p.status NOT IN ('resolved', 'closed')
+           )
+       ),
+       matched AS (
+         SELECT
+           a.id AS seed_id,
+           a.title AS representative_title,
+           a.configuration_item_id,
+           a.service_id,
+           b.id AS peer_id,
+           b.number AS peer_number,
+           b.title AS peer_title,
+           b.status AS peer_status,
+           b.priority AS peer_priority,
+           similarity(a.title, b.title) AS title_similarity
+         FROM open_inc a
+         JOIN open_inc b
+           ON (
+             (a.configuration_item_id IS NOT NULL AND a.configuration_item_id = b.configuration_item_id)
+             OR (a.service_id IS NOT NULL AND a.service_id = b.service_id)
+           )
+          AND similarity(a.title, b.title) >= $1
+       ),
+       grouped AS (
+         SELECT
+           seed_id,
+           representative_title,
+           configuration_item_id,
+           service_id,
+           array_agg(peer_id ORDER BY peer_id) AS incident_ids,
+           jsonb_agg(
+             jsonb_build_object(
+               'id', peer_id,
+               'number', peer_number,
+               'title', peer_title,
+               'status', peer_status,
+               'priority', peer_priority,
+               'title_similarity', round(title_similarity::numeric, 3)
+             )
+             ORDER BY peer_id
+           ) AS incidents,
+           count(*)::int AS incident_count,
+           avg(title_similarity)::float AS avg_similarity
+         FROM matched
+         GROUP BY seed_id, representative_title, configuration_item_id, service_id
+         HAVING count(*) >= $2
+       )
+       SELECT
+         g.seed_id,
+         g.representative_title,
+         g.configuration_item_id,
+         g.service_id,
+         ci.display_name AS configuration_item_name,
+         s.name AS service_name,
+         g.incident_ids,
+         g.incidents,
+         g.incident_count,
+         g.avg_similarity
+       FROM grouped g
+       LEFT JOIN configuration_items ci ON ci.id = g.configuration_item_id
+       LEFT JOIN services s ON s.id = g.service_id
+       WHERE g.seed_id = (SELECT min(x) FROM unnest(g.incident_ids) AS x)
+       ORDER BY g.incident_count DESC, g.avg_similarity DESC
+       LIMIT 50`,
+      [similarity, threshold],
+    );
+
+    res.json({
+      candidates: rows.rows,
+      threshold,
+      similarity,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/from-recurring-incidents', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!hasElevatedProblemRole(req)) throw new AppError(403, 'Insufficient permissions');
+    const client = getRequestClient(req);
+    const b = req.body || {};
+    const incidentIds: string[] = Array.isArray(b.incident_ids)
+      ? b.incident_ids.map((x: unknown) => String(x)).filter(Boolean)
+      : [];
+    if (incidentIds.length < 2) throw new AppError(400, 'incident_ids must include at least 2 incidents');
+    if (!b.assignment_group_id) throw new AppError(400, 'assignment_group_id is required');
+
+    const createGroupOk = await isProblemEnabledGroup(client, b.assignment_group_id);
+    if (!createGroupOk) throw new AppError(400, 'Assignment group is not enabled for Problem Management');
+
+    const incidentsRes = await client.query(
+      `SELECT id, number, title, configuration_item_id, service_id, status
+       FROM incidents
+       WHERE tenant_id = current_tenant_id()
+         AND id = ANY($1::uuid[])
+         AND status NOT IN ('resolved', 'closed', 'cancelled')`,
+      [incidentIds],
+    );
+    if (incidentsRes.rows.length < 2) {
+      throw new AppError(400, 'At least 2 open incidents are required to create a problem from recurrence');
+    }
+
+    const title = String(b.title || incidentsRes.rows[0].title || '').trim();
+    if (!title) throw new AppError(400, 'title is required');
+
+    const affectedCi = b.affected_ci
+      || incidentsRes.rows.find((r: { configuration_item_id: string | null }) => r.configuration_item_id)?.configuration_item_id
+      || null;
+
+    const seq = await client.query(`SELECT nextval('problem_number_seq') AS n`);
+    const number = `PRB${String(seq.rows[0].n).padStart(7, '0')}`;
+    const slaDueAt = await resolveSlaDueAt(client, 'problem', {
+      priority: b.priority || 'medium',
+      impact: b.impact || 'medium',
+      category: b.category || null,
+      serviceId: null,
+    });
+
+    const description = b.description
+      || `Created from ${incidentsRes.rows.length} recurring incidents: ${incidentsRes.rows.map((r: { number: string }) => r.number).join(', ')}`;
+
+    const created = await client.query(
+      `INSERT INTO problems (
+         tenant_id, number, title, description, priority, impact, category, status,
+         root_cause, symptoms, workaround, permanent_fix,
+         reported_by, assigned_to, assignment_group_id, affected_ci, resolution_notes,
+         sla_due_at, sla_breached
+       ) VALUES (
+         current_tenant_id(), $1, $2, $3, $4, $5, $6, COALESCE($7::problem_status_enum, 'new'::problem_status_enum),
+         $8, $9, $10, $11,
+         $12, $13, $14, $15, $16, $17, false
+       ) RETURNING *`,
+      [
+        number,
+        title,
+        description,
+        b.priority || 'medium',
+        b.impact || 'medium',
+        b.category || null,
+        b.status || null,
+        b.root_cause || null,
+        b.symptoms || null,
+        b.workaround || null,
+        b.permanent_fix || null,
+        b.reported_by || req.user!.id,
+        b.assigned_to || null,
+        b.assignment_group_id,
+        affectedCi,
+        b.resolution_notes || null,
+        slaDueAt,
+      ],
+    );
+    const createdProblem = created.rows[0];
+
+    for (const row of incidentsRes.rows) {
+      await client.query(
+        `INSERT INTO problem_incidents (tenant_id, problem_id, incident_id, relationship_type)
+         VALUES (current_tenant_id(), $1, $2, 'caused_by')
+         ON CONFLICT (tenant_id, problem_id, incident_id) DO UPDATE
+         SET relationship_type = EXCLUDED.relationship_type`,
+        [createdProblem.id, row.id],
+      );
+    }
+
+    enqueueNotificationDispatchStartJob({
+      tenantId: req.user!.tenant_id,
+      entityType: 'problem',
+      triggerKey: 'problem.created',
+      entityId: String(createdProblem.id),
+      actorUserId: req.user!.id,
+    }).catch(() => {});
+
+    res.status(201).json({
+      ...createdProblem,
+      linked_incident_ids: incidentsRes.rows.map((r: { id: string }) => r.id),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get(
   '/',
   validateQuery(paginationSchema),
@@ -395,7 +599,7 @@ router.post('/', validateBody(createProblemSchema), async (req: Request, res: Re
 
     const seq = await client.query(`SELECT nextval('problem_number_seq') AS n`);
     const number = `PRB${String(seq.rows[0].n).padStart(7, '0')}`;
-    const slaDueAt = await resolveSlaDueAt(client, 'problem', {
+    const sla = await resolveSlaDueAt(client, 'problem', {
       priority: b.priority || 'medium',
       impact: b.impact || 'medium',
       category: b.category || null,
@@ -429,7 +633,7 @@ router.post('/', validateBody(createProblemSchema), async (req: Request, res: Re
         b.assignment_group_id || null,
         b.affected_ci || null,
         b.resolution_notes || null,
-        slaDueAt,
+        sla.resolutionDueAt,
       ],
     );
     const createdProblem = created.rows[0];
@@ -503,14 +707,14 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
     ) {
       const nextStatus = String(updates.status ?? current.status);
       if (!['resolved', 'closed'].includes(nextStatus)) {
-        const dueAt = await resolveSlaDueAt(client, 'problem', {
+        const due = await resolveSlaDueAt(client, 'problem', {
           priority: updates.priority ?? current.priority,
           impact: updates.impact ?? current.impact,
           category: updates.category ?? current.category,
           serviceId: null,
         });
         sets.push(`sla_due_at = $${i++}`);
-        vals.push(dueAt);
+        vals.push(due.resolutionDueAt);
         sets.push('sla_breached = false');
       }
     }
@@ -676,15 +880,35 @@ router.delete('/:id/tasks/:taskId', async (req: Request, res: Response, next: Ne
   }
 });
 
+async function resolveKbArticleId(
+  client: any,
+  kbArticleId: unknown,
+): Promise<string | null | undefined> {
+  if (kbArticleId === undefined) return undefined;
+  if (kbArticleId === null || kbArticleId === '') return null;
+  const article = await client.query(
+    `SELECT id FROM knowledge_articles
+     WHERE tenant_id = current_tenant_id() AND id = $1`,
+    [String(kbArticleId)],
+  );
+  if (article.rows.length === 0) throw new AppError(400, 'kb_article_id not found');
+  return String(kbArticleId);
+}
+
+const KNOWN_ERROR_SELECT = `SELECT ke.*,
+       ka.number AS kb_article_number,
+       ka.title AS kb_article_title
+FROM known_errors ke
+LEFT JOIN knowledge_articles ka ON ka.id = ke.kb_article_id AND ka.tenant_id = current_tenant_id()`;
+
 router.get('/:id/known-errors', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
     const rows = await client.query(
-      `SELECT *
-       FROM known_errors
-       WHERE tenant_id = current_tenant_id()
-         AND problem_id = $1
-       ORDER BY is_active DESC, updated_at DESC`,
+      `${KNOWN_ERROR_SELECT}
+       WHERE ke.tenant_id = current_tenant_id()
+         AND ke.problem_id = $1
+       ORDER BY ke.is_active DESC, ke.updated_at DESC`,
       [req.params.id],
     );
     res.json({ known_errors: rows.rows });
@@ -703,16 +927,22 @@ router.post('/:id/known-errors', async (req: Request, res: Response, next: NextF
     if (problemRes.rows.length === 0) throw NotFound('Problem not found');
     const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
-    const { title, symptoms, workaround, permanent_fix_eta, tags, severity, is_active } = req.body || {};
+    const { title, symptoms, workaround, permanent_fix_eta, tags, severity, is_active, kb_article_id } = req.body || {};
     if (!title || !symptoms || !workaround) throw new AppError(400, 'title, symptoms and workaround are required');
+    const kbArticleId = await resolveKbArticleId(client, kb_article_id);
     const created = await client.query(
       `INSERT INTO known_errors
-       (tenant_id, problem_id, title, symptoms, workaround, permanent_fix_eta, tags, severity, is_active)
-       VALUES (current_tenant_id(), $1, $2, $3, $4, $5, COALESCE($6, '{}'::text[]), $7, COALESCE($8, true))
+       (tenant_id, problem_id, title, symptoms, workaround, permanent_fix_eta, tags, severity, is_active, kb_article_id)
+       VALUES (current_tenant_id(), $1, $2, $3, $4, $5, COALESCE($6, '{}'::text[]), $7, COALESCE($8, true), $9)
        RETURNING *`,
-      [req.params.id, title, symptoms, workaround, permanent_fix_eta || null, Array.isArray(tags) ? tags : [], severity || null, is_active],
+      [req.params.id, title, symptoms, workaround, permanent_fix_eta || null, Array.isArray(tags) ? tags : [], severity || null, is_active, kbArticleId ?? null],
     );
-    res.status(201).json(created.rows[0]);
+    const row = await client.query(
+      `${KNOWN_ERROR_SELECT}
+       WHERE ke.tenant_id = current_tenant_id() AND ke.id = $1`,
+      [created.rows[0].id],
+    );
+    res.status(201).json(row.rows[0]);
   } catch (err) {
     next(err);
   }
@@ -728,10 +958,21 @@ router.patch('/:id/known-errors/:knownErrorId', async (req: Request, res: Respon
     if (problemRes.rows.length === 0) throw NotFound('Problem not found');
     const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
+
+    const allowed = new Set([
+      'title', 'symptoms', 'workaround', 'permanent_fix_eta', 'tags', 'severity', 'is_active', 'kb_article_id',
+    ]);
     const sets: string[] = [];
     const vals: unknown[] = [];
     let i = 1;
     for (const [k, v] of Object.entries(req.body || {})) {
+      if (!allowed.has(k)) continue;
+      if (k === 'kb_article_id') {
+        const kbArticleId = await resolveKbArticleId(client, v);
+        sets.push(`kb_article_id = $${i++}`);
+        vals.push(kbArticleId ?? null);
+        continue;
+      }
       sets.push(`${k} = $${i++}`);
       vals.push(k === 'tags' && !Array.isArray(v) ? [] : v);
     }
@@ -743,11 +984,83 @@ router.patch('/:id/known-errors/:knownErrorId', async (req: Request, res: Respon
        WHERE tenant_id = current_tenant_id()
          AND problem_id = $${i}
          AND id = $${i + 1}
-       RETURNING *`,
+       RETURNING id`,
       vals,
     );
     if (updated.rows.length === 0) throw NotFound('Known error not found');
-    res.json(updated.rows[0]);
+    const row = await client.query(
+      `${KNOWN_ERROR_SELECT}
+       WHERE ke.tenant_id = current_tenant_id() AND ke.id = $1`,
+      [updated.rows[0].id],
+    );
+    res.json(row.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/known-errors/:knownErrorId/kb-article', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const problemRes = await client.query(
+      `SELECT * FROM problems WHERE id = $1 AND tenant_id = current_tenant_id()`,
+      [req.params.id],
+    );
+    if (problemRes.rows.length === 0) throw NotFound('Problem not found');
+    const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
+    if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
+
+    const kbArticleId = await resolveKbArticleId(client, req.body?.kb_article_id);
+    if (!kbArticleId) throw new AppError(400, 'kb_article_id is required');
+
+    const updated = await client.query(
+      `UPDATE known_errors
+       SET kb_article_id = $3
+       WHERE tenant_id = current_tenant_id()
+         AND problem_id = $1
+         AND id = $2
+       RETURNING id`,
+      [req.params.id, req.params.knownErrorId, kbArticleId],
+    );
+    if (updated.rows.length === 0) throw NotFound('Known error not found');
+    const row = await client.query(
+      `${KNOWN_ERROR_SELECT}
+       WHERE ke.tenant_id = current_tenant_id() AND ke.id = $1`,
+      [updated.rows[0].id],
+    );
+    res.json(row.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/:id/known-errors/:knownErrorId/kb-article', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const problemRes = await client.query(
+      `SELECT * FROM problems WHERE id = $1 AND tenant_id = current_tenant_id()`,
+      [req.params.id],
+    );
+    if (problemRes.rows.length === 0) throw NotFound('Problem not found');
+    const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
+    if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
+
+    const updated = await client.query(
+      `UPDATE known_errors
+       SET kb_article_id = NULL
+       WHERE tenant_id = current_tenant_id()
+         AND problem_id = $1
+         AND id = $2
+       RETURNING id`,
+      [req.params.id, req.params.knownErrorId],
+    );
+    if (updated.rows.length === 0) throw NotFound('Known error not found');
+    const row = await client.query(
+      `${KNOWN_ERROR_SELECT}
+       WHERE ke.tenant_id = current_tenant_id() AND ke.id = $1`,
+      [updated.rows[0].id],
+    );
+    res.json(row.rows[0]);
   } catch (err) {
     next(err);
   }

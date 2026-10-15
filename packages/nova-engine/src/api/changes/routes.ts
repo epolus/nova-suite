@@ -1240,12 +1240,13 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
     const reasonForChange = String(b.reason_for_change || '').trim() || 'Pending assessment';
     const implementationPlan = String(b.implementation_plan || '').trim() || 'Implementation plan to be defined during planning.';
     const backoutPlan = String(b.backout_plan || '').trim() || 'Backout plan to be defined during planning.';
-    const slaDueAt = await resolveSlaDueAt(client, 'change', {
+    const sla = await resolveSlaDueAt(client, 'change', {
       priority: b.priority || 'medium',
       impact: b.impact || 'medium',
       category: b.category || null,
       serviceId: b.service_id || null,
     });
+    const slaDueAt = sla.resolutionDueAt;
 
     const created = await client.query(
       `INSERT INTO changes (
@@ -1389,14 +1390,14 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
       if (['closed', 'cancelled', 'rejected'].includes(nextStatus)) {
         sets.push('sla_due_at = NULL');
       } else {
-        const dueAt = await resolveSlaDueAt(client, 'change', {
+        const due = await resolveSlaDueAt(client, 'change', {
           priority: updates.priority ?? current.priority,
           impact: updates.impact ?? current.impact,
           category: updates.category ?? current.category,
           serviceId: updates.service_id ?? current.service_id,
         });
         sets.push(`sla_due_at = $${i++}`);
-        vals.push(dueAt);
+        vals.push(due.resolutionDueAt);
         sets.push('sla_breached = false');
       }
     }
