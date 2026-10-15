@@ -68,6 +68,31 @@ export interface KnownError {
   tags: string[];
   severity: 'low' | 'medium' | 'high' | 'critical' | null;
   is_active: boolean;
+  kb_article_id: string | null;
+  kb_article_number?: string | null;
+  kb_article_title?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface RecurrenceCandidateIncident {
+  id: string;
+  number: string;
+  title: string;
+  status: string;
+  priority: number;
+  title_similarity: number;
+}
+
+export interface RecurrenceCandidate {
+  seed_id: string;
+  representative_title: string;
+  configuration_item_id: string | null;
+  service_id: string | null;
+  configuration_item_name?: string | null;
+  service_name?: string | null;
+  incident_ids: string[];
+  incidents: RecurrenceCandidateIncident[];
+  incident_count: number;
+  avg_similarity: number;
 }
