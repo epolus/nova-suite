@@ -1033,7 +1033,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.05', 'known_errors_kb_article'),
   ('v00.01.11', 'change_risk_questionnaire'),
   ('v00.01.12', 'notification_webhooks'),
-  ('v00.01.13', 'ai_triage_suggestions');
+  ('v00.01.13', 'ai_triage_suggestions'),
+  ('v00.01.14', 'itam_discovery_external_ids_and_intune');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1072,6 +1073,7 @@ $$;
 -- ITAM ASSET MANAGEMENT
 -- ============================================================
 
+-- status lifecycle (Zod): ordered | in_stock | in_use | maintenance | retired | disposed
 CREATE TABLE assets (
   id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id             uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -1089,11 +1091,19 @@ CREATE TABLE assets (
   contract_ref          text,
   depreciation_months   integer,
   notes                 text,
+  external_id_1         text,
+  external_id_2         text,
   created_at            timestamptz NOT NULL DEFAULT now(),
   updated_at            timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, asset_tag)
 );
 CREATE INDEX idx_assets_tenant_status ON assets(tenant_id, status, category);
+CREATE UNIQUE INDEX uq_assets_tenant_external_id_1
+  ON assets(tenant_id, external_id_1)
+  WHERE external_id_1 IS NOT NULL;
+CREATE UNIQUE INDEX uq_assets_tenant_external_id_2
+  ON assets(tenant_id, external_id_2)
+  WHERE external_id_2 IS NOT NULL;
 CREATE TRIGGER trg_assets_updated_at
   BEFORE UPDATE ON assets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -2170,7 +2180,7 @@ CREATE TABLE data_sources (
   description     text,
   entity_type     text NOT NULL,
   source_type     text NOT NULL DEFAULT 'csv_url'
-                  CHECK (source_type IN ('csv_url', 'json_url', 'rest_api', 'sftp')),
+                  CHECK (source_type IN ('csv_url', 'json_url', 'rest_api', 'sftp', 'intune')),
   source_config   jsonb NOT NULL DEFAULT '{}',
   column_mapping  jsonb NOT NULL DEFAULT '{}',
   schedule_cron   text NOT NULL DEFAULT '0 2 * * *',

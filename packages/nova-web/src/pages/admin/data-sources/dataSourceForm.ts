@@ -47,6 +47,11 @@ export interface FormData {
   // CSV options
   csv_delimiter: string;
   csv_has_headers: boolean;
+  // Intune / Entra
+  azure_tenant_id: string;
+  intune_client_id: string;
+  intune_client_secret: string;
+  intune_class_name: string;
 }
 
 export const EMPTY_FORM: FormData = {
@@ -91,6 +96,10 @@ export const EMPTY_FORM: FormData = {
   sftp_file_type: 'csv',
   csv_delimiter: 'auto',
   csv_has_headers: true,
+  azure_tenant_id: '',
+  intune_client_id: '',
+  intune_client_secret: '',
+  intune_class_name: 'laptop',
 };
 
 export function formatDate(d: string | null, emDash: string) {
@@ -127,7 +136,13 @@ export function buildSaveSourceConfig(
     if (!form.csv_has_headers) sourceConfig.csv_has_headers = false;
   }
 
-  if (form.source_type === 'sftp') {
+  if (form.source_type === 'intune') {
+    if (form.azure_tenant_id) sourceConfig.azure_tenant_id = form.azure_tenant_id;
+    if (form.intune_client_id) sourceConfig.client_id = form.intune_client_id;
+    if (form.intune_client_secret) sourceConfig.client_secret = form.intune_client_secret;
+    if (form.intune_class_name) sourceConfig.class_name = form.intune_class_name;
+    sourceConfig.create_assets = true;
+  } else if (form.source_type === 'sftp') {
     sourceConfig.sftp_host = form.sftp_host;
     if (form.sftp_port) sourceConfig.sftp_port = parseInt(form.sftp_port, 10);
     sourceConfig.sftp_username = form.sftp_username;
@@ -169,6 +184,7 @@ export function buildSaveSourceConfig(
     delete sourceConfig.basic_password;
     delete sourceConfig.oauth2_client_secret;
     delete sourceConfig.sftp_password;
+    delete sourceConfig.client_secret;
   }
 
   return sourceConfig;
@@ -179,7 +195,12 @@ export function buildTestSourceConfig(
   headers: Record<string, string>,
 ): Record<string, unknown> {
   const sourceConfig: Record<string, unknown> = {};
-  if (form.source_type === 'sftp') {
+  if (form.source_type === 'intune') {
+    if (form.azure_tenant_id) sourceConfig.azure_tenant_id = form.azure_tenant_id;
+    if (form.intune_client_id) sourceConfig.client_id = form.intune_client_id;
+    if (form.intune_client_secret) sourceConfig.client_secret = form.intune_client_secret;
+    if (form.intune_class_name) sourceConfig.class_name = form.intune_class_name;
+  } else if (form.source_type === 'sftp') {
     sourceConfig.sftp_host = form.sftp_host;
     if (form.sftp_port) sourceConfig.sftp_port = parseInt(form.sftp_port, 10);
     sourceConfig.sftp_username = form.sftp_username;
@@ -221,6 +242,7 @@ export function buildTestSourceConfig(
     delete sourceConfig.basic_password;
     delete sourceConfig.oauth2_client_secret;
     delete sourceConfig.sftp_password;
+    delete sourceConfig.client_secret;
   }
 
   return sourceConfig;

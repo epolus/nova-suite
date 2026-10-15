@@ -47,10 +47,11 @@ router.post('/', validateBody(createAssetSchema), async (req: Request, res: Resp
     const created = await client.query(
       `INSERT INTO assets (
          tenant_id, asset_tag, name, category, status, owner_user_id, linked_ci_id, vendor_name,
-         purchase_cost, purchase_currency, purchase_date, warranty_expires_at, contract_ref, depreciation_months, notes
+         purchase_cost, purchase_currency, purchase_date, warranty_expires_at, contract_ref, depreciation_months, notes,
+         external_id_1, external_id_2
        ) VALUES (
          current_tenant_id(), $1, $2, COALESCE($3, 'hardware'), COALESCE($4, 'in_use'), $5, $6, $7,
-         $8, COALESCE($9, 'USD'), $10, $11, $12, $13, $14
+         $8, COALESCE($9, 'USD'), $10, $11, $12, $13, $14, $15, $16
        ) RETURNING *`,
       [
         b.asset_tag,
@@ -67,6 +68,8 @@ router.post('/', validateBody(createAssetSchema), async (req: Request, res: Resp
         b.contract_ref || null,
         b.depreciation_months ?? null,
         b.notes || null,
+        b.external_id_1 || null,
+        b.external_id_2 || null,
       ],
     );
     res.status(201).json(created.rows[0]);

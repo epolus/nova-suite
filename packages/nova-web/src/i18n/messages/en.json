@@ -1558,7 +1558,8 @@
           "csvUrl": "CSV (URL)",
           "jsonUrl": "JSON (URL)",
           "restApi": "REST API",
-          "sftp": "SFTP / SSH"
+          "sftp": "SFTP / SSH",
+          "intune": "Microsoft Intune"
         },
         "importModes": {
           "insert": "Insert only (skip existing)",
@@ -3357,8 +3358,11 @@
     "review": "Review",
     "active": "Active",
     "installed": "Installed",
+    "ordered": "Ordered",
     "in_stock": "In Stock",
+    "inUse": "In Use",
     "maintenance": "Maintenance",
+    "disposed": "Disposed",
     "planned": "Planned",
     "critical": "Critical",
     "high": "High",

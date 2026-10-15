@@ -157,9 +157,11 @@ export default function DataSourceFormView({
             disabled={
               testingSource
               || !form.entity_type
-              || (form.source_type === 'sftp'
-                ? (!form.sftp_host || !form.sftp_path)
-                : !form.url)
+              || (form.source_type === 'intune'
+                ? false
+                : form.source_type === 'sftp'
+                  ? (!form.sftp_host || !form.sftp_path)
+                  : !form.url)
             }
             className="px-6 py-2.5 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 transition-colors"
           >
@@ -167,14 +169,32 @@ export default function DataSourceFormView({
           </button>
           <button
             onClick={onSave}
-            disabled={saving || !form.name || !form.entity_type || (form.source_type === 'sftp' ? (!form.sftp_host || !form.sftp_path) : !form.url)}
+            disabled={
+              saving
+              || !form.name
+              || !form.entity_type
+              || (form.source_type === 'intune'
+                ? false
+                : form.source_type === 'sftp'
+                  ? (!form.sftp_host || !form.sftp_path)
+                  : !form.url)
+            }
             className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
           >
             {saving ? tActions('saving') : tActions('save')}
           </button>
           <button
             onClick={onSaveAndClose}
-            disabled={saving || !form.name || !form.entity_type || (form.source_type === 'sftp' ? (!form.sftp_host || !form.sftp_path) : !form.url)}
+            disabled={
+              saving
+              || !form.name
+              || !form.entity_type
+              || (form.source_type === 'intune'
+                ? false
+                : form.source_type === 'sftp'
+                  ? (!form.sftp_host || !form.sftp_path)
+                  : !form.url)
+            }
             className="px-6 py-2.5 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 transition-colors"
           >
             {t('saveAndClose')}

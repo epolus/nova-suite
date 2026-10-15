@@ -16,7 +16,7 @@ export default function DataSourceAuthFields({ form, setField, vaultCreds }: Dat
 
   return (
     <>
-      {(form.source_type === 'rest_api' || form.source_type === 'csv_url' || form.source_type === 'json_url' || form.source_type === 'sftp') && (
+      {(form.source_type === 'rest_api' || form.source_type === 'csv_url' || form.source_type === 'json_url' || form.source_type === 'sftp' || form.source_type === 'intune') && (
         <Card>
           <h3 className="font-semibold text-gray-900 mb-4">{t('vaultSection')}</h3>
           <p className="text-xs text-gray-500 mb-3">
