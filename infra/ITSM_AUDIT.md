@@ -28,14 +28,14 @@
 
 | Module / Practice | Implemented Features | Associated Code / Schemas | Status |
 | :--- | :--- | :--- | :--- |
-| **Incident Management** | CRUD, impact×urgency priority matrix, assignment, journal, SLA due/breach fields, escalate workflow | `infra/postgres/init.sql` (`incidents`, `priority_matrix`), `packages/nova-engine/src/api/incidents/`, `packages/nova-worker/src/workflows/incident-escalation.ts`, `packages/nova-web/src/pages/incidents/` | In Progress |
+| **Incident Management** | CRUD, impact×urgency priority matrix, assignment, journal, dual SLA timers + pause, escalate workflow | `infra/postgres/init.sql` (`incidents`, `priority_matrix`), `packages/nova-engine/src/api/incidents/`, `packages/nova-worker/src/workflows/incident-escalation.ts`, `packages/nova-web/src/pages/incidents/` | In Progress |
 | **Major Incident Management** | Declare/promote, war room, participants, stakeholder cadence, postmortem | `packages/nova-engine/src/api/major-incidents/`, `packages/nova-worker/src/workflows/major-incident.ts`, `packages/nova-web/src/pages/major-incidents/` | MVP Ready |
 | **Service Request Management** | Catalog, dynamic forms, cart, approvals, fulfillment tasks, automation | `packages/nova-engine/src/api/catalog/`, `packages/nova-engine/src/api/requests/`, `packages/nova-web/src/pages/catalog/`, `packages/nova-web/src/pages/requests/` | MVP Ready |
 | **Change Enablement** | Standard/Normal/Emergency types, CAB meetings/approvals, schedule + same-CI conflicts, blackouts | `packages/nova-engine/src/api/changes/`, `packages/nova-web/src/pages/changes/`, `packages/nova-web/src/pages/admin/ChangeAdminPage.tsx` | MVP Ready |
 | **Problem Management** | Problem CRUD, RCA fields, incident linking, KEDB CRUD, problem tasks | `packages/nova-engine/src/api/problems/`, `packages/nova-web/src/pages/problems/`, `known_errors` in `init.sql` | MVP Ready |
 | **IT Asset Management (ITAM)** | Hardware/software inventory, asset↔CI link, statuses (in_use/in_stock/retired/disposed) | `packages/nova-engine/src/api/assets/`, `packages/nova-web/src/pages/assets/` | In Progress |
 | **CMDB** | CI classes, relationships, impact analysis, history, external IDs, data-source ingest | `packages/nova-engine/src/api/cmdb/`, `packages/nova-web/src/pages/cmdb/`, `cmdb_impact_analysis()` | MVP Ready |
-| **Service Level Management** | SLA definitions (response + resolution hours stored), resolution due-at runtime, warning_pct / breach flags | `packages/nova-engine/src/domain/sla.ts`, `packages/nova-web/src/pages/admin/sla/`, `sla_definitions` | In Progress |
+| **Service Level Management** | Dual timers (response + resolution), business calendars/hours/holidays, pause on waiting_* pending, Temporal dual-timer escalation | `packages/nova-engine/src/domain/sla.ts`, `packages/nova-web/src/pages/admin/sla/`, `packages/nova-web/src/pages/admin/BusinessCalendarsPage.tsx`, `sla_definitions`, `business_calendars` | In Progress |
 | **Knowledge Base** | Articles, categories, versioning, approvals, ratings, incident→KB resolutions | `packages/nova-engine/src/api/knowledge/`, `packages/nova-web/src/pages/knowledge/` | MVP Ready |
 | **Notifications** | In-app + email channels, rule admin UI | `packages/nova-engine/src/api/notifications/`, `packages/nova-web/src/pages/admin/notifications/` | In Progress |
 | **AI Assist** | Agent + ESS copilots with KB/catalog tools | `packages/nova-engine/src/ai/`, `packages/nova-engine/src/api/ai/` | In Progress |
@@ -69,10 +69,10 @@
 - [ ] Agentless network discovery / API integrations (e.g., Jamf, Intune). *(partial: generic data-source/import only)*
 
 ### E. Service Level Management (SLA)
-- [ ] Multi-tier SLAs (Response Time vs. Resolution Time). *(partial: both hours stored; runtime uses resolution only)*
-- [ ] Business hours / holiday calendar time-tracking logic.
-- [ ] Pause triggers (e.g., waiting on user response pauses SLA clock).
-- [ ] Breach warnings and automated escalation notifications. *(partial: Temporal warning/breach + journal stubs; no Slack/Teams)*
+- [x] Multi-tier SLAs (Response Time vs. Resolution Time). *(response_due_at + sla_due_at; separate breach flags)*
+- [x] Business hours / holiday calendar time-tracking logic. *(tenant default calendar; wall-clock fallback)*
+- [x] Pause triggers (e.g., waiting on user response pauses SLA clock). *(pending + waiting_* reasons)*
+- [ ] Breach warnings and automated escalation notifications. *(partial: Temporal dual-timer warning/breach + journal stubs; no Slack/Teams)*
 
 ---
 
