@@ -66,6 +66,7 @@ export const ServicesPage = lazy(() => import('@/pages/admin/ServicesPage'));
 export const SlaConfigPage = lazy(() => import('@/pages/admin/SlaConfigPage'));
 export const BusinessCalendarsPage = lazy(() => import('@/pages/admin/BusinessCalendarsPage'));
 export const ThemingPage = lazy(() => import('@/pages/admin/ThemingPage'));
+export const AiSettingsPage = lazy(() => import('@/pages/admin/AiSettingsPage'));
 export const DataSourcesPage = lazy(() => import('@/pages/admin/DataSourcesPage'));
 export const CredentialsPage = lazy(() => import('@/pages/admin/CredentialsPage'));
 export const KnowledgeWorkflowsPage = lazy(() => import('@/pages/admin/KnowledgeWorkflowsPage'));

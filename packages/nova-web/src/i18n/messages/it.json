@@ -28,6 +28,7 @@
       "open": "Aprire",
       "submit": "Invia",
       "approve": "Approvare",
+      "accept": "Accetta",
       "reject": "Rifiutare",
       "reopen": "Riaprire",
       "resolve": "Risolvere",
@@ -185,7 +186,6 @@
       "catalogTasks": "Attività del catalogo",
       "processes": "Processi",
       "slaConfiguration": "Configurazione SLA",
-      "businessCalendars": "Calendari aziendali",
       "notificationWorkflows": "Workflow di notifica",
       "notificationDeliveries": "Consegne notifiche",
       "changeManagement": "Gestione del cambiamento",
@@ -198,7 +198,8 @@
       "configPackages": "Pacchetti di configurazione",
       "importData": "Importa dati",
       "theming": "Tematizzazione",
-      "status": "Stato"
+      "status": "Stato",
+      "aiSettings": "Impostazioni IA"
     }
   },
   "auth": {
@@ -344,7 +345,19 @@
       "attachments": "Allegati",
       "insights": "Approfondimenti",
       "showInsights": "Mostra approfondimenti",
-      "hideInsights": "Nascondi approfondimenti"
+      "hideInsights": "Nascondi approfondimenti",
+      "aiTriageTitle": "Suggerimenti triage IA",
+      "aiTriageDescription": "Rivedi categoria, impatto, urgenza e sentiment prima di applicare.",
+      "aiTriageNonePending": "Nessun suggerimento triage IA in sospeso.",
+      "aiTriageCategory": "Categoria",
+      "aiTriageImpact": "Impatto",
+      "aiTriageUrgency": "Urgenza",
+      "aiTriageSentiment": "Sentiment",
+      "aiTriageConfidence": "Confidenza",
+      "aiTriageTags": "Tag",
+      "aiTriageLoadFailed": "Caricamento suggerimenti triage IA non riuscito",
+      "aiTriageAcceptFailed": "Accettazione suggerimento triage IA non riuscita",
+      "aiTriageRejectFailed": "Rifiuto suggerimento triage IA non riuscito"
     },
     "requests": {
       "title": "Richieste",
@@ -359,21 +372,7 @@
       "description": "Pianificare, valutare e tenere traccia dei cambiamenti.",
       "newChange": "Nuovo cambiamento",
       "calendar": "Cambia calendario",
-      "detailTitle": "Modifica dettaglio",
-      "conflictTypes": {
-        "scheduleOverlap": "Sovrapposizione di pianificazione",
-        "ciOverlap": "Sovrapposizione sullo stesso CI",
-        "blackoutWindow": "Finestra di blackout",
-        "dependencyConflict": "Conflitto di dipendenza"
-      },
-      "dependencyConflictSummary": "{count, plural, one {# conflitto di dipendenza su un CI correlato} other {# conflitti di dipendenza su CI correlati}}",
-      "riskQuestionnaire": "Questionario di rischio",
-      "riskQuestionnaireHint": "Valuta ogni domanda da 0 (rischio più basso) a 5 (più alto). Il salvataggio applica il punteggio ponderato e il livello suggerito.",
-      "riskScore": "Punteggio: {score}",
-      "suggestedRisk": "Suggerito: {level}",
-      "noRiskQuestions": "Nessuna domanda di rischio attiva. Un admin può configurarle in Amministrazione Change.",
-      "riskWeight": "Peso {weight}",
-      "selectScore": "Seleziona punteggio"
+      "detailTitle": "Modifica dettaglio"
     },
     "problems": {
       "title": "Problemi",
@@ -511,6 +510,19 @@
         "resetDefaults": "Ripristina predefiniti"
       },
       "imports": "Importa e sincronizza dati esterni.",
+      "aiSettings": {
+        "title": "Triage IA e deflessione",
+        "description": "Controlla triage IA in creazione e deflessione ESS tramite knowledge base.",
+        "triageOnCreate": "Esegui triage IA alla creazione incidente",
+        "triageOnCreateHelp": "Memorizza suggerimenti di categoria, impatto, urgenza, tag e sentiment.",
+        "autoApplyPriority": "Applica automaticamente impatto/urgenza suggeriti",
+        "autoApplyPriorityHelp": "Se abilitato, i suggerimenti aggiornano subito l'incidente (disattivato di default).",
+        "essAutoDeflect": "Deflessione ESS automatica con articoli KB",
+        "essAutoDeflectHelp": "Con confidenza sufficiente, risolvi il ticket ESS con l'articolo KB corrispondente.",
+        "deflectThreshold": "Soglia di confidenza deflessione ESS",
+        "deflectThresholdHelp": "Valore da 0 a 1. La deflessione automatica parte solo se la confidenza KB raggiunge la soglia.",
+        "saved": "Impostazioni salvate"
+      },
       "changeAdmin": {
         "title": "Amministrazione Change",
         "description": "Configura tipi, modelli, CAB, blackout e domande di rischio.",

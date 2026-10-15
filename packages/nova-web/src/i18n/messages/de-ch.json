@@ -28,6 +28,7 @@
       "open": "Öffnen",
       "submit": "Absenden",
       "approve": "Freigeben",
+      "accept": "Annehmen",
       "reject": "Ablehnen",
       "reopen": "Erneut öffnen",
       "resolve": "Lösen",
@@ -185,7 +186,6 @@
       "catalogTasks": "Katalogaufgaben",
       "processes": "Prozesse",
       "slaConfiguration": "SLA-Konfiguration",
-      "businessCalendars": "Geschäftskalender",
       "notificationWorkflows": "Benachrichtigungsworkflows",
       "notificationDeliveries": "Benachrichtigungszustellungen",
       "changeManagement": "Änderungsmanagement",
@@ -198,7 +198,8 @@
       "configPackages": "Konfigurationspakete",
       "importData": "Daten importieren",
       "theming": "Thematisierung",
-      "status": "Status"
+      "status": "Status",
+      "aiSettings": "KI-Einstellungen"
     }
   },
   "auth": {
@@ -344,7 +345,19 @@
       "attachments": "Anhänge",
       "insights": "Einblicke",
       "showInsights": "Einblicke anzeigen",
-      "hideInsights": "Erkenntnisse ausblenden"
+      "hideInsights": "Erkenntnisse ausblenden",
+      "aiTriageTitle": "KI-Triage-Vorschläge",
+      "aiTriageDescription": "Kategorie, Impact, Urgency und Sentiment prüfen, bevor sie angewendet werden.",
+      "aiTriageNonePending": "Keine ausstehenden KI-Triage-Vorschläge.",
+      "aiTriageCategory": "Kategorie",
+      "aiTriageImpact": "Impact",
+      "aiTriageUrgency": "Urgency",
+      "aiTriageSentiment": "Sentiment",
+      "aiTriageConfidence": "Konfidenz",
+      "aiTriageTags": "Tags",
+      "aiTriageLoadFailed": "KI-Triage-Vorschläge konnten nicht geladen werden",
+      "aiTriageAcceptFailed": "KI-Triage-Vorschlag konnte nicht angenommen werden",
+      "aiTriageRejectFailed": "KI-Triage-Vorschlag konnte nicht abgelehnt werden"
     },
     "requests": {
       "title": "Anfragen",
@@ -359,21 +372,7 @@
       "description": "Planen, bewerten und verfolgen Sie Änderungen.",
       "newChange": "Neue Veränderung",
       "calendar": "Kalender ändern",
-      "detailTitle": "Detail ändern",
-      "conflictTypes": {
-        "scheduleOverlap": "Terminüberschneidung",
-        "ciOverlap": "Gleicher CI-Konflikt",
-        "blackoutWindow": "Blackout-Fenster",
-        "dependencyConflict": "Abhängigkeitskonflikt"
-      },
-      "dependencyConflictSummary": "{count, plural, one {# Abhängigkeitskonflikt mit verwandtem CI} other {# Abhängigkeitskonflikte mit verwandten CIs}}",
-      "riskQuestionnaire": "Risikofragebogen",
-      "riskQuestionnaireHint": "Bewerten Sie jede Frage von 0 (niedrigstes Risiko) bis 5 (höchstes). Speichern wendet den gewichteten Score und die vorgeschlagene Risikostufe an.",
-      "riskScore": "Score: {score}",
-      "suggestedRisk": "Vorschlag: {level}",
-      "noRiskQuestions": "Keine aktiven Risikofragen. Admins können sie unter Change-Administration konfigurieren.",
-      "riskWeight": "Gewicht {weight}",
-      "selectScore": "Score wählen"
+      "detailTitle": "Detail ändern"
     },
     "problems": {
       "title": "Probleme",
@@ -511,6 +510,19 @@
         "resetDefaults": "Auf Standardwerte zurücksetzen"
       },
       "imports": "Externe Daten importieren und synchronisieren.",
+      "aiSettings": {
+        "title": "KI-Triage & Ablenkung",
+        "description": "Steuern Sie AI-Triage bei Incident-Erstellung und ESS-Knowledge-Ablenkung.",
+        "triageOnCreate": "KI-Triage bei Incident-Erstellung",
+        "triageOnCreateHelp": "Speichert Vorschläge zu Kategorie, Impact, Urgency, Tags und Sentiment.",
+        "autoApplyPriority": "Vorgeschlagenen Impact/Urgency automatisch anwenden",
+        "autoApplyPriorityHelp": "Wenn aktiv, werden Vorschläge sofort auf den Incident angewendet (Standard aus).",
+        "essAutoDeflect": "ESS Auto-Ablenkung mit Knowledge-Artikeln",
+        "essAutoDeflectHelp": "Bei hoher Konfidenz wird das ESS-Ticket mit dem passenden KB-Artikel gelöst.",
+        "deflectThreshold": "ESS-Ablenkungs-Konfidenzschwelle",
+        "deflectThresholdHelp": "Wert von 0 bis 1. Auto-Ablenkung nur bei ausreichender KB-Treffer-Konfidenz.",
+        "saved": "Einstellungen gespeichert"
+      },
       "changeAdmin": {
         "title": "Change-Administration",
         "description": "Change-Typen, Vorlagen, CAB, Blackouts und Risikofragen konfigurieren.",

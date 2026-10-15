@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { PoolClient } from 'pg';
 import type { CreateIncidentInput } from '../schemas';
+import { schedulePostCreateAiAssist } from '../../ai/post-create';
 import { resolveSlaDueAt } from '../sla';
 import {
   enqueueIncidentEscalationStartJob,
@@ -100,6 +101,15 @@ export async function createEssIncident(
     entityId: incident.id,
     actorUserId: userId,
   }).catch(() => {});
+
+  schedulePostCreateAiAssist({
+    tenantId,
+    actorUserId: userId,
+    incidentId: String(incident.id),
+    title,
+    description: description || null,
+    essChannel: true,
+  });
 
   return incident;
 }

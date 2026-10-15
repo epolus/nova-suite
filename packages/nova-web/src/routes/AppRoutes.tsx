@@ -126,6 +126,7 @@ export default function AppRoutes() {
           <Route path="knowledge-workflows" element={<Lazy><Pages.KnowledgeWorkflowsPage /></Lazy>} />
           <Route path="system-status" element={<Lazy><Pages.SystemStatusPage /></Lazy>} />
           <Route path="theming" element={<Lazy><Pages.ThemingPage /></Lazy>} />
+          <Route path="ai-settings" element={<Lazy><Pages.AiSettingsPage /></Lazy>} />
           <Route path="data-sources" element={<Lazy><Pages.DataSourcesPage /></Lazy>} />
           <Route path="credentials" element={<Lazy><Pages.CredentialsPage /></Lazy>} />
           <Route path="config-packages" element={<Lazy><Pages.ConfigPackagesPage /></Lazy>} />

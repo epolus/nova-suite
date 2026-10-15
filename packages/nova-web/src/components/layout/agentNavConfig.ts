@@ -143,6 +143,7 @@ export const adminSections: RawAdminSection[] = [
     items: [
       { to: '/admin/system-status', labelKey: 'admin.status', icon: 'status' },
       { to: '/admin/theming', labelKey: 'admin.theming', icon: 'theme' },
+      { to: '/admin/ai-settings', labelKey: 'admin.aiSettings', icon: 'settings' },
     ],
   },
 ];

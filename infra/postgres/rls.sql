@@ -55,6 +55,7 @@ ALTER TABLE change_risk_answers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE incident_ai_suggestions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_pending_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_audit_log ENABLE ROW LEVEL SECURITY;
@@ -419,6 +420,9 @@ CREATE POLICY tenant_isolation_ai_conversations ON ai_conversations
   USING (tenant_id = current_tenant_id() AND user_id = current_user_id())
   WITH CHECK (tenant_id = current_tenant_id() AND user_id = current_user_id());
 
+CREATE POLICY tenant_isolation_incident_ai_suggestions ON incident_ai_suggestions
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 CREATE POLICY tenant_isolation_ai_messages ON ai_messages
   FOR ALL
   USING (
@@ -684,6 +688,7 @@ ALTER TABLE change_risk_answers FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs FORCE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations FORCE ROW LEVEL SECURITY;
+ALTER TABLE incident_ai_suggestions FORCE ROW LEVEL SECURITY;
 ALTER TABLE ai_messages FORCE ROW LEVEL SECURITY;
 ALTER TABLE ai_pending_actions FORCE ROW LEVEL SECURITY;
 ALTER TABLE ai_audit_log FORCE ROW LEVEL SECURITY;
