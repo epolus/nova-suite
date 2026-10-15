@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
-import type { AdminUser, AssignmentGroupItem, AuditEvent, CompanyItem, ConfigDeploymentRun, ConfigPackageApplyResponse, ConfigPackageBundle, ConfigPackageExportResponse, ConfigPackageValidateResponse, CostCenterItem, CreateAssignmentGroupPayload, CreateUserPayload, DepartmentItem, LocationItem, NotificationEmailDelivery, NotificationEmailDeliverySummary, NotificationRule, NotificationWebhook, ProcessItem, RoleItem, RuntimeHealth, ServiceAdminItem, SlaDefinition, SystemMetrics, UpdateAssignmentGroupPayload, UpdateUserPayload, WorkflowDefinition } from '../types';
+import type { AdminUser, AssignmentGroupItem, AuditEvent, BusinessCalendar, BusinessHourRow, CompanyItem, ConfigDeploymentRun, ConfigPackageApplyResponse, ConfigPackageBundle, ConfigPackageExportResponse, ConfigPackageValidateResponse, CostCenterItem, CreateAssignmentGroupPayload, CreateUserPayload, DepartmentItem, HolidayRow, LocationItem, NotificationEmailDelivery, NotificationEmailDeliverySummary, NotificationRule, NotificationWebhook, ProcessItem, RoleItem, RuntimeHealth, ServiceAdminItem, SlaDefinition, SystemMetrics, UpdateAssignmentGroupPayload, UpdateUserPayload, WorkflowDefinition } from '../types';
 import type { AutomationDryRunRequestContext, AutomationDryRunResult } from '../types/automationDryRun';
 
 export const admin = {
@@ -68,6 +68,15 @@ export const admin = {
     request<{ success: boolean }>(`/admin/sla-definitions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteSlaDefinition: (id: string) =>
     request<{ success: boolean }>(`/admin/sla-definitions/${id}`, { method: 'DELETE' }),
+  // Business calendars
+  businessCalendars: () => request<{ business_calendars: BusinessCalendar[] }>('/admin/business-calendars'),
+  businessCalendar: (id: string) => request<BusinessCalendar>(`/admin/business-calendars/${id}`),
+  createBusinessCalendar: (data: Partial<BusinessCalendar> & { hours?: BusinessHourRow[]; holidays?: HolidayRow[] }) =>
+    request<{ id: string }>('/admin/business-calendars', { method: 'POST', body: JSON.stringify(data) }),
+  updateBusinessCalendar: (id: string, data: Partial<BusinessCalendar> & { hours?: BusinessHourRow[]; holidays?: HolidayRow[] }) =>
+    request<{ success: boolean }>(`/admin/business-calendars/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteBusinessCalendar: (id: string) =>
+    request<{ success: boolean }>(`/admin/business-calendars/${id}`, { method: 'DELETE' }),
   // Notification Rules
   notificationRules: () => request<{ notification_rules: NotificationRule[] }>('/admin/notification-rules'),
   createNotificationRule: (data: Partial<NotificationRule>) =>

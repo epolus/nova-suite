@@ -545,6 +545,10 @@ CREATE TABLE incidents (
   closed_at       timestamptz,
   sla_due_at      timestamptz,
   sla_breached    boolean NOT NULL DEFAULT false,
+  response_due_at timestamptz,
+  response_breached boolean NOT NULL DEFAULT false,
+  sla_paused_at   timestamptz,
+  sla_paused_ms   bigint NOT NULL DEFAULT 0,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, number)
@@ -555,6 +559,7 @@ CREATE INDEX idx_incidents_status ON incidents(tenant_id, status);
 CREATE INDEX idx_incidents_assigned ON incidents(assigned_to);
 CREATE INDEX idx_incidents_assignment_group ON incidents(assignment_group_id);
 CREATE INDEX idx_incidents_sla ON incidents(tenant_id, sla_breached, sla_due_at);
+CREATE INDEX idx_incidents_response_due ON incidents(tenant_id, response_breached, response_due_at);
 CREATE INDEX idx_incidents_request ON incidents(request_id);
 
 CREATE SEQUENCE incident_number_seq START 1000;
@@ -1004,7 +1009,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.00', '001_initial_schema'),
   ('v00.01.01', 'data_sources_external_key'),
   ('v00.01.02', 'configuration_items_external_ids_and_status'),
-  ('v00.01.03', 'change_number_seq_after_seed');
+  ('v00.01.03', 'change_number_seq_after_seed'),
+  ('v00.01.04', 'sla_hardening');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2025,6 +2031,51 @@ CREATE TRIGGER trg_sla_definitions_updated_at
   BEFORE UPDATE ON sla_definitions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+-- ============================================================
+-- BUSINESS CALENDARS (SLA business-hours clock)
+-- ============================================================
+
+CREATE TABLE business_calendars (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name        text NOT NULL,
+  timezone    text NOT NULL DEFAULT 'UTC',
+  is_default  boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_business_calendars_tenant ON business_calendars(tenant_id);
+
+CREATE UNIQUE INDEX uq_business_calendars_tenant_default
+  ON business_calendars(tenant_id)
+  WHERE is_default = true;
+
+CREATE TRIGGER trg_business_calendars_updated_at
+  BEFORE UPDATE ON business_calendars
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE business_hours (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  calendar_id  uuid NOT NULL REFERENCES business_calendars(id) ON DELETE CASCADE,
+  day_of_week  integer NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  start_time   time NOT NULL,
+  end_time     time NOT NULL,
+  CHECK (end_time > start_time)
+);
+
+CREATE INDEX idx_business_hours_calendar ON business_hours(calendar_id, day_of_week);
+
+CREATE TABLE holidays (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  calendar_id   uuid NOT NULL REFERENCES business_calendars(id) ON DELETE CASCADE,
+  holiday_date  date NOT NULL,
+  name          text NOT NULL,
+  UNIQUE (calendar_id, holiday_date)
+);
+
+CREATE INDEX idx_holidays_calendar ON holidays(calendar_id, holiday_date);
+
 -- Seed SLA definitions
 INSERT INTO sla_definitions (tenant_id, name, description, process_type, condition_priority, resolution_hours, response_hours, auto_close_days, warning_pct, on_warning, on_breach, sort_order) VALUES
   ('a0000000-0000-0000-0000-000000000001',
@@ -2417,10 +2468,12 @@ CREATE TABLE known_errors (
   tags              text[] NOT NULL DEFAULT '{}',
   severity          text CHECK (severity IN ('low', 'medium', 'high', 'critical')),
   is_active         boolean NOT NULL DEFAULT true,
+  kb_article_id     uuid REFERENCES knowledge_articles(id) ON DELETE SET NULL,
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_known_errors_problem ON known_errors(tenant_id, problem_id, is_active);
+CREATE INDEX idx_known_errors_kb_article ON known_errors(tenant_id, kb_article_id);
 CREATE INDEX idx_known_errors_tags_gin ON known_errors USING gin (tags);
 
 CREATE TABLE problem_tasks (

@@ -66,6 +66,9 @@ ALTER TABLE report_exports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_calendars ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_hours ENABLE ROW LEVEL SECURITY;
+ALTER TABLE holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
@@ -494,6 +497,26 @@ CREATE POLICY tenant_isolation_report_activity_events ON report_activity_events
 CREATE POLICY tenant_isolation_sla_definitions ON sla_definitions
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Business Calendars ───
+CREATE POLICY tenant_isolation_business_calendars ON business_calendars
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Business Hours (scoped via parent calendar) ───
+CREATE POLICY tenant_isolation_business_hours ON business_hours
+  FOR ALL USING (
+    calendar_id IN (
+      SELECT id FROM business_calendars WHERE tenant_id = current_tenant_id()
+    )
+  );
+
+-- ─── Holidays (scoped via parent calendar) ───
+CREATE POLICY tenant_isolation_holidays ON holidays
+  FOR ALL USING (
+    calendar_id IN (
+      SELECT id FROM business_calendars WHERE tenant_id = current_tenant_id()
+    )
+  );
+
 -- ─── Tenant Settings ───
 CREATE POLICY tenant_isolation_tenant_settings ON tenant_settings
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -664,6 +687,9 @@ ALTER TABLE report_exports FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions FORCE ROW LEVEL SECURITY;
+ALTER TABLE business_calendars FORCE ROW LEVEL SECURITY;
+ALTER TABLE business_hours FORCE ROW LEVEL SECURITY;
+ALTER TABLE holidays FORCE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles FORCE ROW LEVEL SECURITY;

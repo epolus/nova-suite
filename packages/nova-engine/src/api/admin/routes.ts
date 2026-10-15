@@ -1361,6 +1361,162 @@ router.delete('/sla-definitions/:id', async (req: Request, res: Response, next: 
 });
 
 // ════════════════════════════════════════════
+// BUSINESS CALENDARS
+// ════════════════════════════════════════════
+
+router.get('/business-calendars', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const rows = await db.getMany(
+      `SELECT * FROM business_calendars
+       WHERE tenant_id = $1
+       ORDER BY is_default DESC, name ASC`,
+      [tenantId],
+    );
+    res.json({ business_calendars: rows });
+  } catch (err) { next(err); }
+});
+
+router.get('/business-calendars/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const calendar = await db.getOne(
+      `SELECT * FROM business_calendars WHERE id = $1 AND tenant_id = $2`,
+      [req.params.id, tenantId],
+    );
+    if (!calendar) throw new AppError(404, 'Calendar not found');
+    const hours = await db.getMany(
+      `SELECT id, day_of_week, start_time::text AS start_time, end_time::text AS end_time
+       FROM business_hours WHERE calendar_id = $1
+       ORDER BY day_of_week, start_time`,
+      [req.params.id],
+    );
+    const holidayRows = await db.getMany(
+      `SELECT id, holiday_date::text AS holiday_date, name
+       FROM holidays WHERE calendar_id = $1
+       ORDER BY holiday_date`,
+      [req.params.id],
+    );
+    res.json({ ...calendar, hours, holidays: holidayRows });
+  } catch (err) { next(err); }
+});
+
+router.post('/business-calendars', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const { name, timezone, is_default, hours, holidays } = req.body || {};
+    if (!name || !String(name).trim()) throw new AppError(400, 'name is required');
+
+    if (is_default) {
+      await db.query(
+        `UPDATE business_calendars SET is_default = false WHERE tenant_id = $1 AND is_default = true`,
+        [tenantId],
+      );
+    }
+
+    const row = await db.getOne<{ id: string }>(
+      `INSERT INTO business_calendars (tenant_id, name, timezone, is_default)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [tenantId, String(name).trim(), timezone || 'UTC', Boolean(is_default)],
+    );
+    const calendarId = row!.id;
+
+    if (Array.isArray(hours)) {
+      for (const h of hours) {
+        await db.query(
+          `INSERT INTO business_hours (calendar_id, day_of_week, start_time, end_time)
+           VALUES ($1, $2, $3::time, $4::time)`,
+          [calendarId, h.day_of_week, h.start_time, h.end_time],
+        );
+      }
+    }
+    if (Array.isArray(holidays)) {
+      for (const hol of holidays) {
+        await db.query(
+          `INSERT INTO holidays (calendar_id, holiday_date, name)
+           VALUES ($1, $2::date, $3)`,
+          [calendarId, hol.holiday_date, hol.name || 'Holiday'],
+        );
+      }
+    }
+
+    res.status(201).json({ id: calendarId });
+  } catch (err) { next(err); }
+});
+
+router.patch('/business-calendars/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    const existing = await db.getOne(
+      `SELECT id FROM business_calendars WHERE id = $1 AND tenant_id = $2`,
+      [req.params.id, tenantId],
+    );
+    if (!existing) throw new AppError(404, 'Calendar not found');
+
+    const { name, timezone, is_default, hours, holidays } = req.body || {};
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    let i = 1;
+
+    if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(String(name).trim()); }
+    if (timezone !== undefined) { sets.push(`timezone = $${i++}`); vals.push(timezone || 'UTC'); }
+    if (is_default !== undefined) {
+      if (is_default) {
+        await db.query(
+          `UPDATE business_calendars SET is_default = false WHERE tenant_id = $1 AND is_default = true AND id <> $2`,
+          [tenantId, req.params.id],
+        );
+      }
+      sets.push(`is_default = $${i++}`);
+      vals.push(Boolean(is_default));
+    }
+
+    if (sets.length) {
+      vals.push(req.params.id, tenantId);
+      await db.query(
+        `UPDATE business_calendars SET ${sets.join(', ')} WHERE id = $${i++} AND tenant_id = $${i}`,
+        vals,
+      );
+    }
+
+    if (Array.isArray(hours)) {
+      await db.query('DELETE FROM business_hours WHERE calendar_id = $1', [req.params.id]);
+      for (const h of hours) {
+        await db.query(
+          `INSERT INTO business_hours (calendar_id, day_of_week, start_time, end_time)
+           VALUES ($1, $2, $3::time, $4::time)`,
+          [req.params.id, h.day_of_week, h.start_time, h.end_time],
+        );
+      }
+    }
+    if (Array.isArray(holidays)) {
+      await db.query('DELETE FROM holidays WHERE calendar_id = $1', [req.params.id]);
+      for (const hol of holidays) {
+        await db.query(
+          `INSERT INTO holidays (calendar_id, holiday_date, name)
+           VALUES ($1, $2::date, $3)`,
+          [req.params.id, hol.holiday_date, hol.name || 'Holiday'],
+        );
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/business-calendars/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tenantId = req.user!.tenant_id;
+    await db.query(
+      'DELETE FROM business_calendars WHERE id = $1 AND tenant_id = $2',
+      [req.params.id, tenantId],
+    );
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// ════════════════════════════════════════════
 // NOTIFICATION RULES
 // ════════════════════════════════════════════
 
