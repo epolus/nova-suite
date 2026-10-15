@@ -108,6 +108,7 @@ export const adminSections: RawAdminSection[] = [
     items: [
       { to: '/admin/processes', labelKey: 'admin.processes', icon: 'processes' },
       { to: '/admin/sla-config', labelKey: 'admin.slaConfiguration', icon: 'sla' },
+      { to: '/admin/business-calendars', labelKey: 'admin.businessCalendars', icon: 'sla' },
       { to: '/admin/notification-config', labelKey: 'admin.notificationWorkflows', icon: 'notifications' },
       { to: '/admin/notification-deliveries', labelKey: 'admin.notificationDeliveries', icon: 'notification_deliveries' },
       { to: '/admin/change-management', labelKey: 'admin.changeManagement', icon: 'change' },
@@ -142,6 +143,7 @@ export const adminSections: RawAdminSection[] = [
     items: [
       { to: '/admin/system-status', labelKey: 'admin.status', icon: 'status' },
       { to: '/admin/theming', labelKey: 'admin.theming', icon: 'theme' },
+      { to: '/admin/ai-settings', labelKey: 'admin.aiSettings', icon: 'settings' },
     ],
   },
 ];

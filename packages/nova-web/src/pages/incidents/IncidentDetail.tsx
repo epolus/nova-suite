@@ -14,13 +14,14 @@ import { IncidentSummaryCard, IncidentCallerCard, IncidentServiceContextCard } f
 import { IncidentDetailsCard, IncidentJournalCard } from './incidentActivity';
 import { KbResolveModal } from './KbResolveModal';
 import { IncidentIntelligenceSidebar } from './IncidentIntelligenceSidebar';
+import { AiTriageSuggestions } from './AiTriageSuggestions';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 
 export default function IncidentDetail() {
   const d = useIncidentDetail();
   const {
-    navigate, inc, loading, loadError, formError,
-    intelligenceOpen, saving,
+    id, navigate, inc, loading, loadError, formError,
+    intelligenceOpen, saving, isFulfiller, readonly, refresh,
     fileAttachments, attachmentsLoading, uploading, dragOver, setDragOver, fileInputRef,
     previewUrl, previewName, closePreview,
     kbSuggestions, kbResolveOpen, setKbResolveOpen, handleResolveWithKb,
@@ -63,6 +64,14 @@ export default function IncidentDetail() {
 
       <div className={intelligenceOpen ? 'xl:flex xl:items-start xl:gap-6' : ''}>
         <div className="min-w-0 flex-1">
+
+          {isFulfiller && id && (
+            <AiTriageSuggestions
+              incidentId={id}
+              readonly={readonly}
+              onApplied={refresh}
+            />
+          )}
 
           <IncidentSummaryCard d={d} />
 

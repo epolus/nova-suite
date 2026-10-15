@@ -26,6 +26,13 @@ import {
 } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { createEssIncident } from '../../domain/incidents/create-ess-incident';
+import { schedulePostCreateAiAssist } from '../../ai/post-create';
+import {
+  pauseSlaClock,
+  resolveSlaDueAt,
+  resumeSlaClock,
+  shouldPauseSlaForPending,
+} from '../../domain/sla';
 import {
   signalIncidentResolved,
   cancelIncidentAutoClose,
@@ -288,10 +295,13 @@ router.post(
       const seqResult = await client.query("SELECT nextval('incident_number_seq')");
       const number = `INC${seqResult.rows[0].nextval.toString().padStart(7, '0')}`;
 
-      // Default SLA: priority-based hours
-      const slaHoursMap: Record<number, number> = { 1: 4, 2: 8, 3: 24, 4: 48, 5: 72 };
-      const slaDueAt = new Date();
-      slaDueAt.setHours(slaDueAt.getHours() + (slaHoursMap[priority] || 24));
+      const sla = await resolveSlaDueAt(client, 'incident', {
+        priority,
+        impact,
+        urgency,
+        category: category || null,
+        serviceId: service_id || null,
+      });
 
       const result = await client.query(
         `INSERT INTO incidents (
@@ -299,20 +309,20 @@ router.post(
           status, impact, urgency, priority,
           assigned_to, assignment_group_id, caller_id,
           contact_info, service_id, configuration_item_id,
-          category, subcategory, sla_due_at
+          category, subcategory, sla_due_at, response_due_at
         ) VALUES (
           current_tenant_id(), $1, $2, $3, $4,
           $5, $6, $7, $8,
           $9, $10, $11,
           $12, $13, $14,
-          $15, $16, $17
+          $15, $16, $17, $18
         ) RETURNING *`,
         [
           number, request_id || null, title, description || null,
           'new', impact, urgency, priority,
           assigned_to || null, assignment_group_id || null, caller_id || null,
           contact_info || null, service_id || null, configuration_item_id || null,
-          category || null, subcategory || null, slaDueAt.toISOString(),
+          category || null, subcategory || null, sla.resolutionDueAt, sla.responseDueAt,
         ],
       );
 
@@ -324,12 +334,15 @@ router.post(
       );
 
       // Fire-and-forget via durable queue: start SLA escalation workflow
-      enqueueIncidentEscalationStartJob({
-        incidentId: result.rows[0].id,
-        tenantId: req.user!.tenant_id,
-        priority,
-        slaDueAt: slaDueAt.toISOString(),
-      }).catch(() => {});
+      if (sla.resolutionDueAt || sla.responseDueAt) {
+        enqueueIncidentEscalationStartJob({
+          incidentId: result.rows[0].id,
+          tenantId: req.user!.tenant_id,
+          priority,
+          slaDueAt: sla.resolutionDueAt || sla.responseDueAt!,
+          responseDueAt: sla.responseDueAt,
+        }).catch(() => {});
+      }
 
       enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
@@ -338,6 +351,15 @@ router.post(
         entityId: result.rows[0].id,
         actorUserId: req.user!.id,
       }).catch(() => {});
+
+      schedulePostCreateAiAssist({
+        tenantId: req.user!.tenant_id,
+        actorUserId: req.user!.id,
+        incidentId: result.rows[0].id,
+        title,
+        description: description || null,
+        essChannel: false,
+      });
 
       res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -1019,6 +1041,140 @@ router.post(
   },
 );
 
+// ─── GET /api/incidents/:id/ai-suggestions ───
+router.get(
+  '/:id/ai-suggestions',
+  requireRole('admin', 'fulfiller'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const incident = await client.query(`SELECT id FROM incidents WHERE id = $1`, [req.params.id]);
+      if (incident.rows.length === 0) throw NotFound('Incident not found');
+
+      const result = await client.query(
+        `SELECT id, incident_id, tenant_id, suggested_category, suggested_impact, suggested_urgency,
+                suggested_tags, sentiment, confidence, raw_json, status, created_at
+         FROM incident_ai_suggestions
+         WHERE incident_id = $1 AND tenant_id = current_tenant_id()
+         ORDER BY created_at DESC`,
+        [req.params.id],
+      );
+      res.json({ suggestions: result.rows });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/incidents/:id/ai-suggestions/:suggestionId/accept ───
+router.post(
+  '/:id/ai-suggestions/:suggestionId/accept',
+  requireRole('admin', 'fulfiller'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const incidentId = String(req.params.id);
+      const suggestionId = String(req.params.suggestionId);
+
+      const sug = await client.query(
+        `SELECT * FROM incident_ai_suggestions
+         WHERE id = $1 AND incident_id = $2 AND tenant_id = current_tenant_id()`,
+        [suggestionId, incidentId],
+      );
+      if (sug.rows.length === 0) throw NotFound('Suggestion not found');
+      const suggestion = sug.rows[0] as {
+        status: string;
+        suggested_category: string | null;
+        suggested_impact: string | null;
+        suggested_urgency: string | null;
+        suggested_tags: string[] | null;
+      };
+      if (suggestion.status !== 'pending') {
+        throw new AppError(400, `Suggestion is already ${suggestion.status}`);
+      }
+
+      const updates: Record<string, unknown> = {};
+      if (suggestion.suggested_category) updates.category = suggestion.suggested_category;
+      if (suggestion.suggested_impact) updates.impact = suggestion.suggested_impact;
+      if (suggestion.suggested_urgency) updates.urgency = suggestion.suggested_urgency;
+
+      if (suggestion.suggested_impact || suggestion.suggested_urgency) {
+        const existing = await client.query(
+          `SELECT impact, urgency FROM incidents WHERE id = $1`,
+          [incidentId],
+        );
+        const impact = suggestion.suggested_impact || existing.rows[0]?.impact;
+        const urgency = suggestion.suggested_urgency || existing.rows[0]?.urgency;
+        const priorityResult = await client.query(
+          'SELECT calculate_priority($1, $2) AS priority',
+          [impact, urgency],
+        );
+        updates.priority = priorityResult.rows[0]?.priority;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        const setClauses = Object.keys(updates).map((k, i) => `${k} = $${i + 2}`);
+        await client.query(
+          `UPDATE incidents SET ${setClauses.join(', ')} WHERE id = $1`,
+          [incidentId, ...Object.values(updates)],
+        );
+      }
+
+      await client.query(
+        `UPDATE incident_ai_suggestions SET status = 'accepted' WHERE id = $1`,
+        [suggestionId],
+      );
+      await client.query(
+        `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
+         VALUES (current_tenant_id(), $1, $2, 'state_change', $3)`,
+        [incidentId, req.user!.id, 'Accepted AI triage suggestion'],
+      );
+
+      const incident = await client.query(`SELECT * FROM incidents WHERE id = $1`, [incidentId]);
+      res.json({ suggestion_id: suggestionId, status: 'accepted', incident: incident.rows[0] });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/incidents/:id/ai-suggestions/:suggestionId/reject ───
+router.post(
+  '/:id/ai-suggestions/:suggestionId/reject',
+  requireRole('admin', 'fulfiller'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const incidentId = String(req.params.id);
+      const suggestionId = String(req.params.suggestionId);
+
+      const sug = await client.query(
+        `SELECT id, status FROM incident_ai_suggestions
+         WHERE id = $1 AND incident_id = $2 AND tenant_id = current_tenant_id()`,
+        [suggestionId, incidentId],
+      );
+      if (sug.rows.length === 0) throw NotFound('Suggestion not found');
+      if (sug.rows[0].status !== 'pending') {
+        throw new AppError(400, `Suggestion is already ${sug.rows[0].status}`);
+      }
+
+      await client.query(
+        `UPDATE incident_ai_suggestions SET status = 'rejected' WHERE id = $1`,
+        [suggestionId],
+      );
+      await client.query(
+        `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
+         VALUES (current_tenant_id(), $1, $2, 'work_note', $3)`,
+        [incidentId, req.user!.id, 'Rejected AI triage suggestion'],
+      );
+
+      res.json({ suggestion_id: suggestionId, status: 'rejected' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── GET /api/incidents/:id/problems ───
 router.get('/:id/problems', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -1167,6 +1323,41 @@ router.patch(
           res.status(400).json({ error: 'Pending reason is required when setting status to pending' });
           return;
         }
+      }
+
+      // Pause/resume SLA clock on pending transitions with waiting_* reasons.
+      const nextStatus = updates.status !== undefined ? updates.status : current.status;
+      const nextReason = updates.resolution_code !== undefined
+        ? updates.resolution_code
+        : current.resolution_code;
+      const enteringPendingPause = nextStatus === 'pending'
+        && current.status !== 'pending'
+        && shouldPauseSlaForPending(nextReason);
+      const leavingPending = current.status === 'pending'
+        && updates.status !== undefined
+        && updates.status !== 'pending'
+        && current.sla_paused_at;
+
+      if (enteringPendingPause) {
+        const paused = pauseSlaClock({
+          sla_paused_at: current.sla_paused_at,
+          sla_paused_ms: current.sla_paused_ms,
+          response_due_at: current.response_due_at,
+          sla_due_at: current.sla_due_at,
+        });
+        updates.sla_paused_at = paused.sla_paused_at;
+        updates.sla_paused_ms = paused.sla_paused_ms;
+      } else if (leavingPending) {
+        const resumed = resumeSlaClock({
+          sla_paused_at: current.sla_paused_at,
+          sla_paused_ms: current.sla_paused_ms,
+          response_due_at: current.response_due_at,
+          sla_due_at: current.sla_due_at,
+        });
+        updates.sla_paused_at = resumed.sla_paused_at;
+        updates.sla_paused_ms = resumed.sla_paused_ms;
+        updates.response_due_at = resumed.response_due_at;
+        updates.sla_due_at = resumed.sla_due_at;
       }
 
       // Resolved requires solution notes.

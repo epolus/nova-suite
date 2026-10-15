@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import { changes } from '../../api/client';
-import type { CabMeeting, ChangeBlackout, ChangeType, StandardChangeTemplate } from '../../api/client';
+import type { CabMeeting, ChangeBlackout, ChangeRiskQuestion, ChangeType, StandardChangeTemplate } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import UserDateTimeInput from '../../components/UserDateTimeInput';
@@ -14,11 +14,13 @@ export default function ChangeAdminPage() {
   const [templates, setTemplates] = useState<StandardChangeTemplate[]>([]);
   const [meetings, setMeetings] = useState<CabMeeting[]>([]);
   const [blackouts, setBlackouts] = useState<ChangeBlackout[]>([]);
+  const [riskQuestions, setRiskQuestions] = useState<ChangeRiskQuestion[]>([]);
   const [loadError, setLoadError] = useState('');
   const [newType, setNewType] = useState({ name: 'normal', description: '', requires_cab_approval: true, requires_manager_approval: true, auto_approve: false });
   const [newTemplate, setNewTemplate] = useState({ change_type_id: '', name: '', category: '', implementation_plan_template: '', backout_plan_template: '', test_plan_template: '' });
   const [newMeeting, setNewMeeting] = useState({ title: '', scheduled_at: '' });
   const [newBlackout, setNewBlackout] = useState({ name: '', start_date: '', end_date: '', reason: '' });
+  const [newQuestion, setNewQuestion] = useState({ prompt: '', weight: '1', sort_order: '0' });
 
   const load = useCallback(() => {
     Promise.all([
@@ -26,13 +28,15 @@ export default function ChangeAdminPage() {
       changes.standardTemplates(),
       changes.cabMeetings(),
       changes.blackouts(),
+      changes.riskQuestions(true),
     ])
-      .then(([typesRes, s, m, b]) => {
+      .then(([typesRes, s, m, b, q]) => {
         setLoadError('');
         setTypes(typesRes.change_types);
         setTemplates(s.templates);
         setMeetings(m.meetings);
         setBlackouts(b.blackouts);
+        setRiskQuestions(q.questions);
         setNewTemplate((p) => ({ ...p, change_type_id: p.change_type_id || typesRes.change_types[0]?.id || '' }));
       })
       .catch((err: unknown) => {
@@ -146,6 +150,81 @@ export default function ChangeAdminPage() {
             />
             <input value={newBlackout.reason} onChange={(e) => setNewBlackout((p) => ({ ...p, reason: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder={tPage('reasonPlaceholder')} />
             <button onClick={() => changes.createBlackout({ ...newBlackout, start_date: new Date(newBlackout.start_date).toISOString(), end_date: new Date(newBlackout.end_date).toISOString() }).then(() => { setNewBlackout({ name: '', start_date: '', end_date: '', reason: '' }); load(); })} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">{tPage('addBlackout')}</button>
+          </div>
+        </Card>
+
+        <Card className="xl:col-span-2">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">{tPage('riskQuestions')}</h3>
+          <div className="space-y-2 mb-4 max-h-72 overflow-y-auto">
+            {riskQuestions.map((q) => (
+              <div key={q.id} className="p-2 border rounded-lg flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{q.prompt}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {tPage('riskWeightLabel', { weight: Number(q.weight) })} · {tPage('sortOrderLabel', { order: q.sort_order })}
+                  </p>
+                </div>
+                <label className="text-xs flex items-center gap-1 shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={q.is_active}
+                    onChange={(e) => changes.updateRiskQuestion(q.id, { is_active: e.target.checked }).then(load)}
+                  />
+                  {tPage('active')}
+                </label>
+                <button
+                  type="button"
+                  className="text-xs text-red-600 shrink-0"
+                  onClick={() => changes.deleteRiskQuestion(q.id).then(load)}
+                >
+                  {tPage('deactivate')}
+                </button>
+              </div>
+            ))}
+            {riskQuestions.length === 0 && <p className="text-sm text-gray-500">{tPage('noRiskQuestions')}</p>}
+          </div>
+          <div className="space-y-2">
+            <input
+              value={newQuestion.prompt}
+              onChange={(e) => setNewQuestion((p) => ({ ...p, prompt: e.target.value }))}
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+              placeholder={tPage('riskPromptPlaceholder')}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={newQuestion.weight}
+                onChange={(e) => setNewQuestion((p) => ({ ...p, weight: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+                placeholder={tPage('weightPlaceholder')}
+              />
+              <input
+                type="number"
+                value={newQuestion.sort_order}
+                onChange={(e) => setNewQuestion((p) => ({ ...p, sort_order: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+                placeholder={tPage('sortOrderPlaceholder')}
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (!newQuestion.prompt.trim()) return;
+                changes.createRiskQuestion({
+                  prompt: newQuestion.prompt.trim(),
+                  weight: Number(newQuestion.weight) || 1,
+                  sort_order: Number(newQuestion.sort_order) || 0,
+                  is_active: true,
+                }).then(() => {
+                  setNewQuestion({ prompt: '', weight: '1', sort_order: '0' });
+                  load();
+                });
+              }}
+              className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm"
+            >
+              {tPage('addRiskQuestion')}
+            </button>
           </div>
         </Card>
       </div>

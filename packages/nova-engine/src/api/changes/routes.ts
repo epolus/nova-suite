@@ -12,10 +12,13 @@ import {
   changeTransitionSchema,
   createBlackoutSchema,
   createCabMeetingSchema,
+  createChangeRiskQuestionSchema,
   createChangeSchema,
   createChangeTypeSchema,
   paginationSchema,
+  submitChangeRiskAssessmentSchema,
   updateBlackoutSchema,
+  updateChangeRiskQuestionSchema,
   updateChangeSchema,
   updateChangeTypeSchema,
 } from '../../domain/schemas';
@@ -224,6 +227,14 @@ async function syncRelatedRecords(client: any, change: any): Promise<void> {
   }
 }
 
+/** Weighted-sum thresholds for suggested risk_level (scores 0–5 × question weight). */
+function suggestRiskLevelFromScore(score: number): 'low' | 'medium' | 'high' | 'very_high' {
+  if (score < 8) return 'low';
+  if (score < 16) return 'medium';
+  if (score < 24) return 'high';
+  return 'very_high';
+}
+
 async function refreshChangeConflicts(client: any, changeId: string): Promise<void> {
   const changeRes = await client.query(
     `SELECT c.id, c.scheduled_start, c.scheduled_end, c.risk_level
@@ -292,6 +303,63 @@ async function refreshChangeConflicts(client: any, changeId: string): Promise<vo
        AND c2.tenant_id = current_tenant_id()
        AND c2.status IN ('approved', 'scheduled', 'implementing', 'implemented', 'reviewing')
        AND tstzrange(c2.scheduled_start, c2.scheduled_end, '[)') && tstzrange($3::timestamptz, $4::timestamptz, '[)')`,
+    [changeId, c.risk_level, c.scheduled_start, c.scheduled_end],
+  );
+
+  // Dependency-aware collisions: overlapping changes on related CIs
+  // (depends_on / runs_on / part_of via cmdb_impact_analysis + reverse edges).
+  await client.query(
+    `WITH change_ci_ids AS (
+       SELECT cc.ci_id
+       FROM change_cis cc
+       WHERE cc.tenant_id = current_tenant_id()
+         AND cc.change_id = $1::uuid
+     ),
+     related_cis AS (
+       SELECT ci_id FROM change_ci_ids
+       UNION
+       SELECT ia.ci_id
+       FROM change_ci_ids cci
+       CROSS JOIN LATERAL cmdb_impact_analysis(cci.ci_id, 5) ia
+       UNION
+       SELECT r.source_ci_id AS ci_id
+       FROM ci_relationships r
+       JOIN change_ci_ids cci ON cci.ci_id = r.target_ci_id
+       WHERE r.tenant_id = current_tenant_id()
+         AND r.relationship_type IN ('depends_on', 'runs_on', 'part_of')
+       UNION
+       SELECT r.target_ci_id AS ci_id
+       FROM ci_relationships r
+       JOIN change_ci_ids cci ON cci.ci_id = r.source_ci_id
+       WHERE r.tenant_id = current_tenant_id()
+         AND r.relationship_type IN ('depends_on', 'runs_on', 'part_of', 'used_by')
+     )
+     INSERT INTO change_conflicts (tenant_id, change_id, conflicting_change_id, conflict_type, severity, details)
+     SELECT DISTINCT
+       current_tenant_id(),
+       $1::uuid,
+       c2.id,
+       'dependency_conflict',
+       CASE
+         WHEN $2::change_risk_enum IN ('high'::change_risk_enum, 'very_high'::change_risk_enum) THEN 'blocking'
+         ELSE 'warning'
+       END,
+       'Overlapping change on a related CI (dependency tree)'
+     FROM related_cis rel
+     JOIN change_cis cc2 ON cc2.ci_id = rel.ci_id AND cc2.change_id <> $1::uuid
+     JOIN changes c2 ON c2.id = cc2.change_id
+     WHERE c2.tenant_id = current_tenant_id()
+       AND c2.status IN ('approved', 'scheduled', 'implementing', 'implemented', 'reviewing')
+       AND c2.scheduled_start IS NOT NULL
+       AND c2.scheduled_end IS NOT NULL
+       AND tstzrange(c2.scheduled_start, c2.scheduled_end, '[)') && tstzrange($3::timestamptz, $4::timestamptz, '[)')
+       AND NOT EXISTS (
+         SELECT 1
+         FROM change_cis own
+         JOIN change_cis other ON other.ci_id = own.ci_id AND other.change_id = c2.id
+         WHERE own.tenant_id = current_tenant_id()
+           AND own.change_id = $1::uuid
+       )`,
     [changeId, c.risk_level, c.scheduled_start, c.scheduled_end],
   );
 }
@@ -637,6 +705,91 @@ router.patch('/blackouts/:id', validateBody(updateBlackoutSchema), async (req: R
   }
 });
 
+router.get('/risk-questions', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const includeInactive = String(req.query.include_inactive || '') === 'true';
+    const rows = await client.query(
+      `SELECT *
+       FROM change_risk_questions
+       WHERE tenant_id = current_tenant_id()
+         AND ($1::boolean OR is_active = true)
+       ORDER BY sort_order ASC, created_at ASC`,
+      [includeInactive && hasChangeRole(req)],
+    );
+    res.json({ questions: rows.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/risk-questions', validateBody(createChangeRiskQuestionSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!hasChangeRole(req)) throw new AppError(403, 'Insufficient permissions');
+    const client = getRequestClient(req);
+    const b = req.body || {};
+    const created = await client.query(
+      `INSERT INTO change_risk_questions (tenant_id, prompt, weight, sort_order, is_active)
+       VALUES (current_tenant_id(), $1, COALESCE($2, 1), COALESCE($3, 0), COALESCE($4, true))
+       RETURNING *`,
+      [b.prompt, b.weight, b.sort_order, b.is_active],
+    );
+    res.status(201).json(created.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/risk-questions/:id', validateBody(updateChangeRiskQuestionSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!hasChangeRole(req)) throw new AppError(403, 'Insufficient permissions');
+    const client = getRequestClient(req);
+    const allowed = new Set(['prompt', 'weight', 'sort_order', 'is_active']);
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    let i = 1;
+    for (const [k, v] of Object.entries(req.body || {})) {
+      if (!allowed.has(k)) continue;
+      sets.push(`${k} = $${i++}`);
+      vals.push(v);
+    }
+    if (sets.length === 0) return void res.json({ success: true });
+    vals.push(req.params.id);
+    const updated = await client.query(
+      `UPDATE change_risk_questions
+       SET ${sets.join(', ')}
+       WHERE tenant_id = current_tenant_id()
+         AND id = $${i}
+       RETURNING *`,
+      vals,
+    );
+    if (updated.rows.length === 0) throw NotFound('Risk question not found');
+    res.json(updated.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/risk-questions/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!hasChangeRole(req)) throw new AppError(403, 'Insufficient permissions');
+    const client = getRequestClient(req);
+    // Soft-delete: deactivate so historical answers remain valid.
+    const updated = await client.query(
+      `UPDATE change_risk_questions
+       SET is_active = false
+       WHERE tenant_id = current_tenant_id()
+         AND id = $1
+       RETURNING *`,
+      [req.params.id],
+    );
+    if (updated.rows.length === 0) throw NotFound('Risk question not found');
+    res.json(updated.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/calendar', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
@@ -868,6 +1021,122 @@ router.get('/nav', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+router.get('/:id/risk-answers', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const changeRes = await client.query(
+      `SELECT id, risk_score, risk_level
+       FROM changes
+       WHERE tenant_id = current_tenant_id()
+         AND id = $1`,
+      [req.params.id],
+    );
+    if (changeRes.rows.length === 0) throw NotFound('Change not found');
+    const change = changeRes.rows[0];
+    const canWork = await canWorkOnChange(client, req, change);
+    if (!canWork) throw new AppError(403, 'Insufficient permissions');
+    const answers = await client.query(
+      `SELECT a.*, q.prompt, q.weight, q.sort_order
+       FROM change_risk_answers a
+       JOIN change_risk_questions q ON q.id = a.question_id
+       WHERE a.tenant_id = current_tenant_id()
+         AND a.change_id = $1
+       ORDER BY q.sort_order ASC, q.created_at ASC`,
+      [req.params.id],
+    );
+    const riskScore = change.risk_score == null ? null : Number(change.risk_score);
+    res.json({
+      answers: answers.rows,
+      risk_score: riskScore,
+      risk_level: change.risk_level,
+      suggested_risk_level: riskScore == null ? null : suggestRiskLevelFromScore(riskScore),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/:id/risk-assessment',
+  validateBody(submitChangeRiskAssessmentSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const changeRes = await client.query(
+        `SELECT *
+         FROM changes
+         WHERE tenant_id = current_tenant_id()
+           AND id = $1`,
+        [req.params.id],
+      );
+      if (changeRes.rows.length === 0) throw NotFound('Change not found');
+      const change = changeRes.rows[0];
+      const canWork = await canWorkOnChange(client, req, change);
+      if (!canWork) throw new AppError(403, 'Insufficient permissions');
+
+      const answers: Array<{ question_id: string; score: number; answer_text?: string | null }> =
+        req.body.answers || [];
+      const questionIds = answers.map((a) => a.question_id);
+      const questions = await client.query(
+        `SELECT id, weight, is_active
+         FROM change_risk_questions
+         WHERE tenant_id = current_tenant_id()
+           AND id = ANY($1::uuid[])`,
+        [questionIds],
+      );
+      if (questions.rows.length !== questionIds.length) {
+        throw new AppError(400, 'One or more risk questions are invalid for this tenant');
+      }
+      const weightById = new Map<string, number>(
+        questions.rows.map((q: { id: string; weight: string | number }) => [q.id, Number(q.weight)]),
+      );
+
+      await client.query(
+        `DELETE FROM change_risk_answers
+         WHERE tenant_id = current_tenant_id()
+           AND change_id = $1`,
+        [req.params.id],
+      );
+
+      let riskScore = 0;
+      for (const answer of answers) {
+        const weight = weightById.get(answer.question_id) ?? 1;
+        riskScore += Number(answer.score) * weight;
+        await client.query(
+          `INSERT INTO change_risk_answers
+           (tenant_id, change_id, question_id, score, answer_text)
+           VALUES (current_tenant_id(), $1, $2, $3, $4)`,
+          [req.params.id, answer.question_id, answer.score, answer.answer_text || null],
+        );
+      }
+
+      const suggested = suggestRiskLevelFromScore(riskScore);
+      const applySuggested = req.body.apply_suggested_risk_level !== false;
+      const updated = await client.query(
+        `UPDATE changes
+         SET risk_score = $1,
+             risk_level = CASE
+               WHEN $2::boolean THEN $3::change_risk_enum
+               ELSE risk_level
+             END
+         WHERE tenant_id = current_tenant_id()
+           AND id = $4
+         RETURNING id, risk_score, risk_level`,
+        [riskScore, applySuggested, suggested, req.params.id],
+      );
+
+      res.json({
+        risk_score: Number(updated.rows[0].risk_score),
+        risk_level: updated.rows[0].risk_level,
+        suggested_risk_level: suggested,
+        answers_saved: answers.length,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
@@ -914,11 +1183,12 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
         [req.params.id],
       ),
       client.query(
-        `SELECT *
-         FROM change_conflicts
-         WHERE tenant_id = current_tenant_id()
-           AND change_id = $1
-         ORDER BY severity DESC, created_at DESC`,
+        `SELECT cc.*, c2.number AS conflicting_change_number, c2.title AS conflicting_change_title
+         FROM change_conflicts cc
+         LEFT JOIN changes c2 ON c2.id = cc.conflicting_change_id
+         WHERE cc.tenant_id = current_tenant_id()
+           AND cc.change_id = $1
+         ORDER BY cc.severity DESC, cc.created_at DESC`,
         [req.params.id],
       ),
     ]);
@@ -970,12 +1240,13 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
     const reasonForChange = String(b.reason_for_change || '').trim() || 'Pending assessment';
     const implementationPlan = String(b.implementation_plan || '').trim() || 'Implementation plan to be defined during planning.';
     const backoutPlan = String(b.backout_plan || '').trim() || 'Backout plan to be defined during planning.';
-    const slaDueAt = await resolveSlaDueAt(client, 'change', {
+    const sla = await resolveSlaDueAt(client, 'change', {
       priority: b.priority || 'medium',
       impact: b.impact || 'medium',
       category: b.category || null,
       serviceId: b.service_id || null,
     });
+    const slaDueAt = sla.resolutionDueAt;
 
     const created = await client.query(
       `INSERT INTO changes (
@@ -1119,14 +1390,14 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
       if (['closed', 'cancelled', 'rejected'].includes(nextStatus)) {
         sets.push('sla_due_at = NULL');
       } else {
-        const dueAt = await resolveSlaDueAt(client, 'change', {
+        const due = await resolveSlaDueAt(client, 'change', {
           priority: updates.priority ?? current.priority,
           impact: updates.impact ?? current.impact,
           category: updates.category ?? current.category,
           serviceId: updates.service_id ?? current.service_id,
         });
         sets.push(`sla_due_at = $${i++}`);
-        vals.push(dueAt);
+        vals.push(due.resolutionDueAt);
         sets.push('sla_breached = false');
       }
     }

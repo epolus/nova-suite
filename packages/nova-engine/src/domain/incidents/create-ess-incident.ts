@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { PoolClient } from 'pg';
 import type { CreateIncidentInput } from '../schemas';
+import { schedulePostCreateAiAssist } from '../../ai/post-create';
+import { resolveSlaDueAt } from '../sla';
 import {
   enqueueIncidentEscalationStartJob,
   enqueueNotificationDispatchStartJob,
@@ -43,9 +45,13 @@ export async function createEssIncident(
   const seqResult = await client.query("SELECT nextval('incident_number_seq')");
   const number = `INC${seqResult.rows[0].nextval.toString().padStart(7, '0')}`;
 
-  const slaHoursMap: Record<number, number> = { 1: 4, 2: 8, 3: 24, 4: 48, 5: 72 };
-  const slaDueAt = new Date();
-  slaDueAt.setHours(slaDueAt.getHours() + (slaHoursMap[priority] || 24));
+  const sla = await resolveSlaDueAt(client, 'incident', {
+    priority,
+    impact,
+    urgency,
+    category: null,
+    serviceId: null,
+  });
 
   const result = await client.query(
     `INSERT INTO incidents (
@@ -53,20 +59,20 @@ export async function createEssIncident(
       status, impact, urgency, priority,
       assigned_to, assignment_group_id, caller_id,
       contact_info, service_id, configuration_item_id,
-      category, subcategory, sla_due_at
+      category, subcategory, sla_due_at, response_due_at
     ) VALUES (
       current_tenant_id(), $1, $2, $3, $4,
       $5, $6, $7, $8,
       $9, $10, $11,
       $12, $13, $14,
-      $15, $16, $17
+      $15, $16, $17, $18
     ) RETURNING *`,
     [
       number, request_id || null, title, description || null,
       'new', impact, urgency, priority,
       null, serviceDesk.id, caller_id || userId,
       contact_info || null, null, null,
-      null, null, slaDueAt.toISOString(),
+      null, null, sla.resolutionDueAt, sla.responseDueAt,
     ],
   );
 
@@ -78,12 +84,15 @@ export async function createEssIncident(
     [incident.id, userId, `Incident created with priority ${priority}`],
   );
 
-  enqueueIncidentEscalationStartJob({
-    incidentId: incident.id,
-    tenantId,
-    priority,
-    slaDueAt: slaDueAt.toISOString(),
-  }).catch(() => {});
+  if (sla.resolutionDueAt || sla.responseDueAt) {
+    enqueueIncidentEscalationStartJob({
+      incidentId: incident.id,
+      tenantId,
+      priority,
+      slaDueAt: sla.resolutionDueAt || sla.responseDueAt!,
+      responseDueAt: sla.responseDueAt,
+    }).catch(() => {});
+  }
 
   enqueueNotificationDispatchStartJob({
     tenantId,
@@ -92,6 +101,15 @@ export async function createEssIncident(
     entityId: incident.id,
     actorUserId: userId,
   }).catch(() => {});
+
+  schedulePostCreateAiAssist({
+    tenantId,
+    actorUserId: userId,
+    incidentId: String(incident.id),
+    title,
+    description: description || null,
+    essChannel: true,
+  });
 
   return incident;
 }

@@ -47,6 +47,7 @@ type IncidentEscalationPayload = {
   incidentId: string;
   priority: number;
   slaDueAt: string;
+  responseDueAt?: string | null;
 };
 
 type IncidentAutoClosePayload = {
@@ -152,6 +153,7 @@ function isIncidentEscalationPayload(value: unknown): value is IncidentEscalatio
     && typeof v.priority === 'number'
     && Number.isFinite(v.priority)
     && typeof v.slaDueAt === 'string'
+    && (v.responseDueAt === undefined || v.responseDueAt === null || typeof v.responseDueAt === 'string')
   );
 }
 
@@ -326,6 +328,7 @@ async function processJob(job: WorkflowStartJobRow): Promise<void> {
         tenantId: job.tenant_id,
         priority: job.payload.priority,
         slaDueAt: job.payload.slaDueAt,
+        responseDueAt: job.payload.responseDueAt ?? null,
       });
       await markJobCompleted(job.id);
       return;
@@ -481,6 +484,7 @@ export async function enqueueIncidentEscalationStartJob(params: {
   incidentId: string;
   priority: number;
   slaDueAt: string;
+  responseDueAt?: string | null;
   queryable?: Queryable;
 }): Promise<void> {
   const workflowId = `incident-escalation-${params.incidentId}`;
@@ -506,6 +510,7 @@ export async function enqueueIncidentEscalationStartJob(params: {
         incidentId: params.incidentId,
         priority: params.priority,
         slaDueAt: params.slaDueAt,
+        responseDueAt: params.responseDueAt ?? null,
       }),
     ],
   );

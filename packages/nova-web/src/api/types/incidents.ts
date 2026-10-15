@@ -23,6 +23,10 @@ export interface Incident {
   closed_at: string | null;
   sla_due_at: string | null;
   sla_breached: boolean;
+  response_due_at?: string | null;
+  response_breached?: boolean;
+  sla_paused_at?: string | null;
+  sla_paused_ms?: number;
   created_at: string;
   updated_at: string;
   assigned_to_name?: string;
@@ -78,6 +82,21 @@ export interface IncidentStats {
   sla_breached: number;
   assigned_to_me: number;
   by_priority: Array<{ priority: number; label: string; count: number }>;
+}
+
+export interface IncidentAiSuggestion {
+  id: string;
+  incident_id: string;
+  tenant_id: string;
+  suggested_category: string | null;
+  suggested_impact: string | null;
+  suggested_urgency: string | null;
+  suggested_tags: string[];
+  sentiment: string | null;
+  confidence: number | null;
+  raw_json: Record<string, unknown>;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
 }
 
 export interface JournalEntry {

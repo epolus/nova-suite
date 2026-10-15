@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
 import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import { PROBLEM_BULK_ACTIONS, PROBLEM_PRIORITY_OPTIONS, PROBLEM_STATUS_OPTIONS } from './problemListConfig';
+import { RecurrenceCandidatesModal } from './RecurrenceCandidatesModal';
 
 const DEFAULT_COLS = ['number', 'title', 'status', 'priority', 'assignment_group_name', 'incident_count', 'updated_at'];
 const PRESETS_KEY = 'nova_filter_presets_problems';
@@ -102,6 +103,7 @@ export default function ProblemsPage() {
   );
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [savePresetName, setSavePresetName] = useState('');
+  const [showRecurrenceModal, setShowRecurrenceModal] = useState(false);
 
   const status = params.filters.status || 'all';
   const priority = params.filters.priority || 'all';
@@ -249,11 +251,21 @@ export default function ProblemsPage() {
         title={tProblems('title')}
         description={tProblems('description')}
         action={
-          <Link to="/problems/new" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
-            + {tProblems('newProblem')}
-          </Link>
+          <div className="flex items-center gap-2">
+            {isAgent && (
+              <Button variant="outline" onClick={() => setShowRecurrenceModal(true)}>
+                {tProblems('createFromRecurring')}
+              </Button>
+            )}
+            <Link to="/problems/new" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+              + {tProblems('newProblem')}
+            </Link>
+          </div>
         }
       />
+      {showRecurrenceModal && (
+        <RecurrenceCandidatesModal onClose={() => setShowRecurrenceModal(false)} />
+      )}
       {isAgent && (presets.length > 0 || hasActiveFilter) && (
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-xs font-medium text-gray-400">{tFilters('saved')}</span>
