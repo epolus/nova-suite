@@ -32,12 +32,10 @@ export function RecurrenceCandidatesModal({ onClose }: { onClose: () => void }) 
         if (cancelled) return;
         setCandidates(candRes.candidates);
         setGroups(groupsRes.assignment_groups);
-        if (groupsRes.assignment_groups.length > 0) {
-          setGroupId(groupsRes.assignment_groups[0].id);
-        }
-        if (candRes.candidates.length > 0) {
-          setSelectedSeed(candRes.candidates[0].seed_id);
-        }
+        const firstGroup = groupsRes.assignment_groups[0];
+        if (firstGroup) setGroupId(firstGroup.id);
+        const firstCandidate = candRes.candidates[0];
+        if (firstCandidate) setSelectedSeed(firstCandidate.seed_id);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : tProblems('recurrenceLoadFailed'));
       } finally {
