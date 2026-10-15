@@ -1004,7 +1004,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.00', '001_initial_schema'),
   ('v00.01.01', 'data_sources_external_key'),
   ('v00.01.02', 'configuration_items_external_ids_and_status'),
-  ('v00.01.03', 'change_number_seq_after_seed');
+  ('v00.01.03', 'change_number_seq_after_seed'),
+  ('v00.01.11', 'change_risk_questionnaire');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2572,6 +2573,7 @@ CREATE TABLE changes (
   stage                     change_stage_enum NOT NULL DEFAULT 'request',
   status                    change_status_enum NOT NULL DEFAULT 'draft',
   risk_level                change_risk_enum NOT NULL DEFAULT 'medium',
+  risk_score                numeric(10, 2),
   impact                    text NOT NULL DEFAULT 'medium',
   impact_description        text,
   implementation_plan       text NOT NULL,
@@ -2657,10 +2659,33 @@ CREATE TABLE change_conflicts (
   tenant_id          uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   change_id          uuid NOT NULL REFERENCES changes(id) ON DELETE CASCADE,
   conflicting_change_id uuid REFERENCES changes(id) ON DELETE CASCADE,
-  conflict_type      text NOT NULL CHECK (conflict_type IN ('schedule_overlap', 'ci_overlap', 'blackout_window')),
+  conflict_type      text NOT NULL CHECK (conflict_type IN ('schedule_overlap', 'ci_overlap', 'blackout_window', 'dependency_conflict')),
   severity           text NOT NULL DEFAULT 'warning' CHECK (severity IN ('warning', 'blocking')),
   details            text,
   created_at         timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE change_risk_questions (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  prompt      text NOT NULL,
+  weight      numeric(8, 2) NOT NULL DEFAULT 1 CHECK (weight > 0),
+  sort_order  integer NOT NULL DEFAULT 0,
+  is_active   boolean NOT NULL DEFAULT true,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE change_risk_answers (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  change_id    uuid NOT NULL REFERENCES changes(id) ON DELETE CASCADE,
+  question_id  uuid NOT NULL REFERENCES change_risk_questions(id) ON DELETE CASCADE,
+  score        integer NOT NULL CHECK (score >= 0 AND score <= 5),
+  answer_text  text,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, change_id, question_id)
 );
 
 CREATE INDEX idx_change_types_tenant_name ON change_types(tenant_id, name, is_active);
@@ -2692,6 +2717,9 @@ CREATE INDEX idx_cab_meeting_changes_meeting ON cab_meeting_changes(tenant_id, c
 CREATE INDEX idx_cab_meeting_changes_change ON cab_meeting_changes(tenant_id, change_id);
 CREATE INDEX idx_change_blackouts_window ON change_blackouts(tenant_id, start_date, end_date);
 CREATE INDEX idx_change_conflicts_change ON change_conflicts(tenant_id, change_id, severity, created_at DESC);
+CREATE INDEX idx_change_risk_questions_tenant ON change_risk_questions(tenant_id, is_active, sort_order);
+CREATE INDEX idx_change_risk_answers_change ON change_risk_answers(tenant_id, change_id);
+CREATE INDEX idx_changes_risk_score ON changes(tenant_id, risk_score);
 
 CREATE TRIGGER trg_change_types_updated_at
   BEFORE UPDATE ON change_types
@@ -2707,6 +2735,14 @@ CREATE TRIGGER trg_changes_updated_at
 
 CREATE TRIGGER trg_change_approvals_updated_at
   BEFORE UPDATE ON change_approvals
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_change_risk_questions_updated_at
+  BEFORE UPDATE ON change_risk_questions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_change_risk_answers_updated_at
+  BEFORE UPDATE ON change_risk_answers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER trg_change_blackouts_updated_at
@@ -2779,6 +2815,14 @@ INSERT INTO change_types (
     'high', 4,
     '{"required_approvals": 1, "allow_emergency_bypass": true, "required_steps": ["request", "assessment", "implementation", "review"]}'::jsonb
   );
+
+
+INSERT INTO change_risk_questions (tenant_id, prompt, weight, sort_order, is_active) VALUES
+  ('a0000000-0000-0000-0000-000000000001', 'How severe is the business impact if this change fails?', 2.0, 10, true),
+  ('a0000000-0000-0000-0000-000000000001', 'How many users or services are affected?', 1.5, 20, true),
+  ('a0000000-0000-0000-0000-000000000001', 'How complex or novel is the implementation?', 1.5, 30, true),
+  ('a0000000-0000-0000-0000-000000000001', 'How weak is the backout / test coverage? (0 = strong, 5 = none)', 1.0, 40, true),
+  ('a0000000-0000-0000-0000-000000000001', 'How risky is the timing (peak hours, freeze window, dependencies)?', 1.0, 50, true);
 
 INSERT INTO standard_changes (
   id, tenant_id, change_type_id, name, description, category,

@@ -864,6 +864,20 @@
       "conflictsScheduling": "Conflicts & Scheduling",
       "conflictDetected": "Conflict detected",
       "noConflicts": "No conflicts detected.",
+      "conflictTypes": {
+        "scheduleOverlap": "Schedule overlap",
+        "ciOverlap": "Same CI overlap",
+        "blackoutWindow": "Blackout window",
+        "dependencyConflict": "Dependency conflict"
+      },
+      "dependencyConflictSummary": "{count, plural, one {# dependency conflict with a related CI} other {# dependency conflicts with related CIs}}",
+      "riskQuestionnaire": "Risk questionnaire",
+      "riskQuestionnaireHint": "Score each question from 0 (lowest risk) to 5 (highest). Saving applies the weighted score and suggested risk level.",
+      "riskScore": "Score: {score}",
+      "suggestedRisk": "Suggested: {level}",
+      "noRiskQuestions": "No active risk questions. An admin can configure them under Change Administration.",
+      "riskWeight": "Weight {weight}",
+      "selectScore": "Select score",
       "implementationPlans": "Implementation Plans",
       "postImplementationReview": "Post-Implementation Review",
       "reviewNotesPir": "Review Notes (PIR)",
@@ -1952,7 +1966,7 @@
       },
       "changeAdmin": {
         "title": "Change Administration",
-        "description": "Configure change types, standard templates, CAB meetings and blackout periods.",
+        "description": "Configure change types, standard templates, CAB meetings, blackout periods and risk questions.",
         "loadFailed": "Failed to load change administration",
         "changeTypes": "Change Types",
         "noDescription": "No description",
@@ -1984,7 +1998,16 @@
         "implementationTemplate": "Implementation template",
         "backoutTemplate": "Backout template",
         "testPlanTemplate": "Test plan template",
-        "scheduleCab": "Schedule CAB"
+        "scheduleCab": "Schedule CAB",
+        "riskQuestions": "Risk questionnaire",
+        "noRiskQuestions": "No risk questions yet.",
+        "riskPromptPlaceholder": "Question prompt",
+        "weightPlaceholder": "Weight",
+        "sortOrderPlaceholder": "Sort order",
+        "riskWeightLabel": "Weight {weight}",
+        "sortOrderLabel": "Order {order}",
+        "addRiskQuestion": "Add Question",
+        "deactivate": "Deactivate"
       },
       "knowledgeWorkflows": {
         "title": "Knowledge Approval Workflows",

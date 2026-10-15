@@ -50,6 +50,8 @@ ALTER TABLE cab_meetings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cab_meeting_changes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE change_blackouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE change_risk_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE change_risk_answers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations ENABLE ROW LEVEL SECURITY;
@@ -397,6 +399,12 @@ CREATE POLICY tenant_isolation_change_blackouts ON change_blackouts
 CREATE POLICY tenant_isolation_change_conflicts ON change_conflicts
   FOR ALL USING (tenant_id = current_tenant_id());
 
+CREATE POLICY tenant_isolation_change_risk_questions ON change_risk_questions
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+CREATE POLICY tenant_isolation_change_risk_answers ON change_risk_answers
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Workflow Definitions ───
 CREATE POLICY tenant_isolation_workflow_definitions ON workflow_definitions
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -636,6 +644,8 @@ ALTER TABLE cab_meetings FORCE ROW LEVEL SECURITY;
 ALTER TABLE cab_meeting_changes FORCE ROW LEVEL SECURITY;
 ALTER TABLE change_blackouts FORCE ROW LEVEL SECURITY;
 ALTER TABLE change_conflicts FORCE ROW LEVEL SECURITY;
+ALTER TABLE change_risk_questions FORCE ROW LEVEL SECURITY;
+ALTER TABLE change_risk_answers FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE workflow_start_jobs FORCE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations FORCE ROW LEVEL SECURITY;

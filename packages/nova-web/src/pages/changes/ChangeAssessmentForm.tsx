@@ -2,6 +2,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type {
   Change,
+  ChangeRiskQuestion,
   CI,
   Incident,
   Problem,
@@ -22,6 +23,11 @@ export function ChangeAssessmentForm({
   incidentsList,
   problemsList,
   change,
+  riskQuestions,
+  riskScores,
+  setRiskScores,
+  riskScore,
+  suggestedRiskLevel,
   inputCls,
   selectCls,
   textareaCls,
@@ -33,6 +39,11 @@ export function ChangeAssessmentForm({
   incidentsList: Incident[];
   problemsList: Problem[];
   change: Change | null;
+  riskQuestions: ChangeRiskQuestion[];
+  riskScores: Record<string, number>;
+  setRiskScores: Dispatch<SetStateAction<Record<string, number>>>;
+  riskScore: number | null;
+  suggestedRiskLevel: Change['risk_level'] | null;
   inputCls: string;
   selectCls: string;
   textareaCls: string;
@@ -172,6 +183,61 @@ export function ChangeAssessmentForm({
               <textarea rows={2} value={form.test_plan} onChange={(e) => setForm((p) => ({ ...p, test_plan: e.target.value }))} className={textareaCls} placeholder={tChanges('testPlanPlaceholder')} />
             </div>
           </div>
+        </Card>
+
+        <Card>
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">{tChanges('riskQuestionnaire')}</h3>
+              <p className="text-xs text-gray-500 mt-1">{tChanges('riskQuestionnaireHint')}</p>
+            </div>
+            {(riskScore != null || suggestedRiskLevel) && (
+              <div className="text-right shrink-0">
+                {riskScore != null && (
+                  <p className="text-sm font-medium text-gray-900">{tChanges('riskScore', { score: riskScore })}</p>
+                )}
+                {suggestedRiskLevel && (
+                  <p className="text-xs text-gray-600 capitalize mt-0.5">
+                    {tChanges('suggestedRisk', {
+                      level: tChanges(`riskLevels.${suggestedRiskLevel === 'very_high' ? 'veryHigh' : suggestedRiskLevel}` as 'riskLevels.low'),
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          {riskQuestions.length === 0 ? (
+            <p className="text-sm text-gray-500">{tChanges('noRiskQuestions')}</p>
+          ) : (
+            <div className="space-y-3">
+              {riskQuestions.map((q) => (
+                <div key={q.id} className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <p className="text-sm text-gray-800">{q.prompt}</p>
+                    <span className="text-[11px] text-gray-400 shrink-0">{tChanges('riskWeight', { weight: Number(q.weight) })}</span>
+                  </div>
+                  <select
+                    value={riskScores[q.id] ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? undefined : Number(e.target.value);
+                      setRiskScores((prev) => {
+                        const next = { ...prev };
+                        if (value === undefined || Number.isNaN(value)) delete next[q.id];
+                        else next[q.id] = value;
+                        return next;
+                      });
+                    }}
+                    className={selectCls}
+                  >
+                    <option value="">{tChanges('selectScore')}</option>
+                    {[0, 1, 2, 3, 4, 5].map((score) => (
+                      <option key={score} value={score}>{score}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </div>

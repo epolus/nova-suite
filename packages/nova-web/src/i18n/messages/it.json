@@ -358,7 +358,21 @@
       "description": "Pianificare, valutare e tenere traccia dei cambiamenti.",
       "newChange": "Nuovo cambiamento",
       "calendar": "Cambia calendario",
-      "detailTitle": "Modifica dettaglio"
+      "detailTitle": "Modifica dettaglio",
+      "conflictTypes": {
+        "scheduleOverlap": "Sovrapposizione di pianificazione",
+        "ciOverlap": "Sovrapposizione sullo stesso CI",
+        "blackoutWindow": "Finestra di blackout",
+        "dependencyConflict": "Conflitto di dipendenza"
+      },
+      "dependencyConflictSummary": "{count, plural, one {# conflitto di dipendenza su un CI correlato} other {# conflitti di dipendenza su CI correlati}}",
+      "riskQuestionnaire": "Questionario di rischio",
+      "riskQuestionnaireHint": "Valuta ogni domanda da 0 (rischio più basso) a 5 (più alto). Il salvataggio applica il punteggio ponderato e il livello suggerito.",
+      "riskScore": "Punteggio: {score}",
+      "suggestedRisk": "Suggerito: {level}",
+      "noRiskQuestions": "Nessuna domanda di rischio attiva. Un admin può configurarle in Amministrazione Change.",
+      "riskWeight": "Peso {weight}",
+      "selectScore": "Seleziona punteggio"
     },
     "problems": {
       "title": "Problemi",
@@ -495,7 +509,22 @@
         "saveFailed": "Salvataggio delle impostazioni del tema non riuscito",
         "resetDefaults": "Ripristina predefiniti"
       },
-      "imports": "Importa e sincronizza dati esterni."
+      "imports": "Importa e sincronizza dati esterni.",
+      "changeAdmin": {
+        "title": "Amministrazione Change",
+        "description": "Configura tipi, modelli, CAB, blackout e domande di rischio.",
+        "loadFailed": "Caricamento non riuscito",
+        "riskQuestions": "Questionario di rischio",
+        "noRiskQuestions": "Nessuna domanda di rischio.",
+        "riskPromptPlaceholder": "Testo della domanda",
+        "weightPlaceholder": "Peso",
+        "sortOrderPlaceholder": "Ordine",
+        "riskWeightLabel": "Peso {weight}",
+        "sortOrderLabel": "Ordine {order}",
+        "addRiskQuestion": "Aggiungi domanda",
+        "deactivate": "Disattiva",
+        "active": "attivo"
+      }
     }
   },
   "status": {

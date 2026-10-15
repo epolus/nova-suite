@@ -358,7 +358,21 @@
       "description": "Planifiez, évaluez et suivez les changements.",
       "newChange": "Nouveau changement",
       "calendar": "Changer de calendrier",
-      "detailTitle": "Modifier les détails"
+      "detailTitle": "Modifier les détails",
+      "conflictTypes": {
+        "scheduleOverlap": "Chevauchement de planning",
+        "ciOverlap": "Chevauchement sur le même CI",
+        "blackoutWindow": "Fenêtre de blackout",
+        "dependencyConflict": "Conflit de dépendance"
+      },
+      "dependencyConflictSummary": "{count, plural, one {# conflit de dépendance sur un CI lié} other {# conflits de dépendance sur des CI liés}}",
+      "riskQuestionnaire": "Questionnaire de risque",
+      "riskQuestionnaireHint": "Notez chaque question de 0 (risque faible) à 5 (risque élevé). L'enregistrement applique le score pondéré et le niveau suggéré.",
+      "riskScore": "Score : {score}",
+      "suggestedRisk": "Suggéré : {level}",
+      "noRiskQuestions": "Aucune question de risque active. Un admin peut les configurer dans Administration des changements.",
+      "riskWeight": "Poids {weight}",
+      "selectScore": "Choisir un score"
     },
     "problems": {
       "title": "Problèmes",
@@ -495,7 +509,22 @@
         "saveFailed": "Échec de l'enregistrement des paramètres du thème",
         "resetDefaults": "Réinitialiser aux valeurs par défaut"
       },
-      "imports": "Importez et synchronisez des données externes."
+      "imports": "Importez et synchronisez des données externes.",
+      "changeAdmin": {
+        "title": "Administration des changements",
+        "description": "Configurer types, modèles, CAB, blackouts et questions de risque.",
+        "loadFailed": "Échec du chargement",
+        "riskQuestions": "Questionnaire de risque",
+        "noRiskQuestions": "Aucune question de risque.",
+        "riskPromptPlaceholder": "Libellé de la question",
+        "weightPlaceholder": "Poids",
+        "sortOrderPlaceholder": "Ordre",
+        "riskWeightLabel": "Poids {weight}",
+        "sortOrderLabel": "Ordre {order}",
+        "addRiskQuestion": "Ajouter une question",
+        "deactivate": "Désactiver",
+        "active": "actif"
+      }
     }
   },
   "status": {

@@ -31,7 +31,7 @@
 | **Incident Management** | CRUD, impact×urgency priority matrix, assignment, journal, SLA due/breach fields, escalate workflow | `infra/postgres/init.sql` (`incidents`, `priority_matrix`), `packages/nova-engine/src/api/incidents/`, `packages/nova-worker/src/workflows/incident-escalation.ts`, `packages/nova-web/src/pages/incidents/` | In Progress |
 | **Major Incident Management** | Declare/promote, war room, participants, stakeholder cadence, postmortem | `packages/nova-engine/src/api/major-incidents/`, `packages/nova-worker/src/workflows/major-incident.ts`, `packages/nova-web/src/pages/major-incidents/` | MVP Ready |
 | **Service Request Management** | Catalog, dynamic forms, cart, approvals, fulfillment tasks, automation | `packages/nova-engine/src/api/catalog/`, `packages/nova-engine/src/api/requests/`, `packages/nova-web/src/pages/catalog/`, `packages/nova-web/src/pages/requests/` | MVP Ready |
-| **Change Enablement** | Standard/Normal/Emergency types, CAB meetings/approvals, schedule + same-CI conflicts, blackouts | `packages/nova-engine/src/api/changes/`, `packages/nova-web/src/pages/changes/`, `packages/nova-web/src/pages/admin/ChangeAdminPage.tsx` | MVP Ready |
+| **Change Enablement** | Standard/Normal/Emergency types, CAB meetings/approvals, risk questionnaire + scoring, schedule / same-CI / dependency conflicts, blackouts | `packages/nova-engine/src/api/changes/`, `packages/nova-web/src/pages/changes/`, `packages/nova-web/src/pages/admin/ChangeAdminPage.tsx`, `change_risk_questions` / `change_risk_answers` | MVP Ready |
 | **Problem Management** | Problem CRUD, RCA fields, incident linking, KEDB CRUD, problem tasks | `packages/nova-engine/src/api/problems/`, `packages/nova-web/src/pages/problems/`, `known_errors` in `init.sql` | MVP Ready |
 | **IT Asset Management (ITAM)** | Hardware/software inventory, asset↔CI link, statuses (in_use/in_stock/retired/disposed) | `packages/nova-engine/src/api/assets/`, `packages/nova-web/src/pages/assets/` | In Progress |
 | **CMDB** | CI classes, relationships, impact analysis, history, external IDs, data-source ingest | `packages/nova-engine/src/api/cmdb/`, `packages/nova-web/src/pages/cmdb/`, `cmdb_impact_analysis()` | MVP Ready |
@@ -55,8 +55,8 @@
 ### B. Change Enablement
 - [x] Standard, Normal, and Emergency Change categorization.
 - [x] Change Advisory Board (CAB) review & approval workflows.
-- [ ] Risk assessment questionnaire and scoring. *(partial: risk_level enum + free-text assessment; no scored questionnaire)*
-- [ ] Collision detection (preventing simultaneous changes on connected assets). *(partial: schedule/blackout/same-CI; no dependency-tree walk)*
+- [x] Risk assessment questionnaire and scoring. *(weighted answers → `risk_score` + suggested `risk_level`; admin CRUD for questions)*
+- [x] Collision detection (preventing simultaneous changes on connected assets). *(schedule/blackout/same-CI + dependency-tree via `cmdb_impact_analysis` / `ci_relationships` → `dependency_conflict`)*
 
 ### C. Problem Management
 - [ ] Problem log creation from recurring incidents. *(partial: manual incident linking only)*
