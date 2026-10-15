@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import { incidents as incidentsApi, type IncidentAiSuggestion } from '../../api/client';
 
@@ -16,35 +16,50 @@ export function AiTriageSuggestions({ incidentId, readonly, onApplied }: Props) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const [prevIncidentId, setPrevIncidentId] = useState(incidentId);
+  if (incidentId !== prevIncidentId) {
+    setPrevIncidentId(incidentId);
+    setSuggestions([]);
     setError('');
-    try {
-      const res = await incidentsApi.aiSuggestions(incidentId);
-      setSuggestions(res.suggestions);
-    } catch (err: unknown) {
-      setSuggestions([]);
-      setError(err instanceof Error ? err.message : t('aiTriageLoadFailed'));
-    } finally {
-      setLoading(false);
-    }
-  }, [incidentId, t]);
+    setLoading(true);
+  }
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await incidentsApi.aiSuggestions(incidentId);
+        if (cancelled) return;
+        setSuggestions(res.suggestions);
+        setError('');
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setSuggestions([]);
+        setError(err instanceof Error ? err.message : t('aiTriageLoadFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [incidentId, t, reloadToken]);
 
   const pending = suggestions.filter((s) => s.status === 'pending');
   if (!loading && !error && pending.length === 0 && suggestions.length === 0) {
     return null;
   }
 
+  const refresh = () => {
+    setLoading(true);
+    setReloadToken((n) => n + 1);
+  };
+
   const accept = async (id: string) => {
     setBusyId(id);
     try {
       await incidentsApi.acceptAiSuggestion(incidentId, id);
-      await load();
+      refresh();
       await onApplied?.();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('aiTriageAcceptFailed'));
@@ -57,7 +72,7 @@ export function AiTriageSuggestions({ incidentId, readonly, onApplied }: Props) 
     setBusyId(id);
     try {
       await incidentsApi.rejectAiSuggestion(incidentId, id);
-      await load();
+      refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('aiTriageRejectFailed'));
     } finally {
