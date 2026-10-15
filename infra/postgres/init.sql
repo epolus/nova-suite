@@ -1005,7 +1005,7 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.01', 'data_sources_external_key'),
   ('v00.01.02', 'configuration_items_external_ids_and_status'),
   ('v00.01.03', 'change_number_seq_after_seed'),
-  ('v00.01.04', 'itam_discovery_external_ids_and_intune');
+  ('v00.01.14', 'itam_discovery_external_ids_and_intune');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
