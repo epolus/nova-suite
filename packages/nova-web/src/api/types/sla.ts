@@ -21,3 +21,27 @@ export interface SlaDefinition {
   created_at: string;
   updated_at: string;
 }
+
+export interface BusinessHourRow {
+  id?: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+export interface HolidayRow {
+  id?: string;
+  holiday_date: string;
+  name: string;
+}
+
+export interface BusinessCalendar {
+  id: string;
+  name: string;
+  timezone: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+  hours?: BusinessHourRow[];
+  holidays?: HolidayRow[];
+}

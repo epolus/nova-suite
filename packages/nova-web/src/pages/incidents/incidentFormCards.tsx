@@ -86,8 +86,22 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
           </div>
         </div>
         <div>
+          <span className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('responseDueDate')}</span>
+          <p className="text-sm text-gray-900 mt-0.5">
+            {inc.response_due_at ? formatDateTime(inc.response_due_at) : tTable('emDash')}
+            {inc.response_breached ? (
+              <span className="ml-2 text-xs font-medium text-red-600">{tIncidents('responseBreached')}</span>
+            ) : null}
+          </p>
+        </div>
+        <div>
           <span className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('slaDueDate')}</span>
-          <p className="text-sm text-gray-900 mt-0.5">{inc.sla_due_at ? formatDateTime(inc.sla_due_at) : tTable('emDash')}</p>
+          <p className="text-sm text-gray-900 mt-0.5">
+            {inc.sla_due_at ? formatDateTime(inc.sla_due_at) : tTable('emDash')}
+            {inc.sla_paused_at ? (
+              <span className="ml-2 text-xs font-medium text-amber-600">{tIncidents('slaPaused')}</span>
+            ) : null}
+          </p>
         </div>
         {fields.status === 'pending' && (
           <div>

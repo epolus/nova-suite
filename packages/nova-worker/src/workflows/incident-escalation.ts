@@ -6,6 +6,7 @@ import type * as activities from '../activities';
 const {
   getIncident,
   markSlaBreached,
+  markResponseBreached,
   escalateIncident,
   autoAssignIncident,
   sendNotification,
@@ -19,22 +20,23 @@ export interface EscalationInput {
   tenantId: string;
   priority: number;
   slaDueAt: string;
+  responseDueAt?: string | null;
 }
 
 // Signal to cancel escalation early (e.g. incident resolved manually)
 export const resolvedSignal = defineSignal('incidentResolved');
 
+const TERMINAL = new Set(['resolved', 'closed', 'cancelled']);
+const PAUSE_POLL_MS = 60_000;
+
+type TimerKind = 'response' | 'resolution';
+
 /**
- * Incident SLA escalation workflow.
+ * Incident SLA escalation workflow — dual timers (response + resolution).
  *
- * 1. Waits until the SLA due time approaches (80% of remaining time).
- * 2. Checks if the incident is still open and unresolved.
- * 3. If still unassigned → auto-assigns to an incident management group.
- * 4. Sends a notification about impending SLA breach.
- * 5. Waits for the full SLA timer to expire.
- * 6. If still not resolved → marks SLA breached, escalates priority, notifies.
- *
- * Can be cancelled early via the `incidentResolved` signal.
+ * Tracks both response_due_at and sla_due_at (resolution). Warns at 80% of each
+ * timer independently. Marks response_breached / sla_breached separately.
+ * While sla_paused_at is set, the workflow polls and does not fire breach.
  */
 export async function incidentEscalation(input: EscalationInput): Promise<string> {
   let resolved = false;
@@ -43,87 +45,165 @@ export async function incidentEscalation(input: EscalationInput): Promise<string
     resolved = true;
   });
 
-  const slaDue = new Date(input.slaDueAt).getTime();
-  const now = Date.now();
-  const totalMs = slaDue - now;
+  let responseWarned = false;
+  let responseBreached = false;
+  let resolutionWarned = false;
+  let resolutionBreached = false;
+  const startedAt = Date.now();
 
-  if (totalMs <= 0) {
-    // SLA already past due when workflow started
-    await markSlaBreached(input.incidentId, input.tenantId);
-    await sendNotification(
-      input.incidentId,
-      input.tenantId,
-      `Incident was already past SLA when escalation workflow started`,
-    );
-    return 'breached_immediately';
+  const responseTotalMs = input.responseDueAt
+    ? Math.max(0, new Date(input.responseDueAt).getTime() - startedAt)
+    : 0;
+  const resolutionTotalMs = input.slaDueAt
+    ? Math.max(0, new Date(input.slaDueAt).getTime() - startedAt)
+    : 0;
+
+  while (!resolved) {
+    const incident = await getIncident(input.incidentId, input.tenantId);
+    if (!incident || TERMINAL.has(incident.status)) {
+      return responseBreached || resolutionBreached ? 'breached_then_resolved' : 'already_resolved';
+    }
+
+    if (incident.responseBreached) responseBreached = true;
+    if (incident.slaBreached) resolutionBreached = true;
+
+    // While paused, wait and re-check (due dates are extended on resume).
+    if (incident.slaPausedAt) {
+      const pausedOut = await condition(() => resolved, PAUSE_POLL_MS);
+      if (pausedOut) return 'resolved_while_paused';
+      continue;
+    }
+
+    const now = Date.now();
+    const responseDueMs = incident.responseDueAt
+      ? new Date(incident.responseDueAt).getTime()
+      : null;
+    const resolutionDueMs = incident.slaDueAt
+      ? new Date(incident.slaDueAt).getTime()
+      : null;
+
+    const nextEvents: Array<{ at: number; kind: TimerKind; phase: 'warn' | 'breach' }> = [];
+
+    if (responseDueMs != null && !responseBreached) {
+      const warnAt = responseDueMs - Math.floor((responseTotalMs || (responseDueMs - startedAt)) * 0.2);
+      if (!responseWarned && warnAt > now) {
+        nextEvents.push({ at: warnAt, kind: 'response', phase: 'warn' });
+      } else if (!responseWarned && now >= warnAt && now < responseDueMs) {
+        await handleWarning(input, incident, 'response');
+        responseWarned = true;
+      }
+      if (now >= responseDueMs) {
+        await handleBreach(input, incident, 'response');
+        responseBreached = true;
+      } else {
+        nextEvents.push({ at: responseDueMs, kind: 'response', phase: 'breach' });
+      }
+    }
+
+    if (resolutionDueMs != null && !resolutionBreached) {
+      const warnAt = resolutionDueMs - Math.floor((resolutionTotalMs || (resolutionDueMs - startedAt)) * 0.2);
+      if (!resolutionWarned && warnAt > now) {
+        nextEvents.push({ at: warnAt, kind: 'resolution', phase: 'warn' });
+      } else if (!resolutionWarned && now >= warnAt && now < resolutionDueMs) {
+        await handleWarning(input, incident, 'resolution');
+        resolutionWarned = true;
+      }
+      if (now >= resolutionDueMs) {
+        await handleBreach(input, incident, 'resolution');
+        resolutionBreached = true;
+      } else {
+        nextEvents.push({ at: resolutionDueMs, kind: 'resolution', phase: 'breach' });
+      }
+    }
+
+    if (responseBreached && resolutionBreached) break;
+    if (nextEvents.length === 0) {
+      // Nothing left to wait for (missing due dates or already handled).
+      break;
+    }
+
+    nextEvents.sort((a, b) => a.at - b.at);
+    const next = nextEvents[0]!;
+    const waitMs = Math.max(0, next.at - Date.now());
+    const early = await condition(() => resolved, waitMs);
+    if (early) return 'resolved_before_breach';
+
+    // Loop will re-fetch and apply the due event.
   }
 
-  // ── Phase 1: Wait until 80% of SLA time has elapsed (warning phase) ──
-  const warningMs = Math.floor(totalMs * 0.8);
-  const earlyResolved = await condition(() => resolved, warningMs);
-  if (earlyResolved) return 'resolved_before_warning';
+  if (resolved) return 'resolved_before_breach';
 
-  // Check if incident is still open
-  const incident = await getIncident(input.incidentId, input.tenantId);
-  if (!incident || ['resolved', 'closed', 'cancelled'].includes(incident.status)) {
-    return 'already_resolved';
+  // Post-breach follow-up when resolution breached
+  if (resolutionBreached) {
+    await sleep('30 minutes');
+    const postBreachCheck = await getIncident(input.incidentId, input.tenantId);
+    if (postBreachCheck && !TERMINAL.has(postBreachCheck.status)) {
+      await sendNotification(
+        input.incidentId,
+        input.tenantId,
+        `URGENT: ${postBreachCheck.number} remains unresolved 30 minutes after resolution SLA breach.`,
+      );
+    }
+    return 'breached';
   }
 
-  // If unassigned, try auto-assignment
-  if (!incident.assignedTo) {
+  if (responseBreached) return 'response_breached';
+  return 'completed';
+}
+
+async function handleWarning(
+  input: EscalationInput,
+  incident: NonNullable<Awaited<ReturnType<typeof getIncident>>>,
+  kind: TimerKind,
+): Promise<void> {
+  if (kind === 'resolution' && !incident.assignedTo) {
     const assigned = await autoAssignIncident(input.incidentId, input.tenantId);
     if (assigned) {
       await sendNotification(
         input.incidentId,
         input.tenantId,
-        `SLA warning: ${incident.number} auto-assigned. ${Math.round((totalMs - warningMs) / 60_000)} minutes remaining.`,
+        `Resolution SLA warning: ${incident.number} auto-assigned.`,
       );
     }
   }
 
+  const label = kind === 'response' ? 'Response' : 'Resolution';
   await sendNotification(
     input.incidentId,
     input.tenantId,
-    `SLA warning: ${incident.number} "${incident.title}" has ${Math.round((totalMs - warningMs) / 60_000)} minutes until SLA breach.`,
+    `${label} SLA warning: ${incident.number} "${incident.title}" is approaching its ${kind} due time.`,
   );
+}
 
-  // ── Phase 2: Wait for the remaining 20% until SLA breach ──
-  const remainingMs = totalMs - warningMs;
-  const resolvedInTime = await condition(() => resolved, remainingMs);
-  if (resolvedInTime) return 'resolved_before_breach';
-
-  // Check once more before marking breach
-  const finalCheck = await getIncident(input.incidentId, input.tenantId);
-  if (!finalCheck || ['resolved', 'closed', 'cancelled'].includes(finalCheck.status)) {
-    return 'resolved_at_last_moment';
-  }
-
-  // ── Phase 3: SLA breached — escalate ──
-  await markSlaBreached(input.incidentId, input.tenantId);
-
-  // Escalate priority by 1 level (minimum P1)
-  const newPriority = Math.max(1, finalCheck.priority - 1);
-  if (newPriority < finalCheck.priority) {
-    await escalateIncident(input.incidentId, input.tenantId, newPriority);
-  }
-
-  await sendNotification(
-    input.incidentId,
-    input.tenantId,
-    `SLA BREACHED: ${finalCheck.number} "${finalCheck.title}" has breached its SLA. Priority escalated to P${newPriority}.`,
-  );
-
-  // ── Phase 4: Post-breach follow-up (check again after 30 min) ──
-  await sleep('30 minutes');
-
-  const postBreachCheck = await getIncident(input.incidentId, input.tenantId);
-  if (postBreachCheck && !['resolved', 'closed', 'cancelled'].includes(postBreachCheck.status)) {
+async function handleBreach(
+  input: EscalationInput,
+  incident: NonNullable<Awaited<ReturnType<typeof getIncident>>>,
+  kind: TimerKind,
+): Promise<void> {
+  if (kind === 'response') {
+    if (!incident.responseBreached) {
+      await markResponseBreached(input.incidentId, input.tenantId);
+    }
     await sendNotification(
       input.incidentId,
       input.tenantId,
-      `URGENT: ${postBreachCheck.number} remains unresolved 30 minutes after SLA breach.`,
+      `Response SLA BREACHED: ${incident.number} "${incident.title}".`,
     );
+    return;
   }
 
-  return 'breached';
+  if (!incident.slaBreached) {
+    await markSlaBreached(input.incidentId, input.tenantId);
+  }
+  const fresh = await getIncident(input.incidentId, input.tenantId);
+  const priority = fresh?.priority ?? incident.priority;
+  const newPriority = Math.max(1, priority - 1);
+  if (newPriority < priority) {
+    await escalateIncident(input.incidentId, input.tenantId, newPriority);
+  }
+  await sendNotification(
+    input.incidentId,
+    input.tenantId,
+    `Resolution SLA BREACHED: ${incident.number} "${incident.title}". Priority escalated to P${newPriority}.`,
+  );
 }
