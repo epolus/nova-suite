@@ -93,10 +93,25 @@ export default function ProblemDetail() {
   const [linkKbResults, setLinkKbResults] = useState<KbArticleSearchResult[]>([]);
 
   const canSearchIncidents = !!incidentSearch.trim() && !!id && !isNew;
+  const canSearchKb = !!kbSearch.trim();
+  const canSearchLinkKb = !!linkKbSearch.trim() && !!linkingKeId;
+
   const [prevCanSearch, setPrevCanSearch] = useState(canSearchIncidents);
   if (canSearchIncidents !== prevCanSearch) {
     setPrevCanSearch(canSearchIncidents);
     if (!canSearchIncidents) setIncidentResults([]);
+  }
+
+  const [prevCanSearchKb, setPrevCanSearchKb] = useState(canSearchKb);
+  if (canSearchKb !== prevCanSearchKb) {
+    setPrevCanSearchKb(canSearchKb);
+    if (!canSearchKb) setKbResults([]);
+  }
+
+  const [prevCanSearchLinkKb, setPrevCanSearchLinkKb] = useState(canSearchLinkKb);
+  if (canSearchLinkKb !== prevCanSearchLinkKb) {
+    setPrevCanSearchLinkKb(canSearchLinkKb);
+    if (!canSearchLinkKb) setLinkKbResults([]);
   }
 
   useEffect(() => {
@@ -108,30 +123,26 @@ export default function ProblemDetail() {
   }, [canSearchIncidents, incidentSearch]);
 
   useEffect(() => {
-    if (!kbSearch.trim()) {
-      setKbResults([]);
-      return;
-    }
+    if (!canSearchKb) return;
+    const query = kbSearch.trim();
     const t = setTimeout(() => {
-      knowledgeApi.articles({ search: kbSearch.trim(), status: 'published' }).then((r) => {
+      knowledgeApi.articles({ search: query, status: 'published' }).then((r) => {
         setKbResults(r.articles.map((a) => ({ id: a.id, number: a.number, title: a.title })));
       }).catch(() => setKbResults([]));
     }, 200);
     return () => clearTimeout(t);
-  }, [kbSearch]);
+  }, [canSearchKb, kbSearch]);
 
   useEffect(() => {
-    if (!linkKbSearch.trim() || !linkingKeId) {
-      setLinkKbResults([]);
-      return;
-    }
+    if (!canSearchLinkKb) return;
+    const query = linkKbSearch.trim();
     const t = setTimeout(() => {
-      knowledgeApi.articles({ search: linkKbSearch.trim(), status: 'published' }).then((r) => {
+      knowledgeApi.articles({ search: query, status: 'published' }).then((r) => {
         setLinkKbResults(r.articles.map((a) => ({ id: a.id, number: a.number, title: a.title })));
       }).catch(() => setLinkKbResults([]));
     }, 200);
     return () => clearTimeout(t);
-  }, [linkKbSearch, linkingKeId]);
+  }, [canSearchLinkKb, linkKbSearch]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
