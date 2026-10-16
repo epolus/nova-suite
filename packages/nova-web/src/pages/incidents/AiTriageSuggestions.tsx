@@ -81,18 +81,18 @@ export function AiTriageSuggestions({ incidentId, readonly, onApplied }: Props) 
   };
 
   return (
-    <section className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 mb-4">
-      <h3 className="text-sm font-semibold text-amber-900 mb-1">{t('aiTriageTitle')}</h3>
-      <p className="text-xs text-amber-800/80 mb-3">{t('aiTriageDescription')}</p>
-      {loading && <p className="text-sm text-gray-500">{t('loadingRecommendations')}</p>}
-      {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+    <section className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 mb-4 dark:border-amber-800 dark:bg-amber-950/40">
+      <h3 className="text-sm font-semibold text-amber-900 mb-1 dark:text-amber-100">{t('aiTriageTitle')}</h3>
+      <p className="text-xs text-amber-800/80 mb-3 dark:text-amber-200/80">{t('aiTriageDescription')}</p>
+      {loading && <p className="text-sm text-gray-500 dark:text-gray-400">{t('loadingRecommendations')}</p>}
+      {error && <p className="text-sm text-red-600 mb-2 dark:text-red-400">{error}</p>}
       {!loading && pending.length === 0 && suggestions.length > 0 && (
-        <p className="text-sm text-gray-500">{t('aiTriageNonePending')}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{t('aiTriageNonePending')}</p>
       )}
       <ul className="space-y-3">
         {pending.map((s) => (
-          <li key={s.id} className="rounded-md border border-amber-200 bg-white p-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-800">
+          <li key={s.id} className="rounded-md border border-amber-200 bg-white p-3 dark:border-amber-800 dark:bg-gray-900">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-800 dark:text-gray-200">
               {s.suggested_category && (
                 <span>{t('aiTriageCategory')}: <strong>{s.suggested_category}</strong></span>
               )}
@@ -110,7 +110,7 @@ export function AiTriageSuggestions({ incidentId, readonly, onApplied }: Props) 
               )}
             </div>
             {s.suggested_tags?.length > 0 && (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {t('aiTriageTags')}: {s.suggested_tags.join(', ')}
               </p>
             )}
@@ -128,7 +128,7 @@ export function AiTriageSuggestions({ incidentId, readonly, onApplied }: Props) 
                   type="button"
                   disabled={busyId === s.id}
                   onClick={() => void reject(s.id)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
                 >
                   {tActions('reject')}
                 </button>
