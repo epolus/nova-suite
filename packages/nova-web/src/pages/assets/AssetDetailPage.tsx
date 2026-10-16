@@ -171,8 +171,10 @@ export default function AssetDetailPage() {
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">{t('status')}</label>
               <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className={inputCls}>
-                <option value="in_use">In use</option>
+                <option value="ordered">Ordered</option>
                 <option value="in_stock">In stock</option>
+                <option value="in_use">In use</option>
+                <option value="maintenance">Maintenance</option>
                 <option value="retired">Retired</option>
                 <option value="disposed">Disposed</option>
               </select>

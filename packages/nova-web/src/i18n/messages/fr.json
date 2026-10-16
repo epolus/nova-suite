@@ -28,6 +28,7 @@
       "open": "Ouvrir",
       "submit": "Soumettre",
       "approve": "Approuver",
+      "accept": "Accepter",
       "reject": "Rejeter",
       "reopen": "Rouvrir",
       "resolve": "Résoudre",
@@ -197,7 +198,8 @@
       "configPackages": "Paquets de configuration",
       "importData": "Importer des données",
       "theming": "Thématisation",
-      "status": "Statut"
+      "status": "Statut",
+      "aiSettings": "Paramètres IA"
     }
   },
   "auth": {
@@ -343,7 +345,19 @@
       "attachments": "Pièces jointes",
       "insights": "Connaissances",
       "showInsights": "Afficher les informations",
-      "hideInsights": "Masquer les informations"
+      "hideInsights": "Masquer les informations",
+      "aiTriageTitle": "Suggestions de triage IA",
+      "aiTriageDescription": "Examinez catégorie, impact, urgence et sentiment avant application.",
+      "aiTriageNonePending": "Aucune suggestion de triage IA en attente.",
+      "aiTriageCategory": "Catégorie",
+      "aiTriageImpact": "Impact",
+      "aiTriageUrgency": "Urgence",
+      "aiTriageSentiment": "Sentiment",
+      "aiTriageConfidence": "Confiance",
+      "aiTriageTags": "Tags",
+      "aiTriageLoadFailed": "Échec du chargement des suggestions de triage IA",
+      "aiTriageAcceptFailed": "Échec de l'acceptation de la suggestion de triage IA",
+      "aiTriageRejectFailed": "Échec du rejet de la suggestion de triage IA"
     },
     "requests": {
       "title": "Demandes",
@@ -495,7 +509,35 @@
         "saveFailed": "Échec de l'enregistrement des paramètres du thème",
         "resetDefaults": "Réinitialiser aux valeurs par défaut"
       },
-      "imports": "Importez et synchronisez des données externes."
+      "imports": "Importez et synchronisez des données externes.",
+      "aiSettings": {
+        "title": "Triage IA et déflexion",
+        "description": "Contrôlez le triage IA à la création et la déflexion ESS via la base de connaissances.",
+        "triageOnCreate": "Lancer le triage IA à la création d'incident",
+        "triageOnCreateHelp": "Enregistre des suggestions de catégorie, impact, urgence, tags et sentiment.",
+        "autoApplyPriority": "Appliquer automatiquement impact/urgence suggérés",
+        "autoApplyPriorityHelp": "Si activé, les suggestions mettent à jour l'incident immédiatement (désactivé par défaut).",
+        "essAutoDeflect": "Déflexion ESS automatique avec articles KB",
+        "essAutoDeflectHelp": "Si la confiance est suffisante, résoudre le ticket ESS avec l'article KB correspondant.",
+        "deflectThreshold": "Seuil de confiance de déflexion ESS",
+        "deflectThresholdHelp": "Valeur de 0 à 1. La déflexion auto ne s'exécute que si la confiance KB atteint ce seuil.",
+        "saved": "Paramètres enregistrés"
+      },
+      "changeAdmin": {
+        "title": "Administration des changements",
+        "description": "Configurer types, modèles, CAB, blackouts et questions de risque.",
+        "loadFailed": "Échec du chargement",
+        "riskQuestions": "Questionnaire de risque",
+        "noRiskQuestions": "Aucune question de risque.",
+        "riskPromptPlaceholder": "Libellé de la question",
+        "weightPlaceholder": "Poids",
+        "sortOrderPlaceholder": "Ordre",
+        "riskWeightLabel": "Poids {weight}",
+        "sortOrderLabel": "Ordre {order}",
+        "addRiskQuestion": "Ajouter une question",
+        "deactivate": "Désactiver",
+        "active": "actif"
+      }
     }
   },
   "status": {

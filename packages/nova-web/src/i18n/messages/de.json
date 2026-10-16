@@ -28,6 +28,7 @@
       "open": "Öffnen",
       "submit": "Absenden",
       "approve": "Freigeben",
+      "accept": "Annehmen",
       "reject": "Ablehnen",
       "reopen": "Erneut öffnen",
       "resolve": "Lösen",
@@ -197,7 +198,8 @@
       "configPackages": "Konfigurationspakete",
       "importData": "Daten importieren",
       "theming": "Thematisierung",
-      "status": "Status"
+      "status": "Status",
+      "aiSettings": "KI-Einstellungen"
     }
   },
   "auth": {
@@ -343,7 +345,19 @@
       "attachments": "Anhänge",
       "insights": "Einblicke",
       "showInsights": "Einblicke anzeigen",
-      "hideInsights": "Erkenntnisse ausblenden"
+      "hideInsights": "Erkenntnisse ausblenden",
+      "aiTriageTitle": "KI-Triage-Vorschläge",
+      "aiTriageDescription": "Kategorie, Impact, Urgency und Sentiment prüfen, bevor sie angewendet werden.",
+      "aiTriageNonePending": "Keine ausstehenden KI-Triage-Vorschläge.",
+      "aiTriageCategory": "Kategorie",
+      "aiTriageImpact": "Impact",
+      "aiTriageUrgency": "Urgency",
+      "aiTriageSentiment": "Sentiment",
+      "aiTriageConfidence": "Konfidenz",
+      "aiTriageTags": "Tags",
+      "aiTriageLoadFailed": "KI-Triage-Vorschläge konnten nicht geladen werden",
+      "aiTriageAcceptFailed": "KI-Triage-Vorschlag konnte nicht angenommen werden",
+      "aiTriageRejectFailed": "KI-Triage-Vorschlag konnte nicht abgelehnt werden"
     },
     "requests": {
       "title": "Anfragen",
@@ -495,7 +509,35 @@
         "saveFailed": "Theme-Einstellungen konnten nicht gespeichert werden",
         "resetDefaults": "Auf Standardwerte zurücksetzen"
       },
-      "imports": "Externe Daten importieren und synchronisieren."
+      "imports": "Externe Daten importieren und synchronisieren.",
+      "aiSettings": {
+        "title": "KI-Triage & Ablenkung",
+        "description": "Steuern Sie AI-Triage bei Incident-Erstellung und ESS-Knowledge-Ablenkung.",
+        "triageOnCreate": "KI-Triage bei Incident-Erstellung",
+        "triageOnCreateHelp": "Speichert Vorschläge zu Kategorie, Impact, Urgency, Tags und Sentiment.",
+        "autoApplyPriority": "Vorgeschlagenen Impact/Urgency automatisch anwenden",
+        "autoApplyPriorityHelp": "Wenn aktiv, werden Vorschläge sofort auf den Incident angewendet (Standard aus).",
+        "essAutoDeflect": "ESS Auto-Ablenkung mit Knowledge-Artikeln",
+        "essAutoDeflectHelp": "Bei hoher Konfidenz wird das ESS-Ticket mit dem passenden KB-Artikel gelöst.",
+        "deflectThreshold": "ESS-Ablenkungs-Konfidenzschwelle",
+        "deflectThresholdHelp": "Wert von 0 bis 1. Auto-Ablenkung nur bei ausreichender KB-Treffer-Konfidenz.",
+        "saved": "Einstellungen gespeichert"
+      },
+      "changeAdmin": {
+        "title": "Change-Administration",
+        "description": "Change-Typen, Vorlagen, CAB, Blackouts und Risikofragen konfigurieren.",
+        "loadFailed": "Laden fehlgeschlagen",
+        "riskQuestions": "Risikofragebogen",
+        "noRiskQuestions": "Noch keine Risikofragen.",
+        "riskPromptPlaceholder": "Fragetext",
+        "weightPlaceholder": "Gewicht",
+        "sortOrderPlaceholder": "Sortierung",
+        "riskWeightLabel": "Gewicht {weight}",
+        "sortOrderLabel": "Reihenfolge {order}",
+        "addRiskQuestion": "Frage hinzufügen",
+        "deactivate": "Deaktivieren",
+        "active": "aktiv"
+      }
     }
   },
   "status": {

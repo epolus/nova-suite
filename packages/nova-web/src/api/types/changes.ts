@@ -46,12 +46,32 @@ export interface ChangeConflict {
   id: string;
   change_id: string;
   conflicting_change_id: string | null;
-  conflict_type: 'schedule_overlap' | 'ci_overlap' | 'blackout_window';
+  conflict_type: 'schedule_overlap' | 'ci_overlap' | 'blackout_window' | 'dependency_conflict';
   severity: 'warning' | 'blocking';
   details: string | null;
   created_at: string;
   conflicting_change_number?: string;
   conflicting_change_title?: string;
+}
+
+export interface ChangeRiskQuestion {
+  id: string;
+  prompt: string;
+  weight: number;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ChangeRiskAnswer {
+  id?: string;
+  question_id: string;
+  score: number;
+  answer_text?: string | null;
+  prompt?: string;
+  weight?: number;
+  sort_order?: number;
 }
 
 export interface Change {
@@ -66,6 +86,7 @@ export interface Change {
   stage: 'request' | 'assessment' | 'approval' | 'planning' | 'implementation' | 'review';
   status: 'draft' | 'assessment' | 'pending_approval' | 'approved' | 'rejected' | 'planning' | 'scheduled' | 'implementing' | 'implemented' | 'reviewing' | 'closed' | 'cancelled';
   risk_level: 'low' | 'medium' | 'high' | 'very_high';
+  risk_score?: number | null;
   impact: string;
   impact_description: string | null;
   implementation_plan: string;

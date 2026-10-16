@@ -9,6 +9,7 @@ import type {
   ChangeApproval,
   ChangeConflict,
   ChangeDetail,
+  ChangeRiskQuestion,
   ChangeType,
   CI,
   Incident,
@@ -140,6 +141,10 @@ export function useChangeDetail() {
   const [problemsList, setProblemsList] = useState<Problem[]>([]);
   const [approvals, setApprovals] = useState<ChangeApproval[]>([]);
   const [conflicts, setConflicts] = useState<ChangeConflict[]>([]);
+  const [riskQuestions, setRiskQuestions] = useState<ChangeRiskQuestion[]>([]);
+  const [riskScores, setRiskScores] = useState<Record<string, number>>({});
+  const [riskScore, setRiskScore] = useState<number | null>(null);
+  const [suggestedRiskLevel, setSuggestedRiskLevel] = useState<Change['risk_level'] | null>(null);
   const [prevId, setPrevId] = useState<string | null>(null);
   const [nextId, setNextId] = useState<string | null>(null);
   const [metaLoading, setMetaLoading] = useState(true);
@@ -168,7 +173,7 @@ export function useChangeDetail() {
     setMetaLoading(true);
     setError('');
     try {
-      const [typesRes, templatesRes, groupsRes, servicesRes, ciRes, incRes, prbRes] = await Promise.all([
+      const [typesRes, templatesRes, groupsRes, servicesRes, ciRes, incRes, prbRes, questionsRes] = await Promise.all([
         changes.types(),
         changes.standardTemplates(),
         changes.assignmentGroups(),
@@ -176,6 +181,7 @@ export function useChangeDetail() {
         cmdb.items({ status: 'installed' }, 1, 100),
         incidents.list({ status: 'new' }, 1, 100),
         problems.list({}, 1, 100),
+        changes.riskQuestions(false),
       ]);
       setTypes(typesRes.change_types);
       setTemplates(templatesRes.templates);
@@ -184,21 +190,33 @@ export function useChangeDetail() {
       setCis(ciRes.items);
       setIncidentsList(incRes.incidents);
       setProblemsList(prbRes.problems);
+      setRiskQuestions(questionsRes.questions || []);
 
       if (isNew) {
         setForm({ ...EMPTY_CHANGE_FORM, change_type_id: typesRes.change_types[0]?.id || '' });
         setApprovals([]);
         setConflicts([]);
+        setRiskScores({});
+        setRiskScore(null);
+        setSuggestedRiskLevel(null);
         setPrevId(null);
         setNextId(null);
       } else if (id) {
-        const [navRes, conflictRes] = await Promise.all([
+        const [navRes, conflictRes, riskRes] = await Promise.all([
           changes.nav(id, listParams),
           changes.conflicts(id),
+          changes.riskAnswers(id),
         ]);
         setConflicts(conflictRes.conflicts || []);
         setPrevId(navRes.prev_id);
         setNextId(navRes.next_id);
+        const nextScores: Record<string, number> = {};
+        for (const a of riskRes.answers || []) {
+          nextScores[a.question_id] = a.score;
+        }
+        setRiskScores(nextScores);
+        setRiskScore(riskRes.risk_score);
+        setSuggestedRiskLevel(riskRes.suggested_risk_level);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load change');
@@ -210,49 +228,11 @@ export function useChangeDetail() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const [typesRes, templatesRes, groupsRes, servicesRes, ciRes, incRes, prbRes] = await Promise.all([
-          changes.types(),
-          changes.standardTemplates(),
-          changes.assignmentGroups(),
-          incidents.services(),
-          cmdb.items({ status: 'installed' }, 1, 100),
-          incidents.list({ status: 'new' }, 1, 100),
-          problems.list({}, 1, 100),
-        ]);
-        if (cancelled) return;
-        setTypes(typesRes.change_types);
-        setTemplates(templatesRes.templates);
-        setGroups(groupsRes.assignment_groups);
-        setServices(servicesRes.services);
-        setCis(ciRes.items);
-        setIncidentsList(incRes.incidents);
-        setProblemsList(prbRes.problems);
-
-        if (isNew) {
-          setForm({ ...EMPTY_CHANGE_FORM, change_type_id: typesRes.change_types[0]?.id || '' });
-          setApprovals([]);
-          setConflicts([]);
-          setPrevId(null);
-          setNextId(null);
-        } else if (id) {
-          const [navRes, conflictRes] = await Promise.all([
-            changes.nav(id, listParams),
-            changes.conflicts(id),
-          ]);
-          if (cancelled) return;
-          setConflicts(conflictRes.conflicts || []);
-          setPrevId(navRes.prev_id);
-          setNextId(navRes.next_id);
-        }
-      } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load change');
-      } finally {
-        if (!cancelled) setMetaLoading(false);
-      }
+      await loadMeta();
+      if (cancelled) return;
     })();
     return () => { cancelled = true; };
-  }, [id, isNew, listParams]);
+  }, [loadMeta]);
 
   const loading = changeLoading || metaLoading;
 
@@ -320,10 +300,34 @@ export function useChangeDetail() {
       };
       if (isNew || !id) {
         const created = await changes.create(payload);
+        const answered = Object.entries(riskScores)
+          .filter(([, score]) => Number.isFinite(score))
+          .map(([question_id, score]) => ({ question_id, score }));
+        if (answered.length > 0) {
+          const riskRes = await changes.submitRiskAssessment(created.id, {
+            answers: answered,
+            apply_suggested_risk_level: true,
+          });
+          if (riskRes.risk_level) {
+            await changes.update(created.id, { risk_level: riskRes.risk_level });
+          }
+        }
         allowNextNavigation();
         navigate(`/changes/${created.id}`, { state: { listParams }, replace: true });
       } else {
         await changes.update(id, payload);
+        const answered = Object.entries(riskScores)
+          .filter(([, score]) => Number.isFinite(score))
+          .map(([question_id, score]) => ({ question_id, score }));
+        if (answered.length > 0) {
+          const riskRes = await changes.submitRiskAssessment(id, {
+            answers: answered,
+            apply_suggested_risk_level: true,
+          });
+          setRiskScore(riskRes.risk_score);
+          setSuggestedRiskLevel(riskRes.suggested_risk_level);
+          setForm((p) => ({ ...p, risk_level: riskRes.risk_level }));
+        }
         await refetchChange();
         await loadMeta();
         invalidateChanges();
@@ -345,6 +349,7 @@ export function useChangeDetail() {
     loadMeta,
     navigate,
     refetchChange,
+    riskScores,
   ]);
 
   useEffect(() => {
@@ -393,6 +398,11 @@ export function useChangeDetail() {
     setApprovals,
     conflicts,
     setConflicts,
+    riskQuestions,
+    riskScores,
+    setRiskScores,
+    riskScore,
+    suggestedRiskLevel,
     prevId,
     nextId,
     goTo,

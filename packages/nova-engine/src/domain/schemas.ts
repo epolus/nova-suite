@@ -154,7 +154,7 @@ export const configPackageNotificationRuleSchema = z.object({
   recipient_type: z.string().min(1).max(100),
   recipient_user_email: z.string().email().nullable().optional(),
   recipient_group_name: z.string().min(1).max(255).nullable().optional(),
-  channels: z.array(z.enum(['in_app', 'email'])).min(1).default(['in_app']),
+  channels: z.array(z.enum(['in_app', 'email', 'slack', 'teams'])).min(1).default(['in_app']),
   templates: z.array(configPackageNotificationRuleTemplateSchema).min(1),
   title_template: z.string().min(1).optional(),
   body_template: z.string().nullable().optional(),
@@ -167,7 +167,7 @@ export const configPackageDataSourceSchema = z.object({
   name: z.string().min(1).max(255),
   description: nullableStringSchema,
   entity_type: z.string().min(1).max(100),
-  source_type: z.enum(['csv_url', 'json_url', 'rest_api', 'sftp']).default('csv_url'),
+  source_type: z.enum(['csv_url', 'json_url', 'rest_api', 'sftp', 'intune']).default('csv_url'),
   /** Connection config without inline secrets (credential_slug is preferred). */
   source_config: z.record(z.string(), z.unknown()).default({}),
   column_mapping: z.record(z.string(), z.unknown()).default({}),
@@ -422,6 +422,24 @@ export const createBlackoutSchema = z.object({
 
 export const updateBlackoutSchema = createBlackoutSchema.partial();
 
+export const createChangeRiskQuestionSchema = z.object({
+  prompt: z.string().min(1).max(2000),
+  weight: z.number().positive().max(100).default(1),
+  sort_order: z.number().int().min(0).max(100000).default(0),
+  is_active: z.boolean().optional().default(true),
+});
+
+export const updateChangeRiskQuestionSchema = createChangeRiskQuestionSchema.partial();
+
+export const submitChangeRiskAssessmentSchema = z.object({
+  answers: z.array(z.object({
+    question_id: uuidSchema,
+    score: z.number().int().min(0).max(5),
+    answer_text: z.string().max(2000).optional().nullable(),
+  })).min(1),
+  apply_suggested_risk_level: z.boolean().optional().default(true),
+});
+
 export const incidentLinkMajorIncidentSchema = z.object({
   major_incident_id: uuidSchema,
 });
@@ -545,7 +563,14 @@ export const majorIncidentListQuerySchema = paginationSchema.extend({
 
 // ─── Assets ───
 const assetCategorySchema = z.enum(['hardware', 'software', 'license', 'consumable']);
-const assetStatusSchema = z.enum(['in_use', 'in_stock', 'retired', 'disposed']);
+const assetStatusSchema = z.enum([
+  'ordered',
+  'in_stock',
+  'in_use',
+  'maintenance',
+  'retired',
+  'disposed',
+]);
 
 export const createAssetSchema = z.object({
   asset_tag: z.string().min(1).max(255),
@@ -562,6 +587,8 @@ export const createAssetSchema = z.object({
   contract_ref: z.string().max(255).nullable().optional(),
   depreciation_months: z.number().int().nullable().optional(),
   notes: z.string().max(10000).nullable().optional(),
+  external_id_1: z.string().max(255).nullable().optional(),
+  external_id_2: z.string().max(255).nullable().optional(),
 });
 
 export const updateAssetSchema = createAssetSchema.partial();

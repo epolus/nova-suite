@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useRef, useState } from 'react';
-import { attachments as attachmentsApi, problems as problemsApi } from '@/api/client';
+import { attachments as attachmentsApi, knowledge as knowledgeApi, problems as problemsApi } from '@/api/client';
 import type { Attachment, KnownError, ProblemTask } from '@/api/client';
 import { useProblemDetail } from './useProblemDetail';
 import PageHeader from '../../components/PageHeader';
@@ -17,6 +17,7 @@ import {
   ProblemKnownErrorsPanel,
   type TaskFormState,
   type KnownErrorFormState,
+  type KbArticleSearchResult,
 } from './ProblemDetailTabs';
 import { ProblemSummaryCard } from './ProblemSummaryCard';
 
@@ -82,13 +83,35 @@ export default function ProblemDetail() {
     tags: '',
     severity: 'medium',
     is_active: true,
+    kb_article_id: '',
+    kb_article_label: '',
   });
+  const [kbSearch, setKbSearch] = useState('');
+  const [kbResults, setKbResults] = useState<KbArticleSearchResult[]>([]);
+  const [linkingKeId, setLinkingKeId] = useState<string | null>(null);
+  const [linkKbSearch, setLinkKbSearch] = useState('');
+  const [linkKbResults, setLinkKbResults] = useState<KbArticleSearchResult[]>([]);
 
   const canSearchIncidents = !!incidentSearch.trim() && !!id && !isNew;
+  const canSearchKb = !!kbSearch.trim();
+  const canSearchLinkKb = !!linkKbSearch.trim() && !!linkingKeId;
+
   const [prevCanSearch, setPrevCanSearch] = useState(canSearchIncidents);
   if (canSearchIncidents !== prevCanSearch) {
     setPrevCanSearch(canSearchIncidents);
     if (!canSearchIncidents) setIncidentResults([]);
+  }
+
+  const [prevCanSearchKb, setPrevCanSearchKb] = useState(canSearchKb);
+  if (canSearchKb !== prevCanSearchKb) {
+    setPrevCanSearchKb(canSearchKb);
+    if (!canSearchKb) setKbResults([]);
+  }
+
+  const [prevCanSearchLinkKb, setPrevCanSearchLinkKb] = useState(canSearchLinkKb);
+  if (canSearchLinkKb !== prevCanSearchLinkKb) {
+    setPrevCanSearchLinkKb(canSearchLinkKb);
+    if (!canSearchLinkKb) setLinkKbResults([]);
   }
 
   useEffect(() => {
@@ -98,6 +121,28 @@ export default function ProblemDetail() {
     }, 200);
     return () => clearTimeout(t);
   }, [canSearchIncidents, incidentSearch]);
+
+  useEffect(() => {
+    if (!canSearchKb) return;
+    const query = kbSearch.trim();
+    const t = setTimeout(() => {
+      knowledgeApi.articles({ search: query, status: 'published' }).then((r) => {
+        setKbResults(r.articles.map((a) => ({ id: a.id, number: a.number, title: a.title })));
+      }).catch(() => setKbResults([]));
+    }, 200);
+    return () => clearTimeout(t);
+  }, [canSearchKb, kbSearch]);
+
+  useEffect(() => {
+    if (!canSearchLinkKb) return;
+    const query = linkKbSearch.trim();
+    const t = setTimeout(() => {
+      knowledgeApi.articles({ search: query, status: 'published' }).then((r) => {
+        setLinkKbResults(r.articles.map((a) => ({ id: a.id, number: a.number, title: a.title })));
+      }).catch(() => setLinkKbResults([]));
+    }, 200);
+    return () => clearTimeout(t);
+  }, [canSearchLinkKb, linkKbSearch]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -152,6 +197,18 @@ export default function ProblemDetail() {
     setTasks(tRes.tasks);
   };
 
+  const emptyKeForm = (): KnownErrorFormState => ({
+    title: '',
+    symptoms: '',
+    workaround: '',
+    permanent_fix_eta: '',
+    tags: '',
+    severity: 'medium',
+    is_active: true,
+    kb_article_id: '',
+    kb_article_label: '',
+  });
+
   const createKnownError = async () => {
     if (!id || isNew || !keForm.title.trim() || !keForm.symptoms.trim() || !keForm.workaround.trim()) return;
     await problemsApi.createKnownError(id, {
@@ -162,15 +219,49 @@ export default function ProblemDetail() {
       tags: keForm.tags.split(',').map((x) => x.trim()).filter(Boolean),
       severity: keForm.severity as KnownError['severity'],
       is_active: keForm.is_active,
+      kb_article_id: keForm.kb_article_id || null,
     });
     const keRes = await problemsApi.knownErrors(id);
     setKnownErrors(keRes.known_errors);
-    setKeForm({ title: '', symptoms: '', workaround: '', permanent_fix_eta: '', tags: '', severity: 'medium', is_active: true });
+    setKeForm(emptyKeForm());
+    setKbSearch('');
+    setKbResults([]);
   };
 
   const toggleKnownError = async (ke: KnownError) => {
     if (!id || isNew) return;
     await problemsApi.updateKnownError(id, ke.id, { is_active: !ke.is_active });
+    const keRes = await problemsApi.knownErrors(id);
+    setKnownErrors(keRes.known_errors);
+  };
+
+  const selectKbArticle = (article: KbArticleSearchResult) => {
+    setKeForm((p) => ({
+      ...p,
+      kb_article_id: article.id,
+      kb_article_label: `${article.number} — ${article.title}`,
+    }));
+    setKbSearch('');
+    setKbResults([]);
+  };
+
+  const clearKbArticle = () => {
+    setKeForm((p) => ({ ...p, kb_article_id: '', kb_article_label: '' }));
+  };
+
+  const linkKbArticle = async (ke: KnownError, articleId: string) => {
+    if (!id || isNew) return;
+    await problemsApi.linkKnownErrorKbArticle(id, ke.id, articleId);
+    const keRes = await problemsApi.knownErrors(id);
+    setKnownErrors(keRes.known_errors);
+    setLinkingKeId(null);
+    setLinkKbSearch('');
+    setLinkKbResults([]);
+  };
+
+  const unlinkKbArticle = async (ke: KnownError) => {
+    if (!id || isNew) return;
+    await problemsApi.unlinkKnownErrorKbArticle(id, ke.id);
     const keRes = await problemsApi.knownErrors(id);
     setKnownErrors(keRes.known_errors);
   };
@@ -406,6 +497,18 @@ export default function ProblemDetail() {
                   createKnownError={createKnownError}
                   knownErrors={knownErrors}
                   toggleKnownError={toggleKnownError}
+                  kbSearch={kbSearch}
+                  setKbSearch={setKbSearch}
+                  kbResults={kbResults}
+                  selectKbArticle={selectKbArticle}
+                  clearKbArticle={clearKbArticle}
+                  linkKbArticle={linkKbArticle}
+                  unlinkKbArticle={unlinkKbArticle}
+                  linkingKeId={linkingKeId}
+                  setLinkingKeId={setLinkingKeId}
+                  linkKbSearch={linkKbSearch}
+                  setLinkKbSearch={setLinkKbSearch}
+                  linkKbResults={linkKbResults}
                   inputCls={inputCls}
                   selectCls={selectCls}
                   textareaCls={textareaCls}

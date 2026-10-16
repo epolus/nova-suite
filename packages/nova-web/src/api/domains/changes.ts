@@ -1,6 +1,19 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
-import type { AssignmentGroupItem, CabMeeting, Change, ChangeBlackout, ChangeConflict, ChangeDetail, ChangeStats, ChangeType, Pagination, StandardChangeTemplate } from '../types';
+import type {
+  AssignmentGroupItem,
+  CabMeeting,
+  Change,
+  ChangeBlackout,
+  ChangeConflict,
+  ChangeDetail,
+  ChangeRiskAnswer,
+  ChangeRiskQuestion,
+  ChangeStats,
+  ChangeType,
+  Pagination,
+  StandardChangeTemplate,
+} from '../types';
 
 export const changes = {
   list: (params: Record<string, string> = {}, page = 1, limit = 20) => {
@@ -47,6 +60,33 @@ export const changes = {
     return request<{ changes: Change[]; blackouts: ChangeBlackout[] }>(`/changes/calendar?${qs}`);
   },
   conflicts: (id: string) => request<{ conflicts: ChangeConflict[] }>(`/changes/conflicts/${id}`),
+  riskQuestions: (includeInactive = false) => {
+    const qs = includeInactive ? '?include_inactive=true' : '';
+    return request<{ questions: ChangeRiskQuestion[] }>(`/changes/risk-questions${qs}`);
+  },
+  createRiskQuestion: (data: Partial<ChangeRiskQuestion>) =>
+    request<ChangeRiskQuestion>('/changes/risk-questions', { method: 'POST', body: JSON.stringify(data) }),
+  updateRiskQuestion: (id: string, data: Partial<ChangeRiskQuestion>) =>
+    request<ChangeRiskQuestion>(`/changes/risk-questions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteRiskQuestion: (id: string) =>
+    request<ChangeRiskQuestion>(`/changes/risk-questions/${id}`, { method: 'DELETE' }),
+  riskAnswers: (changeId: string) =>
+    request<{
+      answers: ChangeRiskAnswer[];
+      risk_score: number | null;
+      risk_level: Change['risk_level'];
+      suggested_risk_level: Change['risk_level'] | null;
+    }>(`/changes/${changeId}/risk-answers`),
+  submitRiskAssessment: (
+    changeId: string,
+    data: { answers: Array<{ question_id: string; score: number; answer_text?: string | null }>; apply_suggested_risk_level?: boolean },
+  ) =>
+    request<{
+      risk_score: number;
+      risk_level: Change['risk_level'];
+      suggested_risk_level: Change['risk_level'];
+      answers_saved: number;
+    }>(`/changes/${changeId}/risk-assessment`, { method: 'POST', body: JSON.stringify(data) }),
   transition: (id: string, data: { action: string; notes?: string; scheduled_start?: string | null; scheduled_end?: string | null }) =>
     request<Change>(`/changes/${id}/transition`, { method: 'POST', body: JSON.stringify(data) }),
   decideApproval: (changeId: string, approvalId: string, decision: 'approved' | 'rejected' | 'waived', notes?: string) =>

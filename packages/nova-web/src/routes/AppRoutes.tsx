@@ -119,12 +119,14 @@ export default function AppRoutes() {
           <Route path="catalog-tasks/:serviceItemId/:taskId" element={<Lazy><Pages.CatalogTaskDetailPage /></Lazy>} />
           <Route path="services" element={<Lazy><Pages.ServicesPage /></Lazy>} />
           <Route path="sla-config" element={<Lazy><Pages.SlaConfigPage /></Lazy>} />
+          <Route path="business-calendars" element={<Lazy><Pages.BusinessCalendarsPage /></Lazy>} />
           <Route path="notification-config" element={<Lazy><Pages.NotificationConfigPage /></Lazy>} />
           <Route path="notification-deliveries" element={<Lazy><Pages.NotificationEmailDeliveriesPage /></Lazy>} />
           <Route path="change-management" element={<Lazy><Pages.ChangeAdminPage /></Lazy>} />
           <Route path="knowledge-workflows" element={<Lazy><Pages.KnowledgeWorkflowsPage /></Lazy>} />
           <Route path="system-status" element={<Lazy><Pages.SystemStatusPage /></Lazy>} />
           <Route path="theming" element={<Lazy><Pages.ThemingPage /></Lazy>} />
+          <Route path="ai-settings" element={<Lazy><Pages.AiSettingsPage /></Lazy>} />
           <Route path="data-sources" element={<Lazy><Pages.DataSourcesPage /></Lazy>} />
           <Route path="credentials" element={<Lazy><Pages.CredentialsPage /></Lazy>} />
           <Route path="config-packages" element={<Lazy><Pages.ConfigPackagesPage /></Lazy>} />

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
-import type { AssignmentGroupItem, Incident, IncidentProblemLink, IncidentStats, JournalEntry, Pagination, ServiceListItem, SimilarIncident, UserListItem } from '../types';
+import type { AssignmentGroupItem, Incident, IncidentAiSuggestion, IncidentProblemLink, IncidentStats, JournalEntry, Pagination, ServiceListItem, SimilarIncident, UserListItem } from '../types';
 
 export const incidents = {
   list: (params: Record<string, string> = {}, page = 1, limit = 20) => {
@@ -57,4 +57,16 @@ export const incidents = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  aiSuggestions: (id: string) =>
+    request<{ suggestions: IncidentAiSuggestion[] }>(`/incidents/${id}/ai-suggestions`),
+  acceptAiSuggestion: (incidentId: string, suggestionId: string) =>
+    request<{ suggestion_id: string; status: string; incident: Incident }>(
+      `/incidents/${incidentId}/ai-suggestions/${suggestionId}/accept`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
+  rejectAiSuggestion: (incidentId: string, suggestionId: string) =>
+    request<{ suggestion_id: string; status: string }>(
+      `/incidents/${incidentId}/ai-suggestions/${suggestionId}/reject`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
 };

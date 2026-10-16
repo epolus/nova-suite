@@ -54,6 +54,11 @@ export default function ChangeDetailPage() {
     problemsList,
     approvals,
     conflicts,
+    riskQuestions,
+    riskScores,
+    setRiskScores,
+    riskScore,
+    suggestedRiskLevel,
     prevId,
     nextId,
     goTo,
@@ -298,6 +303,11 @@ export default function ChangeDetailPage() {
           incidentsList={incidentsList}
           problemsList={problemsList}
           change={change}
+          riskQuestions={riskQuestions}
+          riskScores={riskScores}
+          setRiskScores={setRiskScores}
+          riskScore={riskScore}
+          suggestedRiskLevel={suggestedRiskLevel}
           inputCls={inputCls}
           selectCls={selectCls}
           textareaCls={textareaCls}

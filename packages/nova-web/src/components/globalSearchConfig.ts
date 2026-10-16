@@ -79,6 +79,7 @@ export const NAV_ITEM_DEFS: NavItemDef[] = [
   { id: 'adminChangeManagement', path: '/admin/change-management', icon: 'settings', adminOnly: true },
   { id: 'adminSystemStatus', path: '/admin/system-status', icon: 'settings', adminOnly: true },
   { id: 'adminTheming', path: '/admin/theming', icon: 'theme', adminOnly: true },
+  { id: 'adminAiSettings', path: '/admin/ai-settings', icon: 'settings', adminOnly: true },
   { id: 'adminImport', path: '/admin/import', icon: 'import', adminOnly: true },
   { id: 'adminServiceItems', path: '/admin/service-items', icon: 'service_item', adminOnly: true },
 ];

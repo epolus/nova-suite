@@ -2,11 +2,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import { admin as adminApi } from '../../api/client';
-import type { AssignmentGroupItem, AdminUser, NotificationRule } from '../../api/client';
+import type {
+  AssignmentGroupItem,
+  AdminUser,
+  NotificationRule,
+  NotificationWebhook,
+  NotificationWebhookChannel,
+} from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import Spinner from '../../components/Spinner';
 import NotificationForm from './notifications/NotificationForm';
 import NotificationList from './notifications/NotificationList';
+import WebhookConfigSection from './notifications/WebhookConfigSection';
 import {
   getTemplatesFromRule,
   type TemplateLocale,
@@ -37,6 +44,7 @@ export default function NotificationConfigPage() {
   }), [t]);
 
   const [rules, setRules] = useState<NotificationRule[]>([]);
+  const [webhooks, setWebhooks] = useState<NotificationWebhook[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,11 +57,13 @@ export default function NotificationConfigPage() {
   const load = () => {
     Promise.all([
       adminApi.notificationRules(),
+      adminApi.notificationWebhooks().catch(() => ({ notification_webhooks: [] as NotificationWebhook[] })),
       adminApi.users(),
       adminApi.assignmentGroups(),
     ])
-      .then(([rRes, uRes, gRes]) => {
+      .then(([rRes, wRes, uRes, gRes]) => {
         setRules(rRes.notification_rules);
+        setWebhooks(wRes.notification_webhooks);
         setUsers(uRes.users);
         setGroups(gRes.assignment_groups.filter((g) => g.is_active));
         setLoading(false);
@@ -152,6 +162,36 @@ export default function NotificationConfigPage() {
     alert(t('testStarted'));
   };
 
+  const createWebhook = async (data: {
+    channel: NotificationWebhookChannel;
+    name: string;
+    webhook_url: string;
+  }) => {
+    setSaving(true);
+    try {
+      await adminApi.createNotificationWebhook(data);
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleWebhookActive = async (webhook: NotificationWebhook) => {
+    await adminApi.updateNotificationWebhook(webhook.id, { is_active: !webhook.is_active });
+    await load();
+  };
+
+  const testWebhook = async (webhook: NotificationWebhook) => {
+    await adminApi.testNotificationWebhook(webhook.id);
+    alert(t('webhookTestOk'));
+  };
+
+  const removeWebhook = async (webhook: NotificationWebhook) => {
+    if (!confirm(t('confirmDeleteWebhook', { name: webhook.name }))) return;
+    await adminApi.deleteNotificationWebhook(webhook.id);
+    await load();
+  };
+
   if (loading) return <Spinner />;
 
   return (
@@ -191,6 +231,17 @@ export default function NotificationConfigPage() {
           onEdit={startEdit}
           onToggleActive={toggleActive}
           onDelete={remove}
+        />
+      )}
+
+      {!isFormOpen && (
+        <WebhookConfigSection
+          webhooks={webhooks}
+          saving={saving}
+          onCreate={createWebhook}
+          onToggleActive={toggleWebhookActive}
+          onTest={testWebhook}
+          onDelete={removeWebhook}
         />
       )}
     </>
