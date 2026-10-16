@@ -3328,6 +3328,7 @@
         "adminChangeManagement": { "title": "Change Management Config", "subtitle": "Admin · Process & Automation" },
         "adminSystemStatus": { "title": "System Status", "subtitle": "Admin · System" },
         "adminTheming": { "title": "Theming & Branding", "subtitle": "Admin · System" },
+        "adminAiSettings": { "title": "AI Settings", "subtitle": "Admin · System" },
         "adminImport": { "title": "Import Data", "subtitle": "Admin · Data & Integration" },
         "adminServiceItems": { "title": "Service Items", "subtitle": "Admin · Service Catalog" }
       }
