@@ -353,6 +353,8 @@ export const createChangeSchema = z.object({
   maintenance_window: z.string().max(100).optional(),
   implementation_notes: z.string().max(10000).optional(),
   success: z.boolean().nullable().optional(),
+  failure_category: z.enum(['incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other']).nullable().optional(),
+  planned_downtime_minutes: z.number().int().min(0).nullable().optional(),
   actual_downtime_minutes: z.number().int().min(0).nullable().optional(),
   related_problem_id: uuidSchema.nullable().optional(),
   related_incident_id: uuidSchema.nullable().optional(),
@@ -370,6 +372,11 @@ export const changeTransitionSchema = z.object({
   scheduled_start: z.string().nullable().optional(),
   scheduled_end: z.string().nullable().optional(),
   override_blocking_conflicts: z.boolean().optional(),
+  success: z.boolean().optional(),
+  failure_category: z.enum(['incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other']).nullable().optional(),
+  planned_downtime_minutes: z.number().int().min(0).nullable().optional(),
+  actual_downtime_minutes: z.number().int().min(0).nullable().optional(),
+  review_notes: z.string().max(10000).nullable().optional(),
 });
 
 export const changeApprovalDecisionSchema = z.object({

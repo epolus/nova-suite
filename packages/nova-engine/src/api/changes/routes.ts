@@ -26,6 +26,7 @@ import { AppError, NotFound } from '../../middleware/errorHandler';
 import { hasAnyRole, hasChangeRole, isAdminRole } from '../roles';
 import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-start-queue';
 import { resolveSlaDueAt } from '../../domain/sla';
+import { normalizeChangePir } from '../../domain/change-pir';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -1612,6 +1613,50 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
           );
         }
       }
+    }
+
+    if (action === 'close') {
+      const body = req.body as {
+        success?: boolean;
+        failure_category?: string | null;
+        planned_downtime_minutes?: number | null;
+        actual_downtime_minutes?: number | null;
+        review_notes?: string | null;
+      };
+      let pir;
+      try {
+        pir = normalizeChangePir({
+          success: body.success !== undefined ? body.success : change.success,
+          failureCategory: body.failure_category !== undefined ? body.failure_category : change.failure_category,
+          plannedDowntimeMinutes: body.planned_downtime_minutes !== undefined
+            ? body.planned_downtime_minutes
+            : change.planned_downtime_minutes,
+          actualDowntimeMinutes: body.actual_downtime_minutes !== undefined
+            ? body.actual_downtime_minutes
+            : change.actual_downtime_minutes,
+        });
+      } catch (err) {
+        throw new AppError(400, err instanceof Error ? err.message : 'Post-implementation review is incomplete');
+      }
+      const reviewNotes = body.review_notes !== undefined ? body.review_notes : change.review_notes;
+      await client.query(
+        `UPDATE changes
+         SET success = $1,
+             failure_category = $2,
+             planned_downtime_minutes = $3,
+             actual_downtime_minutes = $4,
+             review_notes = $5
+         WHERE tenant_id = current_tenant_id()
+           AND id = $6`,
+        [
+          pir.success,
+          pir.failureCategory,
+          pir.plannedDowntimeMinutes,
+          pir.actualDowntimeMinutes,
+          reviewNotes || null,
+          req.params.id,
+        ],
+      );
     }
 
     const state = normalizeStatusAndStage(action);

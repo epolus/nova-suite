@@ -115,11 +115,34 @@ export default function ChangeDetailPage() {
       return;
     }
     try {
+      const plannedMinutes = form.planned_downtime_minutes === '' ? null : Number(form.planned_downtime_minutes);
+      const actualMinutes = form.actual_downtime_minutes === '' ? null : Number(form.actual_downtime_minutes);
+      if (action === 'close') {
+        if (form.success !== 'true' && form.success !== 'false') {
+          setError(tChanges('pirOutcomeRequired'));
+          return;
+        }
+        if (form.success === 'false' && !form.failure_category) {
+          setError(tChanges('pirFailureRequired'));
+          return;
+        }
+        if (plannedMinutes == null || actualMinutes == null || !Number.isInteger(plannedMinutes) || !Number.isInteger(actualMinutes)) {
+          setError(tChanges('pirDowntimeRequired'));
+          return;
+        }
+      }
       await changes.transition(id, {
         action,
         scheduled_start: form.scheduled_start ? new Date(form.scheduled_start).toISOString() : null,
         scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null,
         override_blocking_conflicts: overrideBlocking && (action === 'schedule' || action === 'request_approval'),
+        ...(action === 'close' ? {
+          success: form.success === 'true',
+          failure_category: form.success === 'false' ? form.failure_category : null,
+          planned_downtime_minutes: plannedMinutes,
+          actual_downtime_minutes: actualMinutes,
+          review_notes: form.review_notes || null,
+        } : {}),
       });
       await reload();
     } catch (e: unknown) {
@@ -350,7 +373,7 @@ export default function ChangeDetailPage() {
 
       {/* ── Review tab ── */}
       {!isNew && activeTab === 'review' && (
-        <ChangeReviewPanel form={form} setForm={setForm} textareaCls={textareaCls} />
+        <ChangeReviewPanel form={form} setForm={setForm} inputCls={inputCls} selectCls={selectCls} textareaCls={textareaCls} />
       )}
 
     </>

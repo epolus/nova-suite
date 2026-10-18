@@ -5,7 +5,13 @@ import type { ReportActivityEvent, ReportComponentConfig, ReportComponentResult,
 export const reports = {
   kpis: () => request<{
     incidents: { open_count: number; sla_breached: number; mttr_hours: number | null };
-    changes: { closed_count: number; successful_count: number; success_rate: number | null };
+    changes: {
+      closed_count: number;
+      successful_count: number;
+      failed_count: number;
+      downtime_variance_minutes: number | null;
+      success_rate: number | null;
+    };
     requests: { open_count: number; backlog_age_hours: number | null };
     problems: { open_count: number };
   }>('/reports/kpis'),
