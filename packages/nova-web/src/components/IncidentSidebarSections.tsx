@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
-import type { SimilarIncident, KnowledgeSuggestion } from '../api/client';
+import type { SimilarIncident, KnowledgeSuggestion, KnownErrorSuggestion } from '../api/client';
 import Badge from './Badge';
 
 export function SimilarIncidentsSection({
@@ -42,6 +42,39 @@ export function SimilarIncidentsSection({
             </div>
           );
         })}
+      </div>
+    </section>
+  );
+}
+
+export function KnownErrorsSection({
+  knownErrors,
+  loading = false,
+}: {
+  knownErrors: KnownErrorSuggestion[];
+  loading?: boolean;
+}) {
+  const t = useTranslations('components.incidentSidebar');
+
+  return (
+    <section>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{t('knownErrors')}</h4>
+      <div className="space-y-2">
+        {!loading && knownErrors.length === 0 && <p className="text-sm text-gray-400">{t('noKnownErrors')}</p>}
+        {knownErrors.map((ke) => (
+          <Link
+            key={ke.id}
+            to={`/problems/${ke.problem_id}`}
+            className="block rounded-md border border-amber-200 bg-amber-50/50 p-3 hover:bg-amber-50"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-mono text-amber-700">{ke.problem_number}</span>
+              {ke.severity && <span className="text-xs text-gray-500">{ke.severity}</span>}
+            </div>
+            <p className="text-sm font-medium text-gray-900">{ke.title}</p>
+            <p className="text-xs text-gray-600 mt-1 line-clamp-3">{ke.workaround}</p>
+          </Link>
+        ))}
       </div>
     </section>
   );

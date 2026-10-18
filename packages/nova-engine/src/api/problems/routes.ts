@@ -12,6 +12,7 @@ import { AppError, NotFound } from '../../middleware/errorHandler';
 import { isAdminRole, hasProblemRole } from '../roles';
 import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-start-queue';
 import { resolveSlaDueAt } from '../../domain/sla';
+import { canRetireKnownError, hasKnownErrorContent } from '../../domain/known-errors';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -20,6 +21,53 @@ const PROBLEM_PROCESS_NAME = 'Problem Management';
 
 function hasElevatedProblemRole(req: Request): boolean {
   return hasProblemRole(req);
+}
+
+async function linkedChangeCount(client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: Array<{ c?: number }> }> }, problemId: string): Promise<number> {
+  const row = await client.query(
+    `SELECT count(*)::int AS c
+     FROM changes
+     WHERE tenant_id = current_tenant_id()
+       AND related_problem_id = $1
+       AND status NOT IN ('cancelled', 'rejected')`,
+    [problemId],
+  );
+  return Number(row.rows[0]?.c || 0);
+}
+
+async function upsertKnownErrorForProblem(
+  client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  problem: { id: string; title: string; symptoms: string | null; workaround: string | null; priority?: string | null },
+): Promise<void> {
+  const symptoms = String(problem.symptoms || '').trim();
+  const workaround = String(problem.workaround || '').trim();
+  const updated = await client.query(
+    `UPDATE known_errors
+     SET title = $2,
+         symptoms = $3,
+         workaround = $4,
+         is_active = true,
+         updated_at = now()
+     WHERE id = (
+       SELECT id FROM known_errors
+       WHERE tenant_id = current_tenant_id()
+         AND problem_id = $1
+       ORDER BY is_active DESC, updated_at DESC
+       LIMIT 1
+     )
+     RETURNING id`,
+    [problem.id, problem.title, symptoms, workaround],
+  );
+  if (updated.rows.length > 0) return;
+  const severity = ['low', 'medium', 'high', 'critical'].includes(String(problem.priority))
+    ? problem.priority
+    : 'medium';
+  await client.query(
+    `INSERT INTO known_errors
+     (tenant_id, problem_id, title, symptoms, workaround, severity, is_active)
+     VALUES (current_tenant_id(), $1, $2, $3, $4, $5, true)`,
+    [problem.id, problem.title, symptoms, workaround, severity],
+  );
 }
 
 async function canWorkOnProblem(client: any, req: Request, problem: any): Promise<boolean> {
@@ -679,6 +727,35 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
       if (!ok) throw new AppError(400, 'Assignment group is not enabled for Problem Management');
     }
 
+    const nextStatus = updates.status !== undefined ? String(updates.status) : String(current.status);
+    if (nextStatus === 'known_error') {
+      const symptoms = updates.symptoms !== undefined ? updates.symptoms : current.symptoms;
+      const workaround = updates.workaround !== undefined ? updates.workaround : current.workaround;
+      if (!hasKnownErrorContent(symptoms, workaround)) {
+        throw new AppError(400, 'Symptoms and a workaround are required before marking a problem as a known error');
+      }
+    }
+    const retiringKnownError = ['resolved', 'closed'].includes(nextStatus)
+      && !['resolved', 'closed'].includes(String(current.status));
+    if (retiringKnownError) {
+      const active = await client.query(
+        `SELECT count(*)::int AS c
+         FROM known_errors
+         WHERE tenant_id = current_tenant_id()
+           AND problem_id = $1
+           AND is_active = true`,
+        [req.params.id],
+      );
+      const hasActiveKnownError = Number(active.rows[0]?.c || 0) > 0 || current.status === 'known_error';
+      if (hasActiveKnownError) {
+        const permanentFix = updates.permanent_fix !== undefined ? updates.permanent_fix : current.permanent_fix;
+        const changes = await linkedChangeCount(client, String(req.params.id));
+        if (!canRetireKnownError(permanentFix, changes)) {
+          throw new AppError(400, 'A permanent fix or a linked change is required before closing a known error');
+        }
+      }
+    }
+
     const sets: string[] = [];
     const vals: unknown[] = [];
     let i = 1;
@@ -728,6 +805,19 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
       vals,
     );
     const updatedProblem = updated.rows[0];
+    if (updatedProblem.status === 'known_error') {
+      await upsertKnownErrorForProblem(client, updatedProblem);
+    }
+    if (retiringKnownError) {
+      await client.query(
+        `UPDATE known_errors
+         SET is_active = false, updated_at = now()
+         WHERE tenant_id = current_tenant_id()
+           AND problem_id = $1
+           AND is_active = true`,
+        [req.params.id],
+      );
+    }
     if (updates.assigned_to !== undefined && String(updates.assigned_to || '') !== String(current.assigned_to || '')) {
       enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
@@ -977,6 +1067,12 @@ router.patch('/:id/known-errors/:knownErrorId', async (req: Request, res: Respon
       vals.push(k === 'tags' && !Array.isArray(v) ? [] : v);
     }
     if (sets.length === 0) return void res.json({ success: true });
+    if (req.body?.is_active === false) {
+      const changes = await linkedChangeCount(client, String(req.params.id));
+      if (!canRetireKnownError(problemRes.rows[0].permanent_fix, changes)) {
+        throw new AppError(400, 'A permanent fix or a linked change is required before closing a known error');
+      }
+    }
     vals.push(req.params.id, req.params.knownErrorId);
     const updated = await client.query(
       `UPDATE known_errors

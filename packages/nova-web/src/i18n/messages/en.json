@@ -3084,6 +3084,8 @@
       "noSimilar": "No similar incidents found.",
       "suggestedKnowledge": "Suggested Knowledge",
       "noSuggestions": "No article suggestions yet.",
+      "knownErrors": "Known Errors",
+      "noKnownErrors": "No active known errors for this service or CI.",
       "score": "Score {score}",
       "general": "General"
     },

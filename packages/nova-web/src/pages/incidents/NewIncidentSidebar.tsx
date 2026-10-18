@@ -2,19 +2,21 @@
 import { useEffect, useState } from 'react';
 import type { NavigateFunction } from 'react-router';
 import { attachments as attachmentsApi, knowledge as knowledgeApi } from '../../api/client';
-import type { KnowledgeArticleDetail, SimilarIncident, KnowledgeSuggestion } from '../../api/client';
+import type { KnowledgeArticleDetail, SimilarIncident, KnowledgeSuggestion, KnownErrorSuggestion } from '../../api/client';
 import { Card as UiCard, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { SimilarIncidentsSection, KbSuggestionsSection } from '../../components/IncidentSidebarSections';
+import { SimilarIncidentsSection, KbSuggestionsSection, KnownErrorsSection } from '../../components/IncidentSidebarSections';
 import { useTranslations } from 'use-intl';
 
 export function NewIncidentSidebar({
   similarIncidents,
   kbSuggestions,
+  knownErrors,
   loadingSidebar,
   navigate,
 }: {
   similarIncidents: SimilarIncident[];
   kbSuggestions: KnowledgeSuggestion[];
+  knownErrors: KnownErrorSuggestion[];
   loadingSidebar: boolean;
   navigate: NavigateFunction;
 }) {
@@ -80,6 +82,7 @@ export function NewIncidentSidebar({
         </CardHeader>
         <CardContent className="space-y-5">
           {loadingSidebar && <div className="text-sm text-gray-500">{tIncidents('loadingRecommendations')}</div>}
+          <KnownErrorsSection knownErrors={knownErrors} />
           <SimilarIncidentsSection incidents={similarIncidents} />
           <KbSuggestionsSection articles={kbSuggestions} onPreview={openKnowledgePreview} />
           {(previewLoading || previewError || previewArticle) && (
