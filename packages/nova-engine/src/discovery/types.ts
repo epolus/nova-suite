@@ -7,6 +7,7 @@
 
 export type AssetLifecycleStatus =
   | 'ordered'
+  | 'received'
   | 'in_stock'
   | 'in_use'
   | 'maintenance'
