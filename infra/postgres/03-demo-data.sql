@@ -300,8 +300,8 @@ BEGIN
       status, impact, urgency, priority,
       assigned_to, assignment_group_id, caller_id,
       contact_info, service_id, configuration_item_id,
-      category, resolution_code, sla_due_at, sla_breached,
-      created_at, resolved_at, closed_at
+      category, pending_reason, sla_due_at, sla_breached,
+      created_at, resolved_at, closed_at, responded_at
     ) VALUES (
       tenant_id,
       'INC' || lpad((2000 + i)::text, 7, '0'),
@@ -324,7 +324,8 @@ BEGIN
       rand_val > 0.85,
       now() - (random() * interval '60 days'),
       resolved_val,
-      closed_val
+      closed_val,
+      CASE WHEN status_val = 'new' THEN NULL ELSE now() END
     ) RETURNING id INTO inc_id;
 
     -- Add 1-5 journal entries per incident

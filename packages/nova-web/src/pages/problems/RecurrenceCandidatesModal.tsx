@@ -18,6 +18,7 @@ export function RecurrenceCandidatesModal({ onClose }: { onClose: () => void }) 
   const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
   const [groupId, setGroupId] = useState('');
   const [selectedSeed, setSelectedSeed] = useState<string | null>(null);
+  const [scannedAt, setScannedAt] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +32,7 @@ export function RecurrenceCandidatesModal({ onClose }: { onClose: () => void }) 
         ]);
         if (cancelled) return;
         setCandidates(candRes.candidates);
+        setScannedAt(candRes.scanned_at);
         setGroups(groupsRes.assignment_groups);
         const firstGroup = groupsRes.assignment_groups[0];
         if (firstGroup) setGroupId(firstGroup.id);
@@ -78,6 +80,11 @@ export function RecurrenceCandidatesModal({ onClose }: { onClose: () => void }) 
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
         </div>
         <p className="text-sm text-gray-500">{tProblems('recurrenceDescription')}</p>
+        {scannedAt && (
+          <p className="text-xs text-gray-400">
+            {tProblems('recurrenceLastScan', { when: new Date(scannedAt).toLocaleString() })}
+          </p>
+        )}
 
         {loading && (
           <div className="flex justify-center py-8"><Spinner /></div>

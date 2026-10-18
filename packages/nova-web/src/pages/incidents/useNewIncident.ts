@@ -16,6 +16,7 @@ import type {
   Problem,
   SimilarIncident,
   KnowledgeSuggestion,
+  KnownErrorSuggestion,
 } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
@@ -49,6 +50,7 @@ export function useNewIncident(tIncidents: (key: string) => string) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [similarIncidents, setSimilarIncidents] = useState<SimilarIncident[]>([]);
   const [kbSuggestions, setKbSuggestions] = useState<KnowledgeSuggestion[]>([]);
+  const [knownErrors, setKnownErrors] = useState<KnownErrorSuggestion[]>([]);
   const [loadingSidebar, setLoadingSidebar] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [users, setUsers] = useState<UserListItem[]>([]);
@@ -179,6 +181,27 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [title, description, sidebarOpen, category, isEss]);
 
+  const knownErrorContext = sidebarOpen && (serviceId || configItemId)
+    ? `${serviceId}|${configItemId}`
+    : '';
+  const [prevKnownErrorContext, setPrevKnownErrorContext] = useState(knownErrorContext);
+  if (knownErrorContext !== prevKnownErrorContext) {
+    setPrevKnownErrorContext(knownErrorContext);
+    setKnownErrors([]);
+  }
+
+  useEffect(() => {
+    if (!knownErrorContext) return;
+    let cancelled = false;
+    incidentsApi.knownErrorsByContext({
+      configuration_item_id: configItemId || undefined,
+      service_id: serviceId || undefined,
+    })
+      .then((res) => { if (!cancelled) setKnownErrors(res.known_errors); })
+      .catch(() => { if (!cancelled) setKnownErrors([]); });
+    return () => { cancelled = true; };
+  }, [knownErrorContext, serviceId, configItemId]);
+
   const handleSubmit = useCallback(async (): Promise<boolean> => {
     setError('');
     if (!user) {
@@ -287,6 +310,7 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     setSidebarOpen,
     similarIncidents,
     kbSuggestions,
+    knownErrors,
     loadingSidebar,
     users,
     assignmentGroups,

@@ -18,6 +18,7 @@ export interface Incident {
   category: string | null;
   subcategory: string | null;
   resolution_code: string | null;
+  pending_reason?: string | null;
   resolution_notes: string | null;
   resolved_at: string | null;
   closed_at: string | null;
@@ -25,6 +26,8 @@ export interface Incident {
   sla_breached: boolean;
   response_due_at?: string | null;
   response_breached?: boolean;
+  responded_at?: string | null;
+  sla_definition_id?: string | null;
   sla_paused_at?: string | null;
   sla_paused_ms?: number;
   created_at: string;
@@ -57,6 +60,16 @@ export interface IncidentProblemLink {
   problem_title?: string;
   problem_status?: string;
   problem_priority?: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface KnownErrorSuggestion {
+  id: string;
+  title: string;
+  symptoms: string;
+  workaround: string;
+  severity: string | null;
+  problem_id: string;
+  problem_number: string;
 }
 
 export interface SimilarIncident {

@@ -87,7 +87,18 @@ export const changes = {
       suggested_risk_level: Change['risk_level'];
       answers_saved: number;
     }>(`/changes/${changeId}/risk-assessment`, { method: 'POST', body: JSON.stringify(data) }),
-  transition: (id: string, data: { action: string; notes?: string; scheduled_start?: string | null; scheduled_end?: string | null }) =>
+  transition: (id: string, data: {
+    action: string;
+    notes?: string;
+    scheduled_start?: string | null;
+    scheduled_end?: string | null;
+    override_blocking_conflicts?: boolean;
+    success?: boolean;
+    failure_category?: string | null;
+    planned_downtime_minutes?: number | null;
+    actual_downtime_minutes?: number | null;
+    review_notes?: string | null;
+  }) =>
     request<Change>(`/changes/${id}/transition`, { method: 'POST', body: JSON.stringify(data) }),
   decideApproval: (changeId: string, approvalId: string, decision: 'approved' | 'rejected' | 'waived', notes?: string) =>
     request<{ success: boolean }>(`/changes/${changeId}/approvals/${approvalId}/decision`, {

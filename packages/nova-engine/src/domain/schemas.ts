@@ -278,6 +278,7 @@ export const updateIncidentSchema = z.object({
   category: z.string().max(255).nullable().optional(),
   subcategory: z.string().max(255).nullable().optional(),
   resolution_code: z.string().max(255).nullable().optional(),
+  pending_reason: z.string().max(255).nullable().optional(),
   resolution_notes: z.string().max(10000).nullable().optional(),
 });
 
@@ -352,6 +353,8 @@ export const createChangeSchema = z.object({
   maintenance_window: z.string().max(100).optional(),
   implementation_notes: z.string().max(10000).optional(),
   success: z.boolean().nullable().optional(),
+  failure_category: z.enum(['incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other']).nullable().optional(),
+  planned_downtime_minutes: z.number().int().min(0).nullable().optional(),
   actual_downtime_minutes: z.number().int().min(0).nullable().optional(),
   related_problem_id: uuidSchema.nullable().optional(),
   related_incident_id: uuidSchema.nullable().optional(),
@@ -368,6 +371,12 @@ export const changeTransitionSchema = z.object({
   notes: z.string().max(5000).optional(),
   scheduled_start: z.string().nullable().optional(),
   scheduled_end: z.string().nullable().optional(),
+  override_blocking_conflicts: z.boolean().optional(),
+  success: z.boolean().optional(),
+  failure_category: z.enum(['incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other']).nullable().optional(),
+  planned_downtime_minutes: z.number().int().min(0).nullable().optional(),
+  actual_downtime_minutes: z.number().int().min(0).nullable().optional(),
+  review_notes: z.string().max(10000).nullable().optional(),
 });
 
 export const changeApprovalDecisionSchema = z.object({
@@ -500,9 +509,22 @@ export const createCIRelationshipSchema = z.object({
 
 // ─── Major incidents ───
 export const postmortemActionItemSchema = z.object({
+  id: z.string().uuid().optional(),
   title: z.string().min(1).max(500),
   owner_user_id: uuidSchema.optional().nullable(),
   due_at: z.string().optional().nullable(),
+  problem_id: uuidSchema.optional().nullable(),
+  change_id: uuidSchema.optional().nullable(),
+});
+
+export const postmortemActionItemCreateSchema = z.object({
+  title: z.string().min(1).max(500),
+});
+
+export const postmortemFollowUpSchema = z.object({
+  kind: z.enum(['problem', 'change']),
+  assignment_group_id: uuidSchema,
+  change_type_id: uuidSchema.optional(),
 });
 
 export const createMajorIncidentSchema = z.object({

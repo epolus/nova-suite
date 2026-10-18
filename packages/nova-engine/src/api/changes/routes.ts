@@ -23,9 +23,10 @@ import {
   updateChangeTypeSchema,
 } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
-import { hasChangeRole, isAdminRole } from '../roles';
+import { hasAnyRole, hasChangeRole, isAdminRole } from '../roles';
 import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-start-queue';
 import { resolveSlaDueAt } from '../../domain/sla';
+import { normalizeChangePir } from '../../domain/change-pir';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -235,7 +236,44 @@ function suggestRiskLevelFromScore(score: number): 'low' | 'medium' | 'high' | '
   return 'very_high';
 }
 
-async function refreshChangeConflicts(client: any, changeId: string): Promise<void> {
+async function writeChangeConflictSummary(client: any, changeId: string): Promise<number> {
+  await client.query(
+    `UPDATE changes
+     SET conflict_summary = COALESCE((
+       SELECT jsonb_agg(
+         jsonb_build_object(
+           'id', cc.id,
+           'conflict_type', cc.conflict_type,
+           'severity', cc.severity,
+           'details', cc.details,
+           'conflicting_change_id', cc.conflicting_change_id
+         )
+         ORDER BY cc.severity DESC, cc.conflict_type
+       )
+       FROM change_conflicts cc
+       WHERE cc.tenant_id = current_tenant_id()
+         AND cc.change_id = $1::uuid
+     ), '[]'::jsonb)
+     WHERE tenant_id = current_tenant_id()
+       AND id = $1::uuid`,
+    [changeId],
+  );
+  const blocking = await client.query(
+    `SELECT count(*)::int AS blocking
+     FROM change_conflicts
+     WHERE tenant_id = current_tenant_id()
+       AND change_id = $1::uuid
+       AND severity = 'blocking'`,
+    [changeId],
+  );
+  return Number(blocking.rows[0]?.blocking || 0);
+}
+
+async function refreshChangeConflicts(
+  client: any,
+  changeId: string,
+  windowOverride?: { start?: string | null; end?: string | null },
+): Promise<number> {
   const changeRes = await client.query(
     `SELECT c.id, c.scheduled_start, c.scheduled_end, c.risk_level
      FROM changes c
@@ -243,16 +281,18 @@ async function refreshChangeConflicts(client: any, changeId: string): Promise<vo
        AND c.id = $1`,
     [changeId],
   );
-  if (changeRes.rows.length === 0) return;
+  if (changeRes.rows.length === 0) return 0;
   const c = changeRes.rows[0];
+  const start = windowOverride && 'start' in windowOverride ? windowOverride.start : c.scheduled_start;
+  const end = windowOverride && 'end' in windowOverride ? windowOverride.end : c.scheduled_end;
   await client.query(
     `DELETE FROM change_conflicts
      WHERE tenant_id = current_tenant_id()
        AND change_id = $1::uuid`,
     [changeId],
   );
-  if (!c.scheduled_start || !c.scheduled_end) return;
-  if (new Date(c.scheduled_start).getTime() > new Date(c.scheduled_end).getTime()) return;
+  if (!start || !end) return writeChangeConflictSummary(client, changeId);
+  if (new Date(start).getTime() > new Date(end).getTime()) return writeChangeConflictSummary(client, changeId);
 
   await client.query(
     `INSERT INTO change_conflicts (tenant_id, change_id, conflicting_change_id, conflict_type, severity, details)
@@ -271,7 +311,7 @@ async function refreshChangeConflicts(client: any, changeId: string): Promise<vo
        AND c2.id <> $1::uuid
        AND c2.status IN ('approved', 'scheduled', 'implementing', 'implemented', 'reviewing')
        AND tstzrange(c2.scheduled_start, c2.scheduled_end, '[)') && tstzrange($3::timestamptz, $4::timestamptz, '[)')`,
-    [changeId, c.risk_level, c.scheduled_start, c.scheduled_end],
+    [changeId, c.risk_level, start, end],
   );
 
   await client.query(
@@ -280,7 +320,7 @@ async function refreshChangeConflicts(client: any, changeId: string): Promise<vo
      FROM change_blackouts b
      WHERE b.tenant_id = current_tenant_id()
        AND tstzrange(b.start_date, b.end_date, '[)') && tstzrange($2::timestamptz, $3::timestamptz, '[)')`,
-    [changeId, c.scheduled_start, c.scheduled_end],
+    [changeId, start, end],
   );
 
   await client.query(
@@ -303,7 +343,7 @@ async function refreshChangeConflicts(client: any, changeId: string): Promise<vo
        AND c2.tenant_id = current_tenant_id()
        AND c2.status IN ('approved', 'scheduled', 'implementing', 'implemented', 'reviewing')
        AND tstzrange(c2.scheduled_start, c2.scheduled_end, '[)') && tstzrange($3::timestamptz, $4::timestamptz, '[)')`,
-    [changeId, c.risk_level, c.scheduled_start, c.scheduled_end],
+    [changeId, c.risk_level, start, end],
   );
 
   // Dependency-aware collisions: overlapping changes on related CIs
@@ -360,8 +400,10 @@ async function refreshChangeConflicts(client: any, changeId: string): Promise<vo
          WHERE own.tenant_id = current_tenant_id()
            AND own.change_id = $1::uuid
        )`,
-    [changeId, c.risk_level, c.scheduled_start, c.scheduled_end],
+    [changeId, c.risk_level, start, end],
   );
+
+  return writeChangeConflictSummary(client, changeId);
 }
 
 function validateScheduleRange(start: unknown, end: unknown): void {
@@ -1445,7 +1487,7 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
   try {
     const client = getRequestClient(req);
     const changeRes = await client.query(
-      `SELECT c.*, ct.auto_approve, ct.approval_config
+      `SELECT c.*, ct.auto_approve, ct.approval_config, ct.name AS change_type_name
        FROM changes c
        JOIN change_types ct ON ct.id = c.change_type_id
        WHERE c.tenant_id = current_tenant_id()
@@ -1457,7 +1499,7 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
     const canWork = await canWorkOnChange(client, req, change);
     if (!canWork) throw new AppError(403, 'Insufficient permissions');
 
-    const { action, notes, scheduled_start, scheduled_end } = req.body;
+    const { action, notes, scheduled_start, scheduled_end, override_blocking_conflicts } = req.body;
     const pendingApprovalsRes = await client.query(
       `SELECT count(*) AS c
        FROM change_approvals
@@ -1497,6 +1539,26 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
       }
       if (pendingApprovals > 0) {
         throw new AppError(400, 'All required approvals must be completed before approving the change');
+      }
+    }
+    if (action === 'schedule' || action === 'request_approval') {
+      const blocking = await refreshChangeConflicts(
+        client,
+        String(req.params.id),
+        action === 'schedule'
+          ? { start: scheduled_start, end: scheduled_end }
+          : undefined,
+      );
+      const emergency = String(change.change_type_name || '').toLowerCase() === 'emergency';
+      const allowOverride = Boolean(override_blocking_conflicts)
+        && emergency
+        && hasAnyRole(req, ['admin', 'change_manager']);
+      if (blocking > 0 && !allowOverride) {
+        throw new AppError(
+          409,
+          `Blocking schedule conflicts (${blocking}) must be resolved before this transition. A change manager can override them on an emergency change.`,
+          'BLOCKING_CONFLICT',
+        );
       }
     }
     if (action === 'submit_assessment') {
@@ -1551,6 +1613,50 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
           );
         }
       }
+    }
+
+    if (action === 'close') {
+      const body = req.body as {
+        success?: boolean;
+        failure_category?: string | null;
+        planned_downtime_minutes?: number | null;
+        actual_downtime_minutes?: number | null;
+        review_notes?: string | null;
+      };
+      let pir;
+      try {
+        pir = normalizeChangePir({
+          success: body.success !== undefined ? body.success : change.success,
+          failureCategory: body.failure_category !== undefined ? body.failure_category : change.failure_category,
+          plannedDowntimeMinutes: body.planned_downtime_minutes !== undefined
+            ? body.planned_downtime_minutes
+            : change.planned_downtime_minutes,
+          actualDowntimeMinutes: body.actual_downtime_minutes !== undefined
+            ? body.actual_downtime_minutes
+            : change.actual_downtime_minutes,
+        });
+      } catch (err) {
+        throw new AppError(400, err instanceof Error ? err.message : 'Post-implementation review is incomplete');
+      }
+      const reviewNotes = body.review_notes !== undefined ? body.review_notes : change.review_notes;
+      await client.query(
+        `UPDATE changes
+         SET success = $1,
+             failure_category = $2,
+             planned_downtime_minutes = $3,
+             actual_downtime_minutes = $4,
+             review_notes = $5
+         WHERE tenant_id = current_tenant_id()
+           AND id = $6`,
+        [
+          pir.success,
+          pir.failureCategory,
+          pir.plannedDowntimeMinutes,
+          pir.actualDowntimeMinutes,
+          reviewNotes || null,
+          req.params.id,
+        ],
+      );
     }
 
     const state = normalizeStatusAndStage(action);

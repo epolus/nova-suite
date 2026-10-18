@@ -16,6 +16,7 @@ export type { KnowledgeApprovalInput, KnowledgeApprovalDecisionSignal } from './
 export { notificationDispatch } from './notification-dispatch';
 export { systemMetricsDbSizeSnapshot } from './system-metrics-db-size-snapshot';
 export { metricSnapshotsDaily } from './metric-snapshots-daily';
+export { problemRecurrenceScan } from './problem-recurrence-scan';
 export {
   majorIncidentWorkflow,
   declareResolvedSignal,

@@ -21,6 +21,14 @@ import { useChange, useInvalidateChanges } from '@/hooks/queries';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { hasChangeFormChanges } from './changeDetailFields';
 
+const PIR_FAILURE_CATEGORIES = ['incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other'] as const;
+
+function pirFailureCategory(value: string): (typeof PIR_FAILURE_CATEGORIES)[number] | null {
+  return (PIR_FAILURE_CATEGORIES as readonly string[]).includes(value)
+    ? value as (typeof PIR_FAILURE_CATEGORIES)[number]
+    : null;
+}
+
 export type ChangeFormState = {
   change_type_id: string;
   standard_change_id: string;
@@ -47,6 +55,10 @@ export type ChangeFormState = {
   business_justification: string;
   estimated_cost: string;
   review_notes: string;
+  success: '' | 'true' | 'false';
+  failure_category: string;
+  planned_downtime_minutes: string;
+  actual_downtime_minutes: string;
   affected_cis: string[];
 };
 
@@ -76,6 +88,10 @@ export const EMPTY_CHANGE_FORM: ChangeFormState = {
   business_justification: '',
   estimated_cost: '',
   review_notes: '',
+  success: '',
+  failure_category: '',
+  planned_downtime_minutes: '',
+  actual_downtime_minutes: '',
   affected_cis: [],
 };
 
@@ -106,6 +122,10 @@ export function formFromDetail(detail: ChangeDetail): ChangeFormState {
     business_justification: detail.business_justification || '',
     estimated_cost: detail.estimated_cost != null ? String(detail.estimated_cost) : '',
     review_notes: detail.review_notes || '',
+    success: detail.success === true ? 'true' : detail.success === false ? 'false' : '',
+    failure_category: detail.failure_category || '',
+    planned_downtime_minutes: detail.planned_downtime_minutes != null ? String(detail.planned_downtime_minutes) : '',
+    actual_downtime_minutes: detail.actual_downtime_minutes != null ? String(detail.actual_downtime_minutes) : '',
     affected_cis: (detail.affected_cis || []).map((x) => x.ci_id),
   };
 }
@@ -296,6 +316,10 @@ export function useChangeDetail() {
         business_justification: form.business_justification || undefined,
         estimated_cost: form.estimated_cost ? Number(form.estimated_cost) : null,
         review_notes: form.review_notes || undefined,
+        success: form.success === '' ? null : form.success === 'true',
+        failure_category: form.success === 'false' ? pirFailureCategory(form.failure_category) : null,
+        planned_downtime_minutes: form.planned_downtime_minutes === '' ? null : Number(form.planned_downtime_minutes),
+        actual_downtime_minutes: form.actual_downtime_minutes === '' ? null : Number(form.actual_downtime_minutes),
         affected_cis: form.affected_cis,
       };
       if (isNew || !id) {

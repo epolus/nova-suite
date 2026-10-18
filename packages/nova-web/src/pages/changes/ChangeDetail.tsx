@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { changes } from '@/api/client';
 import type { Change } from '@/api/client';
+import { useAuth } from '../../context/AuthContext';
+import { hasRole } from '../../utils/roles';
 import { useChangeDetail } from './useChangeDetail';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
@@ -29,6 +31,7 @@ function hasInvalidScheduleRange(start: string, end: string): boolean {
 }
 
 export default function ChangeDetailPage() {
+  const { user } = useAuth();
   const tChanges = useTranslations('pages.changes');
   const tActions = useTranslations('common.actions');
   const tMaster = useTranslations('common.masterData');
@@ -73,6 +76,7 @@ export default function ChangeDetailPage() {
   } = useChangeDetail();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'approvals' | 'planning' | 'implementation' | 'review'>('overview');
+  const [overrideBlocking, setOverrideBlocking] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -111,10 +115,34 @@ export default function ChangeDetailPage() {
       return;
     }
     try {
+      const plannedMinutes = form.planned_downtime_minutes === '' ? null : Number(form.planned_downtime_minutes);
+      const actualMinutes = form.actual_downtime_minutes === '' ? null : Number(form.actual_downtime_minutes);
+      if (action === 'close') {
+        if (form.success !== 'true' && form.success !== 'false') {
+          setError(tChanges('pirOutcomeRequired'));
+          return;
+        }
+        if (form.success === 'false' && !form.failure_category) {
+          setError(tChanges('pirFailureRequired'));
+          return;
+        }
+        if (plannedMinutes == null || actualMinutes == null || !Number.isInteger(plannedMinutes) || !Number.isInteger(actualMinutes)) {
+          setError(tChanges('pirDowntimeRequired'));
+          return;
+        }
+      }
       await changes.transition(id, {
         action,
         scheduled_start: form.scheduled_start ? new Date(form.scheduled_start).toISOString() : null,
         scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : null,
+        override_blocking_conflicts: overrideBlocking && (action === 'schedule' || action === 'request_approval'),
+        ...(action === 'close' ? {
+          success: form.success === 'true',
+          failure_category: form.success === 'false' ? form.failure_category : null,
+          planned_downtime_minutes: plannedMinutes,
+          actual_downtime_minutes: actualMinutes,
+          review_notes: form.review_notes || null,
+        } : {}),
       });
       await reload();
     } catch (e: unknown) {
@@ -151,6 +179,10 @@ export default function ChangeDetailPage() {
     { key: 'review' as const, label: tChanges('tabs.review') },
   ];
   const allowedActions = !isNew ? (change?.allowed_actions || []) : [];
+  const changeTypeName = types.find((t) => t.id === form.change_type_id)?.name || change?.change_type_name || '';
+  const canOverrideBlocking = changeTypeName.toLowerCase() === 'emergency'
+    && (hasRole(user?.roles, 'admin') || hasRole(user?.roles, 'change_manager'))
+    && (allowedActions.includes('schedule') || allowedActions.includes('request_approval'));
   const canRequestApprovalFromForm =
     !!form.implementation_plan.trim()
     && !!form.scheduled_start
@@ -190,6 +222,16 @@ export default function ChangeDetailPage() {
             <Button onClick={save} disabled={saving || !hasRequiredFields}>
               {saving ? tActions('saving') : isNew ? tChanges('createChange') : tMaster('saveChanges')}
             </Button>
+            {canOverrideBlocking && (
+              <label className="flex items-center gap-2 text-xs text-gray-600 mr-2">
+                <input
+                  type="checkbox"
+                  checked={overrideBlocking}
+                  onChange={(e) => setOverrideBlocking(e.target.checked)}
+                />
+                {tChanges('overrideBlockingConflicts')}
+              </label>
+            )}
             {!isNew && allowedActions.map((action: string) => {
               const meta = actionMeta[action];
               if (!meta) return null;
@@ -331,7 +373,7 @@ export default function ChangeDetailPage() {
 
       {/* ── Review tab ── */}
       {!isNew && activeTab === 'review' && (
-        <ChangeReviewPanel form={form} setForm={setForm} textareaCls={textareaCls} />
+        <ChangeReviewPanel form={form} setForm={setForm} inputCls={inputCls} selectCls={selectCls} textareaCls={textareaCls} />
       )}
 
     </>

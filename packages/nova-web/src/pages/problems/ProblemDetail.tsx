@@ -28,6 +28,7 @@ export default function ProblemDetail() {
     loading,
     saving,
     error,
+    setError,
     problem,
     form,
     setForm,
@@ -230,9 +231,14 @@ export default function ProblemDetail() {
 
   const toggleKnownError = async (ke: KnownError) => {
     if (!id || isNew) return;
-    await problemsApi.updateKnownError(id, ke.id, { is_active: !ke.is_active });
-    const keRes = await problemsApi.knownErrors(id);
-    setKnownErrors(keRes.known_errors);
+    setError('');
+    try {
+      await problemsApi.updateKnownError(id, ke.id, { is_active: !ke.is_active });
+      const keRes = await problemsApi.knownErrors(id);
+      setKnownErrors(keRes.known_errors);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update known error');
+    }
   };
 
   const selectKbArticle = (article: KbArticleSearchResult) => {

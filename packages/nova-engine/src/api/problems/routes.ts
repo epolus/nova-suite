@@ -12,6 +12,13 @@ import { AppError, NotFound } from '../../middleware/errorHandler';
 import { isAdminRole, hasProblemRole } from '../roles';
 import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-start-queue';
 import { resolveSlaDueAt } from '../../domain/sla';
+import { canRetireKnownError, hasKnownErrorContent } from '../../domain/known-errors';
+import { usesStoredRecurrenceScan } from '../../domain/problem-recurrence';
+import {
+  DEFAULT_RECURRENCE_THRESHOLD,
+  DEFAULT_TITLE_SIMILARITY,
+  PROBLEM_RECURRENCE_CANDIDATE_SQL,
+} from '@nova-suite/shared';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -20,6 +27,53 @@ const PROBLEM_PROCESS_NAME = 'Problem Management';
 
 function hasElevatedProblemRole(req: Request): boolean {
   return hasProblemRole(req);
+}
+
+async function linkedChangeCount(client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: Array<{ c?: number }> }> }, problemId: string): Promise<number> {
+  const row = await client.query(
+    `SELECT count(*)::int AS c
+     FROM changes
+     WHERE tenant_id = current_tenant_id()
+       AND related_problem_id = $1
+       AND status NOT IN ('cancelled', 'rejected')`,
+    [problemId],
+  );
+  return Number(row.rows[0]?.c || 0);
+}
+
+async function upsertKnownErrorForProblem(
+  client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  problem: { id: string; title: string; symptoms: string | null; workaround: string | null; priority?: string | null },
+): Promise<void> {
+  const symptoms = String(problem.symptoms || '').trim();
+  const workaround = String(problem.workaround || '').trim();
+  const updated = await client.query(
+    `UPDATE known_errors
+     SET title = $2,
+         symptoms = $3,
+         workaround = $4,
+         is_active = true,
+         updated_at = now()
+     WHERE id = (
+       SELECT id FROM known_errors
+       WHERE tenant_id = current_tenant_id()
+         AND problem_id = $1
+       ORDER BY is_active DESC, updated_at DESC
+       LIMIT 1
+     )
+     RETURNING id`,
+    [problem.id, problem.title, symptoms, workaround],
+  );
+  if (updated.rows.length > 0) return;
+  const severity = ['low', 'medium', 'high', 'critical'].includes(String(problem.priority))
+    ? problem.priority
+    : 'medium';
+  await client.query(
+    `INSERT INTO known_errors
+     (tenant_id, problem_id, title, symptoms, workaround, severity, is_active)
+     VALUES (current_tenant_id(), $1, $2, $3, $4, $5, true)`,
+    [problem.id, problem.title, symptoms, workaround, severity],
+  );
 }
 
 async function canWorkOnProblem(client: any, req: Request, problem: any): Promise<boolean> {
@@ -136,9 +190,6 @@ router.get('/incidents/search', async (req: Request, res: Response, next: NextFu
   }
 });
 
-const DEFAULT_RECURRENCE_THRESHOLD = 3;
-const DEFAULT_TITLE_SIMILARITY = 0.3;
-
 router.get('/incidents/recurrence-candidates', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!hasElevatedProblemRole(req)) throw new AppError(403, 'Insufficient permissions');
@@ -146,89 +197,45 @@ router.get('/incidents/recurrence-candidates', async (req: Request, res: Respons
     const threshold = Math.max(2, Number(req.query.threshold) || DEFAULT_RECURRENCE_THRESHOLD);
     const similarity = Math.min(1, Math.max(0.1, Number(req.query.similarity) || DEFAULT_TITLE_SIMILARITY));
 
-    const rows = await client.query(
-      `WITH open_inc AS (
-         SELECT i.id, i.number, i.title, i.status, i.priority, i.configuration_item_id, i.service_id, i.created_at
-         FROM incidents i
-         WHERE i.tenant_id = current_tenant_id()
-           AND i.status NOT IN ('resolved', 'closed', 'cancelled')
-           AND (i.configuration_item_id IS NOT NULL OR i.service_id IS NOT NULL)
-           AND NOT EXISTS (
-             SELECT 1 FROM problem_incidents pi
-             JOIN problems p ON p.id = pi.problem_id
-             WHERE pi.tenant_id = current_tenant_id()
-               AND pi.incident_id = i.id
-               AND p.status NOT IN ('resolved', 'closed')
-           )
-       ),
-       matched AS (
-         SELECT
-           a.id AS seed_id,
-           a.title AS representative_title,
-           a.configuration_item_id,
-           a.service_id,
-           b.id AS peer_id,
-           b.number AS peer_number,
-           b.title AS peer_title,
-           b.status AS peer_status,
-           b.priority AS peer_priority,
-           similarity(a.title, b.title) AS title_similarity
-         FROM open_inc a
-         JOIN open_inc b
-           ON (
-             (a.configuration_item_id IS NOT NULL AND a.configuration_item_id = b.configuration_item_id)
-             OR (a.service_id IS NOT NULL AND a.service_id = b.service_id)
-           )
-          AND similarity(a.title, b.title) >= $1
-       ),
-       grouped AS (
-         SELECT
-           seed_id,
-           representative_title,
-           configuration_item_id,
-           service_id,
-           array_agg(peer_id ORDER BY peer_id) AS incident_ids,
-           jsonb_agg(
-             jsonb_build_object(
-               'id', peer_id,
-               'number', peer_number,
-               'title', peer_title,
-               'status', peer_status,
-               'priority', peer_priority,
-               'title_similarity', round(title_similarity::numeric, 3)
-             )
-             ORDER BY peer_id
-           ) AS incidents,
-           count(*)::int AS incident_count,
-           avg(title_similarity)::float AS avg_similarity
-         FROM matched
-         GROUP BY seed_id, representative_title, configuration_item_id, service_id
-         HAVING count(*) >= $2
-       )
-       SELECT
-         g.seed_id,
-         g.representative_title,
-         g.configuration_item_id,
-         g.service_id,
-         ci.display_name AS configuration_item_name,
-         s.name AS service_name,
-         g.incident_ids,
-         g.incidents,
-         g.incident_count,
-         g.avg_similarity
-       FROM grouped g
-       LEFT JOIN configuration_items ci ON ci.id = g.configuration_item_id
-       LEFT JOIN services s ON s.id = g.service_id
-       WHERE g.seed_id = (SELECT min(x) FROM unnest(g.incident_ids) AS x)
-       ORDER BY g.incident_count DESC, g.avg_similarity DESC
-       LIMIT 50`,
-      [similarity, threshold],
+    const scan = await client.query(
+      `SELECT scanned_at FROM problem_recurrence_scans WHERE tenant_id = current_tenant_id()`,
     );
+    const scannedAt = scan.rows[0]?.scanned_at ?? null;
+    if (usesStoredRecurrenceScan(scannedAt !== null, threshold, similarity)) {
+      const stored = await client.query(
+        `SELECT
+           c.seed_incident_id AS seed_id,
+           c.representative_title,
+           c.configuration_item_id,
+           c.service_id,
+           ci.display_name AS configuration_item_name,
+           s.name AS service_name,
+           c.incident_ids,
+           c.incidents,
+           c.incident_count,
+           c.avg_similarity
+         FROM problem_recurrence_candidates c
+         LEFT JOIN configuration_items ci ON ci.id = c.configuration_item_id AND ci.tenant_id = c.tenant_id
+         LEFT JOIN services s ON s.id = c.service_id AND s.tenant_id = c.tenant_id
+         WHERE c.tenant_id = current_tenant_id()
+         ORDER BY c.incident_count DESC, c.avg_similarity DESC
+         LIMIT 50`,
+      );
+      res.json({
+        candidates: stored.rows,
+        threshold,
+        similarity,
+        scanned_at: scannedAt,
+      });
+      return;
+    }
 
+    const rows = await client.query(PROBLEM_RECURRENCE_CANDIDATE_SQL, [similarity, threshold]);
     res.json({
       candidates: rows.rows,
       threshold,
       similarity,
+      scanned_at: null,
     });
   } catch (err) {
     next(err);
@@ -308,7 +315,7 @@ router.post('/from-recurring-incidents', async (req: Request, res: Response, nex
         b.assignment_group_id,
         affectedCi,
         b.resolution_notes || null,
-        slaDueAt,
+        slaDueAt.resolutionDueAt,
       ],
     );
     const createdProblem = created.rows[0];
@@ -322,6 +329,21 @@ router.post('/from-recurring-incidents', async (req: Request, res: Response, nex
         [createdProblem.id, row.id],
       );
     }
+
+    await client.query(
+      `DELETE FROM problem_recurrence_candidates
+       WHERE tenant_id = current_tenant_id()
+         AND incident_ids && $1::uuid[]`,
+      [incidentsRes.rows.map((r: { id: string }) => r.id)],
+    );
+    await client.query(
+      `UPDATE problem_recurrence_scans
+       SET candidate_count = (
+         SELECT count(*)::int FROM problem_recurrence_candidates
+         WHERE tenant_id = current_tenant_id()
+       )
+       WHERE tenant_id = current_tenant_id()`,
+    );
 
     enqueueNotificationDispatchStartJob({
       tenantId: req.user!.tenant_id,
@@ -679,6 +701,35 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
       if (!ok) throw new AppError(400, 'Assignment group is not enabled for Problem Management');
     }
 
+    const nextStatus = updates.status !== undefined ? String(updates.status) : String(current.status);
+    if (nextStatus === 'known_error') {
+      const symptoms = updates.symptoms !== undefined ? updates.symptoms : current.symptoms;
+      const workaround = updates.workaround !== undefined ? updates.workaround : current.workaround;
+      if (!hasKnownErrorContent(symptoms, workaround)) {
+        throw new AppError(400, 'Symptoms and a workaround are required before marking a problem as a known error');
+      }
+    }
+    const retiringKnownError = ['resolved', 'closed'].includes(nextStatus)
+      && !['resolved', 'closed'].includes(String(current.status));
+    if (retiringKnownError) {
+      const active = await client.query(
+        `SELECT count(*)::int AS c
+         FROM known_errors
+         WHERE tenant_id = current_tenant_id()
+           AND problem_id = $1
+           AND is_active = true`,
+        [req.params.id],
+      );
+      const hasActiveKnownError = Number(active.rows[0]?.c || 0) > 0 || current.status === 'known_error';
+      if (hasActiveKnownError) {
+        const permanentFix = updates.permanent_fix !== undefined ? updates.permanent_fix : current.permanent_fix;
+        const changes = await linkedChangeCount(client, String(req.params.id));
+        if (!canRetireKnownError(permanentFix, changes)) {
+          throw new AppError(400, 'A permanent fix or a linked change is required before closing a known error');
+        }
+      }
+    }
+
     const sets: string[] = [];
     const vals: unknown[] = [];
     let i = 1;
@@ -728,6 +779,19 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
       vals,
     );
     const updatedProblem = updated.rows[0];
+    if (updatedProblem.status === 'known_error') {
+      await upsertKnownErrorForProblem(client, updatedProblem);
+    }
+    if (retiringKnownError) {
+      await client.query(
+        `UPDATE known_errors
+         SET is_active = false, updated_at = now()
+         WHERE tenant_id = current_tenant_id()
+           AND problem_id = $1
+           AND is_active = true`,
+        [req.params.id],
+      );
+    }
     if (updates.assigned_to !== undefined && String(updates.assigned_to || '') !== String(current.assigned_to || '')) {
       enqueueNotificationDispatchStartJob({
         tenantId: req.user!.tenant_id,
@@ -977,6 +1041,12 @@ router.patch('/:id/known-errors/:knownErrorId', async (req: Request, res: Respon
       vals.push(k === 'tags' && !Array.isArray(v) ? [] : v);
     }
     if (sets.length === 0) return void res.json({ success: true });
+    if (req.body?.is_active === false) {
+      const changes = await linkedChangeCount(client, String(req.params.id));
+      if (!canRetireKnownError(problemRes.rows[0].permanent_fix, changes)) {
+        throw new AppError(400, 'A permanent fix or a linked change is required before closing a known error');
+      }
+    }
     vals.push(req.params.id, req.params.knownErrorId);
     const updated = await client.query(
       `UPDATE known_errors

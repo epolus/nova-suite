@@ -7,6 +7,7 @@ export {
   autoAssignIncident,
   autoCloseIncident,
   sendNotification,
+  applySlaActions,
 } from './incident-activities';
 
 export {
@@ -56,3 +57,7 @@ export {
 export {
   snapshotTrendMetricsForAllTenants,
 } from './analytics-snapshot-activities';
+
+export {
+  scanProblemRecurrenceForAllTenants,
+} from './problem-recurrence-activities';

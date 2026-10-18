@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
-import type { AssignmentGroupItem, Incident, IncidentAiSuggestion, IncidentProblemLink, IncidentStats, JournalEntry, Pagination, ServiceListItem, SimilarIncident, UserListItem } from '../types';
+import type { AssignmentGroupItem, Incident, IncidentAiSuggestion, IncidentProblemLink, IncidentStats, JournalEntry, KnownErrorSuggestion, Pagination, ServiceListItem, SimilarIncident, UserListItem } from '../types';
 
 export const incidents = {
   list: (params: Record<string, string> = {}, page = 1, limit = 20) => {
@@ -36,6 +36,14 @@ export const incidents = {
     const qs = new URLSearchParams();
     if (params.limit !== undefined) qs.set('limit', String(params.limit));
     return request<{ incidents: SimilarIncident[] }>(`/incidents/${id}/similar${qs.size ? `?${qs}` : ''}`);
+  },
+  knownErrors: (id: string) =>
+    request<{ known_errors: KnownErrorSuggestion[] }>(`/incidents/${id}/known-errors`),
+  knownErrorsByContext: (params: { configuration_item_id?: string; service_id?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.configuration_item_id) qs.set('configuration_item_id', params.configuration_item_id);
+    if (params.service_id) qs.set('service_id', params.service_id);
+    return request<{ known_errors: KnownErrorSuggestion[] }>(`/incidents/known-errors-by-context?${qs}`);
   },
   similarByText: (params: { title?: string; description?: string; limit?: number } = {}) => {
     const qs = new URLSearchParams();

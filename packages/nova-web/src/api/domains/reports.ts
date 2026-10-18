@@ -4,8 +4,25 @@ import type { ReportActivityEvent, ReportComponentConfig, ReportComponentResult,
 
 export const reports = {
   kpis: () => request<{
-    incidents: { open_count: number; sla_breached: number; mttr_hours: number | null };
-    changes: { closed_count: number; successful_count: number; success_rate: number | null };
+    incidents: {
+      open_count: number;
+      sla_breached: number;
+      mttr_hours: number | null;
+      response_met: number;
+      response_breached: number;
+      resolution_met: number;
+      resolution_breached: number;
+      response_attainment: number | null;
+      resolution_attainment: number | null;
+      pause_adjusted_mttr_hours: number | null;
+    };
+    changes: {
+      closed_count: number;
+      successful_count: number;
+      failed_count: number;
+      downtime_variance_minutes: number | null;
+      success_rate: number | null;
+    };
     requests: { open_count: number; backlog_age_hours: number | null };
     problems: { open_count: number };
   }>('/reports/kpis'),

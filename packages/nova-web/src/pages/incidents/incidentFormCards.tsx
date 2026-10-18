@@ -89,7 +89,9 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
           <span className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('responseDueDate')}</span>
           <p className="text-sm text-gray-900 mt-0.5">
             {inc.response_due_at ? formatDateTime(inc.response_due_at) : tTable('emDash')}
-            {inc.response_breached ? (
+            {inc.responded_at ? (
+              <span className="ml-2 text-xs font-medium text-green-700">{tIncidents('responseMet')}</span>
+            ) : inc.response_breached ? (
               <span className="ml-2 text-xs font-medium text-red-600">{tIncidents('responseBreached')}</span>
             ) : null}
           </p>
@@ -109,7 +111,7 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
               {tIncidents('pendingReason')} <span className="text-red-500">*</span>
             </FieldCaption>
             {readonly ? (
-              <p className="text-sm text-gray-900 mt-0.5">{inc.resolution_code || tTable('emDash')}</p>
+              <p className="text-sm text-gray-900 mt-0.5">{inc.pending_reason || inc.resolution_code || tTable('emDash')}</p>
             ) : (
               <select id={INCIDENT_FIELD.pendingReason} name={INCIDENT_FIELD.pendingReason} value={fields.pendingReason} onChange={(e) => setField('pendingReason', e.target.value)} className={selectCls}>
                 <option value="">{tIncidents('selectReason')}</option>

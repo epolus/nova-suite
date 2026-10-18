@@ -41,6 +41,8 @@ ALTER TABLE problems ENABLE ROW LEVEL SECURITY;
 ALTER TABLE problem_incidents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE known_errors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE problem_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE problem_recurrence_scans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE problem_recurrence_candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE change_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE changes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE standard_changes ENABLE ROW LEVEL SECURITY;
@@ -346,6 +348,12 @@ CREATE POLICY tenant_isolation_known_errors ON known_errors
 
 -- ─── Problem Tasks ───
 CREATE POLICY tenant_isolation_problem_tasks ON problem_tasks
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+CREATE POLICY tenant_isolation_problem_recurrence_scans ON problem_recurrence_scans
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+CREATE POLICY tenant_isolation_problem_recurrence_candidates ON problem_recurrence_candidates
   FOR ALL USING (tenant_id = current_tenant_id());
 
 -- ─── Change Types ───
@@ -674,6 +682,8 @@ ALTER TABLE problems FORCE ROW LEVEL SECURITY;
 ALTER TABLE problem_incidents FORCE ROW LEVEL SECURITY;
 ALTER TABLE known_errors FORCE ROW LEVEL SECURITY;
 ALTER TABLE problem_tasks FORCE ROW LEVEL SECURITY;
+ALTER TABLE problem_recurrence_scans FORCE ROW LEVEL SECURITY;
+ALTER TABLE problem_recurrence_candidates FORCE ROW LEVEL SECURITY;
 ALTER TABLE change_types FORCE ROW LEVEL SECURITY;
 ALTER TABLE changes FORCE ROW LEVEL SECURITY;
 ALTER TABLE standard_changes FORCE ROW LEVEL SECURITY;

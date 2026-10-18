@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react';
 import { attachments as attachmentsApi, knowledge as knowledgeApi } from '../../api/client';
 import type { KnowledgeArticleDetail } from '../../api/client';
 import { Card as UiCard, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { SimilarIncidentsSection, KbSuggestionsSection } from '../../components/IncidentSidebarSections';
+import { SimilarIncidentsSection, KbSuggestionsSection, KnownErrorsSection } from '../../components/IncidentSidebarSections';
 import { useTranslations } from 'use-intl';
 import type { IncidentDetailState } from './incidentDetailShared';
 
 export function IncidentIntelligenceSidebar({ d }: { d: IncidentDetailState }) {
-  const { similarIncidents, kbSuggestions, loadingSidebar, sidebarError, goTo, navigate } = d;
+  const { similarIncidents, kbSuggestions, knownErrors, loadingSidebar, sidebarError, goTo, navigate } = d;
   const tIncidents = useTranslations('pages.incidents');
   const tActions = useTranslations('common.actions');
 
@@ -72,6 +72,7 @@ export function IncidentIntelligenceSidebar({ d }: { d: IncidentDetailState }) {
         <CardContent className="space-y-5">
           {loadingSidebar && <div className="text-sm text-gray-500">{tIncidents('loadingRecommendations')}</div>}
           {sidebarError && <div className="text-sm text-red-600">{sidebarError}</div>}
+          <KnownErrorsSection knownErrors={knownErrors} loading={loadingSidebar} />
           <SimilarIncidentsSection incidents={similarIncidents} loading={loadingSidebar} onGoTo={goTo} />
           <KbSuggestionsSection articles={kbSuggestions} loading={loadingSidebar} onPreview={openKnowledgePreview} />
           {(previewLoading || previewError || previewArticle) && (

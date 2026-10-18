@@ -112,19 +112,89 @@ export function ChangeImplementationPanel({
   );
 }
 
+const FAILURE_CATEGORIES = ['incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other'] as const;
+
 export function ChangeReviewPanel({
   form,
   setForm,
+  inputCls,
+  selectCls,
   textareaCls,
 }: {
   form: ChangeFormState;
   setForm: Dispatch<SetStateAction<ChangeFormState>>;
+  inputCls: string;
+  selectCls: string;
   textareaCls: string;
 }) {
   const tChanges = useTranslations('pages.changes');
+  const failureLabel = (key: (typeof FAILURE_CATEGORIES)[number]) => {
+    const labels: Record<(typeof FAILURE_CATEGORIES)[number], string> = {
+      incomplete: tChanges('pirFailure.incomplete'),
+      caused_incident: tChanges('pirFailure.causedIncident'),
+      rolled_back: tChanges('pirFailure.rolledBack'),
+      exceeded_window: tChanges('pirFailure.exceededWindow'),
+      other: tChanges('pirFailure.other'),
+    };
+    return labels[key];
+  };
   return (
     <Card>
-      <h3 className="font-semibold text-gray-900 mb-4">{tChanges('postImplementationReview')}</h3>
+      <h3 className="font-semibold text-gray-900 mb-1">{tChanges('postImplementationReview')}</h3>
+      <p className="text-xs text-gray-500 mb-4">{tChanges('pirRequiredHint')}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('pirOutcome')} <span className="text-red-500">*</span></label>
+          <select
+            value={form.success}
+            onChange={(e) => setForm((p) => ({
+              ...p,
+              success: e.target.value as ChangeFormState['success'],
+              failure_category: e.target.value === 'false' ? p.failure_category : '',
+            }))}
+            className={selectCls}
+          >
+            <option value="">{tChanges('pirSelectOutcome')}</option>
+            <option value="true">{tChanges('pirSuccessful')}</option>
+            <option value="false">{tChanges('pirUnsuccessful')}</option>
+          </select>
+        </div>
+        {form.success === 'false' && (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('failureCategory')} <span className="text-red-500">*</span></label>
+            <select
+              value={form.failure_category}
+              onChange={(e) => setForm((p) => ({ ...p, failure_category: e.target.value }))}
+              className={selectCls}
+            >
+              <option value="">{tChanges('pirSelectFailure')}</option>
+              {FAILURE_CATEGORIES.map((key) => (
+                <option key={key} value={key}>{failureLabel(key)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('plannedDowntimeMinutes')} <span className="text-red-500">*</span></label>
+          <input
+            type="number"
+            min={0}
+            value={form.planned_downtime_minutes}
+            onChange={(e) => setForm((p) => ({ ...p, planned_downtime_minutes: e.target.value }))}
+            className={inputCls}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('actualDowntimeMinutes')} <span className="text-red-500">*</span></label>
+          <input
+            type="number"
+            min={0}
+            value={form.actual_downtime_minutes}
+            onChange={(e) => setForm((p) => ({ ...p, actual_downtime_minutes: e.target.value }))}
+            className={inputCls}
+          />
+        </div>
+      </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('reviewNotesPir')}</label>
         <textarea rows={6} value={form.review_notes} onChange={(e) => setForm((p) => ({ ...p, review_notes: e.target.value }))} className={textareaCls} placeholder={tChanges('reviewNotesPlaceholder')} />

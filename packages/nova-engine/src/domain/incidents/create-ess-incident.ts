@@ -59,13 +59,13 @@ export async function createEssIncident(
       status, impact, urgency, priority,
       assigned_to, assignment_group_id, caller_id,
       contact_info, service_id, configuration_item_id,
-      category, subcategory, sla_due_at, response_due_at
+      category, subcategory, sla_due_at, response_due_at, sla_definition_id
     ) VALUES (
       current_tenant_id(), $1, $2, $3, $4,
       $5, $6, $7, $8,
       $9, $10, $11,
       $12, $13, $14,
-      $15, $16, $17, $18
+      $15, $16, $17, $18, $19
     ) RETURNING *`,
     [
       number, request_id || null, title, description || null,
@@ -73,6 +73,7 @@ export async function createEssIncident(
       null, serviceDesk.id, caller_id || userId,
       contact_info || null, null, null,
       null, null, sla.resolutionDueAt, sla.responseDueAt,
+      sla.slaDefinitionId,
     ],
   );
 

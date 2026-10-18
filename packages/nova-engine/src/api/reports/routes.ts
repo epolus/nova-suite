@@ -16,6 +16,7 @@ import {
   type ReportComponentConfig,
 } from './queryCompiler';
 import { recordAuditEvent } from '../../audit/events';
+import { attainmentRate, SLA_ATTAINMENT_COLUMNS } from '../../domain/sla-attainment';
 import { getClientIp } from '../../middleware/client-ip';
 
 const router = Router();
@@ -168,14 +169,22 @@ router.get('/kpis', async (req: Request, res: Response, next: NextFunction) => {
         `SELECT
            count(*) FILTER (WHERE status NOT IN ('closed','cancelled'))::int AS open_count,
            count(*) FILTER (WHERE sla_breached = true AND status NOT IN ('closed','cancelled'))::int AS sla_breached,
-           avg(EXTRACT(EPOCH FROM (COALESCE(resolved_at, now()) - created_at)) / 3600)::numeric(10,2) AS mttr_hours
+           avg(EXTRACT(EPOCH FROM (COALESCE(resolved_at, now()) - created_at)) / 3600)::numeric(10,2) AS mttr_hours,
+           ${SLA_ATTAINMENT_COLUMNS}
          FROM incidents
          WHERE tenant_id = current_tenant_id()`,
       ),
       client.query(
         `SELECT
            count(*) FILTER (WHERE status = 'closed')::int AS closed_count,
-           count(*) FILTER (WHERE status = 'closed' AND success = true)::int AS successful_count
+           count(*) FILTER (WHERE status = 'closed' AND success = true)::int AS successful_count,
+           count(*) FILTER (WHERE status = 'closed' AND success = false)::int AS failed_count,
+           avg(actual_downtime_minutes - planned_downtime_minutes)
+             FILTER (
+               WHERE status = 'closed'
+                 AND actual_downtime_minutes IS NOT NULL
+                 AND planned_downtime_minutes IS NOT NULL
+             )::numeric(10,2) AS downtime_variance_minutes
          FROM changes
          WHERE tenant_id = current_tenant_id()`,
       ),
@@ -196,10 +205,33 @@ router.get('/kpis', async (req: Request, res: Response, next: NextFunction) => {
     const closedCount = Number(change.rows[0]?.closed_count || 0);
     const successfulCount = Number(change.rows[0]?.successful_count || 0);
     const changeSuccessRate = closedCount > 0 ? Number((successfulCount / closedCount).toFixed(4)) : null;
+    const varianceRaw = change.rows[0]?.downtime_variance_minutes;
+    const incidentRow = incident.rows[0] || {};
+    const responseMet = Number(incidentRow.response_met || 0);
+    const responseBreached = Number(incidentRow.response_breached || 0);
+    const resolutionMet = Number(incidentRow.resolution_met || 0);
+    const resolutionBreached = Number(incidentRow.resolution_breached || 0);
+    const pauseAdjusted = incidentRow.pause_adjusted_mttr_hours;
 
     res.json({
-      incidents: incident.rows[0],
-      changes: { ...change.rows[0], success_rate: changeSuccessRate },
+      incidents: {
+        ...incidentRow,
+        open_count: Number(incidentRow.open_count || 0),
+        sla_breached: Number(incidentRow.sla_breached || 0),
+        mttr_hours: incidentRow.mttr_hours == null ? null : Number(incidentRow.mttr_hours),
+        response_met: responseMet,
+        response_breached: responseBreached,
+        resolution_met: resolutionMet,
+        resolution_breached: resolutionBreached,
+        response_attainment: attainmentRate(responseMet, responseBreached),
+        resolution_attainment: attainmentRate(resolutionMet, resolutionBreached),
+        pause_adjusted_mttr_hours: pauseAdjusted == null ? null : Number(pauseAdjusted),
+      },
+      changes: {
+        ...change.rows[0],
+        success_rate: changeSuccessRate,
+        downtime_variance_minutes: varianceRaw == null ? null : Number(varianceRaw),
+      },
       requests: request.rows[0],
       problems: problem.rows[0],
     });
@@ -578,7 +610,9 @@ router.post('/exports', async (req: Request, res: Response, next: NextFunction) 
       payload = { rows };
     } else if (reportKey === 'changes.success') {
       const r = await client.query(
-        `SELECT number, title, status, success, risk_level, scheduled_start, scheduled_end, created_at
+        `SELECT number, title, status, success, failure_category,
+                planned_downtime_minutes, actual_downtime_minutes,
+                risk_level, scheduled_start, scheduled_end, created_at
          FROM changes
          WHERE tenant_id = current_tenant_id()
          ORDER BY created_at DESC

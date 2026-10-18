@@ -411,6 +411,7 @@ router.post('/discovery/intune/sync', async (req: Request, res: Response, next: 
       dryRun,
       createAssets,
       className,
+      fullSync: body.full_sync === true,
     });
     res.json(result);
   } catch (err) {
@@ -697,8 +698,9 @@ router.post('/:id/run', async (req: Request, res: Response, next: NextFunction):
       schedule_cron: string;
       source_type: string;
       source_config: SourceConfig;
+      import_mode: string;
     }>(
-      `SELECT id, schedule_cron, source_type, source_config
+      `SELECT id, schedule_cron, source_type, source_config, import_mode
        FROM data_sources WHERE id = $1 AND tenant_id = $2`,
       [req.params.id, tenantId],
     );
@@ -714,6 +716,7 @@ router.post('/:id/run', async (req: Request, res: Response, next: NextFunction):
         dryRun,
         createAssets: cfg.create_assets !== false,
         className: cfg.class_name || 'laptop',
+        fullSync: ds.import_mode === 'full_sync',
       });
       await db.query(
         `UPDATE data_sources
