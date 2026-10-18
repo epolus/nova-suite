@@ -1585,7 +1585,9 @@
         },
         "importModes": {
           "insert": "Insert only (skip existing)",
-          "upsert": "Upsert (insert or update)"
+          "upsert": "Upsert (insert or update)",
+          "fullSync": "Full sync (retire missing)",
+          "intuneFullSyncHint": "Devices previously imported from Intune that are absent from this feed are marked retired. An empty feed does not retire anything."
         },
         "upsertKey": "Upsert Key",
         "upsertKeyHint": "(match existing records by this field)",

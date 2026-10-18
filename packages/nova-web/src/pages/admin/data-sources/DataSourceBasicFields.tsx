@@ -24,10 +24,16 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
     { value: 'intune', label: t('sourceTypes.intune') },
   ], [t]);
 
-  const IMPORT_MODES = useMemo(() => [
-    { value: 'insert', label: t('importModes.insert') },
-    { value: 'upsert', label: t('importModes.upsert') },
-  ], [t]);
+  const IMPORT_MODES = useMemo(() => {
+    const modes = [
+      { value: 'insert', label: t('importModes.insert') },
+      { value: 'upsert', label: t('importModes.upsert') },
+    ];
+    if (form.source_type === 'intune' || form.import_mode === 'full_sync') {
+      modes.push({ value: 'full_sync', label: t('importModes.fullSync') });
+    }
+    return modes;
+  }, [form.import_mode, form.source_type, t]);
 
   const entityFields = entities.find((e) => e.key === form.entity_type)?.fields || [];
 
@@ -83,6 +89,9 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
               </select>
             </div>
           </div>
+          {form.source_type === 'intune' && form.import_mode === 'full_sync' && (
+            <p className="text-xs text-gray-500">{t('importModes.intuneFullSyncHint')}</p>
+          )}
           {form.import_mode === 'upsert' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -121,7 +130,13 @@ export default function DataSourceBasicFields({ form, setField, entities }: Data
             <label className="block text-sm font-medium text-gray-700 mb-1">{t('sourceType')}</label>
             <select
               value={form.source_type}
-              onChange={(e) => setField('source_type', e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setField('source_type', next);
+                if (next !== 'intune' && form.import_mode === 'full_sync') {
+                  setField('import_mode', 'upsert');
+                }
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden"
             >
               {SOURCE_TYPES.map((s) => (
