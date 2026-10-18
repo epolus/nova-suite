@@ -17,6 +17,7 @@ import { hasConfigurationRole, isAgentRole } from '../../utils/roles';
 import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import { CMDB_BULK_ACTIONS } from './cmdbListConfig';
 import { buildColumns, type CmdbListLabels } from './cmdbColumns';
+import { CmdbFilterChips } from './CmdbFilterChips';
 
 const DEFAULT_COLS = ['name', 'class_display_name', 'status', 'environment', 'managed_by_name', 'assigned_to_name', 'supported_by_name', 'updated_at'];
 const PRESETS_KEY = 'nova_filter_presets_cmdb';
@@ -260,11 +261,6 @@ export default function CMDBPage() {
     }
   };
 
-  const chip = (active: boolean) =>
-    `px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-      active ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-    }`;
-
   return (
     <>
       <PageHeader
@@ -327,49 +323,16 @@ export default function CMDBPage() {
             </Button>
           )}
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <button onClick={() => setFilter('class_id', '')} className={chip(!classFilter)}>
-            {tCmdb('filters.allTypes')}
-          </button>
-          {classes.map((c) => (
-            <button key={c.id} onClick={() => setFilter('class_id', c.id)} className={chip(classFilter === c.id)}>
-              {c.display_name}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <button onClick={() => setFilter('status', '')} className={chip(!statusFilter)}>
-            {tCmdb('filters.allStatuses')}
-          </button>
-          {(['installed', 'in_stock', 'planned', 'maintenance', 'retired'] as const).map((s) => (
-            <button key={s} onClick={() => setFilter('status', s)} className={chip(statusFilter === s)}>
-              {statusLabel(s)}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <button onClick={() => setFilter('environment', '')} className={chip(!environmentFilter)}>
-            {tCmdb('filters.allEnvironments')}
-          </button>
-          {(['production', 'staging', 'development', 'test'] as const).map((env) => (
-            <button key={env} onClick={() => setFilter('environment', env)} className={chip(environmentFilter === env)}>
-              {statusLabel(env)}
-            </button>
-          ))}
-        </div>
-        {canCreate && (
-          <div className="flex gap-2 flex-wrap items-center">
-            <button onClick={() => setFilter('is_active', '')} className={chip(!isActiveFilter)}>
-              {tCmdb('filters.allActive')}
-            </button>
-            <button onClick={() => setFilter('is_active', 'true')} className={chip(isActiveFilter === 'true')}>
-              {tCmdb('filters.activeOnly')}
-            </button>
-            <button onClick={() => setFilter('is_active', 'false')} className={chip(isActiveFilter === 'false')}>
-              {tCmdb('filters.inactiveOnly')}
-            </button>
-          </div>
-        )}
+        <CmdbFilterChips
+          classes={classes}
+          classFilter={classFilter}
+          statusFilter={statusFilter}
+          environmentFilter={environmentFilter}
+          isActiveFilter={isActiveFilter}
+          canCreate={canCreate}
+          setFilter={setFilter}
+          statusLabel={statusLabel}
+        />
       </div>
 
       {isAgent && CMDB_BULK_ACTIONS.length > 0 && selectedIds.length > 0 && (

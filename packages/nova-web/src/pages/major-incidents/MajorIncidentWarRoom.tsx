@@ -15,6 +15,7 @@ import { canManageMajorIncidents } from '../../utils/roles';
 import { RejectPromotionModal, ResolveModal, StakeholderUpdateModal } from './warRoomModals';
 import { WarRoomRoles } from './WarRoomRoles';
 import { MajorIncidentProgress } from './MajorIncidentProgress';
+import { WarRoomLinkedIncidents } from './WarRoomLinkedIncidents';
 
 type Detail = Awaited<ReturnType<typeof majorIncidentsApi.get>>;
 
@@ -359,64 +360,17 @@ export default function MajorIncidentWarRoom() {
               <p className="text-xs text-gray-500">{t('noRunbooks')}</p>
             )}
           </Card>
-          <Card>
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <h3 className="font-semibold text-gray-900">{t('linkedIncidents')}</h3>
-              {!isPendingAcceptance && canManage && (
-                <Button type="button" variant="outline" className="text-xs h-8" onClick={() => void loadSuggested()} disabled={suggLoading}>
-                  {suggLoading ? t('refreshing') : t('refreshSuggestions')}
-                </Button>
-              )}
-            </div>
-            {related.length === 0 ? (
-              <p className="text-xs text-gray-500">{t('noLinkedIncidents')}</p>
-            ) : (
-              <ul className="text-sm space-y-2">
-                {related.map((r) => {
-                  const iid = String(r.incident_id);
-                  const isPrimary = primaryIncidentId !== '' && iid === primaryIncidentId;
-                  return (
-                    <li key={iid} className="flex flex-wrap items-center gap-2">
-                      <Link to={`/incidents/${iid}`} className="text-indigo-700 hover:underline font-medium">
-                        {String(r.incident_number)} — {String(r.incident_title)}
-                      </Link>
-                      {isPrimary && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-sm">
-                          {t('primary')}
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {!isPendingAcceptance && canManage && suggestedToShow.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-gray-100">
-                <p className="text-xs font-medium text-gray-600 mb-2">{t('suggestedSameWindow')}</p>
-                <ul className="text-sm space-y-2">
-                  {suggestedToShow.map((s) => {
-                    const sid = String(s.id);
-                    return (
-                      <li key={sid} className="flex items-center justify-between gap-2">
-                        <Link to={`/incidents/${sid}`} className="text-indigo-700 hover:underline truncate">
-                          {String(s.number)} — {String(s.title)}
-                        </Link>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="text-xs h-8 shrink-0"
-                          disabled={linkBusy !== null}
-                          onClick={() => void linkIncident(sid)}
-                        >
-                          {linkBusy === sid ? t('linking') : t('add')}
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-          </Card>
+          <WarRoomLinkedIncidents
+            related={related}
+            primaryIncidentId={primaryIncidentId}
+            isPendingAcceptance={isPendingAcceptance}
+            canManage={canManage}
+            suggLoading={suggLoading}
+            onRefresh={() => void loadSuggested()}
+            suggested={suggestedToShow}
+            linkBusy={linkBusy}
+            onLink={(incidentId) => void linkIncident(incidentId)}
+          />
         </div>
       </div>
 

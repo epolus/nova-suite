@@ -4,22 +4,17 @@ import { attachments as attachmentsApi, knowledge as knowledgeApi, problems as p
 import type { Attachment, KnownError, ProblemTask } from '@/api/client';
 import { useProblemDetail } from './useProblemDetail';
 import PageHeader from '../../components/PageHeader';
-import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { Button } from '../../components/ui/button';
-import { AttachmentCard } from '../../components/AttachmentCard';
-import { useFieldLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
 import {
-  ProblemIncidentsPanel,
-  ProblemTasksPanel,
-  ProblemKnownErrorsPanel,
   type TaskFormState,
   type KnownErrorFormState,
   type KbArticleSearchResult,
 } from './ProblemDetailTabs';
 import { ProblemSummaryCard } from './ProblemSummaryCard';
+import { ProblemDetailBody } from './ProblemDetailBody';
 
 export default function ProblemDetail() {
   const {
@@ -56,7 +51,6 @@ export default function ProblemDetail() {
   const tProblems = useTranslations('pages.problems');
   const tActions = useTranslations('common.actions');
   const tMaster = useTranslations('common.masterData');
-  const fieldLabel = useFieldLabel();
 
   const [incidentSearch, setIncidentSearch] = useState('');
   const [incidentResults, setIncidentResults] = useState<Array<{ id: string; number: string; title: string; status: string }>>([]);
@@ -306,12 +300,6 @@ export default function ProblemDetail() {
 
   const closePreview = () => { setPreviewUrl(null); setPreviewName(''); };
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
@@ -368,162 +356,60 @@ export default function ProblemDetail() {
         selectCls={selectCls}
       />
 
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]">
-
-        {/* ── Left pane ── */}
-        <div className="space-y-6">
-          {problem && (
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-4">{tProblems('incidentImpact')}</h3>
-              <dl className="space-y-3 text-sm">
-                <div>
-                  <dt className="text-xs text-gray-500">{tProblems('linkedIncidents')}</dt>
-                  <dd className="text-gray-900 font-medium mt-0.5">{problem.incident_count || 0}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-gray-500">{tProblems('openIncidents')}</dt>
-                  <dd className="font-medium mt-0.5">{problem.open_incident_count || 0}</dd>
-                </div>
-              </dl>
-            </Card>
-          )}
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-3">{tProblems('workaround')}</h3>
-            <textarea rows={5} value={form.workaround} onChange={(e) => setForm((p) => ({ ...p, workaround: e.target.value }))} className={textareaCls} placeholder={tProblems('workaroundPlaceholder')} />
-          </Card>
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-3">{tProblems('permanentFix')}</h3>
-            <textarea rows={5} value={form.permanent_fix} onChange={(e) => setForm((p) => ({ ...p, permanent_fix: e.target.value }))} className={textareaCls} placeholder={tProblems('permanentFixPlaceholder')} />
-          </Card>
-        </div>
-
-        {/* ── Center pane ── */}
-        <div className="space-y-6 min-w-0">
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">{tProblems('problemDetails')}</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('title')} <span className="text-red-500">*</span></label>
-                <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} className={inputCls} placeholder={tProblems('problemTitle')} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('description')}</label>
-                <textarea rows={4} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} className={textareaCls} placeholder={tProblems('describeProblem')} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{tProblems('symptoms')}</label>
-                <textarea rows={3} value={form.symptoms} onChange={(e) => setForm((p) => ({ ...p, symptoms: e.target.value }))} className={textareaCls} placeholder={tProblems('symptomsPlaceholder')} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{tProblems('rootCause')}</label>
-                <textarea rows={3} value={form.root_cause} onChange={(e) => setForm((p) => ({ ...p, root_cause: e.target.value }))} className={textareaCls} placeholder={tProblems('rootCausePlaceholder')} />
-              </div>
-              {(form.status === 'resolved' || form.status === 'closed' || form.resolution_notes) && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{tProblems('resolutionNotes')}</label>
-                  <textarea rows={3} value={form.resolution_notes} onChange={(e) => setForm((p) => ({ ...p, resolution_notes: e.target.value }))} className={textareaCls} placeholder={tProblems('howProblemResolved')} />
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* ── Attachments ── */}
-          {!isNew && id && (
-            <AttachmentCard
-              attachments={fileAttachments}
-              uploading={uploading}
-              dragOver={dragOver}
-              fileInputRef={fileInputRef}
-              previewUrl={previewUrl}
-              previewName={previewName}
-              onDragOver={() => setDragOver(true)}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClickZone={() => fileInputRef.current?.click()}
-              onFileChange={handleFileUpload}
-              onPreview={handlePreview}
-              onDownload={(a) => attachmentsApi.download(a.id, a.file_name)}
-              onDelete={handleDeleteAttachment}
-              onClosePreview={closePreview}
-              formatSize={formatSize}
-            />
-          )}
-
-          {/* ── Sub-entity tabs ── */}
-          {!isNew && id && (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {([
-                  { key: 'incidents' as const, label: tProblems('tabs.incidents', { count: linkedIncidents.length }) },
-                  { key: 'tasks' as const, label: tProblems('tabs.tasks', { count: tasks.length }) },
-                  { key: 'known_errors' as const, label: tProblems('tabs.knownErrors', { count: knownErrors.length }) },
-                ] as const).map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      activeTab === tab.key ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {activeTab === 'incidents' && (
-                <ProblemIncidentsPanel
-                  incidentSearch={incidentSearch}
-                  setIncidentSearch={setIncidentSearch}
-                  incidentResults={incidentResults}
-                  linkedIncidents={linkedIncidents}
-                  linkIncident={linkIncident}
-                  unlinkIncident={unlinkIncident}
-                  inputCls={inputCls}
-                />
-              )}
-
-              {activeTab === 'tasks' && (
-                <ProblemTasksPanel
-                  taskForm={taskForm}
-                  setTaskForm={setTaskForm}
-                  createTask={createTask}
-                  tasks={tasks}
-                  updateTaskStatus={updateTaskStatus}
-                  removeTask={removeTask}
-                  inputCls={inputCls}
-                  selectCls={selectCls}
-                  textareaCls={textareaCls}
-                />
-              )}
-
-              {activeTab === 'known_errors' && (
-                <ProblemKnownErrorsPanel
-                  keForm={keForm}
-                  setKeForm={setKeForm}
-                  createKnownError={createKnownError}
-                  knownErrors={knownErrors}
-                  toggleKnownError={toggleKnownError}
-                  kbSearch={kbSearch}
-                  setKbSearch={setKbSearch}
-                  kbResults={kbResults}
-                  selectKbArticle={selectKbArticle}
-                  clearKbArticle={clearKbArticle}
-                  linkKbArticle={linkKbArticle}
-                  unlinkKbArticle={unlinkKbArticle}
-                  linkingKeId={linkingKeId}
-                  setLinkingKeId={setLinkingKeId}
-                  linkKbSearch={linkKbSearch}
-                  setLinkKbSearch={setLinkKbSearch}
-                  linkKbResults={linkKbResults}
-                  inputCls={inputCls}
-                  selectCls={selectCls}
-                  textareaCls={textareaCls}
-                />
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      <ProblemDetailBody
+        problem={problem}
+        form={form}
+        setForm={setForm}
+        inputCls={inputCls}
+        selectCls={selectCls}
+        textareaCls={textareaCls}
+        isNew={isNew}
+        id={id}
+        fileAttachments={fileAttachments}
+        uploading={uploading}
+        dragOver={dragOver}
+        fileInputRef={fileInputRef}
+        previewUrl={previewUrl}
+        previewName={previewName}
+        onDragOver={() => setDragOver(true)}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onFileChange={handleFileUpload}
+        onPreview={handlePreview}
+        onDeleteAttachment={handleDeleteAttachment}
+        onClosePreview={closePreview}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        linkedIncidents={linkedIncidents}
+        incidentSearch={incidentSearch}
+        setIncidentSearch={setIncidentSearch}
+        incidentResults={incidentResults}
+        linkIncident={linkIncident}
+        unlinkIncident={unlinkIncident}
+        taskForm={taskForm}
+        setTaskForm={setTaskForm}
+        createTask={createTask}
+        tasks={tasks}
+        updateTaskStatus={updateTaskStatus}
+        removeTask={removeTask}
+        keForm={keForm}
+        setKeForm={setKeForm}
+        createKnownError={createKnownError}
+        knownErrors={knownErrors}
+        toggleKnownError={toggleKnownError}
+        kbSearch={kbSearch}
+        setKbSearch={setKbSearch}
+        kbResults={kbResults}
+        selectKbArticle={selectKbArticle}
+        clearKbArticle={clearKbArticle}
+        linkKbArticle={linkKbArticle}
+        unlinkKbArticle={unlinkKbArticle}
+        linkingKeId={linkingKeId}
+        setLinkingKeId={setLinkingKeId}
+        linkKbSearch={linkKbSearch}
+        setLinkKbSearch={setLinkKbSearch}
+        linkKbResults={linkKbResults}
+      />
     </>
   );
 }

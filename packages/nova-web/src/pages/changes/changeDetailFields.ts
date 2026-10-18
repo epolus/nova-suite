@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { ChangeDetail } from '@/api/client';
-import type { ChangeFormState } from './useChangeDetail';
-import { EMPTY_CHANGE_FORM, formFromDetail } from './useChangeDetail';
+import { EMPTY_CHANGE_FORM, formFromDetail, type ChangeFormState } from './changeFormState';
 
 function normalizeForm(form: ChangeFormState): ChangeFormState {
   return {
