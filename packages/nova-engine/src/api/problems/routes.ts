@@ -308,7 +308,7 @@ router.post('/from-recurring-incidents', async (req: Request, res: Response, nex
         b.assignment_group_id,
         affectedCi,
         b.resolution_notes || null,
-        slaDueAt,
+        slaDueAt.resolutionDueAt,
       ],
     );
     const createdProblem = created.rows[0];

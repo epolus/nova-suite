@@ -32,6 +32,7 @@ import {
   resolveSlaDueAt,
   resumeSlaClock,
   shouldPauseSlaForPending,
+  SLA_PAUSE_REASONS,
 } from '../../domain/sla';
 import {
   signalIncidentResolved,
@@ -46,6 +47,72 @@ import { isFulfillerRole } from '../roles';
 import { logger } from '../../logger';
 
 const router = Router();
+
+const PAUSE_REASON_LIST = [...SLA_PAUSE_REASONS];
+
+async function clearPendingAndResumeSla(
+  client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  incident: {
+    id: string;
+    sla_paused_at: string | Date | null;
+    sla_paused_ms: number | string | null;
+    response_due_at: string | Date | null;
+    sla_due_at: string | Date | null;
+  },
+): Promise<void> {
+  if (!incident.sla_paused_at) {
+    await client.query(
+      `UPDATE incidents
+       SET pending_reason = NULL,
+           resolution_code = CASE
+             WHEN resolution_code = ANY($2::text[]) THEN NULL
+             ELSE resolution_code
+           END,
+           updated_at = now()
+       WHERE id = $1`,
+      [incident.id, PAUSE_REASON_LIST],
+    );
+    return;
+  }
+
+  const resumed = resumeSlaClock({
+    sla_paused_at: incident.sla_paused_at,
+    sla_paused_ms: incident.sla_paused_ms,
+    response_due_at: incident.response_due_at,
+    sla_due_at: incident.sla_due_at,
+  });
+  await client.query(
+    `UPDATE incidents
+     SET pending_reason = NULL,
+         resolution_code = CASE
+           WHEN resolution_code = ANY($2::text[]) THEN NULL
+           ELSE resolution_code
+         END,
+         sla_paused_at = NULL,
+         sla_paused_ms = $3,
+         response_due_at = $4,
+         sla_due_at = $5,
+         updated_at = now()
+     WHERE id = $1`,
+    [
+      incident.id,
+      PAUSE_REASON_LIST,
+      resumed.sla_paused_ms,
+      resumed.response_due_at,
+      resumed.sla_due_at,
+    ],
+  );
+}
+
+async function markIncidentResponded(
+  client: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
+  incidentId: string,
+): Promise<void> {
+  await client.query(
+    `UPDATE incidents SET responded_at = now() WHERE id = $1 AND responded_at IS NULL`,
+    [incidentId],
+  );
+}
 
 function endUserIncidentVisibilityCondition(userParamRef: string): string {
   return `(i.caller_id = ${userParamRef} OR EXISTS (
@@ -309,13 +376,13 @@ router.post(
           status, impact, urgency, priority,
           assigned_to, assignment_group_id, caller_id,
           contact_info, service_id, configuration_item_id,
-          category, subcategory, sla_due_at, response_due_at
+          category, subcategory, sla_due_at, response_due_at, sla_definition_id
         ) VALUES (
           current_tenant_id(), $1, $2, $3, $4,
           $5, $6, $7, $8,
           $9, $10, $11,
           $12, $13, $14,
-          $15, $16, $17, $18
+          $15, $16, $17, $18, $19
         ) RETURNING *`,
         [
           number, request_id || null, title, description || null,
@@ -323,6 +390,7 @@ router.post(
           assigned_to || null, assignment_group_id || null, caller_id || null,
           contact_info || null, service_id || null, configuration_item_id || null,
           category || null, subcategory || null, sla.resolutionDueAt, sla.responseDueAt,
+          sla.slaDefinitionId,
         ],
       );
 
@@ -1314,29 +1382,46 @@ router.patch(
         updates.status = 'resolved';
       }
 
-      // Pending requires a reason (stored in resolution_code as pending reason).
+      // Pending reason lives on pending_reason. Older clients still send it as resolution_code.
+      let nextReason: string | null = updates.pending_reason !== undefined
+        ? updates.pending_reason
+        : (current.pending_reason ?? null);
+      if (
+        (nextReason == null || String(nextReason).trim().length === 0)
+        && typeof updates.resolution_code === 'string'
+        && shouldPauseSlaForPending(updates.resolution_code)
+      ) {
+        nextReason = updates.resolution_code;
+        delete updates.resolution_code;
+      }
+
       if (updates.status === 'pending') {
-        const pendingReason = typeof updates.resolution_code === 'string'
-          ? updates.resolution_code
-          : current.resolution_code;
-        if (!pendingReason || String(pendingReason).trim().length === 0) {
+        if (!nextReason || String(nextReason).trim().length === 0) {
           res.status(400).json({ error: 'Pending reason is required when setting status to pending' });
           return;
         }
+        updates.pending_reason = String(nextReason).trim();
       }
 
       // Pause/resume SLA clock on pending transitions with waiting_* reasons.
       const nextStatus = updates.status !== undefined ? updates.status : current.status;
-      const nextReason = updates.resolution_code !== undefined
-        ? updates.resolution_code
-        : current.resolution_code;
       const enteringPendingPause = nextStatus === 'pending'
         && current.status !== 'pending'
         && shouldPauseSlaForPending(nextReason);
       const leavingPending = current.status === 'pending'
         && updates.status !== undefined
-        && updates.status !== 'pending'
-        && current.sla_paused_at;
+        && updates.status !== 'pending';
+      if (leavingPending && updates.pending_reason === undefined) {
+        updates.pending_reason = null;
+      }
+      if (
+        leavingPending
+        && updates.resolution_code === undefined
+        && shouldPauseSlaForPending(current.resolution_code)
+      ) {
+        updates.resolution_code = null;
+      }
+      const resumeOnLeave = leavingPending && current.sla_paused_at;
 
       if (enteringPendingPause) {
         const paused = pauseSlaClock({
@@ -1347,7 +1432,7 @@ router.patch(
         });
         updates.sla_paused_at = paused.sla_paused_at;
         updates.sla_paused_ms = paused.sla_paused_ms;
-      } else if (leavingPending) {
+      } else if (resumeOnLeave) {
         const resumed = resumeSlaClock({
           sla_paused_at: current.sla_paused_at,
           sla_paused_ms: current.sla_paused_ms,
@@ -1391,6 +1476,15 @@ router.patch(
       }
       if (updates.status === 'closed' && !current.closed_at) {
         updates.closed_at = new Date().toISOString();
+      }
+
+      if (
+        isFulfiller
+        && !current.responded_at
+        && current.status === 'new'
+        && (nextStatus === 'assigned' || nextStatus === 'in_progress')
+      ) {
+        updates.responded_at = new Date().toISOString();
       }
 
       // Build dynamic UPDATE
@@ -1556,7 +1650,9 @@ router.post(
 
       // Verify incident exists and check permissions
       const incident = await client.query(
-        `SELECT id, caller_id, number, title, status, resolution_code, assigned_to, assignment_group_id
+        `SELECT id, caller_id, number, title, status, resolution_code, pending_reason,
+                assigned_to, assignment_group_id, responded_at,
+                sla_paused_at, sla_paused_ms, response_due_at, sla_due_at
          FROM incidents
          WHERE id = $1`,
         [req.params.id],
@@ -1597,14 +1693,21 @@ router.post(
         && isCaller
         && entry_type !== 'state_change'
         && incident.rows[0].status === 'pending'
-        && incident.rows[0].resolution_code === 'waiting_for_caller'
+        && (incident.rows[0].pending_reason || incident.rows[0].resolution_code) === 'waiting_for_caller'
       ) {
         await client.query(
           `UPDATE incidents
-           SET status = 'in_progress', resolution_code = NULL, updated_at = now()
+           SET status = 'in_progress', updated_at = now()
            WHERE id = $1`,
           [req.params.id],
         );
+        await clearPendingAndResumeSla(client, {
+          id: String(req.params.id),
+          sla_paused_at: incident.rows[0].sla_paused_at,
+          sla_paused_ms: incident.rows[0].sla_paused_ms,
+          response_due_at: incident.rows[0].response_due_at,
+          sla_due_at: incident.rows[0].sla_due_at,
+        });
         await client.query(
           `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
            VALUES (current_tenant_id(), $1, $2, 'state_change', $3)`,
@@ -1665,7 +1768,8 @@ router.post(
       // Work note means active processing has started.
       if (entry_type === 'work_note') {
         const current = await client.query(
-          `SELECT status FROM incidents WHERE id = $1`,
+          `SELECT status, sla_paused_at, sla_paused_ms, response_due_at, sla_due_at, pending_reason
+           FROM incidents WHERE id = $1`,
           [req.params.id],
         );
         const status = current.rows[0]?.status as string | undefined;
@@ -1682,6 +1786,21 @@ router.post(
             [req.params.id, req.user!.id, `Status changed from ${status} to in_progress`],
           );
         }
+        if (status === 'pending' || current.rows[0]?.sla_paused_at) {
+          await clearPendingAndResumeSla(client, {
+            id: String(req.params.id),
+            sla_paused_at: current.rows[0]?.sla_paused_at,
+            sla_paused_ms: current.rows[0]?.sla_paused_ms,
+            response_due_at: current.rows[0]?.response_due_at,
+            sla_due_at: current.rows[0]?.sla_due_at,
+          });
+        }
+      }
+
+      const visibleToCaller = Boolean(is_customer_visible) && entry_type !== 'state_change';
+      const workNoteLeavesNew = entry_type === 'work_note' && incident.rows[0].status === 'new';
+      if (isFulfiller && !incident.rows[0].responded_at && (visibleToCaller || workNoteLeavesNew)) {
+        await markIncidentResponded(client, String(req.params.id));
       }
 
       res.status(201).json(result.rows[0]);

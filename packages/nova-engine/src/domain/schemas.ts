@@ -278,6 +278,7 @@ export const updateIncidentSchema = z.object({
   category: z.string().max(255).nullable().optional(),
   subcategory: z.string().max(255).nullable().optional(),
   resolution_code: z.string().max(255).nullable().optional(),
+  pending_reason: z.string().max(255).nullable().optional(),
   resolution_notes: z.string().max(10000).nullable().optional(),
 });
 
@@ -368,6 +369,7 @@ export const changeTransitionSchema = z.object({
   notes: z.string().max(5000).optional(),
   scheduled_start: z.string().nullable().optional(),
   scheduled_end: z.string().nullable().optional(),
+  override_blocking_conflicts: z.boolean().optional(),
 });
 
 export const changeApprovalDecisionSchema = z.object({

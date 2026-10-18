@@ -2,6 +2,7 @@
 import { proxyActivities, sleep, defineSignal, setHandler, condition } from '@temporalio/workflow';
 
 import type * as activities from '../activities';
+import { warningAtMs } from './sla-warning';
 
 const {
   getIncident,
@@ -10,6 +11,7 @@ const {
   escalateIncident,
   autoAssignIncident,
   sendNotification,
+  applySlaActions,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '30 seconds',
   retry: { maximumAttempts: 3, initialInterval: '2 seconds' },
@@ -34,8 +36,9 @@ type TimerKind = 'response' | 'resolution';
 /**
  * Incident SLA escalation workflow — dual timers (response + resolution).
  *
- * Tracks both response_due_at and sla_due_at (resolution). Warns at 80% of each
- * timer independently. Marks response_breached / sla_breached separately.
+ * Tracks both response_due_at and sla_due_at (resolution). Warns at the
+ * definition's warning_pct (default 80%). Marks response_breached / sla_breached
+ * separately. A set responded_at stops the response timer.
  * While sla_paused_at is set, the workflow polls and does not fire breach.
  */
 export async function incidentEscalation(input: EscalationInput): Promise<string> {
@@ -84,8 +87,14 @@ export async function incidentEscalation(input: EscalationInput): Promise<string
 
     const nextEvents: Array<{ at: number; kind: TimerKind; phase: 'warn' | 'breach' }> = [];
 
-    if (responseDueMs != null && !responseBreached) {
-      const warnAt = responseDueMs - Math.floor((responseTotalMs || (responseDueMs - startedAt)) * 0.2);
+    const responseSatisfied = Boolean(incident.respondedAt);
+    if (responseDueMs != null && !responseBreached && !responseSatisfied) {
+      const warnAt = warningAtMs(
+        responseDueMs,
+        responseTotalMs || (responseDueMs - startedAt),
+        startedAt,
+        incident.warningPct ?? 80,
+      );
       if (!responseWarned && warnAt > now) {
         nextEvents.push({ at: warnAt, kind: 'response', phase: 'warn' });
       } else if (!responseWarned && now >= warnAt && now < responseDueMs) {
@@ -101,7 +110,12 @@ export async function incidentEscalation(input: EscalationInput): Promise<string
     }
 
     if (resolutionDueMs != null && !resolutionBreached) {
-      const warnAt = resolutionDueMs - Math.floor((resolutionTotalMs || (resolutionDueMs - startedAt)) * 0.2);
+      const warnAt = warningAtMs(
+        resolutionDueMs,
+        resolutionTotalMs || (resolutionDueMs - startedAt),
+        startedAt,
+        incident.warningPct ?? 80,
+      );
       if (!resolutionWarned && warnAt > now) {
         nextEvents.push({ at: warnAt, kind: 'resolution', phase: 'warn' });
       } else if (!resolutionWarned && now >= warnAt && now < resolutionDueMs) {
@@ -156,6 +170,14 @@ async function handleWarning(
   incident: NonNullable<Awaited<ReturnType<typeof getIncident>>>,
   kind: TimerKind,
 ): Promise<void> {
+  const label = kind === 'response' ? 'Response' : 'Resolution';
+  const message = `${label} SLA warning: ${incident.number} "${incident.title}" is approaching its ${kind} due time.`;
+
+  if (incident.slaDefinitionId) {
+    await applySlaActions(input.incidentId, input.tenantId, incident.onWarning, message, 'warn');
+    return;
+  }
+
   if (kind === 'resolution' && !incident.assignedTo) {
     const assigned = await autoAssignIncident(input.incidentId, input.tenantId);
     if (assigned) {
@@ -167,12 +189,7 @@ async function handleWarning(
     }
   }
 
-  const label = kind === 'response' ? 'Response' : 'Resolution';
-  await sendNotification(
-    input.incidentId,
-    input.tenantId,
-    `${label} SLA warning: ${incident.number} "${incident.title}" is approaching its ${kind} due time.`,
-  );
+  await sendNotification(input.incidentId, input.tenantId, message);
 }
 
 async function handleBreach(
@@ -184,26 +201,53 @@ async function handleBreach(
     if (!incident.responseBreached) {
       await markResponseBreached(input.incidentId, input.tenantId);
     }
-    await sendNotification(
-      input.incidentId,
-      input.tenantId,
-      `Response SLA BREACHED: ${incident.number} "${incident.title}".`,
-    );
+    const message = `Response SLA BREACHED: ${incident.number} "${incident.title}".`;
+    if (incident.slaDefinitionId) {
+      await applyConfiguredBreach(input, incident, message);
+      return;
+    }
+    await sendNotification(input.incidentId, input.tenantId, message);
     return;
   }
 
   if (!incident.slaBreached) {
     await markSlaBreached(input.incidentId, input.tenantId);
   }
+
+  const message = `Resolution SLA BREACHED: ${incident.number} "${incident.title}".`;
+  if (incident.slaDefinitionId) {
+    await applyConfiguredBreach(input, incident, message);
+    return;
+  }
+
   const fresh = await getIncident(input.incidentId, input.tenantId);
   const priority = fresh?.priority ?? incident.priority;
-  const newPriority = Math.max(1, priority - 1);
-  if (newPriority < priority) {
-    await escalateIncident(input.incidentId, input.tenantId, newPriority);
+  const escalatedTo = Math.max(1, priority - 1);
+  if (escalatedTo < priority) {
+    await escalateIncident(input.incidentId, input.tenantId, escalatedTo);
   }
   await sendNotification(
     input.incidentId,
     input.tenantId,
-    `Resolution SLA BREACHED: ${incident.number} "${incident.title}". Priority escalated to P${newPriority}.`,
+    `${message} Priority escalated to P${escalatedTo}.`,
   );
+}
+
+async function applyConfiguredBreach(
+  input: EscalationInput,
+  incident: NonNullable<Awaited<ReturnType<typeof getIncident>>>,
+  message: string,
+): Promise<void> {
+  const actions = incident.onBreach;
+  let text = message;
+  if (actions.includes('escalate_priority')) {
+    const fresh = await getIncident(input.incidentId, input.tenantId);
+    const priority = fresh?.priority ?? incident.priority;
+    const escalatedTo = Math.max(1, priority - 1);
+    if (escalatedTo < priority) {
+      await escalateIncident(input.incidentId, input.tenantId, escalatedTo);
+      text = `${message} Priority escalated to P${escalatedTo}.`;
+    }
+  }
+  await applySlaActions(input.incidentId, input.tenantId, actions, text, 'breach');
 }

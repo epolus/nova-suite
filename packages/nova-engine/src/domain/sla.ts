@@ -12,6 +12,7 @@ type SlaContext = {
 export type SlaDueAts = {
   responseDueAt: string | null;
   resolutionDueAt: string | null;
+  slaDefinitionId: string | null;
 };
 
 export type BusinessHourWindow = {
@@ -288,7 +289,7 @@ export async function resolveSlaDueAt(
   from: Date = new Date(),
 ): Promise<SlaDueAts> {
   const rows = await client.query(
-    `SELECT resolution_hours, response_hours
+    `SELECT id, resolution_hours, response_hours
      FROM sla_definitions sd
      WHERE sd.process_type = $1
        AND sd.is_active = true
@@ -310,7 +311,7 @@ export async function resolveSlaDueAt(
   );
   const def = rows.rows?.[0];
   if (!def) {
-    return { responseDueAt: null, resolutionDueAt: null };
+    return { responseDueAt: null, resolutionDueAt: null, slaDefinitionId: null };
   }
 
   const calendar = await loadDefaultBusinessCalendar(client);
@@ -320,6 +321,7 @@ export async function resolveSlaDueAt(
   return {
     responseDueAt: dueIsoFromHours(responseHours, from, calendar),
     resolutionDueAt: dueIsoFromHours(resolutionHours, from, calendar),
+    slaDefinitionId: def.id ? String(def.id) : null,
   };
 }
 
