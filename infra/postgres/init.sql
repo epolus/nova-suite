@@ -1038,7 +1038,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.13', 'ai_triage_suggestions'),
   ('v00.01.14', 'itam_discovery_external_ids_and_intune'),
   ('v00.01.15', 'incident_sla_controls_and_change_conflict_gate'),
-  ('v00.01.16', 'change_post_implementation_review');
+  ('v00.01.16', 'change_post_implementation_review'),
+  ('v00.01.17', 'problem_recurrence_scan');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2540,6 +2541,29 @@ CREATE TABLE problem_tasks (
 );
 CREATE INDEX idx_problem_tasks_problem ON problem_tasks(tenant_id, problem_id, status);
 CREATE INDEX idx_problem_tasks_assigned_to ON problem_tasks(tenant_id, assigned_to, status);
+
+CREATE TABLE problem_recurrence_scans (
+  tenant_id        uuid PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+  scanned_at       timestamptz NOT NULL,
+  candidate_count  integer NOT NULL DEFAULT 0
+);
+
+CREATE TABLE problem_recurrence_candidates (
+  id                      uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id               uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  seed_incident_id        uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  representative_title    text NOT NULL,
+  configuration_item_id   uuid REFERENCES configuration_items(id) ON DELETE SET NULL,
+  service_id              uuid REFERENCES services(id) ON DELETE SET NULL,
+  incident_ids            uuid[] NOT NULL,
+  incidents               jsonb NOT NULL,
+  incident_count          integer NOT NULL,
+  avg_similarity          double precision NOT NULL,
+  scanned_at              timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, seed_incident_id)
+);
+CREATE INDEX idx_problem_recurrence_candidates_tenant
+  ON problem_recurrence_candidates(tenant_id, incident_count DESC, avg_similarity DESC);
 
 CREATE TRIGGER trg_knowledge_categories_updated_at
   BEFORE UPDATE ON knowledge_categories

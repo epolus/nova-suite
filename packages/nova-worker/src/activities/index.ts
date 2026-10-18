@@ -57,3 +57,7 @@ export {
 export {
   snapshotTrendMetricsForAllTenants,
 } from './analytics-snapshot-activities';
+
+export {
+  scanProblemRecurrenceForAllTenants,
+} from './problem-recurrence-activities';

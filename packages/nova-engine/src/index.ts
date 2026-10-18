@@ -19,7 +19,7 @@ import {
   startWorkflowStartQueueDispatcher,
   stopWorkflowStartQueueDispatcher,
 } from './temporal/workflow-start-queue';
-import { checkTemporalHealth, startDbSizeSnapshotSchedule, startMetricSnapshotSchedule } from './temporal/workflows';
+import { checkTemporalHealth, startDbSizeSnapshotSchedule, startMetricSnapshotSchedule, startProblemRecurrenceScanSchedule } from './temporal/workflows';
 import { metricsHandler, metricsMiddleware } from './observability/metrics';
 
 type SchemaRuntimeStatus = {
@@ -37,6 +37,7 @@ const schemaRuntimeStatus: SchemaRuntimeStatus = {
 };
 let dbSizeSnapshotScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
 let metricSnapshotScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
+let recurrenceScanScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
 let snapshotScheduleRetryTimer: NodeJS.Timeout | null = null;
 let workflowDispatcherStarted = false;
 let server: ReturnType<typeof app.listen> | null = null;
@@ -118,6 +119,7 @@ app.get('/health', async (_req, res) => {
       workflow_start_queue_failed: queueStats.failed,
       db_size_snapshot_schedule: dbSizeSnapshotScheduleStatus,
       metric_snapshot_schedule: metricSnapshotScheduleStatus,
+      recurrence_scan_schedule: recurrenceScanScheduleStatus,
     },
   });
 });
@@ -162,13 +164,28 @@ async function ensureMetricSnapshotScheduleStarted(): Promise<void> {
   }
 }
 
+async function ensureRecurrenceScanScheduleStarted(): Promise<void> {
+  try {
+    await startProblemRecurrenceScanSchedule();
+    recurrenceScanScheduleStatus = 'running';
+  } catch (err) {
+    recurrenceScanScheduleStatus = 'failed';
+    logger.warn({ err }, 'Problem recurrence scan schedule startup failed; will retry in background');
+  }
+}
+
 async function ensureSnapshotSchedulesStarted(): Promise<void> {
   await Promise.all([
     ensureDbSizeSnapshotScheduleStarted(),
     ensureMetricSnapshotScheduleStarted(),
+    ensureRecurrenceScanScheduleStarted(),
   ]);
 
-  if (dbSizeSnapshotScheduleStatus === 'running' && metricSnapshotScheduleStatus === 'running') {
+  if (
+    dbSizeSnapshotScheduleStatus === 'running'
+    && metricSnapshotScheduleStatus === 'running'
+    && recurrenceScanScheduleStatus === 'running'
+  ) {
     if (snapshotScheduleRetryTimer) {
       clearInterval(snapshotScheduleRetryTimer);
       snapshotScheduleRetryTimer = null;
@@ -212,7 +229,11 @@ async function bootstrap(): Promise<void> {
     startWorkflowStartQueueDispatcher();
     workflowDispatcherStarted = true;
     await ensureSnapshotSchedulesStarted();
-    if (dbSizeSnapshotScheduleStatus !== 'running' || metricSnapshotScheduleStatus !== 'running') {
+    if (
+      dbSizeSnapshotScheduleStatus !== 'running'
+      || metricSnapshotScheduleStatus !== 'running'
+      || recurrenceScanScheduleStatus !== 'running'
+    ) {
       snapshotScheduleRetryTimer = setInterval(() => {
         void ensureSnapshotSchedulesStarted();
       }, 30_000);
@@ -220,6 +241,7 @@ async function bootstrap(): Promise<void> {
   } else {
     dbSizeSnapshotScheduleStatus = 'not_started';
     metricSnapshotScheduleStatus = 'not_started';
+    recurrenceScanScheduleStatus = 'not_started';
     logger.warn('Workflow start queue dispatcher disabled due to schema incompatibility');
   }
 }
