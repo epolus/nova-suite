@@ -62,6 +62,16 @@ export interface IncidentProblemLink {
   problem_priority?: 'low' | 'medium' | 'high' | 'critical';
 }
 
+export interface KnownErrorSuggestion {
+  id: string;
+  title: string;
+  symptoms: string;
+  workaround: string;
+  severity: string | null;
+  problem_id: string;
+  problem_number: string;
+}
+
 export interface SimilarIncident {
   id: string;
   number: string;

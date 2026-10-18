@@ -51,6 +51,7 @@ export default function NewIncident() {
           <NewIncidentSidebar
             similarIncidents={state.similarIncidents}
             kbSuggestions={state.kbSuggestions}
+            knownErrors={state.knownErrors}
             loadingSidebar={state.loadingSidebar}
             navigate={state.guardNavigate}
           />

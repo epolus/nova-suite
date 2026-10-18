@@ -26,6 +26,7 @@ import {
 } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { createEssIncident } from '../../domain/incidents/create-ess-incident';
+import { suggestActiveKnownErrors } from '../../domain/known-errors';
 import { schedulePostCreateAiAssist } from '../../ai/post-create';
 import {
   pauseSlaClock,
@@ -967,6 +968,31 @@ router.get('/by-ci/:ciId', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
+function optionalUuid(value: unknown): string | null {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) {
+    throw new AppError(400, 'Invalid identifier');
+  }
+  return text;
+}
+
+// ─── GET /api/incidents/known-errors-by-context ───
+router.get('/known-errors-by-context', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const query = req.query as Record<string, unknown>;
+    const knownErrors = await suggestActiveKnownErrors(
+      client,
+      optionalUuid(query.configuration_item_id),
+      optionalUuid(query.service_id),
+    );
+    res.json({ known_errors: knownErrors });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── GET /api/incidents/:id ───
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -1039,6 +1065,33 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     );
 
     res.json({ ...incident, linked_major_incidents: links.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /api/incidents/:id/known-errors ───
+router.get('/:id/known-errors', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const result = await client.query(
+      `SELECT configuration_item_id, service_id, caller_id
+       FROM incidents
+       WHERE id = $1 AND tenant_id = current_tenant_id()`,
+      [req.params.id],
+    );
+    if (result.rows.length === 0) throw NotFound('Incident not found');
+    const incident = result.rows[0];
+    if (!isFulfillerRole(req) && incident.caller_id !== req.user!.id) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+    const knownErrors = await suggestActiveKnownErrors(
+      client,
+      incident.configuration_item_id,
+      incident.service_id,
+    );
+    res.json({ known_errors: knownErrors });
   } catch (err) {
     next(err);
   }

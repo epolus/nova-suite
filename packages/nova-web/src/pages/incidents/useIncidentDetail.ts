@@ -101,7 +101,7 @@ export function useIncidentDetail() {
   const [journalVisible, setJournalVisible] = useState(true);
 
   // Intelligence sidebar
-  const { similarIncidents, kbSuggestions, loadingSidebar, sidebarError } = useIncidentSidebar(
+  const { similarIncidents, kbSuggestions, knownErrors, loadingSidebar, sidebarError } = useIncidentSidebar(
     id,
     intelligenceOpen,
   );
@@ -353,6 +353,7 @@ export function useIncidentDetail() {
     // Intelligence sidebar
     similarIncidents,
     kbSuggestions,
+    knownErrors,
     loadingSidebar,
     sidebarError,
     // KB resolve modal
