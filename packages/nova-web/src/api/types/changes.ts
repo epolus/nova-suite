@@ -104,6 +104,8 @@ export interface Change {
   maintenance_window: string | null;
   implementation_notes: string | null;
   success: boolean | null;
+  failure_category?: 'incomplete' | 'caused_incident' | 'rolled_back' | 'exceeded_window' | 'other' | null;
+  planned_downtime_minutes?: number | null;
   actual_downtime_minutes: number | null;
   related_problem_id: string | null;
   related_incident_id: string | null;

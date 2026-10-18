@@ -1037,7 +1037,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.12', 'notification_webhooks'),
   ('v00.01.13', 'ai_triage_suggestions'),
   ('v00.01.14', 'itam_discovery_external_ids_and_intune'),
-  ('v00.01.15', 'incident_sla_controls_and_change_conflict_gate');
+  ('v00.01.15', 'incident_sla_controls_and_change_conflict_gate'),
+  ('v00.01.16', 'change_post_implementation_review');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2688,6 +2689,11 @@ CREATE TABLE changes (
   maintenance_window        text,
   implementation_notes      text,
   success                   boolean,
+  failure_category          text
+                            CHECK (failure_category IS NULL OR failure_category IN (
+                              'incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other'
+                            )),
+  planned_downtime_minutes  integer CHECK (planned_downtime_minutes IS NULL OR planned_downtime_minutes >= 0),
   actual_downtime_minutes   integer,
   related_problem_id        uuid REFERENCES problems(id) ON DELETE SET NULL,
   related_incident_id       uuid REFERENCES incidents(id) ON DELETE SET NULL,
