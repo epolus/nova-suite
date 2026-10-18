@@ -1,7 +1,11 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'use-intl';
-import { incidents as incidentsApi, type IncidentAiSuggestion } from '../../api/client';
+import {
+  incidents as incidentsApi,
+  settings as settingsApi,
+  type IncidentAiSuggestion,
+} from '../../api/client';
 
 type Props = {
   incidentId: string;
@@ -9,9 +13,15 @@ type Props = {
   onApplied?: () => Promise<void> | void;
 };
 
+function parseEnabledFlag(raw: string | undefined): boolean {
+  if (raw == null || raw === '') return true;
+  return raw === 'true' || raw === '1' || raw === 'yes';
+}
+
 export function AiTriageSuggestions({ incidentId, readonly, onApplied }: Props) {
   const t = useTranslations('pages.incidents');
   const tActions = useTranslations('common.actions');
+  const [triageEnabled, setTriageEnabled] = useState<boolean | null>(null);
   const [suggestions, setSuggestions] = useState<IncidentAiSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,6 +40,23 @@ export function AiTriageSuggestions({ incidentId, readonly, onApplied }: Props) 
     let cancelled = false;
     (async () => {
       try {
+        const res = await settingsApi.get();
+        if (cancelled) return;
+        setTriageEnabled(parseEnabledFlag(res.settings.ai_triage_on_create));
+      } catch {
+        if (!cancelled) setTriageEnabled(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (triageEnabled !== true) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
         const res = await incidentsApi.aiSuggestions(incidentId);
         if (cancelled) return;
         setSuggestions(res.suggestions);
@@ -43,7 +70,11 @@ export function AiTriageSuggestions({ incidentId, readonly, onApplied }: Props) 
       }
     })();
     return () => { cancelled = true; };
-  }, [incidentId, t, reloadToken]);
+  }, [triageEnabled, incidentId, t, reloadToken]);
+
+  if (triageEnabled !== true) {
+    return null;
+  }
 
   const pending = suggestions.filter((s) => s.status === 'pending');
   if (!loading && !error && pending.length === 0 && suggestions.length === 0) {
