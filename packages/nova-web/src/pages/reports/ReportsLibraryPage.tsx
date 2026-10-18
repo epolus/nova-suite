@@ -9,6 +9,7 @@ import { reports, type ReportDefinitionSummary } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { hasReportingCreateRole, hasReportingViewRole } from '../../utils/roles';
 import { formatDateTime } from '../../utils/dateTime';
+import { SlaAttainmentCard, type SlaAttainment } from './SlaAttainmentCard';
 
 function NewReportCard({ onCreate, creating }: { onCreate: (name: string) => Promise<void>; creating: boolean }) {
   const t = useTranslations('pages.reports');
@@ -53,6 +54,7 @@ export default function ReportsLibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [busyDeleteId, setBusyDeleteId] = useState<string | null>(null);
+  const [sla, setSla] = useState<SlaAttainment | null>(null);
 
   const canView = hasReportingViewRole(user?.roles);
   const canCreate = hasReportingCreateRole(user?.roles);
@@ -61,8 +63,12 @@ export default function ReportsLibraryPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await reports.listDefinitions();
+      const [res, kpis] = await Promise.all([
+        reports.listDefinitions(),
+        reports.kpis(),
+      ]);
       setItems(res.reports);
+      setSla(kpis.incidents);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('loadFailed'));
     } finally {
@@ -80,9 +86,15 @@ export default function ReportsLibraryPage() {
   useEffect(() => {
     if (!canView) return;
     let cancelled = false;
-    reports.listDefinitions()
-      .then((res) => {
-        if (!cancelled) setItems(res.reports);
+    Promise.all([
+      reports.listDefinitions(),
+      reports.kpis(),
+    ])
+      .then(([res, kpis]) => {
+        if (!cancelled) {
+          setItems(res.reports);
+          setSla(kpis.incidents);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
@@ -157,6 +169,8 @@ export default function ReportsLibraryPage() {
           <p className="text-sm text-red-600">{error}</p>
         </Card>
       )}
+
+      {sla && <SlaAttainmentCard sla={sla} />}
 
       {canCreate && <NewReportCard onCreate={createReport} creating={creating} />}
 
