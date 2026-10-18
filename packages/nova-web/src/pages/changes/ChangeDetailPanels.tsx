@@ -5,7 +5,7 @@ import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import { Button } from '../../components/ui/button';
 import { useTranslations } from 'use-intl';
-import type { ChangeFormState } from './useChangeDetail';
+import type { ChangeFormState } from './changeFormState';
 
 export function ChangeApprovalsPanel({
   approvals,
