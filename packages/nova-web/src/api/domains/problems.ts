@@ -31,7 +31,7 @@ export const problems = {
     const qs = new URLSearchParams();
     if (params.threshold !== undefined) qs.set('threshold', String(params.threshold));
     if (params.similarity !== undefined) qs.set('similarity', String(params.similarity));
-    return request<{ candidates: RecurrenceCandidate[]; threshold: number; similarity: number }>(
+    return request<{ candidates: RecurrenceCandidate[]; threshold: number; similarity: number; scanned_at: string | null }>(
       `/problems/incidents/recurrence-candidates${qs.size ? `?${qs}` : ''}`,
     );
   },

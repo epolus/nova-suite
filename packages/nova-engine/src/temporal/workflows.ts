@@ -357,6 +357,30 @@ export async function startDbSizeSnapshotSchedule(cronSchedule = '0 2 * * *'): P
   }
 }
 
+/** Default: daily at 02:15 UTC, after the metric snapshot jobs. */
+export async function startProblemRecurrenceScanSchedule(cronSchedule = '15 2 * * *'): Promise<string> {
+  const workflowId = 'problem-recurrence-scan-schedule';
+  try {
+    const cl = await getClient();
+    const handle = await cl.workflow.start('problemRecurrenceScan', {
+      taskQueue: TASK_QUEUE,
+      workflowId,
+      args: [],
+      cronSchedule,
+      workflowExecutionTimeout: '365 days',
+    });
+    logger.info({ workflowId: handle.workflowId, cronSchedule }, 'Started problem recurrence scan schedule');
+    return handle.workflowId;
+  } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, cronSchedule }, 'Problem recurrence scan schedule already running');
+      return workflowId;
+    }
+    logger.warn({ err, workflowId }, 'Failed to start problem recurrence scan schedule');
+    throw err;
+  }
+}
+
 export async function startMajorIncidentWorkflow(params: {
   majorIncidentId: string;
   tenantId: string;

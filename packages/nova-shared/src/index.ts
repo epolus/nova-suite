@@ -7,3 +7,4 @@ export * from './automation-native';
 export * from './catalog-links';
 export * from './analytics-snapshot-metrics';
 export * from './notification-webhooks';
+export * from './problem-recurrence';

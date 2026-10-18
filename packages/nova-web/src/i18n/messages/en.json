@@ -999,6 +999,7 @@
       "unlinkKbArticle": "Unlink",
       "createFromRecurring": "Create from recurring",
       "recurrenceDescription": "Open incidents that share a CI or service and have similar titles. Select a cluster to create a problem with those incidents linked.",
+      "recurrenceLastScan": "Last scan {when}",
       "noRecurrenceCandidates": "No recurring incident clusters found.",
       "recurrenceCount": "{count} incidents",
       "recurrenceNoCiService": "Shared CI/service",
