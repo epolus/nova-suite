@@ -7,6 +7,7 @@ export {
   autoAssignIncident,
   autoCloseIncident,
   sendNotification,
+  applySlaActions,
 } from './incident-activities';
 
 export {

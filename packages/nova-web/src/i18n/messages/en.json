@@ -573,6 +573,7 @@
       "slaDueDate": "Resolution Due",
       "responseDueDate": "Response Due",
       "responseBreached": "Response breached",
+      "responseMet": "Response met",
       "slaPaused": "SLA paused",
       "pendingReason": "Pending Reason",
       "selectReason": "Select reason...",
@@ -882,6 +883,7 @@
       "conflictsScheduling": "Conflicts & Scheduling",
       "conflictDetected": "Conflict detected",
       "noConflicts": "No conflicts detected.",
+      "overrideBlockingConflicts": "Override blocking conflicts for this emergency change",
       "conflictTypes": {
         "scheduleOverlap": "Schedule overlap",
         "ciOverlap": "Same CI overlap",

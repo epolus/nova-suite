@@ -29,7 +29,7 @@ export function buildFieldsFromIncident(i: Incident): IncidentFields {
     impact: i.impact,
     urgency: i.urgency,
     status: i.status,
-    pendingReason: i.resolution_code || '',
+    pendingReason: i.pending_reason || i.resolution_code || '',
     assignmentGroupId: i.assignment_group_id || '',
     assignedTo: i.assigned_to || '',
     callerId: i.caller_id || '',
@@ -55,7 +55,8 @@ export function buildIncidentUpdates(fields: IncidentFields, inc: Incident): Rec
   if (fields.category !== (inc.category || '')) updates.category = fields.category || null;
   if (fields.subcategory !== (inc.subcategory || '')) updates.subcategory = fields.subcategory || null;
   if (fields.contactInfo !== (inc.contact_info || '')) updates.contact_info = fields.contactInfo || null;
-  if (fields.pendingReason !== (inc.resolution_code || '')) updates.resolution_code = fields.pendingReason || null;
+  const currentPending = inc.pending_reason || (inc.status === 'pending' ? inc.resolution_code : '') || '';
+  if (fields.pendingReason !== currentPending) updates.pending_reason = fields.pendingReason || null;
 
   const newAgId = fields.assignmentGroupId || null;
   if (newAgId !== (inc.assignment_group_id || null)) updates.assignment_group_id = newAgId;

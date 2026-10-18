@@ -540,6 +540,7 @@ CREATE TABLE incidents (
   category        text,
   subcategory     text,
   resolution_code text,
+  pending_reason  text,
   resolution_notes text,
   resolved_at     timestamptz,
   closed_at       timestamptz,
@@ -547,6 +548,7 @@ CREATE TABLE incidents (
   sla_breached    boolean NOT NULL DEFAULT false,
   response_due_at timestamptz,
   response_breached boolean NOT NULL DEFAULT false,
+  responded_at    timestamptz,
   sla_paused_at   timestamptz,
   sla_paused_ms   bigint NOT NULL DEFAULT 0,
   created_at      timestamptz NOT NULL DEFAULT now(),
@@ -1034,7 +1036,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.11', 'change_risk_questionnaire'),
   ('v00.01.12', 'notification_webhooks'),
   ('v00.01.13', 'ai_triage_suggestions'),
-  ('v00.01.14', 'itam_discovery_external_ids_and_intune');
+  ('v00.01.14', 'itam_discovery_external_ids_and_intune'),
+  ('v00.01.15', 'incident_sla_controls_and_change_conflict_gate');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2059,6 +2062,11 @@ CREATE TABLE sla_definitions (
 CREATE INDEX idx_sla_definitions_tenant ON sla_definitions(tenant_id, process_type, is_active);
 CREATE INDEX idx_sla_definitions_on_warning_gin ON sla_definitions USING gin (on_warning);
 CREATE INDEX idx_sla_definitions_on_breach_gin ON sla_definitions USING gin (on_breach);
+
+ALTER TABLE incidents
+  ADD COLUMN sla_definition_id uuid REFERENCES sla_definitions(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_incidents_sla_definition ON incidents(sla_definition_id);
 
 CREATE TRIGGER trg_sla_definitions_updated_at
   BEFORE UPDATE ON sla_definitions
