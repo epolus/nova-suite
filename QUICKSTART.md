@@ -55,7 +55,7 @@ Expected response:
 ```json
 {
   "status": "healthy",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "checks": { "database": "connected" }
 }
 ```

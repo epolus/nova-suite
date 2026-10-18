@@ -1,6 +1,6 @@
 {
   "name": "@nova-suite/web",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,7 +15,7 @@
   "dependencies": {
     "@jsonforms/core": "^3.8.0",
     "@jsonforms/react": "^3.8.0",
-    "@nova-suite/shared": "0.1.2",
+    "@nova-suite/shared": "0.1.4",
     "@tanstack/react-query": "^5.104.2",
     "@workflowbuilder/sdk": "^3.0.0",
     "@xyflow/react": "^12.12.0",
