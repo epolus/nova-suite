@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/button';
 import { majorIncidents as majorIncidentsApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { canManageMajorIncidents } from '../../utils/roles';
+import { PostmortemActionItems } from './PostmortemActionItems';
 
 function linesToArray(s: string): string[] {
   return s.split('\n').map((x) => x.trim()).filter(Boolean);
@@ -187,6 +188,15 @@ export default function MajorIncidentPostmortemPage() {
               </div>
             )}
           </Card>
+          {id && (
+            <PostmortemActionItems
+              majorIncidentId={id}
+              actionItems={pm.action_items}
+              canManage={canManage}
+              onChanged={load}
+              onError={setErr}
+            />
+          )}
         </div>
       )}
     </>

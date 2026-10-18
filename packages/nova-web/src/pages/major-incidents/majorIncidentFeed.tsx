@@ -176,6 +176,29 @@ export function majorIncidentEventToFeedItem(
             </p>
           ) : undefined,
       };
+    case 'investigation_started':
+      return {
+        accent: 'indigo',
+        title: t('events.investigationStarted.title'),
+        meta: metaLine(actor, undefined),
+      };
+    case 'postmortem_follow_up': {
+      const number = typeof payload.record_number === 'string' ? payload.record_number : '';
+      const kind = payload.kind === 'change' ? 'change' : 'problem';
+      const recordId = typeof payload.record_id === 'string' ? payload.record_id : '';
+      return {
+        accent: 'emerald',
+        title: t('events.postmortemFollowUp.title', { kind: t(`events.postmortemFollowUp.${kind}`) }),
+        meta: metaLine(actor, number || undefined),
+        body: recordId ? (
+          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+            <Link to={kind === 'change' ? `/changes/${recordId}` : `/problems/${recordId}`} className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+              {number || t('events.postmortemFollowUp.open')}
+            </Link>
+          </p>
+        ) : undefined,
+      };
+    }
     case 'role_assigned': {
       const role = typeof payload.role === 'string' ? payload.role.replace(/_/g, ' ') : 'role';
       return {

@@ -509,9 +509,22 @@ export const createCIRelationshipSchema = z.object({
 
 // ─── Major incidents ───
 export const postmortemActionItemSchema = z.object({
+  id: z.string().uuid().optional(),
   title: z.string().min(1).max(500),
   owner_user_id: uuidSchema.optional().nullable(),
   due_at: z.string().optional().nullable(),
+  problem_id: uuidSchema.optional().nullable(),
+  change_id: uuidSchema.optional().nullable(),
+});
+
+export const postmortemActionItemCreateSchema = z.object({
+  title: z.string().min(1).max(500),
+});
+
+export const postmortemFollowUpSchema = z.object({
+  kind: z.enum(['problem', 'change']),
+  assignment_group_id: uuidSchema,
+  change_type_id: uuidSchema.optional(),
 });
 
 export const createMajorIncidentSchema = z.object({
