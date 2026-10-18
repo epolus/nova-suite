@@ -40,6 +40,28 @@ export const majorIncidents = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  investigate: (id: string) =>
+    request<{ major_incident: Record<string, unknown> }>(`/major-incidents/${id}/investigate`, { method: 'POST' }),
+  addPostmortemActionItem: (id: string, body: { title: string }) =>
+    request<{ postmortem: Record<string, unknown> }>(`/major-incidents/${id}/postmortem/action-items`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  createPostmortemFollowUp: (id: string, actionItemId: string, body: {
+    kind: 'problem' | 'change';
+    assignment_group_id: string;
+    change_type_id?: string;
+  }) =>
+    request<{
+      postmortem: Record<string, unknown>;
+      already: boolean;
+      kind: 'problem' | 'change';
+      record_id: string;
+      record_number?: string;
+    }>(`/major-incidents/${id}/postmortem/action-items/${actionItemId}/follow-up`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   resolve: (id: string, body: { solution: string }) =>
     request<{ ok: boolean; major_incident?: Record<string, unknown> }>(`/major-incidents/${id}/resolve`, {
       method: 'POST',

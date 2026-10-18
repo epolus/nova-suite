@@ -13,6 +13,8 @@ import { useMajorIncidentTimeline } from './majorIncidentFeed';
 import { useAuth } from '../../context/AuthContext';
 import { canManageMajorIncidents } from '../../utils/roles';
 import { RejectPromotionModal, ResolveModal, StakeholderUpdateModal } from './warRoomModals';
+import { WarRoomRoles } from './WarRoomRoles';
+import { MajorIncidentProgress } from './MajorIncidentProgress';
 
 type Detail = Awaited<ReturnType<typeof majorIncidentsApi.get>>;
 
@@ -123,6 +125,20 @@ export default function MajorIncidentWarRoom() {
       await load();
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : t('resolveFailed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startInvestigation = async () => {
+    if (!id) return;
+    setSaving(true);
+    try {
+      await majorIncidentsApi.investigate(id);
+      invalidateSummaries();
+      await load();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : t('investigateFailed'));
     } finally {
       setSaving(false);
     }
@@ -249,6 +265,11 @@ export default function MajorIncidentWarRoom() {
                 {tPostmortem('title')}
               </Link>
             )}
+            {!isPendingAcceptance && canManage && mi.status === 'declared' && (
+              <Button type="button" variant="outline" onClick={() => void startInvestigation()} disabled={saving}>
+                {t('startInvestigation')}
+              </Button>
+            )}
             {!isPendingAcceptance && canManage && (
               <Button type="button" onClick={() => setUpdateOpen(true)}>{t('sendUpdate')}</Button>
             )}
@@ -267,6 +288,8 @@ export default function MajorIncidentWarRoom() {
       />
 
       {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
+
+      <MajorIncidentProgress status={String(mi.status)} />
 
       {isPendingAcceptance && canManage && (
         <Card className="mb-4 border-amber-200 bg-amber-50/80 dark:border-amber-700 dark:bg-amber-950/45">
@@ -315,17 +338,14 @@ export default function MajorIncidentWarRoom() {
           </Card>
         </div>
         <div className="space-y-4">
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-3">{t('roles')}</h3>
-            <ul className="text-sm space-y-2">
-              {(data.participants || []).map((p) => (
-                <li key={String((p as Record<string, unknown>).id)} className="flex justify-between gap-2">
-                  <span className="text-gray-500 capitalize">{String((p as Record<string, unknown>).role).replace(/_/g, ' ')}</span>
-                  <span className="font-medium text-gray-900">{String((p as Record<string, unknown>).display_name)}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <WarRoomRoles
+            majorIncidentId={String(mi.id ?? id)}
+            participants={(data.participants || []) as Record<string, unknown>[]}
+            canManage={canManage}
+            disabled={isPendingAcceptance}
+            onAssigned={load}
+            onError={setErr}
+          />
           <Card>
             <h3 className="font-semibold text-gray-900 mb-2">{t('runbooks')}</h3>
             <ul className="text-sm space-y-1 text-gray-800">

@@ -2732,6 +2732,21 @@
         "postmortem": "Postmortem",
         "sendUpdate": "Send update",
         "declareResolved": "Declare resolved",
+        "startInvestigation": "Start investigation",
+        "investigateFailed": "Failed to start investigation",
+        "assignRole": "Assign role",
+        "assigningRole": "Assigning…",
+        "assignRoleFailed": "Failed to assign role",
+        "noRoles": "No roles assigned yet.",
+        "roleNames": {
+          "commander": "Commander",
+          "comms_lead": "Comms lead",
+          "scribe": "Scribe",
+          "resolver": "Resolver"
+        },
+        "processProgress": "Process",
+        "processStep": "Step {current} of {total}",
+        "processCancelled": "Cancelled before the response process continued.",
         "statusDescription": "Status: {status} · Workflow: {phase}",
         "statusPendingDescription": "Status: {status} · Workflow: not started (pending acceptance)",
         "workflowNotAvailable": "n/a",
@@ -2792,7 +2807,21 @@
         "rootCausesLabel": "Root causes (one per line)",
         "contributingFactorsLabel": "Contributing factors (one per line)",
         "saveDraft": "Save draft",
-        "publish": "Publish"
+        "publish": "Publish",
+        "actionItems": "Action items",
+        "actionItemsHint": "Optional follow-up work. Create a problem or a change from an action item.",
+        "noActionItems": "No action items yet.",
+        "actionItemPlaceholder": "Action item title",
+        "addActionItem": "Add",
+        "actionItemFailed": "Failed to add action item",
+        "createProblem": "Problem",
+        "createChange": "Change",
+        "createFollowUp": "Create",
+        "creatingFollowUp": "Creating…",
+        "followUpFailed": "Failed to create follow-up",
+        "followUpOptionsFailed": "Failed to load assignment groups",
+        "openProblem": "Open problem",
+        "openChange": "Open change"
       },
       "timeline": {
         "empty": "No activity yet.",
@@ -2842,6 +2871,15 @@
           },
           "roleAssigned": {
             "title": "Role assigned: {role}"
+          },
+          "investigationStarted": {
+            "title": "Investigation started"
+          },
+          "postmortemFollowUp": {
+            "title": "Follow-up {kind} created",
+            "problem": "problem",
+            "change": "change",
+            "open": "Open record"
           },
           "relatedIncidentLinked": {
             "title": "Related incident linked"

@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { randomUUID } from 'node:crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import {
   authenticate,
@@ -18,9 +19,13 @@ import {
   publishPostmortemSchema,
   majorIncidentListQuerySchema,
   majorIncidentResolveSchema,
+  postmortemActionItemCreateSchema,
+  postmortemFollowUpSchema,
 } from '../../domain/schemas';
 import type { CreateMajorIncidentInput } from '../../domain/schemas';
-import { NotFound } from '../../middleware/errorHandler';
+import { AppError, NotFound } from '../../middleware/errorHandler';
+import { resolveSlaDueAt } from '../../domain/sla';
+import { canStartInvestigation, existingFollowUpId } from '../../domain/major-incident-follow-up';
 import {
   signalMajorIncidentDeclareResolved,
   signalMajorIncidentStakeholderUpdate,
@@ -593,6 +598,95 @@ router.post(
   },
 );
 
+async function assignmentGroupServesProcess(
+  client: PgClient,
+  groupId: string,
+  processName: string,
+  memberRole: string,
+): Promise<boolean> {
+  const row = await client.query(
+    `SELECT 1
+     FROM assignment_groups ag
+     WHERE ag.tenant_id = current_tenant_id()
+       AND ag.id = $1
+       AND ag.is_active = true
+       AND (
+         EXISTS (
+           SELECT 1
+           FROM assignment_group_processes agp
+           JOIN processes p ON p.id = agp.process_id
+           WHERE agp.tenant_id = current_tenant_id()
+             AND agp.group_id = ag.id
+             AND p.tenant_id = current_tenant_id()
+             AND p.is_active = true
+             AND p.name = $2
+         )
+         OR EXISTS (
+           SELECT 1
+           FROM assignment_group_members agm
+           JOIN user_roles ur ON ur.user_id = agm.user_id AND ur.tenant_id = current_tenant_id()
+           JOIN roles r ON r.id = ur.role_id AND r.tenant_id = current_tenant_id()
+           WHERE agm.tenant_id = current_tenant_id()
+             AND agm.group_id = ag.id
+             AND r.name = $3
+             AND r.is_active = true
+         )
+       )
+     LIMIT 1`,
+    [groupId, processName, memberRole],
+  );
+  return row.rows.length > 0;
+}
+
+type PostmortemActionItem = {
+  id?: string;
+  title: string;
+  owner_user_id?: string | null;
+  due_at?: string | null;
+  problem_id?: string | null;
+  change_id?: string | null;
+};
+
+function readActionItems(value: unknown): PostmortemActionItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || typeof (item as { title?: unknown }).title !== 'string') return [];
+    return [item as PostmortemActionItem];
+  });
+}
+
+// ─── POST /api/major-incidents/:id/investigate ───
+router.post('/:id/investigate', requireMajorIncidentManage, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const id = routeId(req);
+    const tenantId = req.user!.tenant_id;
+    const cur = await client.query(
+      `SELECT status::text AS status FROM major_incidents WHERE id = $1 AND tenant_id = $2`,
+      [id, tenantId],
+    );
+    if (cur.rows.length === 0) throw NotFound('Major incident not found');
+    const status = String((cur.rows[0] as { status: string }).status);
+    if (!canStartInvestigation(status)) {
+      throw new AppError(400, 'Only a declared major incident can move to investigating');
+    }
+    const upd = await client.query(
+      `UPDATE major_incidents
+       SET status = 'investigating'::major_incident_status_enum, updated_at = now()
+       WHERE id = $1 AND tenant_id = $2 AND status = 'declared'::major_incident_status_enum
+       RETURNING *`,
+      [id, tenantId],
+    );
+    if (upd.rows.length === 0) {
+      throw new AppError(400, 'Only a declared major incident can move to investigating');
+    }
+    await insertMiEvent(client, tenantId, id, 'investigation_started', {}, req.user!.id);
+    res.json({ major_incident: upd.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── POST /api/major-incidents/:id/resolve ───
 router.post(
   '/:id/resolve',
@@ -872,6 +966,209 @@ router.post(
     } catch (err) {
       next(err);
       return;
+    }
+  },
+);
+
+// ─── POST /api/major-incidents/:id/postmortem/action-items ───
+router.post(
+  '/:id/postmortem/action-items',
+  requireMajorIncidentManage,
+  validateBody(postmortemActionItemCreateSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const id = routeId(req);
+      const tenantId = req.user!.tenant_id;
+      const title = String((req.body as { title: string }).title).trim();
+      const current = await client.query(
+        `SELECT p.id, p.action_items
+         FROM postmortems p
+         JOIN major_incidents mi ON mi.id = p.major_incident_id
+         WHERE p.major_incident_id = $1 AND mi.tenant_id = $2`,
+        [id, tenantId],
+      );
+      if (current.rows.length === 0) throw NotFound('Postmortem not found');
+      const items = readActionItems(current.rows[0].action_items);
+      items.push({ id: randomUUID(), title });
+      const updated = await client.query(
+        `UPDATE postmortems
+         SET action_items = $3::jsonb, updated_at = now()
+         WHERE id = $1 AND tenant_id = $2
+         RETURNING *`,
+        [current.rows[0].id, tenantId, JSON.stringify(items)],
+      );
+      res.status(201).json({ postmortem: updated.rows[0] });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/major-incidents/:id/postmortem/action-items/:actionItemId/follow-up ───
+router.post(
+  '/:id/postmortem/action-items/:actionItemId/follow-up',
+  requireMajorIncidentManage,
+  validateBody(postmortemFollowUpSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const id = routeId(req);
+      const actionItemId = String(req.params.actionItemId || '');
+      const tenantId = req.user!.tenant_id;
+      const body = req.body as { kind: 'problem' | 'change'; assignment_group_id: string; change_type_id?: string };
+      const current = await client.query(
+        `SELECT p.id, p.action_items, mi.number AS major_number, mi.title AS major_title, mi.primary_incident_id
+         FROM postmortems p
+         JOIN major_incidents mi ON mi.id = p.major_incident_id
+         WHERE p.major_incident_id = $1 AND mi.tenant_id = $2`,
+        [id, tenantId],
+      );
+      if (current.rows.length === 0) throw NotFound('Postmortem not found');
+      const row = current.rows[0] as {
+        id: string;
+        action_items: unknown;
+        major_number: string;
+        major_title: string;
+        primary_incident_id: string | null;
+      };
+      const items = readActionItems(row.action_items);
+      const item = items.find((entry) => entry.id === actionItemId);
+      if (!item) throw NotFound('Action item not found');
+      const alreadyId = existingFollowUpId(item, body.kind);
+      if (alreadyId) {
+        res.json({
+          postmortem: row,
+          already: true,
+          kind: body.kind,
+          record_id: alreadyId,
+        });
+        return;
+      }
+
+      const description = `Follow-up from ${row.major_number}: ${item.title}`;
+      let recordId = '';
+      let recordNumber = '';
+
+      if (body.kind === 'problem') {
+        const allowed = await assignmentGroupServesProcess(client, body.assignment_group_id, 'Problem Management', 'problem');
+        if (!allowed) throw new AppError(400, 'Assignment group is not enabled for Problem Management');
+        const seq = await client.query(`SELECT nextval('problem_number_seq') AS n`);
+        recordNumber = `PRB${String(seq.rows[0].n).padStart(7, '0')}`;
+        const sla = await resolveSlaDueAt(client, 'problem', {
+          priority: 'medium',
+          impact: 'medium',
+          category: null,
+          serviceId: null,
+        });
+        const created = await client.query(
+          `INSERT INTO problems (
+             tenant_id, number, title, description, priority, impact, status,
+             reported_by, assignment_group_id, sla_due_at, sla_breached
+           ) VALUES (
+             current_tenant_id(), $1, $2, $3, 'medium', 'medium', 'new'::problem_status_enum,
+             $4, $5, $6, false
+           ) RETURNING id, number`,
+          [recordNumber, item.title, description, req.user!.id, body.assignment_group_id, sla.resolutionDueAt],
+        );
+        recordId = String(created.rows[0].id);
+        recordNumber = String(created.rows[0].number);
+        if (row.primary_incident_id) {
+          await client.query(
+            `INSERT INTO problem_incidents (tenant_id, problem_id, incident_id, relationship_type)
+             VALUES (current_tenant_id(), $1, $2, 'caused_by')
+             ON CONFLICT (tenant_id, problem_id, incident_id) DO NOTHING`,
+            [recordId, row.primary_incident_id],
+          );
+        }
+        item.problem_id = recordId;
+        enqueueNotificationDispatchStartJob({
+          tenantId,
+          entityType: 'problem',
+          triggerKey: 'problem.created',
+          entityId: recordId,
+          actorUserId: req.user!.id,
+        }).catch(() => {});
+      } else {
+        if (!body.change_type_id) throw new AppError(400, 'change_type_id is required');
+        const allowed = await assignmentGroupServesProcess(client, body.assignment_group_id, 'Change Management', 'change_manager');
+        if (!allowed) throw new AppError(400, 'Assignment group is not enabled for Change Management');
+        const typeRes = await client.query(
+          `SELECT id, default_risk_level
+           FROM change_types
+           WHERE tenant_id = current_tenant_id() AND id = $1 AND is_active = true`,
+          [body.change_type_id],
+        );
+        if (typeRes.rows.length === 0) throw new AppError(400, 'Invalid change type');
+        const seq = await client.query(`SELECT nextval('change_number_seq') AS n`);
+        recordNumber = `CHG${String(seq.rows[0].n).padStart(7, '0')}`;
+        const sla = await resolveSlaDueAt(client, 'change', {
+          priority: 'medium',
+          impact: 'high',
+          category: null,
+          serviceId: null,
+        });
+        const created = await client.query(
+          `INSERT INTO changes (
+             tenant_id, number, change_type_id, title, description, reason_for_change,
+             stage, status, risk_level, impact, implementation_plan, backout_plan,
+             requested_by, assignment_group_id, related_incident_id, priority,
+             sla_due_at, sla_breached
+           ) VALUES (
+             current_tenant_id(), $1, $2, $3, $4, $5,
+             'request'::change_stage_enum, 'draft'::change_status_enum, $6::change_risk_enum, 'high',
+             'Implementation plan to be defined during planning.',
+             'Backout plan to be defined during planning.',
+             $7, $8, $9, 'medium'::change_priority_enum,
+             $10, false
+           ) RETURNING id, number`,
+          [
+            recordNumber,
+            body.change_type_id,
+            item.title,
+            description,
+            `Raised from postmortem action on ${row.major_number} (${row.major_title}).`,
+            typeRes.rows[0].default_risk_level || 'medium',
+            req.user!.id,
+            body.assignment_group_id,
+            row.primary_incident_id,
+            sla.resolutionDueAt,
+          ],
+        );
+        recordId = String(created.rows[0].id);
+        recordNumber = String(created.rows[0].number);
+        item.change_id = recordId;
+        enqueueNotificationDispatchStartJob({
+          tenantId,
+          entityType: 'change',
+          triggerKey: 'change.created',
+          entityId: recordId,
+          actorUserId: req.user!.id,
+        }).catch(() => {});
+      }
+
+      const updated = await client.query(
+        `UPDATE postmortems
+         SET action_items = $3::jsonb, updated_at = now()
+         WHERE id = $1 AND tenant_id = $2
+         RETURNING *`,
+        [row.id, tenantId, JSON.stringify(items)],
+      );
+      await insertMiEvent(client, tenantId, id, 'postmortem_follow_up', {
+        kind: body.kind,
+        action_item_id: actionItemId,
+        record_id: recordId,
+        record_number: recordNumber,
+      }, req.user!.id);
+      res.status(201).json({
+        postmortem: updated.rows[0],
+        already: false,
+        kind: body.kind,
+        record_id: recordId,
+        record_number: recordNumber,
+      });
+    } catch (err) {
+      next(err);
     }
   },
 );
