@@ -34,6 +34,7 @@ const colorMap: Record<string, string> = {
   active: 'bg-green-100 text-green-800',
   installed: 'bg-green-100 text-green-800',
   ordered: 'bg-indigo-100 text-indigo-800',
+  received: 'bg-sky-100 text-sky-800',
   in_stock: 'bg-teal-100 text-teal-800',
   in_use: 'bg-green-100 text-green-800',
   maintenance: 'bg-yellow-100 text-yellow-800',

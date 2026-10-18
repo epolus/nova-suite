@@ -9,15 +9,50 @@ import Spinner from '@/components/Spinner';
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog';
 import { Button } from '@/components/ui/button';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
+import { useStatusLabel } from '@/i18n/hooks';
+import UserDateInput from '@/components/UserDateInput';
 
-const EMPTY_FORM = {
+const ASSET_STATUSES = ['ordered', 'received', 'in_stock', 'in_use', 'maintenance', 'retired', 'disposed'] as const;
+
+interface AssetForm {
+  asset_tag: string;
+  name: string;
+  category: string;
+  status: string;
+  vendor_name: string;
+  purchase_cost: string;
+  purchase_currency: string;
+  purchase_date: string;
+  warranty_expires_at: string;
+  contract_ref: string;
+  depreciation_months: string;
+  notes: string;
+}
+
+const EMPTY_FORM: AssetForm = {
   asset_tag: '',
   name: '',
   category: 'hardware',
   status: 'in_use',
   vendor_name: '',
+  purchase_cost: '',
+  purchase_currency: 'USD',
+  purchase_date: '',
+  warranty_expires_at: '',
+  contract_ref: '',
+  depreciation_months: '',
   notes: '',
 };
+
+function dateInput(value: string | null | undefined): string {
+  if (!value) return '';
+  return String(value).slice(0, 10);
+}
+
+function textInput(value: string | number | null | undefined): string {
+  if (value == null) return '';
+  return String(value);
+}
 
 export default function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +60,7 @@ export default function AssetDetailPage() {
   const navigate = useNavigate();
   const t = useTranslations('pages.assets');
   const tActions = useTranslations('common.actions');
+  const statusLabel = useStatusLabel();
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -49,12 +85,18 @@ export default function AssetDetailPage() {
     assets.get(id)
       .then((asset) => {
         if (cancelled) return;
-        const next = {
+        const next: AssetForm = {
           asset_tag: asset.asset_tag,
           name: asset.name,
           category: asset.category,
           status: asset.status,
           vendor_name: asset.vendor_name || '',
+          purchase_cost: textInput(asset.purchase_cost),
+          purchase_currency: asset.purchase_currency || 'USD',
+          purchase_date: dateInput(asset.purchase_date),
+          warranty_expires_at: dateInput(asset.warranty_expires_at),
+          contract_ref: asset.contract_ref || '',
+          depreciation_months: textInput(asset.depreciation_months),
           notes: asset.notes || '',
         };
         setForm(next);
@@ -93,6 +135,18 @@ export default function AssetDetailPage() {
       setError(t('requiredFields'));
       return false;
     }
+    const costText = form.purchase_cost.trim();
+    const purchaseCost = costText === '' ? null : Number(costText);
+    if (purchaseCost != null && !Number.isFinite(purchaseCost)) {
+      setError(t('invalidCost'));
+      return false;
+    }
+    const depreciationText = form.depreciation_months.trim();
+    const depreciationMonths = depreciationText === '' ? null : Number(depreciationText);
+    if (depreciationMonths != null && (!Number.isInteger(depreciationMonths) || depreciationMonths < 0)) {
+      setError(t('invalidDepreciation'));
+      return false;
+    }
     setSaving(true);
     setError('');
     try {
@@ -102,6 +156,12 @@ export default function AssetDetailPage() {
         category: form.category,
         status: form.status,
         vendor_name: form.vendor_name || null,
+        purchase_cost: purchaseCost,
+        purchase_currency: form.purchase_currency.trim() || 'USD',
+        purchase_date: form.purchase_date || null,
+        warranty_expires_at: form.warranty_expires_at || null,
+        contract_ref: form.contract_ref.trim() || null,
+        depreciation_months: depreciationMonths,
         notes: form.notes || null,
       };
       if (isNew) {
@@ -171,18 +231,45 @@ export default function AssetDetailPage() {
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">{t('status')}</label>
               <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className={inputCls}>
-                <option value="ordered">Ordered</option>
-                <option value="in_stock">In stock</option>
-                <option value="in_use">In use</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="retired">Retired</option>
-                <option value="disposed">Disposed</option>
+                {ASSET_STATUSES.map((status) => (
+                  <option key={status} value={status}>{statusLabel(status)}</option>
+                ))}
               </select>
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">{t('vendor')}</label>
             <input value={form.vendor_name} onChange={(e) => setForm((p) => ({ ...p, vendor_name: e.target.value }))} className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('purchaseCost')}</label>
+              <input type="number" step="0.01" value={form.purchase_cost} onChange={(e) => setForm((p) => ({ ...p, purchase_cost: e.target.value }))} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('purchaseCurrency')}</label>
+              <input value={form.purchase_currency} maxLength={8} onChange={(e) => setForm((p) => ({ ...p, purchase_currency: e.target.value }))} className={inputCls} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('purchaseDate')}</label>
+              <UserDateInput value={form.purchase_date} onChange={(value) => setForm((p) => ({ ...p, purchase_date: value }))} className={`${inputCls} pr-10`} ariaLabel={t('purchaseDate')} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('warrantyExpires')}</label>
+              <UserDateInput value={form.warranty_expires_at} onChange={(value) => setForm((p) => ({ ...p, warranty_expires_at: value }))} className={`${inputCls} pr-10`} ariaLabel={t('warrantyExpires')} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('contractRef')}</label>
+              <input value={form.contract_ref} onChange={(e) => setForm((p) => ({ ...p, contract_ref: e.target.value }))} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('depreciationMonths')}</label>
+              <input type="number" min="0" step="1" value={form.depreciation_months} onChange={(e) => setForm((p) => ({ ...p, depreciation_months: e.target.value }))} className={inputCls} />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">{t('notes')}</label>

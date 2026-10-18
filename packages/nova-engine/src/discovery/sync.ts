@@ -37,6 +37,7 @@ function ciStatusFromHint(hint: DiscoveredDevice['statusHint']): string {
       return 'retired';
     case 'in_stock':
     case 'ordered':
+    case 'received':
       return 'in_stock';
     default:
       return 'installed';
