@@ -587,6 +587,7 @@ export const majorIncidentListQuerySchema = paginationSchema.extend({
 const assetCategorySchema = z.enum(['hardware', 'software', 'license', 'consumable']);
 const assetStatusSchema = z.enum([
   'ordered',
+  'received',
   'in_stock',
   'in_use',
   'maintenance',

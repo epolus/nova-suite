@@ -1078,7 +1078,7 @@ $$;
 -- ITAM ASSET MANAGEMENT
 -- ============================================================
 
--- status lifecycle (Zod): ordered | in_stock | in_use | maintenance | retired | disposed
+-- status lifecycle (Zod): ordered | received | in_stock | in_use | maintenance | retired | disposed
 CREATE TABLE assets (
   id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id             uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
