@@ -54,6 +54,11 @@ export interface DiscoverySyncOptions {
   /** Also upsert ITAM assets linked to the CI (default: true). */
   createAssets?: boolean;
   dryRun?: boolean;
+  /**
+   * After upsert, retire connector-owned CIs and assets whose external id
+   * is absent from this feed. An empty feed never retires.
+   */
+  fullSync?: boolean;
 }
 
 export interface DiscoverySyncResult {
@@ -62,6 +67,8 @@ export interface DiscoverySyncResult {
   fetched: number;
   cisUpserted: number;
   assetsUpserted: number;
+  cisRetired: number;
+  assetsRetired: number;
   errors: string[];
   sample?: DiscoveredDevice[];
 }

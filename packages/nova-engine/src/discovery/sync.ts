@@ -47,6 +47,15 @@ function assetStatusFromHint(hint: DiscoveredDevice['statusHint']): string {
   return hint || 'in_use';
 }
 
+/** Empty feeds and failed upserts must not retire inventory. */
+export function shouldRetireMissingDevices(
+  fullSync: boolean,
+  fetched: number,
+  errorCount = 0,
+): boolean {
+  return fullSync && fetched > 0 && errorCount === 0;
+}
+
 async function upsertConfigurationItem(
   client: PoolClient,
   classId: string,
@@ -229,6 +238,8 @@ export async function syncDiscoveredDevices(
   const errors: string[] = [];
   let cisUpserted = 0;
   let assetsUpserted = 0;
+  let cisRetired = 0;
+  let assetsRetired = 0;
 
   const devices = await connector.fetchDevices({ dryRun });
 
@@ -239,6 +250,8 @@ export async function syncDiscoveredDevices(
       fetched: devices.length,
       cisUpserted: 0,
       assetsUpserted: 0,
+      cisRetired: 0,
+      assetsRetired: 0,
       errors: [],
       sample: devices.slice(0, 5),
     };
@@ -260,12 +273,48 @@ export async function syncDiscoveredDevices(
     }
   }
 
+  const seenIds = devices.map((device) => device.externalId.trim()).filter((id) => id.length > 0);
+  if (shouldRetireMissingDevices(options.fullSync === true, seenIds.length, errors.length)) {
+    const retiredCis = await client.query(
+      `UPDATE configuration_items
+       SET status = 'retired'::ci_status_enum,
+           is_active = false,
+           updated_at = now()
+       WHERE tenant_id = current_tenant_id()
+         AND external_id_1 IS NOT NULL
+         AND attributes->>'source' = $1
+         AND NOT (external_id_1 = ANY($2::text[]))
+         AND (status <> 'retired' OR is_active = true)`,
+      [connector.name, seenIds],
+    );
+    cisRetired = retiredCis.rowCount ?? 0;
+    const retiredAssets = await client.query(
+      `UPDATE assets
+       SET status = 'retired',
+           updated_at = now()
+       WHERE tenant_id = current_tenant_id()
+         AND external_id_1 IS NOT NULL
+         AND status <> 'retired'
+         AND NOT (external_id_1 = ANY($2::text[]))
+         AND EXISTS (
+           SELECT 1 FROM configuration_items ci
+           WHERE ci.tenant_id = assets.tenant_id
+             AND ci.external_id_1 = assets.external_id_1
+             AND ci.attributes->>'source' = $1
+         )`,
+      [connector.name, seenIds],
+    );
+    assetsRetired = retiredAssets.rowCount ?? 0;
+  }
+
   return {
     connector: connector.name,
     dryRun: false,
     fetched: devices.length,
     cisUpserted,
     assetsUpserted,
+    cisRetired,
+    assetsRetired,
     errors,
   };
 }

@@ -832,7 +832,8 @@ async function validateBundle(
         message: `Unknown entity type "${source.entity_type}" on target`,
       });
     }
-    if ((source.import_mode === 'upsert' || source.import_mode === 'full_sync') && !source.upsert_key) {
+    const intuneConnector = source.source_type === 'intune';
+    if (!intuneConnector && (source.import_mode === 'upsert' || source.import_mode === 'full_sync') && !source.upsert_key) {
       issues.push({
         severity: 'warning',
         path: `contents.data_sources.sources.${sourceIndex}.upsert_key`,
