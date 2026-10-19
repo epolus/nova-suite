@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router';
+import { Routes, Route, Navigate, Outlet } from 'react-router';
 import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/Layout';
 import ESSLayout from '@/components/ESSLayout';
 import Spinner from '@/components/Spinner';
 import Login from '@/pages/Login';
 import AdminAccessGuard from '@/components/AdminAccessGuard';
-import { isAgentRole } from '@/utils/roles';
+import { canAccessImprovements, isAgentRole } from '@/utils/roles';
 import * as Pages from './lazyPages';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -25,6 +25,12 @@ function SmartLayout() {
 function SmartHome() {
   const { user } = useAuth();
   return isAgentRole(user?.roles) ? <Pages.Dashboard /> : <Navigate to="/ess" replace />;
+}
+
+function ImprovementAccess() {
+  const { user } = useAuth();
+  if (!canAccessImprovements(user?.roles)) return <Navigate to="/" replace />;
+  return <Outlet />;
 }
 
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -74,6 +80,11 @@ export default function AppRoutes() {
         <Route path="/assets" element={<Lazy><Pages.AssetsPage /></Lazy>} />
         <Route path="/assets/new" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
         <Route path="/assets/:id" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
+        <Route path="/improvements" element={<ImprovementAccess />}>
+          <Route index element={<Lazy><Pages.ImprovementsPage /></Lazy>} />
+          <Route path="new" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />
+          <Route path=":id" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />
+        </Route>
         <Route path="/releases" element={<Lazy><Pages.ReleasesPage /></Lazy>} />
         <Route path="/releases/new" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />
         <Route path="/releases/:id" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />

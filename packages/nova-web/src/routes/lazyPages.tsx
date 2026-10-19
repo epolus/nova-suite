@@ -24,6 +24,8 @@ export const ChangesPage = lazy(() => import('@/pages/changes/ChangesPage'));
 export const ChangeDetailPage = lazy(() => import('@/pages/changes/ChangeDetail'));
 export const AssetsPage = lazy(() => import('@/pages/assets/AssetsPage'));
 export const AssetDetailPage = lazy(() => import('@/pages/assets/AssetDetailPage'));
+export const ImprovementsPage = lazy(() => import('@/pages/improvements/ImprovementsPage'));
+export const ImprovementDetailPage = lazy(() => import('@/pages/improvements/ImprovementDetailPage'));
 export const ReleasesPage = lazy(() => import('@/pages/releases/ReleasesPage'));
 export const ReleaseDetailPage = lazy(() => import('@/pages/releases/ReleaseDetailPage'));
 export const ChangeCalendarPage = lazy(() => import('@/pages/changes/ChangeCalendarPage'));

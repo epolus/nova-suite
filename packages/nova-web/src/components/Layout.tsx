@@ -18,7 +18,7 @@ import {
 } from './layout/agentNavConfig';
 import DarkModeToggle from './DarkModeToggle';
 import { AppIcon } from './globalSearchIcons';
-import { hasReportingViewRole, isAdminRole } from '../utils/roles';
+import { canAccessImprovements, hasReportingViewRole, isAdminRole } from '../utils/roles';
 import { canAccessAdminRoute } from '../utils/adminRouteAccess';
 import { useUserPreferenceState } from '../hooks/useUserPreferenceState';
 import { useTranslations } from 'use-intl';
@@ -168,6 +168,7 @@ export default function Layout() {
   const localizedNav: NavItemDef[] = agentNav
     .filter((item) => {
       if (item.to === '/reports') return hasReportingViewRole(user?.roles);
+      if (item.to === '/improvements') return canAccessImprovements(user?.roles);
       return true;
     })
     .map((item) => ({

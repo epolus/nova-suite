@@ -13,6 +13,8 @@ export { problems } from './domains/problems';
 export { changes } from './domains/changes';
 export { assets } from './domains/assets';
 export { releases } from './domains/releases';
+export { improvements } from './domains/improvements';
+export type { ImprovementSource } from './domains/improvements';
 export { reports } from './domains/reports';
 export { admin } from './domains/admin';
 export { cmdb } from './domains/cmdb';

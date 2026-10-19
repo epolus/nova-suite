@@ -15,6 +15,7 @@ import {
   type TaskFormState,
 } from './ProblemDetailTabs';
 import type { ProblemFormState } from './useProblemDetail';
+import { ImprovementSourceLink } from '../../components/ImprovementSourceLink';
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -157,6 +158,11 @@ export function ProblemDetailBody({
         <Card>
           <h3 className="font-semibold text-gray-900 mb-3">{tProblems('permanentFix')}</h3>
           <textarea rows={5} value={form.permanent_fix} onChange={(e) => setForm((p) => ({ ...p, permanent_fix: e.target.value }))} className={textareaCls} placeholder={tProblems('permanentFixPlaceholder')} />
+          {problem?.id && problem.permanent_fix?.trim() && (
+            <div className="mt-3">
+              <ImprovementSourceLink sourceType="problem" sourceId={problem.id} canRegister />
+            </div>
+          )}
         </Card>
       </div>
 

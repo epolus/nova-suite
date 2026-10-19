@@ -373,7 +373,15 @@ export default function ChangeDetailPage() {
 
       {/* ── Review tab ── */}
       {!isNew && activeTab === 'review' && (
-        <ChangeReviewPanel form={form} setForm={setForm} inputCls={inputCls} selectCls={selectCls} textareaCls={textareaCls} />
+        <ChangeReviewPanel
+          form={form}
+          setForm={setForm}
+          inputCls={inputCls}
+          selectCls={selectCls}
+          textareaCls={textareaCls}
+          changeId={id}
+          savedUnsuccessful={change?.success === false}
+        />
       )}
 
     </>

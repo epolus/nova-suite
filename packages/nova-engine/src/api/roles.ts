@@ -66,3 +66,8 @@ export function canManageMajorIncidents(req: Request): boolean {
 export function canCreateMajorIncidentRecord(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'fulfiller', 'major_incident_manager']);
 }
+
+/** Continual improvement register. ESS users are excluded. */
+export function canAccessImprovements(req: Request): boolean {
+  return hasChangeRole(req) || hasProblemRole(req) || canManageMajorIncidents(req);
+}

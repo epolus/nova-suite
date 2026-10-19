@@ -2,18 +2,19 @@
 
 ## Vision
 
-Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.17`.
+Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.19`.
 
 ## Implemented Modules
 
 - **Service Catalog & Requests**: Dynamic request forms, approval and fulfillment workflows, request task queues, automation builder, and cart/checkout flows.
 - **Incident Management**: Full lifecycle, assignment and group routing, response and resolution SLA clocks with pause/resume, journal and work notes, known-error suggestions, bulk actions, and dashboard insights.
-- **Major Incident Management**: Promote and accept, war room with commander, comms lead, scribe, and resolver roles, process progress, stakeholder cadence, and postmortem action items that can open a problem or a change.
+- **Major Incident Management**: Promote and accept, war room with commander, comms lead, scribe, and resolver roles, process progress, stakeholder cadence, and postmortem action items that can open a problem, a change, or an improvement.
 - **Change Enablement**: Standard, normal, and emergency changes, risk questionnaire, CAB, schedule and dependency conflict checks with an emergency override, blackout windows, and a structured post-implementation review.
 - **Problem Management**: Problem records, linked incidents, a daily recurrence scan, known-error control (symptoms and workaround to enter, permanent fix or a linked change to close), and task tracking.
 - **Knowledge Management**: Article authoring, versioning, review, and publishing, approval workflows, ratings, suggestions, and markdown with attachments.
 - **CMDB**: CI classes, relationship mapping, impact traversal, relationship graph, audit history, and Microsoft Intune discovery. A full sync retires Intune devices missing from a non-empty feed.
 - **IT Asset Management**: Asset records linked to configuration items, lifecycle through received, in stock, in use, maintenance, retired, and disposed, plus purchase cost, warranty, contract reference, and depreciation.
+- **Continual Improvement**: A register of improvements created by hand, from a postmortem action item, from an unsuccessful change, or from a problem’s permanent fix, with an activity journal of comments, work notes, and status or owner changes.
 - **Service Level Management**: SLA definitions, business calendars, warning and breach actions on a bound definition, and an attainment report with pause-adjusted MTTR.
 - **Reports**: Saved reports and an SLA attainment card on the reports library.
 - **Notifications**: In-app, email, and outgoing Slack and Teams webhooks.
@@ -72,7 +73,6 @@ Nova Suite is a production-ready, open-source ITSM Suite for internal IT, manage
 
 ## What's Next
 
-- Continual improvement register tied to postmortems, failed changes, and problem fixes
 - Operational level agreements on assignment groups
 - Two-way Slack and Teams conversations, beyond outgoing webhooks
 - Event management and automated root-cause analysis, once a real alert source exists

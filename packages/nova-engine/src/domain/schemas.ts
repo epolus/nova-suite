@@ -515,6 +515,7 @@ export const postmortemActionItemSchema = z.object({
   due_at: z.string().optional().nullable(),
   problem_id: uuidSchema.optional().nullable(),
   change_id: uuidSchema.optional().nullable(),
+  improvement_id: uuidSchema.optional().nullable(),
 });
 
 export const postmortemActionItemCreateSchema = z.object({
@@ -640,6 +641,40 @@ export const createReleaseSchema = z.object({
 
 export const updateReleaseSchema = createReleaseSchema.partial();
 export const RELEASE_UPDATE_COLUMNS = Object.keys(updateReleaseSchema.shape);
+
+// ─── Continual improvement ───
+const improvementStatusSchema = z.enum(['registered', 'in_progress', 'done', 'cancelled']);
+
+export const createImprovementSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(10000).nullable().optional(),
+});
+
+export const updateImprovementSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  description: z.string().max(10000).nullable().optional(),
+  status: improvementStatusSchema.optional(),
+  owner_user_id: uuidSchema.nullable().optional(),
+});
+export const IMPROVEMENT_UPDATE_COLUMNS = Object.keys(updateImprovementSchema.shape);
+
+export const improvementFromPostmortemSchema = z.object({
+  major_incident_id: uuidSchema,
+  action_item_id: uuidSchema,
+});
+
+export const improvementFromChangeSchema = z.object({
+  change_id: uuidSchema,
+});
+
+export const improvementFromProblemSchema = z.object({
+  problem_id: uuidSchema,
+});
+
+export const addImprovementJournalSchema = z.object({
+  entry_type: z.enum(['comment', 'work_note']).default('comment'),
+  content: z.string().min(1).max(10000),
+});
 
 // ─── Type Exports ───
 export type LoginInput = z.infer<typeof loginSchema>;

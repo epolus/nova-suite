@@ -67,6 +67,8 @@ ALTER TABLE system_metrics_db_size_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metric_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE improvements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE improvement_journal ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_exports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events ENABLE ROW LEVEL SECURITY;
@@ -501,6 +503,13 @@ CREATE POLICY tenant_isolation_assets ON assets
 CREATE POLICY tenant_isolation_releases ON releases
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Continual improvement ───
+CREATE POLICY tenant_isolation_improvements ON improvements
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+CREATE POLICY tenant_isolation_improvement_journal ON improvement_journal
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Report Exports ───
 CREATE POLICY tenant_isolation_report_exports ON report_exports
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -708,6 +717,8 @@ ALTER TABLE system_metrics_db_size_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE metric_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE assets FORCE ROW LEVEL SECURITY;
 ALTER TABLE releases FORCE ROW LEVEL SECURITY;
+ALTER TABLE improvements FORCE ROW LEVEL SECURITY;
+ALTER TABLE improvement_journal FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_exports FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events FORCE ROW LEVEL SECURITY;
