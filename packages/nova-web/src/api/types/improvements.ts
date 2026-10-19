@@ -19,3 +19,13 @@ export interface Improvement {
   created_at: string;
   updated_at: string;
 }
+
+export interface ImprovementJournalEntry {
+  id: string;
+  improvement_id: string;
+  author_id: string;
+  author_name?: string | null;
+  entry_type: 'comment' | 'work_note' | 'state_change';
+  content: string;
+  created_at: string;
+}

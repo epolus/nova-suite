@@ -9,6 +9,7 @@ import {
   createImprovementSchema,
   improvementFromChangeSchema,
   improvementFromPostmortemSchema,
+  addImprovementJournalSchema,
   improvementFromProblemSchema,
   updateImprovementSchema,
 } from '../../domain/schemas';
@@ -51,6 +52,30 @@ function readActionItems(value: unknown): ActionItem[] {
     if (!item || typeof item !== 'object' || typeof (item as { title?: unknown }).title !== 'string') return [];
     return [item as ActionItem];
   });
+}
+
+async function userLabel(client: PoolClient, userId: string | null): Promise<string> {
+  if (!userId) return 'unassigned';
+  const row = await client.query(
+    `SELECT display_name FROM users WHERE id = $1 AND tenant_id = current_tenant_id()`,
+    [userId],
+  );
+  const name = (row.rows[0] as { display_name?: string } | undefined)?.display_name;
+  return name || 'unknown';
+}
+
+async function addJournalEntry(
+  client: PoolClient,
+  improvementId: string,
+  authorId: string,
+  entryType: 'comment' | 'work_note' | 'state_change',
+  content: string,
+) {
+  await client.query(
+    `INSERT INTO improvement_journal (tenant_id, improvement_id, author_id, entry_type, content)
+     VALUES (current_tenant_id(), $1, $2, $3, $4)`,
+    [improvementId, authorId, entryType, content],
+  );
 }
 
 async function nextNumber(client: PoolClient): Promise<string> {
@@ -299,6 +324,13 @@ router.patch('/:id', validateBody(updateImprovementSchema), async (req: Request,
       return;
     }
     const client = getRequestClient(req);
+    const current = await client.query(
+      `SELECT status, owner_user_id FROM improvements
+       WHERE tenant_id = current_tenant_id() AND id = $1`,
+      [req.params.id],
+    );
+    if (current.rows.length === 0) throw NotFound('Improvement not found');
+    const before = current.rows[0] as { status: string; owner_user_id: string | null };
     const updated = await client.query(
       `UPDATE improvements
        SET ${patch.sets.join(', ')}
@@ -307,7 +339,81 @@ router.patch('/:id', validateBody(updateImprovementSchema), async (req: Request,
       [...patch.values, req.params.id],
     );
     if (updated.rows.length === 0) throw NotFound('Improvement not found');
+    const after = updated.rows[0] as { status: string; owner_user_id: string | null };
+    if (before.status !== after.status) {
+      await addJournalEntry(
+        client,
+        String(req.params.id),
+        req.user!.id,
+        'state_change',
+        `Status changed from ${before.status} to ${after.status}`,
+      );
+    }
+    if (before.owner_user_id !== after.owner_user_id) {
+      const [fromName, toName] = await Promise.all([
+        userLabel(client, before.owner_user_id),
+        userLabel(client, after.owner_user_id),
+      ]);
+      await addJournalEntry(
+        client,
+        String(req.params.id),
+        req.user!.id,
+        'state_change',
+        `Owner changed from ${fromName} to ${toName}`,
+      );
+    }
     res.json(updated.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:id/journal', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const improvement = await client.query(
+      `SELECT id FROM improvements WHERE tenant_id = current_tenant_id() AND id = $1`,
+      [req.params.id],
+    );
+    if (improvement.rows.length === 0) throw NotFound('Improvement not found');
+    const entries = await client.query(
+      `SELECT j.id, j.improvement_id, j.author_id, j.entry_type, j.content, j.created_at,
+              u.display_name AS author_name
+       FROM improvement_journal j
+       JOIN users u ON u.id = j.author_id
+       WHERE j.tenant_id = current_tenant_id() AND j.improvement_id = $1
+       ORDER BY j.created_at DESC`,
+      [req.params.id],
+    );
+    res.json({ entries: entries.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/journal', validateBody(addImprovementJournalSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const improvement = await client.query(
+      `SELECT id FROM improvements WHERE tenant_id = current_tenant_id() AND id = $1`,
+      [req.params.id],
+    );
+    if (improvement.rows.length === 0) throw NotFound('Improvement not found');
+    const { entry_type, content } = req.body as { entry_type: 'comment' | 'work_note'; content: string };
+    const created = await client.query(
+      `INSERT INTO improvement_journal (tenant_id, improvement_id, author_id, entry_type, content)
+       VALUES (current_tenant_id(), $1, $2, $3, $4)
+       RETURNING id, improvement_id, author_id, entry_type, content, created_at`,
+      [req.params.id, req.user!.id, entry_type, content],
+    );
+    const author = await client.query(
+      `SELECT display_name FROM users WHERE id = $1`,
+      [req.user!.id],
+    );
+    res.status(201).json({
+      ...created.rows[0],
+      author_name: (author.rows[0] as { display_name?: string } | undefined)?.display_name || null,
+    });
   } catch (err) {
     next(err);
   }

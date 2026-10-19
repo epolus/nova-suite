@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { UserRefPicker } from '@/components/UserRefPicker';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useStatusLabel } from '@/i18n/hooks';
+import { ImprovementJournal } from './ImprovementJournal';
 
 const STATUSES = ['registered', 'in_progress', 'done', 'cancelled'] as const;
 
@@ -34,6 +35,7 @@ export default function ImprovementDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [record, setRecord] = useState<Improvement | null>(null);
+  const [journalRevision, setJournalRevision] = useState(0);
   const [form, setForm] = useState(EMPTY_FORM);
   const [baseline, setBaseline] = useState(EMPTY_FORM);
 
@@ -126,6 +128,7 @@ export default function ImprovementDetailPage() {
       setRecord((current) => (current ? { ...current, ...updated } : updated));
       setForm(next);
       setBaseline(next);
+      setJournalRevision((current) => current + 1);
       return true;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('saveFailed'));
@@ -229,6 +232,11 @@ export default function ImprovementDetailPage() {
           )}
         </div>
       </Card>
+      {!isNew && id && (
+        <div className="mt-6">
+          <ImprovementJournal improvementId={id} revision={journalRevision} />
+        </div>
+      )}
       <UnsavedChangesDialog
         open={dialogOpen}
         saving={dialogSaving}

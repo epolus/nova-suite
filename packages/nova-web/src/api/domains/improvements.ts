@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
-import type { Improvement } from '../types';
+import type { Improvement, ImprovementJournalEntry } from '../types';
 
 export type ImprovementSource = 'postmortem' | 'change' | 'problem';
 
@@ -30,5 +30,11 @@ export const improvements = {
     request<{ id: string; number?: string; already: boolean }>('/improvements/from-problem', {
       method: 'POST',
       body: JSON.stringify({ problem_id: problemId }),
+    }),
+  journal: (id: string) => request<{ entries: ImprovementJournalEntry[] }>(`/improvements/${id}/journal`),
+  addJournal: (id: string, data: { entry_type: 'comment' | 'work_note'; content: string }) =>
+    request<ImprovementJournalEntry>(`/improvements/${id}/journal`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 };

@@ -1040,7 +1040,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.15', 'incident_sla_controls_and_change_conflict_gate'),
   ('v00.01.16', 'change_post_implementation_review'),
   ('v00.01.17', 'problem_recurrence_scan'),
-  ('v00.01.18', 'continual_improvement');
+  ('v00.01.18', 'continual_improvement'),
+  ('v00.01.19', 'improvement_journal');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2949,6 +2950,19 @@ CREATE UNIQUE INDEX uq_improvements_problem
 CREATE TRIGGER trg_improvements_updated_at
   BEFORE UPDATE ON improvements
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE improvement_journal (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  improvement_id  uuid NOT NULL REFERENCES improvements(id) ON DELETE CASCADE,
+  author_id       uuid NOT NULL REFERENCES users(id),
+  entry_type      text NOT NULL DEFAULT 'comment'
+                  CHECK (entry_type IN ('comment', 'work_note', 'state_change')),
+  content         text NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_improvement_journal_improvement
+  ON improvement_journal(improvement_id, created_at DESC);
 
 -- Seed change types
 INSERT INTO change_types (

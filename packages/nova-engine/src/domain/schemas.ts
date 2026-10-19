@@ -671,6 +671,11 @@ export const improvementFromProblemSchema = z.object({
   problem_id: uuidSchema,
 });
 
+export const addImprovementJournalSchema = z.object({
+  entry_type: z.enum(['comment', 'work_note']).default('comment'),
+  content: z.string().min(1).max(10000),
+});
+
 // ─── Type Exports ───
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
