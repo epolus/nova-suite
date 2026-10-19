@@ -2,7 +2,7 @@
 import type { PoolClient } from 'pg';
 import type { CreateIncidentInput } from '../schemas';
 import { schedulePostCreateAiAssist } from '../../ai/post-create';
-import { resolveSlaDueAt } from '../sla';
+import { resolveSlaDueAt, startOlaClock } from '../sla';
 import {
   enqueueIncidentEscalationStartJob,
   enqueueNotificationDispatchStartJob,
@@ -52,6 +52,7 @@ export async function createEssIncident(
     category: null,
     serviceId: null,
   });
+  const ola = await startOlaClock(client, serviceDesk.id);
 
   const result = await client.query(
     `INSERT INTO incidents (
@@ -59,13 +60,16 @@ export async function createEssIncident(
       status, impact, urgency, priority,
       assigned_to, assignment_group_id, caller_id,
       contact_info, service_id, configuration_item_id,
-      category, subcategory, sla_due_at, response_due_at, sla_definition_id
+      category, subcategory, sla_due_at, response_due_at, sla_definition_id,
+      ola_group_id, ola_response_due_at, ola_resolution_due_at, ola_responded_at,
+      ola_paused_at, ola_paused_ms
     ) VALUES (
       current_tenant_id(), $1, $2, $3, $4,
       $5, $6, $7, $8,
       $9, $10, $11,
       $12, $13, $14,
-      $15, $16, $17, $18, $19
+      $15, $16, $17, $18, $19,
+      $20, $21, $22, $23, $24, $25
     ) RETURNING *`,
     [
       number, request_id || null, title, description || null,
@@ -74,6 +78,8 @@ export async function createEssIncident(
       contact_info || null, null, null,
       null, null, sla.resolutionDueAt, sla.responseDueAt,
       sla.slaDefinitionId,
+      ola.ola_group_id, ola.ola_response_due_at, ola.ola_resolution_due_at, ola.ola_responded_at,
+      ola.ola_paused_at, ola.ola_paused_ms,
     ],
   );
 

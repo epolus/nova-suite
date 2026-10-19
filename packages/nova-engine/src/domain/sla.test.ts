@@ -5,6 +5,8 @@ import {
   pauseSlaClock,
   resumeSlaClock,
   shouldPauseSlaForPending,
+  olaMarks,
+  startOlaClock,
   type BusinessCalendarData,
 } from './sla';
 
@@ -85,6 +87,57 @@ describe('pauseSlaClock / resumeSlaClock', () => {
     expect(resumed.sla_paused_ms).toBe(1000 + 2 * 60 * 60 * 1000);
     expect(resumed.response_due_at).toBe('2026-03-10T15:00:00.000Z');
     expect(resumed.sla_due_at).toBe('2026-03-10T20:00:00.000Z');
+  });
+});
+
+describe('startOlaClock', () => {
+  it('uses wall-clock hours from the assignment group when no calendar exists', async () => {
+    const now = new Date('2026-03-10T10:00:00.000Z');
+    const client = {
+      query: async (sql: string) => {
+        if (sql.includes('assignment_groups')) {
+          return { rows: [{ ola_response_hours: 1, ola_resolution_hours: 4 }] };
+        }
+        return { rows: [] };
+      },
+    };
+    const clock = await startOlaClock(client, 'group-1', { now });
+    expect(clock.ola_group_id).toBe('group-1');
+    expect(clock.ola_response_due_at).toBe('2026-03-10T11:00:00.000Z');
+    expect(clock.ola_resolution_due_at).toBe('2026-03-10T14:00:00.000Z');
+    expect(clock.ola_responded_at).toBeNull();
+    expect(clock.ola_paused_at).toBeNull();
+  });
+
+  it('leaves the clock empty when the group has no targets', async () => {
+    const client = {
+      query: async () => ({ rows: [{ ola_response_hours: null, ola_resolution_hours: null }] }),
+    };
+    const clock = await startOlaClock(client, 'group-1');
+    expect(clock.ola_group_id).toBeNull();
+    expect(clock.ola_response_due_at).toBeNull();
+  });
+});
+
+describe('olaMarks', () => {
+  it('marks an unanswered handoff breached only after the due time', () => {
+    const open = olaMarks({
+      ola_response_due_at: '2026-03-10T12:00:00.000Z',
+      ola_resolution_due_at: '2026-03-10T16:00:00.000Z',
+      ola_responded_at: null,
+      ola_paused_at: null,
+      resolved_at: null,
+    }, new Date('2026-03-10T11:00:00.000Z'));
+    expect(open.response).toBeNull();
+    const late = olaMarks({
+      ola_response_due_at: '2026-03-10T12:00:00.000Z',
+      ola_resolution_due_at: '2026-03-10T16:00:00.000Z',
+      ola_responded_at: null,
+      ola_paused_at: null,
+      resolved_at: null,
+    }, new Date('2026-03-10T13:00:00.000Z'));
+    expect(late.response).toBe('breached');
+    expect(late.resolution).toBeNull();
   });
 });
 

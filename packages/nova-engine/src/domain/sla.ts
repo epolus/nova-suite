@@ -328,6 +328,139 @@ export async function resolveSlaDueAt(
 /** Alias kept for call sites that prefer the plural name. */
 export const resolveSlaDueAts = resolveSlaDueAt;
 
+export type OlaClockFields = {
+  ola_group_id: string | null;
+  ola_response_due_at: string | null;
+  ola_resolution_due_at: string | null;
+  ola_responded_at: null;
+  ola_paused_at: string | null;
+  ola_paused_ms: number;
+};
+
+/**
+ * Handoff clock for an assignment group. Hours come from the group.
+ * Due dates use the same business calendar as the customer SLA.
+ * A paused handoff freezes those due dates until resume.
+ */
+export async function startOlaClock(
+  client: any,
+  groupId: string | null,
+  options: { paused?: boolean; now?: Date } = {},
+): Promise<OlaClockFields> {
+  const now = options.now ?? new Date();
+  const empty: OlaClockFields = {
+    ola_group_id: null,
+    ola_response_due_at: null,
+    ola_resolution_due_at: null,
+    ola_responded_at: null,
+    ola_paused_at: null,
+    ola_paused_ms: 0,
+  };
+  if (!groupId) return empty;
+
+  const row = await client.query(
+    `SELECT ola_response_hours, ola_resolution_hours
+     FROM assignment_groups WHERE id = $1`,
+    [groupId],
+  );
+  const hours = row.rows?.[0] as { ola_response_hours?: number | null; ola_resolution_hours?: number | null } | undefined;
+  const responseHours = Number(hours?.ola_response_hours ?? 0);
+  const resolutionHours = Number(hours?.ola_resolution_hours ?? 0);
+  if (responseHours <= 0 && resolutionHours <= 0) return empty;
+
+  const calendar = await loadDefaultBusinessCalendar(client);
+  return {
+    ola_group_id: groupId,
+    ola_response_due_at: dueIsoFromHours(responseHours, now, calendar),
+    ola_resolution_due_at: dueIsoFromHours(resolutionHours, now, calendar),
+    ola_responded_at: null,
+    ola_paused_at: options.paused ? now.toISOString() : null,
+    ola_paused_ms: 0,
+  };
+}
+
+export type OlaMark = 'met' | 'breached' | 'paused' | null;
+
+/** Labels for an incident handoff clock. `now` is supplied by the caller so the UI stays pure. */
+export function olaMarks(
+  row: {
+    ola_response_due_at?: string | Date | null;
+    ola_resolution_due_at?: string | Date | null;
+    ola_responded_at?: string | Date | null;
+    ola_paused_at?: string | Date | null;
+    resolved_at?: string | Date | null;
+  },
+  now: Date = new Date(),
+): { response: OlaMark; resolution: OlaMark } {
+  const dueMs = (value: string | Date | null | undefined): number | null => {
+    if (!value) return null;
+    const ms = new Date(value).getTime();
+    return Number.isNaN(ms) ? null : ms;
+  };
+  const responseDue = dueMs(row.ola_response_due_at);
+  const resolutionDue = dueMs(row.ola_resolution_due_at);
+  const resolvedAt = dueMs(row.resolved_at);
+  let response: OlaMark = null;
+  if (responseDue != null) {
+    if (row.ola_responded_at) response = 'met';
+    else if (row.ola_paused_at) response = 'paused';
+    else if (responseDue < now.getTime()) response = 'breached';
+  }
+  let resolution: OlaMark = null;
+  if (resolutionDue != null) {
+    if (row.ola_paused_at) resolution = 'paused';
+    else if (resolvedAt != null && resolvedAt <= resolutionDue) resolution = 'met';
+    else if (resolutionDue < (resolvedAt ?? now.getTime())) resolution = 'breached';
+  }
+  return { response, resolution };
+}
+
+export function pauseOlaClock(
+  state: {
+    ola_paused_at: string | Date | null;
+    ola_paused_ms: number | string | null;
+    ola_response_due_at: string | Date | null;
+    ola_resolution_due_at: string | Date | null;
+  },
+  now: Date = new Date(),
+) {
+  const paused = pauseSlaClock({
+    sla_paused_at: state.ola_paused_at,
+    sla_paused_ms: state.ola_paused_ms,
+    response_due_at: state.ola_response_due_at,
+    sla_due_at: state.ola_resolution_due_at,
+  }, now);
+  return {
+    ola_paused_at: paused.sla_paused_at,
+    ola_paused_ms: paused.sla_paused_ms,
+    ola_response_due_at: paused.response_due_at,
+    ola_resolution_due_at: paused.sla_due_at,
+  };
+}
+
+export function resumeOlaClock(
+  state: {
+    ola_paused_at: string | Date | null;
+    ola_paused_ms: number | string | null;
+    ola_response_due_at: string | Date | null;
+    ola_resolution_due_at: string | Date | null;
+  },
+  now: Date = new Date(),
+) {
+  const resumed = resumeSlaClock({
+    sla_paused_at: state.ola_paused_at,
+    sla_paused_ms: state.ola_paused_ms,
+    response_due_at: state.ola_response_due_at,
+    sla_due_at: state.ola_resolution_due_at,
+  }, now);
+  return {
+    ola_paused_at: resumed.sla_paused_at,
+    ola_paused_ms: resumed.sla_paused_ms,
+    ola_response_due_at: resumed.response_due_at,
+    ola_resolution_due_at: resumed.sla_due_at,
+  };
+}
+
 function toIsoOrNull(value: string | Date | null | undefined): string | null {
   if (value == null) return null;
   if (value instanceof Date) return value.toISOString();

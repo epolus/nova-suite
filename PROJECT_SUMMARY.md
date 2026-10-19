@@ -2,7 +2,7 @@
 
 ## Vision
 
-Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.19`.
+Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.20`.
 
 ## Implemented Modules
 
@@ -15,7 +15,7 @@ Nova Suite is a production-ready, open-source ITSM Suite for internal IT, manage
 - **CMDB**: CI classes, relationship mapping, impact traversal, relationship graph, audit history, and Microsoft Intune discovery. A full sync retires Intune devices missing from a non-empty feed.
 - **IT Asset Management**: Asset records linked to configuration items, lifecycle through received, in stock, in use, maintenance, retired, and disposed, plus purchase cost, warranty, contract reference, and depreciation.
 - **Continual Improvement**: A register of improvements created by hand, from a postmortem action item, from an unsuccessful change, or from a problem’s permanent fix, with an activity journal of comments, work notes, and status or owner changes.
-- **Service Level Management**: SLA definitions, business calendars, warning and breach actions on a bound definition, and an attainment report with pause-adjusted MTTR.
+- **Service Level Management**: SLA definitions, business calendars, warning and breach actions on a bound definition, an attainment report with pause-adjusted MTTR, and OLA targets on assignment groups that start a handoff clock on the incident.
 - **Reports**: Saved reports and an SLA attainment card on the reports library.
 - **Notifications**: In-app, email, and outgoing Slack and Teams webhooks.
 - **AI Assist**: Optional agent and employee copilots, plus create-time triage suggestions. Priority auto-apply stays off unless enabled.
@@ -73,7 +73,6 @@ Nova Suite is a production-ready, open-source ITSM Suite for internal IT, manage
 
 ## What's Next
 
-- Operational level agreements on assignment groups
 - Two-way Slack and Teams conversations, beyond outgoing webhooks
 - Event management and automated root-cause analysis, once a real alert source exists
 - Jamf discovery, after it uses the same connector pattern as Intune

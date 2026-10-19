@@ -18,6 +18,15 @@ import Spinner from '../../components/Spinner';
 import ChecklistFieldset from './assignment-groups/ChecklistFieldset';
 import { sortAssignmentGroups } from './assignment-groups/groupListSort';
 
+function parseOlaHours(value: string): number | null | 'invalid' {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^\d+$/.test(trimmed)) return 'invalid';
+  const hours = Number(trimmed);
+  if (hours < 1 || hours > 8760) return 'invalid';
+  return hours;
+}
+
 export default function AssignmentGroupDetailPage() {
   const t = useTranslations('pages.admin.assignmentGroupDetail');
   const tActions = useTranslations('common.actions');
@@ -125,6 +134,8 @@ export default function AssignmentGroupDetailPage() {
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [processIds, setProcessIds] = useState<string[]>([]);
   const [roleIds, setRoleIds] = useState<string[]>([]);
+  const [olaResponseHours, setOlaResponseHours] = useState('');
+  const [olaResolutionHours, setOlaResolutionHours] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -142,6 +153,8 @@ export default function AssignmentGroupDetailPage() {
       setMemberIds([]);
       setProcessIds([]);
       setRoleIds([]);
+      setOlaResponseHours('');
+      setOlaResolutionHours('');
     } else {
       setName(currentGroup.name ?? '');
       setDescription(currentGroup.description ?? '');
@@ -152,6 +165,8 @@ export default function AssignmentGroupDetailPage() {
       setMemberIds(currentGroup.members?.map((m) => m.id) ?? []);
       setProcessIds(currentGroup.processes?.map((p) => p.id) ?? []);
       setRoleIds(currentGroup.roles?.map((r) => r.id) ?? []);
+      setOlaResponseHours(currentGroup.ola_response_hours == null ? '' : String(currentGroup.ola_response_hours));
+      setOlaResolutionHours(currentGroup.ola_resolution_hours == null ? '' : String(currentGroup.ola_resolution_hours));
     }
   }
 
@@ -182,6 +197,12 @@ export default function AssignmentGroupDetailPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const olaResponse = parseOlaHours(olaResponseHours);
+    const olaResolution = parseOlaHours(olaResolutionHours);
+    if (olaResponse === 'invalid' || olaResolution === 'invalid') {
+      setError(t('invalidOlaHours'));
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -193,6 +214,8 @@ export default function AssignmentGroupDetailPage() {
         member_ids: memberIds,
         process_ids: processIds,
         role_ids: roleIds,
+        ola_response_hours: olaResponse,
+        ola_resolution_hours: olaResolution,
         ...(isNew ? {} : { is_active: isActive }),
       };
       if (isNew) {
@@ -298,6 +321,21 @@ export default function AssignmentGroupDetailPage() {
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-600 mb-1">{tFields('description')}</label>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder={t('placeholderDescription')} className={inputCls + ' resize-none'} />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="text-sm font-semibold text-gray-700 mb-1">{t('ola')}</legend>
+            <p className="text-xs text-gray-500 mb-3">{t('olaHint')}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{t('olaResponseHours')}</label>
+                <input type="text" inputMode="numeric" value={olaResponseHours} onChange={(e) => setOlaResponseHours(e.target.value)} placeholder={t('olaHoursPlaceholder')} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{t('olaResolutionHours')}</label>
+                <input type="text" inputMode="numeric" value={olaResolutionHours} onChange={(e) => setOlaResolutionHours(e.target.value)} placeholder={t('olaHoursPlaceholder')} className={inputCls} />
               </div>
             </div>
           </fieldset>
