@@ -10,6 +10,8 @@ const colorMap: Record<string, string> = {
   rejected: 'bg-red-100 text-red-800',
   assigned: 'bg-purple-100 text-purple-800',
   in_progress: 'bg-indigo-100 text-indigo-800',
+  registered: 'bg-sky-100 text-sky-800',
+  done: 'bg-emerald-100 text-emerald-800',
   pending: 'bg-yellow-100 text-yellow-800',
   resolved: 'bg-emerald-100 text-emerald-800',
   fulfilled: 'bg-emerald-100 text-emerald-800',

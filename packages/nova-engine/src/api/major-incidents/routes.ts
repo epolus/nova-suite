@@ -645,6 +645,7 @@ type PostmortemActionItem = {
   due_at?: string | null;
   problem_id?: string | null;
   change_id?: string | null;
+  improvement_id?: string | null;
 };
 
 function readActionItems(value: unknown): PostmortemActionItem[] {

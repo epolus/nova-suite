@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import Card from '../../components/Card';
+import { ImprovementSourceLink } from '../../components/ImprovementSourceLink';
 import { Button } from '../../components/ui/button';
 import { changes as changesApi, majorIncidents as majorIncidentsApi, problems as problemsApi } from '../../api/client';
 import type { AssignmentGroupItem, ChangeType } from '../../api/client';
@@ -12,6 +13,7 @@ type ActionItem = {
   title: string;
   problem_id?: string | null;
   change_id?: string | null;
+  improvement_id?: string | null;
 };
 
 function readItems(value: unknown): ActionItem[] {
@@ -180,6 +182,16 @@ export function PostmortemActionItems({
               )}
               {item.change_id && (
                 <Link to={`/changes/${item.change_id}`} className="text-indigo-700 hover:underline">{t('openChange')}</Link>
+              )}
+              {item.id && (item.improvement_id || canManage) && (
+                <ImprovementSourceLink
+                  sourceType="postmortem"
+                  sourceId={majorIncidentId}
+                  actionItemId={item.id}
+                  existingId={item.improvement_id}
+                  canRegister={canManage}
+                  onRegistered={onChanged}
+                />
               )}
             </div>
             {canManage && (

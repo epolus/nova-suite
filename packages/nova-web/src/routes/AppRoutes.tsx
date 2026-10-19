@@ -74,6 +74,9 @@ export default function AppRoutes() {
         <Route path="/assets" element={<Lazy><Pages.AssetsPage /></Lazy>} />
         <Route path="/assets/new" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
         <Route path="/assets/:id" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
+        <Route path="/improvements" element={<Lazy><Pages.ImprovementsPage /></Lazy>} />
+        <Route path="/improvements/new" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />
+        <Route path="/improvements/:id" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />
         <Route path="/releases" element={<Lazy><Pages.ReleasesPage /></Lazy>} />
         <Route path="/releases/new" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />
         <Route path="/releases/:id" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />
