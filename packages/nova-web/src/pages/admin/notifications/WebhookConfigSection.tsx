@@ -7,7 +7,14 @@ import Card from '../../../components/Card';
 interface WebhookConfigSectionProps {
   webhooks: NotificationWebhook[];
   saving: boolean;
-  onCreate: (data: { channel: NotificationWebhookChannel; name: string; webhook_url: string }) => Promise<void>;
+  onCreate: (data: {
+    channel: NotificationWebhookChannel;
+    name: string;
+    webhook_url: string;
+    reply_channel_id?: string | null;
+    api_token?: string | null;
+    signing_secret?: string | null;
+  }) => Promise<void>;
   onToggleActive: (webhook: NotificationWebhook) => Promise<void>;
   onTest: (webhook: NotificationWebhook) => Promise<void>;
   onDelete: (webhook: NotificationWebhook) => Promise<void>;
@@ -17,6 +24,9 @@ const emptyForm = {
   channel: 'slack' as NotificationWebhookChannel,
   name: '',
   webhook_url: '',
+  reply_channel_id: '',
+  api_token: '',
+  signing_secret: '',
 };
 
 export default function WebhookConfigSection({
@@ -39,6 +49,9 @@ export default function WebhookConfigSection({
       channel: form.channel,
       name: form.name.trim(),
       webhook_url: form.webhook_url.trim(),
+      reply_channel_id: form.channel === 'slack' ? form.reply_channel_id.trim() || null : null,
+      api_token: form.channel === 'slack' ? form.api_token.trim() || null : null,
+      signing_secret: form.channel === 'slack' ? form.signing_secret.trim() || null : null,
     });
     setForm(emptyForm);
     setOpen(false);
@@ -94,6 +107,42 @@ export default function WebhookConfigSection({
                 placeholder={t('webhookUrlPlaceholder')}
               />
             </div>
+            {form.channel === 'slack' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('replyChannelId')}</label>
+                  <input
+                    value={form.reply_channel_id}
+                    onChange={(e) => setForm({ ...form, reply_channel_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 font-mono"
+                    placeholder={t('replyChannelIdPlaceholder')}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('botToken')}</label>
+                  <input
+                    type="password"
+                    value={form.api_token}
+                    onChange={(e) => setForm({ ...form, api_token: e.target.value })}
+                    autoComplete="off"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 font-mono"
+                    placeholder={t('botTokenPlaceholder')}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('signingSecret')}</label>
+                  <input
+                    type="password"
+                    value={form.signing_secret}
+                    onChange={(e) => setForm({ ...form, signing_secret: e.target.value })}
+                    autoComplete="off"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 font-mono"
+                    placeholder={t('signingSecretPlaceholder')}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{t('slackThreadHint')}</p>
+                </div>
+              </>
+            )}
           </div>
           <div className="mt-4 flex gap-3 pt-4 border-t border-gray-100">
             <button
@@ -135,6 +184,11 @@ export default function WebhookConfigSection({
                     )}
                   </div>
                   <p className="text-xs text-gray-500 mt-2 font-mono truncate">{webhook.webhook_url}</p>
+                  {webhook.channel === 'slack' && (webhook.reply_channel_id || webhook.has_api_token) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {t('threadRepliesReady', { channel: webhook.reply_channel_id || t('botToken') })}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button

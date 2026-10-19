@@ -1050,7 +1050,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.17', 'problem_recurrence_scan'),
   ('v00.01.18', 'continual_improvement'),
   ('v00.01.19', 'improvement_journal'),
-  ('v00.01.20', 'assignment_group_ola');
+  ('v00.01.20', 'assignment_group_ola'),
+  ('v00.01.21', 'chat_threads');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -3216,14 +3217,17 @@ CREATE TRIGGER trg_notification_email_deliveries_updated_at
 CREATE TYPE notification_webhook_channel AS ENUM ('slack', 'teams');
 
 CREATE TABLE tenant_notification_webhooks (
-  id           uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  tenant_id    uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  channel      notification_webhook_channel NOT NULL,
-  name         text        NOT NULL,
-  webhook_url  text        NOT NULL,
-  is_active    boolean     NOT NULL DEFAULT true,
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  updated_at   timestamptz NOT NULL DEFAULT now(),
+  id               uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id        uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  channel          notification_webhook_channel NOT NULL,
+  name             text        NOT NULL,
+  webhook_url      text        NOT NULL,
+  reply_channel_id text,
+  api_token        text,
+  signing_secret   text,
+  is_active        boolean     NOT NULL DEFAULT true,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT tenant_notification_webhooks_name_nonempty CHECK (char_length(trim(name)) > 0),
   CONSTRAINT tenant_notification_webhooks_url_nonempty CHECK (char_length(trim(webhook_url)) > 0)
 );
@@ -3232,6 +3236,34 @@ CREATE INDEX idx_tenant_notification_webhooks_tenant_channel
 CREATE TRIGGER trg_tenant_notification_webhooks_updated_at
   BEFORE UPDATE ON tenant_notification_webhooks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE chat_threads (
+  id                 uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id          uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  webhook_id         uuid        NOT NULL REFERENCES tenant_notification_webhooks(id) ON DELETE CASCADE,
+  channel            notification_webhook_channel NOT NULL,
+  entity_type        text        NOT NULL CHECK (entity_type = 'incident'),
+  entity_id          uuid        NOT NULL,
+  entity_number      text        NOT NULL,
+  external_thread_id text,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, webhook_id, entity_type, entity_id)
+);
+CREATE UNIQUE INDEX chat_threads_external_thread
+  ON chat_threads (tenant_id, channel, external_thread_id)
+  WHERE external_thread_id IS NOT NULL;
+CREATE TRIGGER trg_chat_threads_updated_at
+  BEFORE UPDATE ON chat_threads
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE chat_inbound_receipts (
+  tenant_id         uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  channel           notification_webhook_channel NOT NULL,
+  external_event_id text        NOT NULL,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, channel, external_event_id)
+);
 
 INSERT INTO notification_rules (
   tenant_id, name, description, entity_type, trigger_key, recipient_type, title_template, body_template, sort_order

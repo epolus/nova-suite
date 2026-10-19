@@ -2,7 +2,7 @@
 
 ## Vision
 
-Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.20`.
+Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.21`.
 
 ## Implemented Modules
 
@@ -17,7 +17,7 @@ Nova Suite is a production-ready, open-source ITSM Suite for internal IT, manage
 - **Continual Improvement**: A register of improvements created by hand, from a postmortem action item, from an unsuccessful change, or from a problem’s permanent fix, with an activity journal of comments, work notes, and status or owner changes.
 - **Service Level Management**: SLA definitions, business calendars, warning and breach actions on a bound definition, an attainment report with pause-adjusted MTTR, and OLA targets on assignment groups that start a handoff clock on the incident.
 - **Reports**: Saved reports and an SLA attainment card on the reports library.
-- **Notifications**: In-app, email, and outgoing Slack and Teams webhooks.
+- **Notifications**: In-app, email, and Slack and Teams messages that stay on the incident thread. A reply that names the incident, or that arrives on a known thread, is added to the journal. Status changes are posted back. Slack learns the thread id when a bot token is set; Teams follow-ups are another card on the same webhook. Setup is in `docs/SLACK_TEAMS.md`.
 - **AI Assist**: Optional agent and employee copilots, plus create-time triage suggestions. Priority auto-apply stays off unless enabled.
 - **Admin Platform**: Users, roles, groups, departments, cost centers, locations, companies, services, branding, workflows, credentials, config packages, and data-source imports.
 
@@ -73,7 +73,6 @@ Nova Suite is a production-ready, open-source ITSM Suite for internal IT, manage
 
 ## What's Next
 
-- Two-way Slack and Teams conversations, beyond outgoing webhooks
 - Event management and automated root-cause analysis, once a real alert source exists
 - Jamf discovery, after it uses the same connector pattern as Intune
 - Supplier contracts, software entitlements, and release environments

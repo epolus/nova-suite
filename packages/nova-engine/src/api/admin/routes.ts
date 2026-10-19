@@ -25,7 +25,7 @@ import {
 import { loadCredentialSecretsBySlugs } from '../../credentials/vault';
 import { logger } from '../../logger';
 import { sendAutomationEmail } from './automation-send-email';
-import { postNotificationWebhook } from '../../notifications/webhook-dispatcher';
+import { postChatWebhook } from '../../notifications/webhook-dispatcher';
 import { assertPublicHttpUrl, UnsafeHttpUrlError } from '../../data/public-http-url';
 
 const router = Router();
@@ -1570,6 +1570,17 @@ function normalizeWebhookChannel(raw: unknown): NotificationWebhookChannel {
   return value;
 }
 
+function blankToNull(raw: unknown): string | null {
+  if (raw == null) return null;
+  const value = String(raw).trim();
+  return value || null;
+}
+
+const WEBHOOK_PUBLIC_COLUMNS = `id, channel, name, webhook_url, reply_channel_id,
+  (api_token IS NOT NULL) AS has_api_token,
+  (signing_secret IS NOT NULL) AS has_signing_secret,
+  is_active, created_at, updated_at`;
+
 function normalizeNotificationTemplates(raw: unknown, legacyTitle?: unknown, legacyBody?: unknown): NotificationRuleTemplateInput[] {
   if (!Array.isArray(raw)) {
     const fallbackTitle = String(legacyTitle || '').trim();
@@ -1882,7 +1893,7 @@ router.get('/notification-webhooks', async (req: Request, res: Response, next: N
   try {
     const tenantId = req.user!.tenant_id;
     const rows = await db.getMany(
-      `SELECT id, channel, name, webhook_url, is_active, created_at, updated_at
+      `SELECT ${WEBHOOK_PUBLIC_COLUMNS}
        FROM tenant_notification_webhooks
        WHERE tenant_id = $1
        ORDER BY channel, name`,
@@ -1907,12 +1918,22 @@ router.post('/notification-webhooks', async (req: Request, res: Response, next: 
       throw err;
     }
 
+    const slack = channel === 'slack';
     const row = await db.getOne(
       `INSERT INTO tenant_notification_webhooks (
-        tenant_id, channel, name, webhook_url, is_active
-      ) VALUES ($1, $2::notification_webhook_channel, $3, $4, $5)
-      RETURNING id, channel, name, webhook_url, is_active, created_at, updated_at`,
-      [tenantId, channel, name, webhookUrl, req.body?.is_active !== false],
+        tenant_id, channel, name, webhook_url, reply_channel_id, api_token, signing_secret, is_active
+      ) VALUES ($1, $2::notification_webhook_channel, $3, $4, $5, $6, $7, $8)
+      RETURNING ${WEBHOOK_PUBLIC_COLUMNS}`,
+      [
+        tenantId,
+        channel,
+        name,
+        webhookUrl,
+        slack ? blankToNull(req.body?.reply_channel_id) : null,
+        slack ? blankToNull(req.body?.api_token) : null,
+        slack ? blankToNull(req.body?.signing_secret) : null,
+        req.body?.is_active !== false,
+      ],
     );
     res.status(201).json(row);
   } catch (err) { next(err); }
@@ -1926,9 +1947,12 @@ router.patch('/notification-webhooks/:id', async (req: Request, res: Response, n
     const vals: unknown[] = [];
     let i = 1;
 
-    if (req.body?.channel !== undefined) {
+    const nextChannel = req.body?.channel !== undefined
+      ? normalizeWebhookChannel(req.body.channel)
+      : undefined;
+    if (nextChannel !== undefined) {
       sets.push(`channel = $${i++}::notification_webhook_channel`);
-      vals.push(normalizeWebhookChannel(req.body.channel));
+      vals.push(nextChannel);
     }
     if (req.body?.name !== undefined) {
       const name = String(req.body.name || '').trim();
@@ -1951,6 +1975,22 @@ router.patch('/notification-webhooks/:id', async (req: Request, res: Response, n
     if (req.body?.is_active !== undefined) {
       sets.push(`is_active = $${i++}`);
       vals.push(Boolean(req.body.is_active));
+    }
+    if (nextChannel === 'teams') {
+      sets.push('reply_channel_id = NULL', 'api_token = NULL', 'signing_secret = NULL');
+    } else {
+      if (req.body?.reply_channel_id !== undefined) {
+        sets.push(`reply_channel_id = $${i++}`);
+        vals.push(blankToNull(req.body.reply_channel_id));
+      }
+      if (req.body?.api_token !== undefined) {
+        sets.push(`api_token = $${i++}`);
+        vals.push(blankToNull(req.body.api_token));
+      }
+      if (req.body?.signing_secret !== undefined) {
+        sets.push(`signing_secret = $${i++}`);
+        vals.push(blankToNull(req.body.signing_secret));
+      }
     }
     if (sets.length === 0) { res.json({ success: true }); return; }
 
@@ -1987,15 +2027,22 @@ router.post('/notification-webhooks/:id/test', async (req: Request, res: Respons
       channel: NotificationWebhookChannel;
       webhook_url: string;
       name: string;
+      api_token: string | null;
+      reply_channel_id: string | null;
     }>(
-      `SELECT id, channel, webhook_url, name
+      `SELECT id, channel, webhook_url, name, api_token, reply_channel_id
        FROM tenant_notification_webhooks
        WHERE id = $1 AND tenant_id = $2`,
       [req.params.id, tenantId],
     );
     if (!webhook) throw new AppError(404, 'Notification webhook not found');
 
-    const result = await postNotificationWebhook(webhook.channel, webhook.webhook_url, {
+    const result = await postChatWebhook({
+      channel: webhook.channel,
+      webhookUrl: webhook.webhook_url,
+      apiToken: webhook.api_token,
+      replyChannelId: webhook.reply_channel_id,
+    }, {
       title: 'Nova Suite connection test',
       text: `Test message from webhook "${webhook.name}".`,
     });

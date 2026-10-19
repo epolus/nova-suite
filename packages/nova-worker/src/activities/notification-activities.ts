@@ -316,6 +316,9 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
           client,
           [...webhookChannels],
           { title: webhookSubject, text: webhookBody || webhookSubject },
+          input.entityType === 'incident' && vars.entity_number
+            ? { entityId: input.entityId, entityNumber: vars.entity_number }
+            : undefined,
         );
         webhookAttempted += webhookResults.length;
         webhookSent += webhookResults.filter((r) => r.ok).length;

@@ -55,7 +55,12 @@ app.use(helmet({
   },
 }));
 app.use(cors({ origin: config.cors.origin }));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, _res, buf) => {
+    (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+  },
+}));
 app.use(metricsMiddleware);
 
 const authLimiter = rateLimit({

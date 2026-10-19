@@ -318,6 +318,7 @@ export async function sendNotification(
       client,
       ['slack', 'teams'],
       { title, text },
+      incident ? { entityId: incidentId, entityNumber: incident.number } : undefined,
     );
     log.info('Webhook notification dispatch complete', {
       incidentId,
