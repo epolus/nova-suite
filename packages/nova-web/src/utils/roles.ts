@@ -77,6 +77,11 @@ export function canCreateMajorIncidentRecord(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'fulfiller', 'major_incident_manager']);
 }
 
+/** Continual improvement register. Matches the API: admin, fulfiller, change_manager, problem, major_incident_manager. */
+export function canAccessImprovements(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'fulfiller', 'change_manager', 'problem', 'major_incident_manager']);
+}
+
 export function hasAnyRole(roles: RoleList, required: string[]): boolean {
   return required.some((role) => hasRole(roles, role));
 }

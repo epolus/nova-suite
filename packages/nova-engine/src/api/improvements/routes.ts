@@ -14,10 +14,17 @@ import {
 } from '../../domain/schemas';
 import { changeImprovementAllowed, problemImprovementAllowed } from '../../domain/improvements';
 import { parameterizedSet } from '../../data/parameterized-set';
-import { canManageMajorIncidents, hasChangeRole, hasProblemRole } from '../roles';
+import { canAccessImprovements, canManageMajorIncidents, hasChangeRole, hasProblemRole } from '../roles';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
+router.use((req: Request, _res: Response, next: NextFunction) => {
+  if (!canAccessImprovements(req)) {
+    next(new AppError(403, 'Insufficient permissions'));
+    return;
+  }
+  next();
+});
 
 const IMPROVEMENT_SELECT = `
   SELECT i.*,
@@ -37,10 +44,6 @@ type ActionItem = {
   title: string;
   improvement_id?: string | null;
 };
-
-function canManageImprovements(req: Request): boolean {
-  return hasChangeRole(req) || hasProblemRole(req) || canManageMajorIncidents(req);
-}
 
 function readActionItems(value: unknown): ActionItem[] {
   if (!Array.isArray(value)) return [];
@@ -139,7 +142,6 @@ router.get('/source', async (req: Request, res: Response, next: NextFunction) =>
 
 router.post('/', validateBody(createImprovementSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!canManageImprovements(req)) throw new AppError(403, 'Insufficient permissions');
     const client = getRequestClient(req);
     const created = await insertImprovement(client, req, {
       title: req.body.title,
@@ -291,7 +293,6 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
 router.patch('/:id', validateBody(updateImprovementSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!canManageImprovements(req)) throw new AppError(403, 'Insufficient permissions');
     const patch = parameterizedSet(IMPROVEMENT_UPDATE_COLUMNS, req.body || {});
     if (!patch) {
       res.json({ success: true });
