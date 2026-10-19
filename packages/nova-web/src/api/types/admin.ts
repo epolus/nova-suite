@@ -183,6 +183,8 @@ export interface AssignmentGroupItem {
   manager_id: string | null;
   cost_center_id: string | null;
   parent_group_id: string | null;
+  ola_response_hours: number | null;
+  ola_resolution_hours: number | null;
   created_at: string;
   updated_at: string;
   manager_name: string | null;
@@ -204,6 +206,8 @@ export interface CreateAssignmentGroupPayload {
   member_ids?: string[];
   process_ids?: string[];
   role_ids?: string[];
+  ola_response_hours?: number | null;
+  ola_resolution_hours?: number | null;
 }
 
 export interface UpdateAssignmentGroupPayload {
@@ -216,6 +220,8 @@ export interface UpdateAssignmentGroupPayload {
   member_ids?: string[];
   process_ids?: string[];
   role_ids?: string[];
+  ola_response_hours?: number | null;
+  ola_resolution_hours?: number | null;
 }
 
 export interface UpdateUserPayload {

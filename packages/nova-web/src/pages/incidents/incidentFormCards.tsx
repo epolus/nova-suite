@@ -105,6 +105,36 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
             ) : null}
           </p>
         </div>
+        {inc.ola_response_due_at && (
+          <div>
+            <span className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('olaResponseDue')}</span>
+            <p className="text-sm text-gray-900 mt-0.5">
+              {formatDateTime(inc.ola_response_due_at)}
+              {inc.ola_response_mark === 'met' ? (
+                <span className="ml-2 text-xs font-medium text-green-700">{tIncidents('olaMet')}</span>
+              ) : inc.ola_response_mark === 'paused' ? (
+                <span className="ml-2 text-xs font-medium text-amber-600">{tIncidents('olaPaused')}</span>
+              ) : inc.ola_response_mark === 'breached' ? (
+                <span className="ml-2 text-xs font-medium text-red-600">{tIncidents('olaBreached')}</span>
+              ) : null}
+            </p>
+          </div>
+        )}
+        {inc.ola_resolution_due_at && (
+          <div>
+            <span className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('olaResolutionDue')}</span>
+            <p className="text-sm text-gray-900 mt-0.5">
+              {formatDateTime(inc.ola_resolution_due_at)}
+              {inc.ola_resolution_mark === 'met' ? (
+                <span className="ml-2 text-xs font-medium text-green-700">{tIncidents('olaMet')}</span>
+              ) : inc.ola_resolution_mark === 'paused' ? (
+                <span className="ml-2 text-xs font-medium text-amber-600">{tIncidents('olaPaused')}</span>
+              ) : inc.ola_resolution_mark === 'breached' ? (
+                <span className="ml-2 text-xs font-medium text-red-600">{tIncidents('olaBreached')}</span>
+              ) : null}
+            </p>
+          </div>
+        )}
         {fields.status === 'pending' && (
           <div>
             <FieldCaption htmlFor={INCIDENT_FIELD.pendingReason} hasControl={!readonly} className="block text-xs font-medium text-gray-500 mb-1">

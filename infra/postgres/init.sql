@@ -322,6 +322,8 @@ CREATE TABLE assignment_groups (
   cost_center_id  uuid REFERENCES cost_centers(id) ON DELETE SET NULL,
   parent_group_id uuid REFERENCES assignment_groups(id) ON DELETE SET NULL,
   is_active       boolean NOT NULL DEFAULT true,
+  ola_response_hours   integer CHECK (ola_response_hours IS NULL OR ola_response_hours BETWEEN 1 AND 8760),
+  ola_resolution_hours integer CHECK (ola_resolution_hours IS NULL OR ola_resolution_hours BETWEEN 1 AND 8760),
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, name)
@@ -551,6 +553,12 @@ CREATE TABLE incidents (
   responded_at    timestamptz,
   sla_paused_at   timestamptz,
   sla_paused_ms   bigint NOT NULL DEFAULT 0,
+  ola_group_id    uuid REFERENCES assignment_groups(id) ON DELETE SET NULL,
+  ola_response_due_at timestamptz,
+  ola_resolution_due_at timestamptz,
+  ola_responded_at timestamptz,
+  ola_paused_at   timestamptz,
+  ola_paused_ms   bigint NOT NULL DEFAULT 0,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, number)
@@ -1041,7 +1049,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.16', 'change_post_implementation_review'),
   ('v00.01.17', 'problem_recurrence_scan'),
   ('v00.01.18', 'continual_improvement'),
-  ('v00.01.19', 'improvement_journal');
+  ('v00.01.19', 'improvement_journal'),
+  ('v00.01.20', 'assignment_group_ola');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT

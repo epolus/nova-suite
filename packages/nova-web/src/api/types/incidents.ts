@@ -30,6 +30,13 @@ export interface Incident {
   sla_definition_id?: string | null;
   sla_paused_at?: string | null;
   sla_paused_ms?: number;
+  ola_group_id?: string | null;
+  ola_response_due_at?: string | null;
+  ola_resolution_due_at?: string | null;
+  ola_responded_at?: string | null;
+  ola_paused_at?: string | null;
+  ola_response_mark?: 'met' | 'breached' | 'paused' | null;
+  ola_resolution_mark?: 'met' | 'breached' | 'paused' | null;
   created_at: string;
   updated_at: string;
   assigned_to_name?: string;
