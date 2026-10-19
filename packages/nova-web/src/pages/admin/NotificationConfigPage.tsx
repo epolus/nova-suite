@@ -166,6 +166,9 @@ export default function NotificationConfigPage() {
     channel: NotificationWebhookChannel;
     name: string;
     webhook_url: string;
+    reply_channel_id?: string | null;
+    api_token?: string | null;
+    signing_secret?: string | null;
   }) => {
     setSaving(true);
     try {

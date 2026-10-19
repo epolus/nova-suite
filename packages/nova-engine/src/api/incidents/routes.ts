@@ -50,6 +50,7 @@ import {
 } from '../../temporal/workflow-start-queue';
 import { isFulfillerRole } from '../roles';
 import { logger } from '../../logger';
+import { replyIncidentStatus } from '../../notifications/chat-threads';
 
 const router = Router();
 
@@ -1671,6 +1672,15 @@ router.patch(
            VALUES (current_tenant_id(), $1, $2, 'state_change', $3)`,
           [incidentId, req.user!.id, `Status changed from ${current.status} to ${updates.status}`],
         );
+        try {
+          await replyIncidentStatus(client, {
+            id: String(incidentId),
+            number: String(current.number),
+            status: String(updates.status),
+          });
+        } catch (err) {
+          logger.warn({ err, incidentId }, 'Chat status reply failed');
+        }
 
         // Signal escalation workflow when incident is resolved/closed/cancelled
         if (['resolved', 'closed', 'cancelled'].includes(updates.status)) {
@@ -1875,6 +1885,15 @@ router.post(
             'Status changed from pending to in_progress after caller response',
           ],
         );
+        try {
+          await replyIncidentStatus(client, {
+            id: String(req.params.id),
+            number: String(incident.rows[0].number),
+            status: 'in_progress',
+          });
+        } catch (err) {
+          logger.warn({ err, incidentId: req.params.id }, 'Chat status reply failed');
+        }
 
         const assignedTo = incident.rows[0].assigned_to as string | null;
         const assignmentGroupId = incident.rows[0].assignment_group_id as string | null;
@@ -1944,6 +1963,15 @@ router.post(
              VALUES (current_tenant_id(), $1, $2, 'state_change', $3)`,
             [req.params.id, req.user!.id, `Status changed from ${status} to in_progress`],
           );
+          try {
+            await replyIncidentStatus(client, {
+              id: String(req.params.id),
+              number: String(incident.rows[0].number),
+              status: 'in_progress',
+            });
+          } catch (err) {
+            logger.warn({ err, incidentId: req.params.id }, 'Chat status reply failed');
+          }
         }
         if (status === 'pending' || current.rows[0]?.sla_paused_at) {
           await clearPendingAndResumeSla(client, {
