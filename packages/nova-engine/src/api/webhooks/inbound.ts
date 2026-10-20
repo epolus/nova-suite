@@ -13,7 +13,7 @@ import { recordChatInbound, replyIncidentStatus } from '../../notifications/chat
 import { logger } from '../../logger';
 import { slackSignatureValid } from '../../notifications/slack-signature';
 import { ingestAlerts } from '../../domain/alerts';
-import { signalIncidentResolved } from '../../temporal/workflows';
+import { cancelIncidentAutoClose, signalIncidentResolved } from '../../temporal/workflows';
 
 const router = Router();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
@@ -167,6 +167,7 @@ router.post('/inbound/events', async (req: Request, res: Response, next: NextFun
     const results = await ingestAlerts(tenantId, alerts);
     for (const row of results) {
       if (row.resolvedIncidentId) signalIncidentResolved(row.resolvedIncidentId).catch(() => {});
+      if (row.reopenedIncidentId) cancelIncidentAutoClose(row.reopenedIncidentId).catch(() => {});
     }
     res.status(202).json({
       results: results.map((row) => ({
