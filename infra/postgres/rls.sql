@@ -91,6 +91,9 @@ ALTER TABLE notification_email_deliveries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_notification_webhooks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_threads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_inbound_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alert_definitions ENABLE ROW LEVEL SECURITY;
 
 -- ─── Departments ───
 CREATE POLICY tenant_isolation_departments ON departments
@@ -640,6 +643,37 @@ CREATE POLICY tenant_isolation_notification_email_deliveries ON notification_ema
     AND current_user_has_role('admin', 'fulfiller', 'system')
   );
 
+-- ─── Events and alerts ───
+CREATE POLICY tenant_isolation_events ON events
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+  );
+
+CREATE POLICY tenant_isolation_alerts ON alerts
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+  );
+
+CREATE POLICY tenant_isolation_alert_definitions ON alert_definitions
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_manager', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_manager', 'system')
+  );
+
 -- ─── Chat threads (Slack / Teams replies on an incident) ───
 CREATE POLICY tenant_isolation_chat_threads ON chat_threads
   FOR ALL USING (
@@ -764,6 +798,9 @@ ALTER TABLE notification_email_deliveries FORCE ROW LEVEL SECURITY;
 ALTER TABLE tenant_notification_webhooks FORCE ROW LEVEL SECURITY;
 ALTER TABLE chat_threads FORCE ROW LEVEL SECURITY;
 ALTER TABLE chat_inbound_receipts FORCE ROW LEVEL SECURITY;
+ALTER TABLE events FORCE ROW LEVEL SECURITY;
+ALTER TABLE alerts FORCE ROW LEVEL SECURITY;
+ALTER TABLE alert_definitions FORCE ROW LEVEL SECURITY;
 
 -- Import staging tables
 ALTER TABLE import_jobs ENABLE ROW LEVEL SECURITY;

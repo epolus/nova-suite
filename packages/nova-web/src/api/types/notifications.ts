@@ -4,7 +4,7 @@ export interface NotificationRule {
   external_key?: string | null;
   name: string;
   description: string | null;
-  entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
+  entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident' | 'alert';
   trigger_key: string;
   recipient_type:
     | 'caller'

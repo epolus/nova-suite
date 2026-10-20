@@ -1051,7 +1051,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.18', 'continual_improvement'),
   ('v00.01.19', 'improvement_journal'),
   ('v00.01.20', 'assignment_group_ola'),
-  ('v00.01.21', 'chat_threads');
+  ('v00.01.21', 'chat_threads'),
+  ('v00.01.22', 'event_management');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1264,7 +1265,13 @@ INSERT INTO roles (id, tenant_id, name, description) VALUES
    'report_admin', 'Can manage all tenant reports and sharing'),
   ('a3000000-0000-0000-0000-000000000015',
    'a0000000-0000-0000-0000-000000000001',
-   'major_incident_manager', 'Owns major incident response: accept, war room actions, postmortem');
+   'major_incident_manager', 'Owns major incident response: accept, war room actions, postmortem'),
+  ('a3000000-0000-0000-0000-000000000016',
+   'a0000000-0000-0000-0000-000000000001',
+   'event_operator', 'Can view and work monitoring alerts'),
+  ('a3000000-0000-0000-0000-000000000017',
+   'a0000000-0000-0000-0000-000000000001',
+   'event_manager', 'Can manage alert definitions and work monitoring alerts');
 
 -- Demo company
 INSERT INTO companies (
@@ -3264,6 +3271,101 @@ CREATE TABLE chat_inbound_receipts (
   created_at        timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, channel, external_event_id)
 );
+
+CREATE SEQUENCE alert_number_seq START 1000;
+
+CREATE TABLE events (
+  id                     uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id              uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  source                 text        NOT NULL,
+  external_event_id      text,
+  fingerprint            text        NOT NULL,
+  status                 text        NOT NULL CHECK (status IN ('firing', 'resolved')),
+  severity               text        NOT NULL,
+  title                  text        NOT NULL,
+  labels                 jsonb       NOT NULL DEFAULT '{}',
+  payload                jsonb       NOT NULL DEFAULT '{}',
+  source_url             text,
+  configuration_item_id  uuid        REFERENCES configuration_items(id) ON DELETE SET NULL,
+  alert_id               uuid,
+  occurred_at            timestamptz,
+  received_at            timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX events_external_id
+  ON events (tenant_id, source, external_event_id)
+  WHERE external_event_id IS NOT NULL;
+CREATE INDEX idx_events_received ON events (tenant_id, received_at DESC);
+
+CREATE TABLE alerts (
+  id                     uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id              uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  number                 text        NOT NULL,
+  source                 text        NOT NULL,
+  fingerprint            text        NOT NULL,
+  status                 text        NOT NULL CHECK (status IN ('firing', 'resolved')),
+  severity               text        NOT NULL,
+  title                  text        NOT NULL,
+  labels                 jsonb       NOT NULL DEFAULT '{}',
+  source_url             text,
+  configuration_item_id  uuid        REFERENCES configuration_items(id) ON DELETE SET NULL,
+  event_count            integer     NOT NULL DEFAULT 1,
+  first_seen_at          timestamptz NOT NULL DEFAULT now(),
+  last_seen_at           timestamptz NOT NULL DEFAULT now(),
+  resolved_at            timestamptz,
+  definition_id          uuid,
+  incident_id            uuid        REFERENCES incidents(id) ON DELETE SET NULL,
+  workflow_id            text,
+  suppressed_reason      text,
+  created_at             timestamptz NOT NULL DEFAULT now(),
+  updated_at             timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, number)
+);
+CREATE UNIQUE INDEX alerts_one_firing_episode
+  ON alerts (tenant_id, source, fingerprint)
+  WHERE status = 'firing';
+CREATE INDEX idx_alerts_ci ON alerts (tenant_id, configuration_item_id, first_seen_at DESC);
+CREATE INDEX idx_alerts_status ON alerts (tenant_id, status, last_seen_at DESC);
+CREATE TRIGGER trg_alerts_updated_at
+  BEFORE UPDATE ON alerts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE alert_definitions (
+  id                   uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id            uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name                 text        NOT NULL,
+  description          text,
+  is_active            boolean     NOT NULL DEFAULT true,
+  sort_order           integer     NOT NULL DEFAULT 100,
+  source               text,
+  severity             text,
+  match_labels         jsonb       NOT NULL DEFAULT '{}',
+  severity_map         jsonb,
+  action               text        NOT NULL DEFAULT 'none'
+                       CHECK (action IN ('none', 'incident', 'workflow')),
+  assignment_group_id  uuid        REFERENCES assignment_groups(id) ON DELETE SET NULL,
+  impact               text        CHECK (impact IS NULL OR impact IN ('low', 'medium', 'high')),
+  urgency              text        CHECK (urgency IS NULL OR urgency IN ('low', 'medium', 'high')),
+  workflow_key         text,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_at           timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_alert_definitions_active
+  ON alert_definitions (tenant_id, is_active, sort_order);
+CREATE TRIGGER trg_alert_definitions_updated_at
+  BEFORE UPDATE ON alert_definitions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE events
+  ADD CONSTRAINT events_alert_id_fkey
+  FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE SET NULL;
+CREATE INDEX idx_events_alert ON events (alert_id);
+ALTER TABLE alerts
+  ADD CONSTRAINT alerts_definition_id_fkey
+  FOREIGN KEY (definition_id) REFERENCES alert_definitions(id) ON DELETE SET NULL;
+
+INSERT INTO alert_definitions (tenant_id, name, severity, action, impact, urgency, sort_order)
+SELECT t.id, 'Critical alert opens an incident', 'critical', 'incident', 'high', 'high', 10
+FROM tenants t;
 
 INSERT INTO notification_rules (
   tenant_id, name, description, entity_type, trigger_key, recipient_type, title_template, body_template, sort_order

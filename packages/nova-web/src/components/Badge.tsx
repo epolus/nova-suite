@@ -21,6 +21,8 @@ const colorMap: Record<string, string> = {
   closed: 'bg-gray-100 text-gray-800',
   cancelled: 'bg-gray-100 text-gray-500',
   major_incident_manager: 'bg-orange-100 text-orange-900 dark:bg-orange-950/50 dark:text-orange-100',
+  event_operator: 'bg-rose-100 text-rose-900 dark:bg-rose-950/50 dark:text-rose-100',
+  event_manager: 'bg-rose-100 text-rose-900 dark:bg-rose-950/50 dark:text-rose-100',
   // Major incident statuses
   pending_acceptance: 'bg-yellow-100 text-yellow-900',
   declared: 'bg-orange-100 text-orange-900',
@@ -28,6 +30,10 @@ const colorMap: Record<string, string> = {
   monitoring: 'bg-amber-100 text-amber-900',
   // Priorities
   critical: 'bg-red-100 text-red-800',
+  firing: 'bg-red-100 text-red-800',
+  incident: 'bg-indigo-100 text-indigo-800',
+  workflow: 'bg-sky-100 text-sky-800',
+  none: 'bg-gray-100 text-gray-600',
   high: 'bg-orange-100 text-orange-800',
   medium: 'bg-yellow-100 text-yellow-800',
   low: 'bg-green-100 text-green-800',

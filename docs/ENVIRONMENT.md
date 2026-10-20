@@ -9,7 +9,7 @@ For the complete baseline list, see `.env.example`.
 |----------|-------------|--------|
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Postgres image init, Temporal auto-setup, `nova-migrate`, backups | Bootstrap **superuser**. Never point the API or worker at this role. |
 | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | `nova-engine`, `nova-worker` | Default `nova_runtime`. Must be `NOSUPERUSER NOBYPASSRLS`. Created by `infra/postgres/00-runtime-role.sh`. |
-| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.21`). Mismatch puts the API in degraded mode and stops the worker. |
+| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.22`). Mismatch puts the API in degraded mode and stops the worker. |
 | `NOVA_MIGRATIONS_DIR` | `nova-migrate` | Directory of `vNN.NN.NN__slug.sql` files. Defaults to `/app/infra/postgres/migrations` in the engine image. |
 
 ## Core Variables
@@ -107,4 +107,5 @@ required in that file, so Compose fails with a named error rather than starting 
 - `VITE_*` values are injected at frontend build time; rebuild `nova-web` after changing them.
 - **`VITE_HIDE_DEMO_LOGIN_CREDENTIALS`** — when `true`, hides the demo quick-login buttons (Admin / Fulfiller / User) on the login page. Default is `false` (shown). Set to `true` in production deployments.
 - **AI assistant** — see [AI_ASSISTANT.md](./AI_ASSISTANT.md). Set `AI_ENABLED=true` and configure `OPENAI_*`, Azure OpenAI, or `OLLAMA_*`. ESS/agent toggles: `AI_ESS_ENABLED`, `AI_AGENT_ENABLED`.
-- **Slack and Teams** — see [SLACK_TEAMS.md](./SLACK_TEAMS.md). `NOVA_INBOUND_WEBHOOK_SECRET` authenticates non-Slack callers of `POST /api/webhooks/inbound/chat`. Leave it empty until you connect a channel. Do not store that secret in tenant settings.
+- **Slack and Teams** — see [SLACK_TEAMS.md](./SLACK_TEAMS.md). `NOVA_INBOUND_WEBHOOK_SECRET` authenticates non-Slack callers of `POST /api/webhooks/inbound/chat` and alert ingest at `POST /api/webhooks/inbound/events`. Leave it empty until you connect a channel. Do not store that secret in tenant settings.
+- **Event management** — see [EVENT_MANAGEMENT.md](./EVENT_MANAGEMENT.md).

@@ -8,4 +8,5 @@ export * from './catalog-links';
 export * from './analytics-snapshot-metrics';
 export * from './notification-webhooks';
 export * from './chat-inbound';
+export * from './alert-inbound';
 export * from './problem-recurrence';

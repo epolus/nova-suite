@@ -149,7 +149,7 @@ export const configPackageNotificationRuleSchema = z.object({
   external_key: configExternalKeySchema,
   name: z.string().min(1).max(255),
   description: nullableStringSchema,
-  entity_type: z.enum(['incident', 'request', 'change', 'problem', 'knowledge', 'major_incident']).default('incident'),
+  entity_type: z.enum(['incident', 'request', 'change', 'problem', 'knowledge', 'major_incident', 'alert']).default('incident'),
   trigger_key: z.string().min(1).max(100),
   recipient_type: z.string().min(1).max(100),
   recipient_user_email: z.string().email().nullable().optional(),

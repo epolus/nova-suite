@@ -25,6 +25,9 @@ export const ChangeDetailPage = lazy(() => import('@/pages/changes/ChangeDetail'
 export const AssetsPage = lazy(() => import('@/pages/assets/AssetsPage'));
 export const AssetDetailPage = lazy(() => import('@/pages/assets/AssetDetailPage'));
 export const ImprovementsPage = lazy(() => import('@/pages/improvements/ImprovementsPage'));
+export const AlertsPage = lazy(() => import('@/pages/alerts/AlertsPage'));
+export const AlertDetailPage = lazy(() => import('@/pages/alerts/AlertDetailPage'));
+export const AlertDefinitionsPage = lazy(() => import('@/pages/admin/AlertDefinitionsPage'));
 export const ImprovementDetailPage = lazy(() => import('@/pages/improvements/ImprovementDetailPage'));
 export const ReleasesPage = lazy(() => import('@/pages/releases/ReleasesPage'));
 export const ReleaseDetailPage = lazy(() => import('@/pages/releases/ReleaseDetailPage'));
