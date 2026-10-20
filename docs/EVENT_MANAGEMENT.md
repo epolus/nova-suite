@@ -43,12 +43,12 @@ An admin or **event manager** opens **Alert Definitions** (`/admin/alert-definit
 
 | Action | Result |
 | --- | --- |
-| Create an incident | One incident, and only when a CI matched and an assignment group is available. The definition's group wins. Otherwise Nova uses the CI support group. |
+| Create an incident | One incident, and only when a CI matched and an assignment group is available. The definition's group wins. Otherwise Nova Suite uses the CI support group. If the CI shows up on a later firing and the alert still has no incident, Nova Suite opens it then. |
 | Notify on alert.firing | Starts the notification workflow for entity `alert` and trigger `alert.firing`. Add that rule under Notification Workflows. |
 | Store only | The alert stays on the Alerts list. |
 
 A scheduled or implementing change on that CI, whose window covers the alert, suppresses both actions and records the change number on the alert.
 
-A resolved alert adds a journal line on its incident. If the incident is still `new` and nobody has added a comment, work note, or other update, Nova resolves it.
+A resolved alert adds a journal line on its incident. If the incident is still `new` and nobody has added a comment, work note, or other update, Nova Suite resolves it. If that incident is later resolved or closed and the same alert fires again, Nova Suite moves it back to in progress.
 
-**Event operators** and **event managers** see the episodes under **Alerts**. A fulfiller does not, unless they also have one of those roles. Assign both roles under Admin → Roles. The incident sidebar lists other recent alerts and changes for the same CI for those roles. Those are hints. Nova does not write the root cause.
+**Event operators** and **event managers** see the episodes under **Alerts**. A fulfiller does not, unless they also have one of those roles. Assign both roles under Admin → Roles. The incident sidebar lists other recent alerts and changes for the same CI for those roles. Those are hints. Nova Suite does not write the root cause.

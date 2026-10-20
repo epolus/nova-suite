@@ -29,6 +29,7 @@ export type IngestAlertResult = {
   alertNumber: string | null;
   incidentNumber: string | null;
   resolvedIncidentId: string | null;
+  reopenedIncidentId: string | null;
 };
 
 async function matchCi(keys: string[]): Promise<CiMatch | null> {
@@ -288,6 +289,124 @@ async function applyDefinition(input: {
   return null;
 }
 
+/** A later firing can open the incident once a CI matches. The first delivery often arrives before the CI exists. */
+async function openMissedIncident(input: {
+  alert: ParsedInboundAlert;
+  episode: OpenAlert;
+  ci: CiMatch | null;
+  authorId: string | null;
+  tenantId: string;
+}): Promise<string | null> {
+  if (!input.ci || !input.authorId) return null;
+  const linked = await db.getOne<DefinitionRow>(
+    `SELECT d.id, d.source, d.severity, d.match_labels, d.severity_map, d.action, d.assignment_group_id, d.impact, d.urgency, d.workflow_key
+     FROM alerts a
+     JOIN alert_definitions d ON d.id = a.definition_id AND d.is_active = true
+     WHERE a.id = $1`,
+    [input.episode.id],
+  );
+  const definitions = linked ? [] : await db.getMany<DefinitionRow>(
+    `SELECT id, source, severity, match_labels, severity_map, action, assignment_group_id, impact, urgency, workflow_key
+     FROM alert_definitions
+     WHERE tenant_id = current_tenant_id() AND is_active = true
+     ORDER BY sort_order, created_at`,
+  );
+  const definition = linked ?? definitions.find((row) => definitionMatches(row, input.alert, normalizeSeverity(input.alert.severity, row.severity_map)));
+  if (!definition || definition.action !== 'incident') return null;
+  const changeNumber = await suppressingChange(input.ci.id);
+  if (changeNumber) {
+    await db.query(
+      `UPDATE alerts SET suppressed_reason = $2, configuration_item_id = $3 WHERE id = $1`,
+      [input.episode.id, changeNumber, input.ci.id],
+    );
+    return null;
+  }
+  const incident = await createIncident({
+    alert: input.alert,
+    alertNumber: input.episode.number,
+    ci: input.ci,
+    definition,
+    authorId: input.authorId,
+    tenantId: input.tenantId,
+  });
+  if (!incident) return null;
+  const saved = await db.query(
+    `UPDATE alerts
+     SET incident_id = $2, definition_id = COALESCE(definition_id, $3), configuration_item_id = $4
+     WHERE id = $1 AND incident_id IS NULL`,
+    [input.episode.id, incident.id, definition.id, input.ci.id],
+  );
+  return saved.rowCount ? incident.number : null;
+}
+
+async function previousEpisodeIncident(source: string, fingerprint: string, exceptAlertId: string): Promise<{
+  id: string;
+  number: string;
+  status: string;
+  definition_id: string | null;
+} | null> {
+  return db.getOne(
+    `SELECT i.id, i.number, i.status, a.definition_id
+     FROM alerts a
+     JOIN incidents i ON i.id = a.incident_id
+     WHERE a.tenant_id = current_tenant_id()
+       AND a.source = $1
+       AND a.fingerprint = $2
+       AND a.id <> $3
+     ORDER BY a.last_seen_at DESC
+     LIMIT 1`,
+    [source, fingerprint, exceptAlertId],
+  );
+}
+
+/** Resolved and closed incidents come back to in progress when the same alert fires again. */
+async function reopenLinkedIncident(alertNumber: string, incidentId: string, authorId: string | null): Promise<boolean> {
+  const row = await db.getOne<{ status: string }>(
+    `SELECT status FROM incidents WHERE id = $1`,
+    [incidentId],
+  );
+  if (!row || (row.status !== 'resolved' && row.status !== 'closed')) return false;
+  const updated = await db.query(
+    `UPDATE incidents
+     SET status = 'in_progress', resolved_at = NULL, closed_at = NULL
+     WHERE id = $1 AND status IN ('resolved', 'closed')`,
+    [incidentId],
+  );
+  if (!updated.rowCount) return false;
+  if (authorId) {
+    await db.query(
+      `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content, is_customer_visible)
+       VALUES (current_tenant_id(), $1, $2, 'state_change', $3, false)`,
+      [incidentId, authorId, `Alert ${alertNumber} fired again. Status changed from ${row.status} to in_progress.`],
+    );
+  }
+  return true;
+}
+
+async function reusePreviousIncident(input: {
+  alert: ParsedInboundAlert;
+  episode: OpenAlert;
+  authorId: string | null;
+}): Promise<{ number: string; reopenedId: string | null } | null> {
+  const previous = await previousEpisodeIncident(input.alert.source, input.alert.fingerprint, input.episode.id);
+  if (!previous || previous.status === 'cancelled') return null;
+  await db.query(
+    `UPDATE alerts
+     SET incident_id = $2, definition_id = COALESCE(definition_id, $3)
+     WHERE id = $1 AND incident_id IS NULL`,
+    [input.episode.id, previous.id, previous.definition_id],
+  );
+  const reopened = await reopenLinkedIncident(input.episode.number, previous.id, input.authorId);
+  if (!reopened && input.authorId && previous.status !== 'resolved' && previous.status !== 'closed') {
+    await db.query(
+      `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content, is_customer_visible)
+       VALUES (current_tenant_id(), $1, $2, 'state_change', $3, false)`,
+      [previous.id, input.authorId, `Alert ${input.episode.number} fired again.`],
+    );
+  }
+  return { number: previous.number, reopenedId: reopened ? previous.id : null };
+}
+
 async function clearIncident(alertNumber: string, incidentId: string, authorId: string | null): Promise<string | null> {
   const state = await db.getOne<{ status: string; worked: boolean }>(
     `SELECT i.status,
@@ -341,6 +460,7 @@ export async function ingestAlerts(tenantId: string, alerts: ParsedInboundAlert[
           alertNumber: null,
           incidentNumber: null,
           resolvedIncidentId: null,
+          reopenedIncidentId: null,
         });
         continue;
       }
@@ -354,7 +474,7 @@ export async function ingestAlerts(tenantId: string, alerts: ParsedInboundAlert[
           [alert.source, alert.fingerprint],
         );
         if (!open) {
-          results.push({ fingerprint: alert.fingerprint, duplicate: false, alertNumber: null, incidentNumber: null, resolvedIncidentId: null });
+          results.push({ fingerprint: alert.fingerprint, duplicate: false, alertNumber: null, incidentNumber: null, resolvedIncidentId: null, reopenedIncidentId: null });
           continue;
         }
         await db.query(
@@ -374,6 +494,7 @@ export async function ingestAlerts(tenantId: string, alerts: ParsedInboundAlert[
           alertNumber: open.number,
           incidentNumber: null,
           resolvedIncidentId,
+          reopenedIncidentId: null,
         });
         continue;
       }
@@ -382,15 +503,38 @@ export async function ingestAlerts(tenantId: string, alerts: ParsedInboundAlert[
       const episode = await openEpisode(alert, ci?.id || null, normalized);
       await db.query('UPDATE events SET alert_id = $2 WHERE id = $1', [eventId, episode.id]);
       let incidentNumber: string | null = null;
+      let reopenedIncidentId: string | null = null;
       if (episode.inserted) {
-        incidentNumber = await applyDefinition({
-          alert,
-          episode,
-          ci,
-          authorId,
-          tenantId,
-          normalized,
-        });
+        const suppressed = ci ? await suppressingChange(ci.id) : null;
+        const reused = suppressed ? null : await reusePreviousIncident({ alert, episode, authorId });
+        if (reused) {
+          incidentNumber = reused.number;
+          reopenedIncidentId = reused.reopenedId;
+        } else {
+          incidentNumber = await applyDefinition({
+            alert,
+            episode,
+            ci,
+            authorId,
+            tenantId,
+            normalized,
+          });
+        }
+      } else if (!episode.incident_id) {
+        const reused = await reusePreviousIncident({ alert, episode, authorId });
+        if (reused) {
+          incidentNumber = reused.number;
+          reopenedIncidentId = reused.reopenedId;
+        } else {
+          incidentNumber = await openMissedIncident({ alert, episode, ci, authorId, tenantId });
+        }
+      } else if (authorId || episode.incident_id) {
+        const reopened = await reopenLinkedIncident(episode.number, episode.incident_id, authorId);
+        if (reopened) {
+          reopenedIncidentId = episode.incident_id;
+          const linked = await db.getOne<{ number: string }>(`SELECT number FROM incidents WHERE id = $1`, [episode.incident_id]);
+          incidentNumber = linked?.number || null;
+        }
       }
       results.push({
         fingerprint: alert.fingerprint,
@@ -398,6 +542,7 @@ export async function ingestAlerts(tenantId: string, alerts: ParsedInboundAlert[
         alertNumber: episode.number,
         incidentNumber,
         resolvedIncidentId: null,
+        reopenedIncidentId,
       });
     }
     return results;
