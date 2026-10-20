@@ -14,6 +14,7 @@ export { changes } from './domains/changes';
 export { assets } from './domains/assets';
 export { releases } from './domains/releases';
 export { improvements } from './domains/improvements';
+export { alerts } from './domains/alerts';
 export type { ImprovementSource } from './domains/improvements';
 export { reports } from './domains/reports';
 export { admin } from './domains/admin';

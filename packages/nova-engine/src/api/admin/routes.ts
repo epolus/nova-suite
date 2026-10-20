@@ -1844,7 +1844,7 @@ router.post('/notification-rules/:id/test', async (req: Request, res: Response, 
     const tenantId = req.user!.tenant_id;
     const rule = await db.getOne<{
       id: string;
-      entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
+      entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident' | 'alert';
       trigger_key: string;
     }>(
       `SELECT id, entity_type, trigger_key
@@ -1863,6 +1863,7 @@ router.post('/notification-rules/:id/test', async (req: Request, res: Response, 
         problem: 'SELECT id FROM problems WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1',
         knowledge: 'SELECT id FROM knowledge_articles WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1',
         major_incident: 'SELECT id FROM major_incidents WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1',
+        alert: 'SELECT id FROM alerts WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1',
       };
       const entityQuery = latestEntityByType[rule.entity_type];
       if (!entityQuery) throw new AppError(400, 'Unsupported entity type for test');

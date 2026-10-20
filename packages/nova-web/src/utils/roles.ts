@@ -11,6 +11,8 @@ const AGENT_ROLES = new Set([
   'report_viewer',
   'report_creator',
   'report_admin',
+  'event_operator',
+  'event_manager',
 ]);
 
 type RoleList = string[] | undefined;
@@ -41,6 +43,16 @@ export function isCatalogDesignerRole(roles: RoleList): boolean {
 
 export function isFulfillerRole(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'fulfiller']);
+}
+
+/** Alert list and correlation hints. */
+export function canViewAlerts(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'event_operator', 'event_manager']);
+}
+
+/** Create and edit alert definitions. */
+export function canManageAlertDefinitions(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'event_manager']);
 }
 
 export function hasConfigurationRole(roles: RoleList): boolean {

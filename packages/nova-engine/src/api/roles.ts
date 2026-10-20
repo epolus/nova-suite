@@ -24,6 +24,16 @@ export function isFulfillerRole(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'fulfiller']);
 }
 
+/** Alert list and correlation hints. */
+export function canViewAlerts(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'event_operator', 'event_manager']);
+}
+
+/** Create and edit alert definitions. */
+export function canManageAlertDefinitions(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'event_manager']);
+}
+
 export function hasConfigurationRole(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'fulfiller', 'configuration_manager']);
 }

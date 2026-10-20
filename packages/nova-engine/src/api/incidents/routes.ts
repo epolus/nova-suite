@@ -48,9 +48,11 @@ import {
   enqueueIncidentEscalationStartJob,
   enqueueNotificationDispatchStartJob,
 } from '../../temporal/workflow-start-queue';
-import { isFulfillerRole } from '../roles';
+import { canViewAlerts, isFulfillerRole } from '../roles';
 import { logger } from '../../logger';
 import { replyIncidentStatus } from '../../notifications/chat-threads';
+import { correlateAlerts } from '../../ai/rca-correlation';
+import { storedAlertAdapter } from '../../domain/event-correlation';
 
 const router = Router();
 
@@ -1132,6 +1134,33 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ─── GET /api/incidents/:id/correlations ───
+router.get('/:id/correlations', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!canViewAlerts(req)) {
+      res.json({ hints: [] });
+      return;
+    }
+    const client = getRequestClient(req);
+    const incident = await client.query(
+      `SELECT id, title, description, configuration_item_id, service_id, created_at
+       FROM incidents WHERE id = $1`,
+      [req.params.id],
+    );
+    const row = incident.rows[0] as {
+      id: string;
+      title: string;
+      description: string | null;
+      configuration_item_id: string | null;
+      service_id: string | null;
+      created_at: string;
+    } | undefined;
+    if (!row) throw NotFound('Incident not found');
+    const hints = await correlateAlerts(row, storedAlertAdapter(client));
+    res.json({ hints });
+  } catch (err) { next(err); }
 });
 
 // ─── GET /api/incidents/:id/known-errors ───

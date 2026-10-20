@@ -20,3 +20,4 @@ export * from './dataSources';
 export * from './ai';
 export * from './analytics';
 export * from './improvements';
+export * from './alerts';

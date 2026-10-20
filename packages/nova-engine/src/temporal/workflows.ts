@@ -278,7 +278,7 @@ export async function signalKnowledgeApprovalDecision(
 
 export async function startNotificationDispatch(params: {
   tenantId: string;
-  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
+  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident' | 'alert';
   triggerKey: string;
   entityId: string;
   actorUserId?: string | null;

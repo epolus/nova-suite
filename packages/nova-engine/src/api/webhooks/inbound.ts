@@ -6,12 +6,14 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { timingSafeEqual } from 'node:crypto';
-import { parseChatInbound } from '@nova-suite/shared';
+import { parseChatInbound, parseInboundAlerts } from '@nova-suite/shared';
 import { db } from '../../data/db';
 import { AppError } from '../../middleware/errorHandler';
 import { recordChatInbound, replyIncidentStatus } from '../../notifications/chat-threads';
 import { logger } from '../../logger';
 import { slackSignatureValid } from '../../notifications/slack-signature';
+import { ingestAlerts } from '../../domain/alerts';
+import { signalIncidentResolved } from '../../temporal/workflows';
 
 const router = Router();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
@@ -133,6 +135,52 @@ async function chatRequestAuthorized(req: Request): Promise<boolean> {
   if (!expected) return false;
   return secretsEqual(provided, expected);
 }
+
+async function sharedSecretAuthorized(req: Request): Promise<boolean> {
+  const provided = String(
+    req.body?.secret
+    || req.headers['x-nova-webhook-secret']
+    || (String(req.headers.authorization || '').toLowerCase().startsWith('bearer ')
+      ? String(req.headers.authorization).slice(7)
+      : '')
+    || '',
+  ).trim();
+  if (!provided) return false;
+  const setting = await db.getOne<{ value: string }>(
+    `SELECT value FROM tenant_settings
+     WHERE tenant_id = current_tenant_id() AND key = 'inbound_webhook_secret'
+     LIMIT 1`,
+  );
+  const expected = (setting?.value || process.env.NOVA_INBOUND_WEBHOOK_SECRET || '').trim();
+  if (!expected) return false;
+  return secretsEqual(provided, expected);
+}
+
+router.post('/inbound/events', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const alerts = parseInboundAlerts(req.body);
+    if (!alerts) throw new AppError(400, 'Unrecognized alert payload');
+    const tenantId = readTenantId(req);
+    if (!tenantId) throw new AppError(400, 'tenant_id is required');
+    const allowed = await db.withTenantContext(tenantId, SYSTEM_USER_ID, 'system', () => sharedSecretAuthorized(req));
+    if (!allowed) throw new AppError(401, 'Invalid webhook secret');
+    const results = await ingestAlerts(tenantId, alerts);
+    for (const row of results) {
+      if (row.resolvedIncidentId) signalIncidentResolved(row.resolvedIncidentId).catch(() => {});
+    }
+    res.status(202).json({
+      results: results.map((row) => ({
+        fingerprint: row.fingerprint,
+        duplicate: row.duplicate,
+        alert_number: row.alertNumber,
+        incident_number: row.incidentNumber,
+        resolved: Boolean(row.resolvedIncidentId),
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.post('/inbound/chat', async (req: Request, res: Response, next: NextFunction) => {
   try {

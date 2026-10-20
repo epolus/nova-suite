@@ -3,9 +3,8 @@
 /**
  * Automated RCA correlation stubs.
  *
- * Discovery / monitoring events and deployment feeds will plug into
- * `correlateAlerts` later (CMDB alerts, CI change windows, CI/CD).
- * Until then adapters return empty hints so callers can wire UI/API safely.
+ * Live hints come from stored alerts and overlapping changes
+ * (`domain/event-correlation.ts`). This adapter stays empty when no client is available.
  */
 
 export interface CorrelationHint {

@@ -80,6 +80,8 @@ export default function AppRoutes() {
         <Route path="/assets" element={<Lazy><Pages.AssetsPage /></Lazy>} />
         <Route path="/assets/new" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
         <Route path="/assets/:id" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
+        <Route path="/alerts" element={<Lazy><Pages.AlertsPage /></Lazy>} />
+        <Route path="/alerts/:id" element={<Lazy><Pages.AlertDetailPage /></Lazy>} />
         <Route path="/improvements" element={<ImprovementAccess />}>
           <Route index element={<Lazy><Pages.ImprovementsPage /></Lazy>} />
           <Route path="new" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />
@@ -132,6 +134,7 @@ export default function AppRoutes() {
           <Route path="sla-config" element={<Lazy><Pages.SlaConfigPage /></Lazy>} />
           <Route path="business-calendars" element={<Lazy><Pages.BusinessCalendarsPage /></Lazy>} />
           <Route path="notification-config" element={<Lazy><Pages.NotificationConfigPage /></Lazy>} />
+          <Route path="alert-definitions" element={<Lazy><Pages.AlertDefinitionsPage /></Lazy>} />
           <Route path="notification-deliveries" element={<Lazy><Pages.NotificationEmailDeliveriesPage /></Lazy>} />
           <Route path="change-management" element={<Lazy><Pages.ChangeAdminPage /></Lazy>} />
           <Route path="knowledge-workflows" element={<Lazy><Pages.KnowledgeWorkflowsPage /></Lazy>} />

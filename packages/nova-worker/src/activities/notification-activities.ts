@@ -6,7 +6,7 @@ import { dispatchTenantWebhookNotifications } from './webhook-dispatcher';
 
 export interface NotificationDispatchInput {
   tenantId: string;
-  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
+  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident' | 'alert';
   triggerKey: string;
   entityId: string;
   actorUserId?: string | null;
@@ -149,6 +149,16 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
         [input.entityId],
       );
       entity = (r.rows[0] as Record<string, string | null>) || null;
+    } else if (input.entityType === 'alert') {
+      const r = await client.query(
+        `SELECT a.id, a.number, a.title, ci.supported_by AS assignment_group_id, ag.manager_id AS assignment_group_manager_id
+         FROM alerts a
+         LEFT JOIN configuration_items ci ON ci.id = a.configuration_item_id
+         LEFT JOIN assignment_groups ag ON ag.id = ci.supported_by
+         WHERE a.id = $1::uuid`,
+        [input.entityId],
+      );
+      entity = (r.rows[0] as Record<string, string | null>) || null;
     } else if (input.entityType === 'major_incident') {
       const r = await client.query(
         `SELECT id::text AS id, number, title, created_by
@@ -237,6 +247,8 @@ export async function dispatchConfiguredNotifications(input: NotificationDispatc
       knowledge_title: String(entity.title || ''),
       major_incident_number: String(entity.number || ''),
       major_incident_title: String(entity.title || ''),
+      alert_number: String(entity.number || ''),
+      alert_title: String(entity.title || ''),
     };
 
     let inserted = 0;
