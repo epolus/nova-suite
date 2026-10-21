@@ -847,6 +847,7 @@
       "selectType": "Select type",
       "standardTemplate": "Standard Template",
       "noTemplate": "No template",
+      "templateWithRate": "{name} ({rate}%)",
       "risk": "Risk",
       "selectAssignmentGroup": "Select assignment group...",
       "tabs": {
@@ -2153,6 +2154,8 @@
         "autoApprove": "Auto-approve",
         "addType": "Add Type",
         "standardTemplates": "Standard Templates",
+        "successRate": "{rate}% successful across {count, plural, one {# closed change} other {# closed changes}}",
+        "noClosedOutcomes": "No closed changes yet",
         "templateNamePlaceholder": "Template name",
         "categoryPlaceholder": "Category",
         "implementationPlan": "Implementation plan template",

@@ -289,7 +289,13 @@ export default function ChangeDetailPage() {
             <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('standardTemplate')}</label>
             <select value={form.standard_change_id} onChange={(e) => applyTemplate(e.target.value)} className={selectCls}>
               <option value="">{tChanges('noTemplate')}</option>
-              {templateOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {templateOptions.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.success_rate == null
+                    ? t.name
+                    : tChanges('templateWithRate', { name: t.name, rate: Number(t.success_rate).toFixed(2) })}
+                </option>
+              ))}
             </select>
           </div>
           <div>
