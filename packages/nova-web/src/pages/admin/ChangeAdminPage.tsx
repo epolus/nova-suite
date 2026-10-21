@@ -90,6 +90,11 @@ export default function ChangeAdminPage() {
               <div key={t.id} className="p-2 border rounded-lg">
                 <p className="text-sm font-medium">{t.name}</p>
                 <p className="text-xs text-gray-500">{t.change_type_name} • {t.category || tPage('uncategorized')}</p>
+                <p className="text-xs text-gray-500">
+                  {t.success_rate == null
+                    ? tPage('noClosedOutcomes')
+                    : tPage('successRate', { rate: Number(t.success_rate).toFixed(2), count: Number(t.usage_count) })}
+                </p>
               </div>
             ))}
           </div>

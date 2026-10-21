@@ -27,6 +27,7 @@ import { hasAnyRole, hasChangeRole, isAdminRole } from '../roles';
 import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-start-queue';
 import { resolveSlaDueAt } from '../../domain/sla';
 import { normalizeChangePir } from '../../domain/change-pir';
+import { standardChangeSuccessRate } from '../../domain/standard-change-outcome';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -135,6 +136,32 @@ async function canWorkOnChange(client: any, req: Request, change: any): Promise<
     if (m.rows.length > 0) return true;
   }
   return hasChangeRole(req);
+}
+
+async function refreshStandardChangeOutcome(
+  client: { query: (text: string, params?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }> },
+  standardChangeId: string,
+) {
+  const stats = await client.query(
+    `SELECT count(*)::int AS closed_count,
+            count(*) FILTER (WHERE success IS TRUE)::int AS success_count
+     FROM changes
+     WHERE tenant_id = current_tenant_id()
+       AND standard_change_id = $1
+       AND status = 'closed'
+       AND success IS NOT NULL`,
+    [standardChangeId],
+  );
+  const closedCount = Number(stats.rows[0]?.closed_count || 0);
+  const successCount = Number(stats.rows[0]?.success_count || 0);
+  await client.query(
+    `UPDATE standard_changes
+     SET usage_count = $2,
+         success_rate = $3
+     WHERE tenant_id = current_tenant_id()
+       AND id = $1`,
+    [standardChangeId, closedCount, standardChangeSuccessRate(successCount, closedCount)],
+  );
 }
 
 function normalizeStatusAndStage(action: string): { stage: string; status: string } {
@@ -1477,6 +1504,13 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
          AND id = $1`,
       [req.params.id],
     );
+    const templateIds = new Set<string>();
+    for (const row of [current, updated.rows[0]]) {
+      if (row?.status === 'closed' && row.standard_change_id) templateIds.add(String(row.standard_change_id));
+    }
+    for (const templateId of templateIds) {
+      await refreshStandardChangeOutcome(client, templateId);
+    }
     res.json(updated.rows[0]);
   } catch (err) {
     next(err);
@@ -1682,6 +1716,9 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
       [req.params.id],
     );
     await syncRelatedRecords(client, updated.rows[0]);
+    if (action === 'close' && updated.rows[0]?.standard_change_id) {
+      await refreshStandardChangeOutcome(client, String(updated.rows[0].standard_change_id));
+    }
     const transitionTriggerByAction: Record<string, string> = {
       request_approval: 'change.pending_approval',
       approve: 'change.approved',
