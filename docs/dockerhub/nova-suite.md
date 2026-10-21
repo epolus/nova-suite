@@ -1,8 +1,8 @@
 # Nova Suite
 
-**Open-source IT Service Management (ITSM) platform — service catalog, incident, change and problem management, knowledge base, CMDB, and workflow automation.**
+**Open-source IT Service Management (ITSM) platform — service catalog, incidents, major incidents, change and problem management, assets, CMDB, event management, Slack and Teams, knowledge base, and workflow automation.**
 
-Nova Suite is a complete service management solution: a self-service portal with a dynamic request catalog and approvals, an agent console for the full incident and change lifecycle with SLA tracking, a configuration management database with relationship mapping and impact analysis, and an admin platform covering users, roles, organizations, theming, and integrations. It is multi-tenant at the database level using PostgreSQL Row-Level Security, authenticates with JWT and OpenID Connect SSO, and runs workflows on Temporal.
+Nova Suite is a complete service management solution: a self-service portal with a dynamic request catalog and approvals; an agent console for incidents, changes, problems, assets, and improvements with SLA and OLA tracking; event ingest into alert episodes; Slack and Teams incident threads; a configuration management database with relationship mapping, impact analysis, and Intune discovery; and an admin platform covering users, roles, organizations, theming, and integrations. It is multi-tenant at the database level using PostgreSQL Row-Level Security, authenticates with JWT and OpenID Connect SSO, and runs workflows on Temporal.
 
 Source: **[github.com/epolus/nova-suite](https://github.com/epolus/nova-suite)**
 

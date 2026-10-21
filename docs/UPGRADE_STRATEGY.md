@@ -9,9 +9,9 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). That seeds `schema_migrations` at `v00.01.00`. Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.22`). Those files **do not re-run** on an existing volume.
 
-Later schema changes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). That folder is empty at `v00.01.00`: the job is the mechanism for **future** changes, not a replay of P0.1–P0.3.
+Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
 `nova-migrate` (compose one-shot, same image as the engine, command `node packages/nova-engine/dist/migrate.js`) connects as `POSTGRES_USER` (`nova_app`), applies any file whose version is greater than the ledger, then exits. Engine and worker wait on `service_completed_successfully` and keep using `POSTGRES_APP_USER` (`nova_runtime`).
 
