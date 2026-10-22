@@ -1,49 +1,49 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-
+import { useId } from 'react';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { formatDate } from '../../utils/dateTime';
 
 interface TrendChartProps {
   points: { date: string; value: number }[];
   loading?: boolean;
   error?: string;
-  accent?: string;
   emptyLabel?: string;
   summaryMode?: 'sum' | 'latest';
   summaryLabel?: string;
+  seriesLabel?: string;
 }
 
-const CHART_HEIGHT = 120;
-const CHART_PADDING = { top: 8, right: 8, bottom: 20, left: 36 };
-
-function buildYTicks(maxValue: number): number[] {
-  if (maxValue <= 0) return [0];
-  const tickCount = 4;
-  const ticks = Array.from({ length: tickCount }, (_, index) =>
-    Math.round((maxValue * index) / (tickCount - 1)),
-  );
-  return [...new Set(ticks)].sort((a, b) => a - b);
-}
-
-function formatTickValue(value: number): string {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+function formatTrendDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return formatDate(value);
+  return formatDate(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
 }
 
 export default function TrendChart({
   points,
   loading,
   error,
-  accent = '#4f46e5',
   emptyLabel = 'No data',
   summaryMode = 'sum',
   summaryLabel,
+  seriesLabel,
 }: TrendChartProps) {
+  const gradientId = useId().replace(/:/g, '');
+  const chartConfig = {
+    value: {
+      label: seriesLabel || summaryLabel || (summaryMode === 'latest' ? 'current' : 'total'),
+      color: 'var(--chart-1)',
+    },
+  } satisfies ChartConfig;
+
   if (loading) {
-    return <div className="h-full min-h-[120px] animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />;
+    return <div className="h-full min-h-[120px] animate-pulse rounded-lg bg-muted" />;
   }
 
   if (error) {
     return (
-      <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-red-600 dark:text-red-400 px-2 text-center">
+      <div className="flex h-full min-h-[120px] items-center justify-center px-2 text-center text-sm text-destructive">
         {error}
       </div>
     );
@@ -51,34 +51,12 @@ export default function TrendChart({
 
   if (points.length === 0) {
     return (
-      <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-gray-400">
+      <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-muted-foreground">
         {emptyLabel}
       </div>
     );
   }
 
-  const width = 320;
-  const plotLeft = CHART_PADDING.left;
-  const plotRight = width - CHART_PADDING.right;
-  const plotTop = CHART_PADDING.top;
-  const plotBottom = CHART_HEIGHT - CHART_PADDING.bottom;
-  const innerW = plotRight - plotLeft;
-  const innerH = plotBottom - plotTop;
-  const maxValue = Math.max(...points.map((point) => point.value), 1);
-  const yTicks = buildYTicks(maxValue);
-
-  const valueToY = (value: number) => plotTop + innerH - (value / maxValue) * innerH;
-
-  const coords = points.map((point, index) => {
-    const x = plotLeft + (index / Math.max(points.length - 1, 1)) * innerW;
-    const y = valueToY(point.value);
-    return { x, y, ...point };
-  });
-
-  const linePath = coords.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
-  const areaPath = `${linePath} L ${coords[coords.length - 1]!.x} ${plotBottom} L ${coords[0]!.x} ${plotBottom} Z`;
-  const firstLabel = points[0]?.date ? formatDate(points[0].date) : '';
-  const lastLabel = points[points.length - 1]?.date ? formatDate(points[points.length - 1]!.date) : '';
   const summaryValue = summaryMode === 'latest'
     ? (points[points.length - 1]?.value ?? 0)
     : points.reduce((sum, point) => sum + point.value, 0);
@@ -86,53 +64,46 @@ export default function TrendChart({
 
   return (
     <div className="flex h-full min-h-[120px] flex-col">
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 tabular-nums">
+      <p className="mb-1 shrink-0 text-xs tabular-nums text-muted-foreground">
         {summaryValue.toLocaleString()} {summaryLabel ?? defaultSummaryLabel}
       </p>
-      <svg
-        viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
-        className="w-full flex-1"
-        preserveAspectRatio="none"
-        role="img"
-        aria-hidden
-      >
-        {yTicks.map((tick) => {
-          const y = valueToY(tick);
-          return (
-            <g key={tick}>
-              <line
-                x1={plotLeft}
-                y1={y}
-                x2={plotRight}
-                y2={y}
-                className="stroke-gray-200 dark:stroke-gray-700"
-                strokeWidth={1}
-                vectorEffect="non-scaling-stroke"
+      <ChartContainer config={chartConfig} className="aspect-auto min-h-0 w-full flex-1">
+        <AreaChart data={points} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="var(--color-value)" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="var(--color-value)" stopOpacity={0.1} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            minTickGap={28}
+            tickFormatter={formatTrendDate}
+          />
+          <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+          <ChartTooltip
+            content={(
+              <ChartTooltipContent
+                labelFormatter={(_label, payload) => {
+                  const date = payload?.[0]?.payload?.date;
+                  return typeof date === 'string' ? formatTrendDate(date) : '';
+                }}
               />
-              <text
-                x={plotLeft - 4}
-                y={y + 3}
-                textAnchor="end"
-                className="fill-gray-400"
-                fontSize={8}
-              >
-                {formatTickValue(tick)}
-              </text>
-            </g>
-          );
-        })}
-        <path d={areaPath} fill={accent} fillOpacity={0.12} />
-        <path d={linePath} fill="none" stroke={accent} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-        {coords.map((point) => (
-          <circle key={point.date} cx={point.x} cy={point.y} r={2.5} fill={accent} />
-        ))}
-        <text x={plotLeft} y={CHART_HEIGHT - 4} className="fill-gray-400" fontSize={9}>
-          {firstLabel}
-        </text>
-        <text x={plotRight} y={CHART_HEIGHT - 4} textAnchor="end" className="fill-gray-400" fontSize={9}>
-          {lastLabel}
-        </text>
-      </svg>
+            )}
+          />
+          <Area
+            dataKey="value"
+            type="natural"
+            fill={`url(#${gradientId})`}
+            stroke="var(--color-value)"
+            strokeWidth={2}
+          />
+        </AreaChart>
+      </ChartContainer>
     </div>
   );
 }

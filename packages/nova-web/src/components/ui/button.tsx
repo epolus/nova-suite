@@ -1,39 +1,40 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { Slot } from '@radix-ui/react-slot';
+import { cva, type VariantProps } from 'class-variance-authority';
 import type { ButtonHTMLAttributes } from 'react';
 import { cn } from './utils';
 
-type Variant = 'default' | 'outline' | 'secondary' | 'ghost' | 'warning';
-type Size = 'default' | 'sm' | 'icon';
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
+        outline: 'border border-border bg-card text-foreground shadow-xs hover:bg-muted',
+        secondary: 'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80',
+        ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        warning: 'bg-amber-500 text-white shadow-xs hover:bg-amber-400 active:bg-amber-600',
+      },
+      size: {
+        default: 'h-9 px-4 py-2',
+        sm: 'h-8 rounded-md px-3 text-xs',
+        icon: 'h-9 w-9',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  },
+);
 
-const variantClasses: Record<Variant, string> = {
-  default: 'bg-indigo-600 text-white shadow-xs hover:bg-indigo-500 active:bg-indigo-700',
-  outline: 'border border-gray-300 bg-white text-gray-700 shadow-xs hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100',
-  secondary: 'bg-gray-100 text-gray-800 shadow-xs hover:bg-gray-200 active:bg-gray-300',
-  ghost: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 active:bg-gray-200',
-  warning: 'bg-amber-500 text-white shadow-xs hover:bg-amber-400 active:bg-amber-600',
-};
-
-const sizeClasses: Record<Size, string> = {
-  default: 'h-9 px-4 py-2',
-  sm: 'h-8 rounded-md px-3 text-xs',
-  icon: 'h-9 w-9',
-};
-
-interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: Variant;
-  size?: Size;
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
 }
 
-export function Button({ className, variant = 'default', size = 'default', ...props }: Props) {
-  return (
-    <button
-      className={cn(
-        'inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
-        variantClasses[variant],
-        sizeClasses[size],
-        className,
-      )}
-      {...props}
-    />
-  );
+function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
+  const Comp = asChild ? Slot : 'button';
+  return <Comp data-slot="button" className={cn(buttonVariants({ variant, size, className }))} {...props} />;
 }
+
+export { Button };

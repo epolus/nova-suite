@@ -25,7 +25,7 @@ export default function OpenRequestsStatWidget(_props: DashboardWidgetProps) {
       label={t('openRequests')}
       value={data}
       accent="blue"
-      icon={DashboardIcons.request('w-5 h-5')}
+      icon={<DashboardIcons.request className="size-5" />}
       link="/requests?active=true"
     />
   );

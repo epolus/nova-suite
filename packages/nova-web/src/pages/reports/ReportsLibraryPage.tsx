@@ -5,6 +5,7 @@ import { useTranslations } from 'use-intl';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
+import { Button } from '@/components/ui/button';
 import { reports, type ReportDefinitionSummary } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { hasReportingCreateRole, hasReportingViewRole } from '../../utils/roles';
@@ -28,17 +29,17 @@ function NewReportCard({ onCreate, creating }: { onCreate: (name: string) => Pro
           placeholder={t('reportNamePlaceholder')}
           className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
         />
-        <button
+        <Button
+          type="button"
           disabled={!name.trim() || creating}
           onClick={() => {
             const trimmed = name.trim();
             if (!trimmed) return;
             void onCreate(trimmed).then(() => setName(''));
           }}
-          className="px-3 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
         >
           {creating ? t('creating') : tActions('create')}
-        </button>
+        </Button>
       </div>
     </Card>
   );
@@ -155,12 +156,9 @@ export default function ReportsLibraryPage() {
         title={t('title')}
         description={t('sharedPrivateCounts', { shared: items.length - privateCount, private: privateCount })}
         action={
-          <button
-            onClick={() => void load()}
-            className="px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50"
-          >
+          <Button type="button" variant="outline" onClick={() => void load()}>
             {tActions('refresh')}
-          </button>
+          </Button>
         }
       />
 
@@ -196,31 +194,28 @@ export default function ReportsLibraryPage() {
                   </p>
                 </div>
                 <div className="shrink-0 flex gap-2">
-                  <Link
-                    to={`/reports/${item.id}`}
-                    className="px-2.5 py-1.5 rounded-md text-xs border border-gray-200 hover:bg-gray-50"
-                  >
-                    {tActions('view')}
-                  </Link>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/reports/${item.id}`}>{tActions('view')}</Link>
+                  </Button>
                   {item.can_edit && (
-                    <Link
-                      to={`/reports/${item.id}/builder`}
-                      className="px-2.5 py-1.5 rounded-md text-xs bg-indigo-600 text-white hover:bg-indigo-700"
-                    >
-                      {tActions('edit')}
-                    </Link>
+                    <Button size="sm" asChild>
+                      <Link to={`/reports/${item.id}/builder`}>{tActions('edit')}</Link>
+                    </Button>
                   )}
                 </div>
               </div>
               {item.can_edit && (
                 <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
                     onClick={() => void deleteReport(item.id)}
                     disabled={busyDeleteId === item.id}
-                    className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
                   >
                     {busyDeleteId === item.id ? t('deleting') : tActions('delete')}
-                  </button>
+                  </Button>
                 </div>
               )}
             </Card>
