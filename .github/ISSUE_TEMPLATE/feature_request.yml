@@ -1,0 +1,107 @@
+name: Feature request
+description: Suggest a capability for Nova Suite
+title: "[feat]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature for **Nova Suite**, the open-source ITSM platform. Please search [open and closed issues](https://github.com/epolus/nova-suite/issues?q=is%3Aissue) and [pull requests](https://github.com/epolus/nova-suite/pulls) before submitting.
+
+  - type: markdown
+    attributes:
+      value: |
+        Still shaping the idea? Start in [Ideas](https://github.com/epolus/nova-suite/discussions/new?category=ideas). Questions about current behavior belong in [Q&A](https://github.com/epolus/nova-suite/discussions/new?category=q-a).
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature description
+      description: What should Nova Suite do, and which workflow does it unblock?
+      placeholder: Assignment groups need an OLA report so MSPs can see handoff breaches by tenant.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: persona
+    attributes:
+      label: Who is this for?
+      description: Nova Suite is built for internal IT teams, managed service providers, and small enterprises.
+      multiple: true
+      options:
+        - Internal IT team
+        - Managed service provider (MSP)
+        - Small enterprise
+        - Self-hosting operator
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: product-area
+    attributes:
+      label: Product area
+      description: Where should this live?
+      multiple: true
+      options:
+        - Employee portal
+        - Service catalog and requests
+        - Incidents
+        - Major incidents
+        - Change management
+        - Problem management
+        - Releases
+        - Knowledge base
+        - CMDB
+        - Assets and discovery
+        - Events and alerts
+        - Slack / Teams
+        - Continual improvement
+        - Reports and dashboards
+        - Workflows and automation
+        - Administration
+        - Authentication and SSO
+        - AI assistant
+        - Notifications
+        - API
+        - Database and tenancy
+        - Deployment and operations
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Optional. Nova Web is the Vite/React app, Nova Engine is the Express API, Nova Worker runs Temporal jobs, and `@nova-suite/shared` holds shared types and automation helpers.
+      multiple: true
+      options:
+        - nova-web
+        - nova-engine
+        - nova-worker
+        - nova-shared
+        - PostgreSQL / RLS
+        - Docker / Caddy
+        - Not sure
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, related docs, or the API and data model you have in mind. Multi-tenancy and row-level security apply to any data this feature would store.
+      placeholder: Link a screenshot or describe the records, roles, and tenant boundaries involved.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Before submitting
+      description: By submitting this issue, you agree to follow the [contributing guidelines](https://github.com/epolus/nova-suite/blob/main/CONTRIBUTING.md).
+      options:
+        - label: I searched existing issues, pull requests, and the documentation
+          required: true
