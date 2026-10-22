@@ -8,22 +8,59 @@ import Card from '@/components/Card';
 import Badge from '@/components/Badge';
 import Spinner from '@/components/Spinner';
 
-const emptyForm = {
+type DefinitionForm = {
+  name: string;
+  sort_order: string;
+  source: string;
+  severity: string;
+  action: AlertDefinition['action'];
+  impact: string;
+  urgency: string;
+  assignment_group_id: string;
+};
+
+const emptyForm: DefinitionForm = {
   name: '',
+  sort_order: '100',
   source: '',
   severity: 'critical',
-  action: 'incident' as AlertDefinition['action'],
+  action: 'incident',
   impact: 'high',
   urgency: 'high',
   assignment_group_id: '',
 };
+
+function nextSortOrder(items: AlertDefinition[]): string {
+  const max = items.reduce((highest, item) => Math.max(highest, Number(item.sort_order) || 0), 0);
+  return String(max + 10);
+}
+
+function formFromDefinition(item: AlertDefinition): DefinitionForm {
+  return {
+    name: item.name,
+    sort_order: String(item.sort_order ?? 100),
+    source: item.source || '',
+    severity: item.severity || '',
+    action: item.action,
+    impact: item.impact || 'high',
+    urgency: item.urgency || 'high',
+    assignment_group_id: item.assignment_group_id || '',
+  };
+}
+
+function actionLabelKey(action: AlertDefinition['action']): 'actionIncident' | 'actionWorkflow' | 'actionNone' {
+  if (action === 'incident') return 'actionIncident';
+  if (action === 'workflow') return 'actionWorkflow';
+  return 'actionNone';
+}
 
 export default function AlertDefinitionsPage() {
   const t = useTranslations('pages.alerts');
   const tActions = useTranslations('common.actions');
   const [items, setItems] = useState<AlertDefinition[]>([]);
   const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<DefinitionForm>(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -55,28 +92,59 @@ export default function AlertDefinitionsPage() {
     return () => { cancelled = true; };
   }, [t]);
 
+  const closeForm = () => {
+    setOpen(false);
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
+  const startCreate = () => {
+    setEditingId(null);
+    setForm({ ...emptyForm, sort_order: nextSortOrder(items) });
+    setOpen(true);
+    setError('');
+  };
+
+  const startEdit = (item: AlertDefinition) => {
+    setEditingId(item.id);
+    setForm(formFromDefinition(item));
+    setOpen(true);
+    setError('');
+  };
+
   const submit = async () => {
     if (!form.name.trim()) return;
     setSaving(true);
     setError('');
+    const sortOrder = Number(form.sort_order);
+    const payload = {
+      name: form.name.trim(),
+      sort_order: Number.isFinite(sortOrder) ? Math.trunc(sortOrder) : 100,
+      source: form.source.trim() || null,
+      severity: form.severity || null,
+      action: form.action,
+      impact: form.action === 'incident' ? form.impact : null,
+      urgency: form.action === 'incident' ? form.urgency : null,
+      assignment_group_id: form.action === 'incident' ? (form.assignment_group_id || null) : null,
+    };
     try {
-      await alertsApi.createDefinition({
-        name: form.name.trim(),
-        source: form.source.trim() || null,
-        severity: form.severity || null,
-        action: form.action,
-        impact: form.action === 'incident' ? form.impact : null,
-        urgency: form.action === 'incident' ? form.urgency : null,
-        assignment_group_id: form.assignment_group_id || null,
-      });
-      setForm(emptyForm);
-      setOpen(false);
+      if (editingId) {
+        await alertsApi.updateDefinition(editingId, payload);
+      } else {
+        await alertsApi.createDefinition(payload);
+      }
+      closeForm();
       load(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
+  };
+
+  const groupName = (id: string | null) => {
+    if (!id) return t('groupFromCi');
+    return groups.find((group) => group.id === id)?.name || id;
   };
 
   if (loading) return <Spinner />;
@@ -87,7 +155,7 @@ export default function AlertDefinitionsPage() {
         title={t('definitionsTitle')}
         description={t('definitionsDescription')}
         action={!open ? (
-          <button type="button" onClick={() => setOpen(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+          <button type="button" onClick={startCreate} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
             {t('newDefinition')}
           </button>
         ) : undefined}
@@ -95,10 +163,24 @@ export default function AlertDefinitionsPage() {
       {error && <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
       {open && (
         <Card className="mb-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">
+            {editingId ? t('editDefinition') : t('newDefinition')}
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block text-sm">
               <span className="font-medium text-gray-700">{t('name')}</span>
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium text-gray-700">{t('sortOrder')}</span>
+              <input
+                type="number"
+                step={1}
+                value={form.sort_order}
+                onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <span className="mt-1 block text-xs text-gray-500">{t('sortOrderHint')}</span>
             </label>
             <label className="block text-sm">
               <span className="font-medium text-gray-700">{t('source')}</span>
@@ -138,14 +220,22 @@ export default function AlertDefinitionsPage() {
                     <option value="low">low</option>
                   </select>
                 </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-gray-700">{t('urgency')}</span>
+                  <select value={form.urgency} onChange={(e) => setForm({ ...form, urgency: e.target.value })} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="high">high</option>
+                    <option value="medium">medium</option>
+                    <option value="low">low</option>
+                  </select>
+                </label>
               </>
             )}
           </div>
           <div className="mt-4 flex gap-3">
             <button type="button" onClick={() => void submit()} disabled={saving || !form.name.trim()} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm disabled:opacity-50">
-              {saving ? tActions('saving') : t('createDefinition')}
+              {saving ? tActions('saving') : editingId ? t('saveDefinition') : t('createDefinition')}
             </button>
-            <button type="button" onClick={() => { setOpen(false); setForm(emptyForm); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">{tActions('cancel')}</button>
+            <button type="button" onClick={closeForm} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">{tActions('cancel')}</button>
           </div>
         </Card>
       )}
@@ -153,21 +243,47 @@ export default function AlertDefinitionsPage() {
         {items.map((item) => (
           <Card key={item.id} className={item.is_active ? '' : 'opacity-60'}>
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
+              <button type="button" onClick={() => startEdit(item)} className="text-left min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-medium text-gray-500 tabular-nums">{t('orderLabel', { order: item.sort_order })}</span>
                   <h3 className="font-semibold text-gray-900">{item.name}</h3>
                   <Badge value={item.action} />
                   {item.severity && <Badge value={item.severity} />}
+                  {!item.is_active && <Badge value="inactive" />}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">{item.source || t('anySource')} · {item.workflow_key || item.impact || t('actionNone')}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void alertsApi.updateDefinition(item.id, { is_active: !item.is_active }).then(() => load(true))}
-                className="text-sm text-indigo-600 hover:text-indigo-800"
-              >
-                {item.is_active ? t('deactivate') : t('activate')}
+                <p className="text-xs text-gray-500 mt-1">
+                  {item.source || t('anySource')}
+                  {' · '}
+                  {t(actionLabelKey(item.action))}
+                  {item.action === 'incident' && (
+                    <>
+                      {' · '}
+                      {t('impact')}: {item.impact || '—'}
+                      {' · '}
+                      {t('urgency')}: {item.urgency || '—'}
+                      {' · '}
+                      {groupName(item.assignment_group_id)}
+                    </>
+                  )}
+                </p>
+                {item.description && <p className="text-sm text-gray-600 mt-2">{item.description}</p>}
               </button>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => startEdit(item)}
+                  className="text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  {t('editDefinition')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void alertsApi.updateDefinition(item.id, { is_active: !item.is_active }).then(() => load(true))}
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
+                  {item.is_active ? t('deactivate') : t('activate')}
+                </button>
+              </div>
             </div>
           </Card>
         ))}

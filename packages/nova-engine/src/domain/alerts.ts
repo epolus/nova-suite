@@ -247,11 +247,12 @@ async function applyDefinition(input: {
   tenantId: string;
   normalized: string;
 }): Promise<string | null> {
+  // Lowest sort_order wins. .find stops at the first match so later rules never run.
   const definitions = await db.getMany<DefinitionRow>(
     `SELECT id, source, severity, match_labels, severity_map, action, assignment_group_id, impact, urgency, workflow_key
      FROM alert_definitions
      WHERE tenant_id = current_tenant_id() AND is_active = true
-     ORDER BY sort_order, created_at`,
+     ORDER BY sort_order ASC, name ASC, created_at ASC`,
   );
   const definition = definitions.find((row) => definitionMatches(row, input.alert, normalizeSeverity(input.alert.severity, row.severity_map)));
   if (!definition) return null;
@@ -309,8 +310,9 @@ async function openMissedIncident(input: {
     `SELECT id, source, severity, match_labels, severity_map, action, assignment_group_id, impact, urgency, workflow_key
      FROM alert_definitions
      WHERE tenant_id = current_tenant_id() AND is_active = true
-     ORDER BY sort_order, created_at`,
+     ORDER BY sort_order ASC, name ASC, created_at ASC`,
   );
+  // Reuses the linked definition when present; otherwise the first ordered match only.
   const definition = linked ?? definitions.find((row) => definitionMatches(row, input.alert, normalizeSeverity(input.alert.severity, row.severity_map)));
   if (!definition || definition.action !== 'incident') return null;
   const changeNumber = await suppressingChange(input.ci.id);
