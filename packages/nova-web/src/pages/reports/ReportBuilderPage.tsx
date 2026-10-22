@@ -2,9 +2,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useTranslations } from 'use-intl';
+import { ChartColumn, ChartPie, Gauge, Table2 } from 'lucide-react';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
+import { Button } from '@/components/ui/button';
 import {
   reports,
   type ReportComponentConfig,
@@ -13,6 +15,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { hasReportingCreateRole } from '../../utils/roles';
 import { DATASET_LABELS } from './reportBuilderConfig';
+import { ReportTypeIcon } from './reportIcons';
 import { ResultPreview } from './ResultPreview';
 import { WidgetSettings } from './WidgetSettings';
 import {
@@ -242,34 +245,19 @@ export default function ReportBuilderPage() {
         action={(
           <div className="flex items-center gap-2">
             {isExistingReport && (
-              <Link
-                to={`/reports/${reportId}`}
-                className="px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50"
-              >
-                {t('viewMode')}
-              </Link>
+              <Button variant="outline" asChild>
+                <Link to={`/reports/${reportId}`}>{t('viewMode')}</Link>
+              </Button>
             )}
-            <button
-              onClick={() => void runReport()}
-              disabled={running}
-              className="px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-            >
+            <Button type="button" variant="outline" onClick={() => void runReport()} disabled={running}>
               {running ? t('running') : t('run')}
-            </button>
-            <button
-              onClick={() => void exportReport()}
-              disabled={exporting}
-              className="px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="button" variant="outline" onClick={() => void exportReport()} disabled={exporting}>
               {exporting ? t('exporting') : t('export')}
-            </button>
-            <button
-              onClick={() => void save()}
-              disabled={saving || !canEdit}
-              className="px-3 py-2 rounded-lg text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="button" onClick={() => void save()} disabled={saving || !canEdit}>
               {saving ? tActions('saving') : tActions('save')}
-            </button>
+            </Button>
           </div>
         )}
       />
@@ -284,30 +272,22 @@ export default function ReportBuilderPage() {
         <Card>
           <p className="text-xs uppercase tracking-wide text-gray-400">{t('palette')}</p>
           <div className="mt-3 space-y-2">
-            <button
-              onClick={() => addComponent('table')}
-              className="w-full text-left px-3 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
-            >
+            <Button type="button" variant="outline" className="h-auto w-full justify-start px-3 py-2" onClick={() => addComponent('table')}>
+              <Table2 />
               {t('addTable')}
-            </button>
-            <button
-              onClick={() => addComponent('kpi')}
-              className="w-full text-left px-3 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
-            >
+            </Button>
+            <Button type="button" variant="outline" className="h-auto w-full justify-start px-3 py-2" onClick={() => addComponent('kpi')}>
+              <Gauge />
               {t('addKpi')}
-            </button>
-            <button
-              onClick={() => addComponent('bar_chart')}
-              className="w-full text-left px-3 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
-            >
+            </Button>
+            <Button type="button" variant="outline" className="h-auto w-full justify-start px-3 py-2" onClick={() => addComponent('bar_chart')}>
+              <ChartColumn />
               {t('addBarChart')}
-            </button>
-            <button
-              onClick={() => addComponent('pie_chart')}
-              className="w-full text-left px-3 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
-            >
+            </Button>
+            <Button type="button" variant="outline" className="h-auto w-full justify-start px-3 py-2" onClick={() => addComponent('pie_chart')}>
+              <ChartPie />
               {t('addPieChart')}
-            </button>
+            </Button>
           </div>
           <p className="mt-4 text-xs text-gray-500">{t('paletteHint')}</p>
         </Card>
@@ -366,26 +346,29 @@ export default function ReportBuilderPage() {
                   onClick={() => setSelectedComponentId(component.id)}
                   className="text-left min-w-0 flex-1"
                 >
-                  <p className="text-xs uppercase text-gray-400">{component.type}</p>
+                  <p className="flex items-center gap-1.5 text-xs uppercase text-gray-400">
+                    <ReportTypeIcon type={component.type} className="size-3.5" />
+                    {component.type}
+                  </p>
                   <p className="text-sm font-semibold text-gray-800 truncate mt-1">{component.title || t('widgetFallback', { index: index + 1 })}</p>
                   <p className="text-xs text-gray-500 mt-1">{DATASET_LABELS[component.dataset]}</p>
                 </button>
                 <div className="flex gap-2 shrink-0">
-                  <button
-                    onClick={() => void previewComponent(component)}
-                    className="px-2 py-1 text-xs border border-gray-200 rounded-md hover:bg-gray-50"
-                  >
+                  <Button type="button" variant="outline" size="sm" onClick={() => void previewComponent(component)}>
                     {t('preview')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-600"
                     onClick={() => {
                       setState((prev) => ({ ...prev, components: prev.components.filter((entry) => entry.id !== component.id) }));
                       setSelectedComponentId((prev) => (prev === component.id ? null : prev));
                     }}
-                    className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded-md hover:bg-red-50"
                   >
                     {t('remove')}
-                  </button>
+                  </Button>
                 </div>
               </div>
               {previewById[component.id] && (

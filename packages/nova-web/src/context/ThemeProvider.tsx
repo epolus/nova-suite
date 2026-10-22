@@ -72,6 +72,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty('--color-primary', theme.primary_color);
+    root.style.setProperty('--primary', theme.primary_color);
+    root.style.setProperty('--ring', theme.primary_color);
     root.style.setProperty('--color-sidebar-bg', theme.sidebar_bg);
     root.style.setProperty('--color-sidebar-active', theme.sidebar_active_bg);
     root.style.setProperty('--color-content-bg', isDark ? (theme.dark_content_bg || DEFAULT_THEME.dark_content_bg!) : theme.content_bg);

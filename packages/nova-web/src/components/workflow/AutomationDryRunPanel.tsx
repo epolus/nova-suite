@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState } from 'react';
+import { Loader2, Play } from 'lucide-react';
 import { useTranslations } from 'use-intl';
+import { Button } from '@/components/ui/button';
 import { admin } from '../../api/client';
 import type { AutomationDryRunResult } from '../../api/types/automationDryRun';
 
@@ -59,15 +61,14 @@ export default function AutomationDryRunPanel({
           <p className="text-sm font-semibold text-gray-900">{t('title')}</p>
           <p className="text-xs text-gray-500">{t('description')}</p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={() => void run()}
           disabled={disabled || running}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
         >
-          <span aria-hidden>▶</span>
+          {running ? <Loader2 className="animate-spin" /> : <Play />}
           {running ? t('running') : t('play')}
-        </button>
+        </Button>
       </div>
 
       <div>

@@ -12,6 +12,7 @@ export default function TrendChartWidget({ instance }: DashboardWidgetProps) {
   const { data, isLoading, error } = useTrendSeries(config.dataset, config.metric, config.days ?? 30);
   const summaryMode = data?.kind === 'snapshot' ? 'latest' : 'sum';
   const summaryLabel = data?.kind === 'snapshot' ? tAnalytics('current') : tAnalytics('total');
+  const seriesLabel = tAnalytics(`metrics.${config.dataset}.${config.metric}` as 'metrics.incidents.opened');
 
   return (
     <div className="flex h-full flex-col px-1 py-1">
@@ -23,6 +24,7 @@ export default function TrendChartWidget({ instance }: DashboardWidgetProps) {
           emptyLabel={tStates('noData')}
           summaryMode={summaryMode}
           summaryLabel={summaryLabel}
+          seriesLabel={seriesLabel}
         />
       </div>
     </div>

@@ -3,6 +3,34 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* shadcn semantic colors. Utilities read these; values follow ThemeProvider tenant vars. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
@@ -27,6 +55,49 @@
     --color-dark-border: #475569;
     --color-dark-text-primary: #f1f5f9;
     --color-dark-text-muted: #94a3b8;
+
+    /* Light defaults. ThemeProvider overwrites --primary and --ring with the tenant primary. */
+    --background: var(--color-content-bg, #f1f5f9);
+    --foreground: #111827;
+    --card: #ffffff;
+    --card-foreground: #111827;
+    --popover: #ffffff;
+    --popover-foreground: #111827;
+    --primary: #4f46e5;
+    --primary-foreground: #ffffff;
+    --secondary: #f3f4f6;
+    --secondary-foreground: #1f2937;
+    --muted: #f3f4f6;
+    --muted-foreground: #4b5563;
+    --accent: #f3f4f6;
+    --accent-foreground: #111827;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: #e5e7eb;
+    --input: #e5e7eb;
+    --ring: #4f46e5;
+    --chart-1: var(--primary);
+    --chart-2: #16a34a;
+    --chart-3: #f97316;
+    --chart-4: #0891b2;
+    --chart-5: #a855f7;
+  }
+
+  html.dark {
+    --background: var(--color-dark-content-bg);
+    --foreground: var(--color-dark-text-primary);
+    --card: var(--color-dark-surface-bg);
+    --card-foreground: var(--color-dark-text-primary);
+    --popover: var(--color-dark-surface-bg);
+    --popover-foreground: var(--color-dark-text-primary);
+    --secondary: var(--color-dark-surface-bg);
+    --secondary-foreground: var(--color-dark-text-primary);
+    --muted: var(--color-dark-muted-bg);
+    --muted-foreground: var(--color-dark-text-muted);
+    --accent: var(--color-dark-muted-bg);
+    --accent-foreground: var(--color-dark-text-primary);
+    --border: var(--color-dark-border);
+    --input: var(--color-dark-border);
   }
 
   html {

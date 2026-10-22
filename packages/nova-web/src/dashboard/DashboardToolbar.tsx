@@ -47,7 +47,7 @@ export default function DashboardToolbar({
             title={t('settingsTitle')}
             aria-label={t('settingsTitle')}
           >
-            {DashboardIcons.settings()}
+            <DashboardIcons.settings />
           </Button>
         )}
       </div>
