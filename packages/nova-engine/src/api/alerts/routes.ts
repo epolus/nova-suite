@@ -131,7 +131,7 @@ router.get('/definitions', async (_req: Request, res: Response, next: NextFuncti
               action, assignment_group_id, impact, urgency, workflow_key, created_at, updated_at
        FROM alert_definitions
        WHERE tenant_id = current_tenant_id()
-       ORDER BY sort_order, name`,
+       ORDER BY sort_order ASC, name ASC`,
     );
     res.json({ alert_definitions: rows });
   } catch (err) { next(err); }
@@ -201,6 +201,43 @@ router.patch('/definitions/:id', async (req: Request, res: Response, next: NextF
       sets.push(`description = $${i++}`);
       vals.push(optionalText(req.body.description));
     }
+    if (req.body?.source !== undefined) {
+      sets.push(`source = $${i++}`);
+      vals.push(optionalText(req.body.source));
+    }
+    if (req.body?.severity !== undefined) {
+      sets.push(`severity = $${i++}`);
+      vals.push(optionalText(req.body.severity));
+    }
+    if (req.body?.match_labels !== undefined) {
+      sets.push(`match_labels = $${i++}::jsonb`);
+      vals.push(JSON.stringify(labelObject(req.body.match_labels)));
+    }
+    if (req.body?.sort_order !== undefined) {
+      if (!Number.isFinite(Number(req.body.sort_order))) throw new AppError(400, 'sort_order must be a number');
+      sets.push(`sort_order = $${i++}`);
+      vals.push(Number(req.body.sort_order));
+    }
+    if (req.body?.assignment_group_id !== undefined) {
+      sets.push(`assignment_group_id = $${i++}`);
+      vals.push(optionalText(req.body.assignment_group_id));
+    }
+    if (req.body?.impact !== undefined) {
+      const impact = optionalText(req.body.impact);
+      if (impact && !['low', 'medium', 'high'].includes(impact)) {
+        throw new AppError(400, 'impact must be low, medium, or high');
+      }
+      sets.push(`impact = $${i++}`);
+      vals.push(impact);
+    }
+    if (req.body?.urgency !== undefined) {
+      const urgency = optionalText(req.body.urgency);
+      if (urgency && !['low', 'medium', 'high'].includes(urgency)) {
+        throw new AppError(400, 'urgency must be low, medium, or high');
+      }
+      sets.push(`urgency = $${i++}`);
+      vals.push(urgency);
+    }
     if (req.body?.action !== undefined) {
       const action = optionalText(req.body.action);
       if (action !== 'none' && action !== 'incident' && action !== 'workflow') {
@@ -211,9 +248,13 @@ router.patch('/definitions/:id', async (req: Request, res: Response, next: NextF
       if (action === 'workflow') {
         sets.push(`workflow_key = $${i++}`);
         vals.push('notification_dispatch');
-      }
-      if (action !== 'workflow') {
+      } else {
         sets.push('workflow_key = NULL');
+      }
+      if (action !== 'incident') {
+        if (req.body?.impact === undefined) sets.push('impact = NULL');
+        if (req.body?.urgency === undefined) sets.push('urgency = NULL');
+        if (req.body?.assignment_group_id === undefined) sets.push('assignment_group_id = NULL');
       }
     }
     if (sets.length === 0) {
@@ -224,11 +265,12 @@ router.patch('/definitions/:id', async (req: Request, res: Response, next: NextF
     const result = await db.query(
       `UPDATE alert_definitions SET ${sets.join(', ')}
        WHERE id = $${i} AND tenant_id = current_tenant_id()
-       RETURNING id`,
+       RETURNING id, name, description, is_active, sort_order, source, severity, match_labels, severity_map,
+                 action, assignment_group_id, impact, urgency, workflow_key, created_at, updated_at`,
       vals,
     );
     if (result.rowCount === 0) throw new AppError(404, 'Alert definition not found');
-    res.json({ success: true });
+    res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
 

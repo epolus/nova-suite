@@ -23,6 +23,17 @@ export const alerts = {
     match_labels?: Record<string, string>;
     sort_order?: number;
   }) => request<AlertDefinition>('/alerts/definitions', { method: 'POST', body: JSON.stringify(data) }),
-  updateDefinition: (id: string, data: { is_active?: boolean; name?: string; action?: string }) =>
-    request<{ success: boolean }>(`/alerts/definitions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  updateDefinition: (id: string, data: {
+    is_active?: boolean;
+    name?: string;
+    description?: string | null;
+    source?: string | null;
+    severity?: string | null;
+    action?: 'none' | 'incident' | 'workflow';
+    impact?: string | null;
+    urgency?: string | null;
+    assignment_group_id?: string | null;
+    match_labels?: Record<string, string>;
+    sort_order?: number;
+  }) => request<AlertDefinition>(`/alerts/definitions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };

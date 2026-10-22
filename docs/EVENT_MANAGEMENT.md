@@ -1,6 +1,6 @@
 # Event management
 
-Monitoring events land in `events`, roll up into one open `alerts` row per source and fingerprint, and the first matching `alert_definitions` row decides what that episode does.
+Monitoring events land in `events`, roll up into one open `alerts` row per source and fingerprint, and the first matching `alert_definitions` row decides what that episode does. Active definitions are tried in ascending `sort_order` (then name). After the first match, no other rule runs.
 
 Schema `v00.01.22` is required. Apply `infra/postgres/migrations/v00.01.22__event_management.sql` and set `DB_SCHEMA_VERSION=v00.01.22`.
 
