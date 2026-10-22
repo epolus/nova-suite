@@ -1,0 +1,139 @@
+name: Bug report
+description: Something in Nova Suite is broken or behaves incorrectly
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug in **Nova Suite**. Please search [open and closed issues](https://github.com/epolus/nova-suite/issues?q=is%3Aissue) before submitting.
+
+        Do not include passwords, JWT or SSO tokens, API keys, connection strings, or personal data from a tenant. For vulnerabilities, open a [private security advisory](https://github.com/epolus/nova-suite/security/advisories/new) instead of a public issue.
+
+  - type: markdown
+    attributes:
+      value: |
+        Not sure this is a bug? Ask in [Q&A](https://github.com/epolus/nova-suite/discussions/new?category=q-a).
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Describe the bug
+      description: What went wrong, and what did you expect? Mention the tenant role you were using (admin, fulfiller, user, or a practice role) if it matters. If you plan to open a pull request, say so here.
+      placeholder: The incident SLA clock keeps running after the incident is resolved.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: product-area
+    attributes:
+      label: Product area
+      description: Which part of Nova Suite is affected?
+      multiple: true
+      options:
+        - Employee portal
+        - Service catalog and requests
+        - Incidents
+        - Major incidents
+        - Change management
+        - Problem management
+        - Releases
+        - Knowledge base
+        - CMDB
+        - Assets and discovery
+        - Events and alerts
+        - Slack / Teams
+        - Continual improvement
+        - Reports and dashboards
+        - Workflows and automation
+        - Administration
+        - Authentication and SSO
+        - AI assistant
+        - Notifications
+        - API
+        - Database and tenancy
+        - Deployment and operations
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Which part of the stack is involved? Nova Web is the Vite/React app, Nova Engine is the Express API, Nova Worker runs Temporal jobs, and `@nova-suite/shared` holds shared types and automation helpers.
+      multiple: true
+      options:
+        - nova-web
+        - nova-engine
+        - nova-worker
+        - nova-shared
+        - PostgreSQL / RLS
+        - Docker / Caddy
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running Nova Suite?
+      options:
+        - Docker Compose from this repository
+        - Published images (`docker-compose.deploy.yml`)
+        - Local dev servers (`npm run dev`)
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Release, git commit, or image tag (`NOVA_TAG`). Package version is in the root and workspace `package.json` files.
+      placeholder: e.g. 0.1.4 or engine-0.1.4
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How to reproduce
+      description: Steps from a signed-in role. Include the page or API route, and whether this is specific to one tenant.
+      placeholder: |
+        1. Sign in as fulfiller@acme.local
+        2. Open an incident and resolve it
+        3. The resolution SLA clock does not pause
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Browser console, Nova Engine, or Nova Worker output around the failure. Copy the text. Remove tokens, secrets, and tenant data.
+
+  - type: textarea
+    id: system-info
+    attributes:
+      label: Environment
+      description: Browser, OS, and anything else that affects the bug (Node.js version for local dev, PostgreSQL version, OIDC provider, AI provider).
+      placeholder: |
+        Browser: Chrome 131
+        OS: Ubuntu 24.04
+        Node: 24
+        Auth: local JWT / Google OIDC / Microsoft Entra ID
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Before submitting
+      description: By submitting this issue, you agree to follow the [contributing guidelines](https://github.com/epolus/nova-suite/blob/main/CONTRIBUTING.md).
+      options:
+        - label: I searched existing issues and the documentation
+          required: true
+        - label: This report contains no secrets, tokens, or personal data
+          required: true
