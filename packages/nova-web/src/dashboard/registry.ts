@@ -206,30 +206,6 @@ export function isKnownWidgetType(type: string): type is DashboardWidgetType {
   return REGISTRY_MAP.has(type as DashboardWidgetType);
 }
 
-export function getAllWidgetDefinitions(): DashboardWidgetDefinition[] {
-  return WIDGET_DEFINITIONS;
-}
-
-export function getAvailableWidgets(roles: string[] | undefined): DashboardWidgetDefinition[] {
-  return WIDGET_DEFINITIONS.filter((def) => {
-    if (!def.requiredRoles || def.requiredRoles.length === 0) return true;
-    return hasAnyRole(roles, def.requiredRoles);
-  });
-}
-
-export function getWidgetsByCategory(
-  roles: string[] | undefined,
-): Record<DashboardWidgetDefinition['category'], DashboardWidgetDefinition[]> {
-  const available = getAvailableWidgets(roles);
-  return {
-    stats: available.filter((w) => w.category === 'stats'),
-    lists: available.filter((w) => w.category === 'lists'),
-    alerts: available.filter((w) => w.category === 'alerts'),
-    breakdown: available.filter((w) => w.category === 'breakdown'),
-    trends: available.filter((w) => w.category === 'trends'),
-  };
-}
-
 function canAccessCatalogEntry(entry: DashboardWidgetCatalogEntry, roles: string[] | undefined): boolean {
   if (!entry.requiredRoles || entry.requiredRoles.length === 0) return true;
   return hasAnyRole(roles, entry.requiredRoles);
@@ -250,20 +226,4 @@ export function getWidgetCatalogEntries(roles: string[] | undefined): DashboardW
 
   const trendEntries = TREND_CATALOG_PRESETS.filter((entry) => canAccessCatalogEntry(entry, roles));
   return [...baseEntries, ...trendEntries].filter((entry) => canAccessCatalogEntry(entry, roles));
-}
-
-export function getCatalogEntry(catalogKey: string): DashboardWidgetCatalogEntry | undefined {
-  const fromPreset = TREND_CATALOG_PRESETS.find((entry) => entry.catalogKey === catalogKey);
-  if (fromPreset) return fromPreset;
-  const def = WIDGET_DEFINITIONS.find((item) => (item.catalogKey ?? item.type) === catalogKey);
-  if (!def) return undefined;
-  return {
-    catalogKey: def.catalogKey ?? def.type,
-    type: def.type,
-    titleKey: def.titleKey,
-    category: def.category,
-    defaultSize: def.defaultSize,
-    defaultConfig: def.defaultConfig,
-    requiredRoles: def.requiredRoles,
-  };
 }

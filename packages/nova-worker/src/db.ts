@@ -1,39 +1,11 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import {
+  assertRuntimeRoleCannotBypassRls as assertRoleCannotBypassRls,
+  checkSchemaCompatibility as checkSchema,
+  type SchemaCompatibilityCheck,
+} from '@nova-suite/shared/node';
 import { Pool, PoolClient } from 'pg';
 import { config } from './config';
-
-export type SchemaCompatibilityCheck = {
-  ok: boolean;
-  expectedVersion: string;
-  actualVersion: string | null;
-  reason:
-    | 'match'
-    | 'older_than_expected'
-    | 'newer_than_expected'
-    | 'no_migrations'
-    | 'migration_table_missing'
-    | 'invalid_expected_version'
-    | 'invalid_actual_version'
-    | 'check_failed';
-  errorCode?: string;
-};
-
-type SchemaVersionRow = { version: string };
-const SCHEMA_VERSION_PATTERN = /^v\d{2}\.\d{2}\.\d{2}$/;
-
-function isSchemaVersion(value: string): boolean {
-  return SCHEMA_VERSION_PATTERN.test(value);
-}
-
-function compareSchemaVersions(a: string, b: string): number {
-  const aParts = a.slice(1).split('.').map((part) => Number.parseInt(part, 10));
-  const bParts = b.slice(1).split('.').map((part) => Number.parseInt(part, 10));
-  for (let idx = 0; idx < 3; idx += 1) {
-    if (aParts[idx] > bParts[idx]) return 1;
-    if (aParts[idx] < bParts[idx]) return -1;
-  }
-  return 0;
-}
 
 const pool = new Pool({
   host: config.db.host,
@@ -80,30 +52,12 @@ export async function withTenantContext<T>(
   }
 }
 
-export type PgRoleBypassFlags = {
-  rolsuper: boolean;
-  rolbypassrls: boolean;
-};
-
-export function roleBypassesRls(role: PgRoleBypassFlags): boolean {
-  return role.rolsuper === true || role.rolbypassrls === true;
+export function assertRuntimeRoleCannotBypassRls(): Promise<void> {
+  return assertRoleCannotBypassRls(pool, config.db.user);
 }
 
-export async function assertRuntimeRoleCannotBypassRls(): Promise<void> {
-  const rows = await query<PgRoleBypassFlags>(
-    'SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user',
-  );
-  const row = rows[0];
-  if (!row) {
-    throw new Error('Connected database role was not found in pg_roles');
-  }
-  if (roleBypassesRls(row)) {
-    throw new Error(
-      `Database role "${config.db.user}" is superuser and/or BYPASSRLS. `
-      + 'Nova Suite must connect as POSTGRES_APP_USER (nova_runtime), not POSTGRES_USER. '
-      + 'FORCE ROW LEVEL SECURITY does not apply to superusers.',
-    );
-  }
+export function checkSchemaCompatibility(expectedVersion: string): Promise<SchemaCompatibilityCheck> {
+  return checkSchema(pool, expectedVersion);
 }
 
 export async function shutdown(): Promise<void> {
@@ -118,81 +72,4 @@ export async function heartbeat(workerName: string): Promise<void> {
      DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at`,
     [workerName],
   );
-}
-
-export async function getLatestSchemaVersion(): Promise<string | null> {
-  const rows = await query<SchemaVersionRow>(
-    'SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1',
-  );
-  return rows[0]?.version ?? null;
-}
-
-export async function checkSchemaCompatibility(expectedVersion: string): Promise<SchemaCompatibilityCheck> {
-  if (!isSchemaVersion(expectedVersion)) {
-    return {
-      ok: false,
-      expectedVersion,
-      actualVersion: null,
-      reason: 'invalid_expected_version',
-    };
-  }
-
-  try {
-    const actualVersion = await getLatestSchemaVersion();
-    if (actualVersion === null) {
-      return {
-        ok: false,
-        expectedVersion,
-        actualVersion: null,
-        reason: 'no_migrations',
-      };
-    }
-    if (!isSchemaVersion(actualVersion)) {
-      return {
-        ok: false,
-        expectedVersion,
-        actualVersion,
-        reason: 'invalid_actual_version',
-      };
-    }
-
-    if (actualVersion === expectedVersion) {
-      return {
-        ok: true,
-        expectedVersion,
-        actualVersion,
-        reason: 'match',
-      };
-    }
-
-    return {
-      ok: false,
-      expectedVersion,
-      actualVersion,
-      reason: compareSchemaVersions(actualVersion, expectedVersion) < 0
-        ? 'older_than_expected'
-        : 'newer_than_expected',
-    };
-  } catch (err) {
-    const code = typeof err === 'object' && err !== null && 'code' in err
-      ? String((err as { code: unknown }).code)
-      : undefined;
-    if (code === '42P01') {
-      return {
-        ok: false,
-        expectedVersion,
-        actualVersion: null,
-        reason: 'migration_table_missing',
-        errorCode: code,
-      };
-    }
-
-    return {
-      ok: false,
-      expectedVersion,
-      actualVersion: null,
-      reason: 'check_failed',
-      errorCode: code,
-    };
-  }
 }

@@ -676,8 +676,7 @@
       },
       "searchPlaceholder": "Search by number, title, description, category...",
       "empty": "No incidents found.",
-      "emptySearch": "No incidents matching \"{query}\"",
-      "exportFailed": "Failed to export incidents"
+      "emptySearch": "No incidents matching \"{query}\""
     },
     "requests": {
       "title": "Service Requests",
@@ -3048,11 +3047,6 @@
       },
       "filters": {
         "allOpen": "All Open"
-      },
-      "bulk": {
-        "assignGroup": "Assign Group",
-        "closeIncidents": "Close Incidents",
-        "confirmClose": "Close {count} incidents?"
       }
     },
     "reports": {

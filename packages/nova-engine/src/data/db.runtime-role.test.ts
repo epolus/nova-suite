@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { describe, expect, it } from 'vitest';
-import { roleBypassesRls } from './db';
+import { roleBypassesRls } from '@nova-suite/shared/node';
 
 describe('roleBypassesRls', () => {
   it('returns true for superusers even without BYPASSRLS', () => {

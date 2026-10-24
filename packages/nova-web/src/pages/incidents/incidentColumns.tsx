@@ -4,14 +4,14 @@ import type { Incident } from '../../api/client';
 import Badge from '../../components/Badge';
 import { type DataColumnDef } from '../../components/DataTable';
 import { formatDate } from '../../utils/dateTime';
-import type { useFieldLabel, usePriorityLabel, useStatusLabel } from '@/i18n/hooks';
+import type { useFieldLabel, usePriorityLabel } from '@/i18n/hooks';
 
 export type IncidentListLabels = {
   field: ReturnType<typeof useFieldLabel>;
   priority: ReturnType<typeof usePriorityLabel>;
-  status: ReturnType<typeof useStatusLabel>;
   emDash: string;
   slaBreached: string;
+  unassigned?: string;
 };
 
 export function buildColumns(listParams: Record<string, string>, labels: IncidentListLabels): DataColumnDef<Incident>[] {
@@ -67,7 +67,7 @@ export function buildColumns(listParams: Record<string, string>, labels: Inciden
     label: labels.field('assignedTo'),
     sortable: true,
     defaultVisible: true,
-    render: (inc) => <span className="text-gray-500">{inc.assigned_to_name || labels.emDash}</span>,
+    render: (inc) => <span className="text-gray-500">{inc.assigned_to_name || labels.unassigned || labels.emDash}</span>,
   },
   {
     key: 'impact',

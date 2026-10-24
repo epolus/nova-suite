@@ -1,14 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import {
-  buildIncomingWebhookPayload,
-  buildSlackChatPostPayload,
-  readSlackMessageTs,
-  type NotificationWebhookChannel,
-  type NotificationWebhookMessage,
-} from '@nova-suite/shared';
+import type { NotificationWebhookChannel, NotificationWebhookMessage } from '@nova-suite/shared';
+import { postChatWebhook } from '@nova-suite/shared/node';
 import type { PoolClient } from 'pg';
 import { log } from '@temporalio/activity';
-import { fetchPublicHttp, UnsafeHttpUrlError } from '../public-http-url';
 
 export type WebhookDispatchResult = {
   webhookId: string;
@@ -18,60 +12,6 @@ export type WebhookDispatchResult = {
   status?: number;
   error?: string;
 };
-
-type ChatPostResult = {
-  ok: boolean;
-  status?: number;
-  error?: string;
-  threadId?: string | null;
-};
-
-export async function postNotificationWebhook(
-  channel: NotificationWebhookChannel,
-  webhookUrl: string,
-  message: NotificationWebhookMessage,
-  threadId?: string | null,
-  slack?: { apiToken?: string | null; replyChannelId?: string | null },
-): Promise<ChatPostResult> {
-  try {
-    if (channel === 'slack' && slack?.apiToken && slack.replyChannelId) {
-      const res = await fetchPublicHttp('https://slack.com/api/chat.postMessage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${slack.apiToken}`,
-        },
-        body: JSON.stringify(buildSlackChatPostPayload(slack.replyChannelId, message, threadId)),
-      });
-      const raw = await res.text();
-      let parsed: unknown = null;
-      try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = null; }
-      const returnedTs = readSlackMessageTs(parsed);
-      const slackOk = Boolean(parsed && typeof parsed === 'object' && (parsed as { ok?: unknown }).ok === true);
-      if (!res.ok || !slackOk) {
-        return { ok: false, status: res.status, error: raw.slice(0, 500) || `HTTP ${res.status}` };
-      }
-      return { ok: true, status: res.status, threadId: returnedTs || threadId || null };
-    }
-    const res = await fetchPublicHttp(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildIncomingWebhookPayload(channel, message, threadId)),
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      return { ok: false, status: res.status, error: errText.slice(0, 500) || `HTTP ${res.status}` };
-    }
-    return { ok: true, status: res.status, threadId: threadId || null };
-  } catch (err) {
-    const messageText = err instanceof UnsafeHttpUrlError
-      ? err.message
-      : err instanceof Error
-        ? err.message
-        : 'webhook post failed';
-    return { ok: false, error: messageText };
-  }
-}
 
 type WebhookRow = {
   id: string;
@@ -121,13 +61,13 @@ export async function dispatchTenantWebhookNotifications(
       );
       threadId = existing.rows[0]?.external_thread_id || null;
     }
-    const posted = await postNotificationWebhook(
-      row.channel,
-      row.webhook_url,
-      message,
+    const posted = await postChatWebhook({
+      channel: row.channel,
+      webhookUrl: row.webhook_url,
       threadId,
-      { apiToken: row.api_token, replyChannelId: row.reply_channel_id },
-    );
+      apiToken: row.api_token,
+      replyChannelId: row.reply_channel_id,
+    }, message);
     if (incident && posted.ok) {
       try {
         await client.query(

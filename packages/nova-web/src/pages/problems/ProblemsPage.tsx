@@ -13,7 +13,8 @@ import DataTable, { type DataColumnDef } from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
 import { useResettingState } from '../../hooks/useSyncedState';
-import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
+import { useCsvExport } from '@/hooks/useCsvExport';
+import FilterPresetsBar from '@/components/FilterPresetsBar';
 import { formatDate } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
@@ -23,15 +24,10 @@ import { RecurrenceCandidatesModal } from './RecurrenceCandidatesModal';
 
 const DEFAULT_COLS = ['number', 'title', 'status', 'priority', 'assignment_group_name', 'incident_count', 'updated_at'];
 const PRESETS_KEY = 'nova_filter_presets_problems';
-
-interface FilterPreset {
-  id: string;
-  name: string;
-  search: string;
-  status: string;
-  priority: string;
-  columnFilters: Record<string, string>;
-}
+const PROBLEM_CSV_HEADERS: (keyof Problem & string)[] = [
+  'number', 'title', 'status', 'priority', 'assignment_group_name', 'assigned_to_name',
+  'incident_count', 'open_incident_count', 'updated_at', 'created_at',
+];
 
 type ProblemListLabels = {
   field: ReturnType<typeof useFieldLabel>;
@@ -72,7 +68,6 @@ function buildColumns(listParams: Record<string, string>, labels: ProblemListLab
 export default function ProblemsPage() {
   const tProblems = useTranslations('pages.problems');
   const tList = useTranslations('common.list');
-  const tFilters = useTranslations('common.filters');
   const tActions = useTranslations('common.actions');
   const tMaster = useTranslations('common.masterData');
   const tTable = useTranslations('common.table');
@@ -91,43 +86,15 @@ export default function ProblemsPage() {
     storageKey: 'problems',
   });
   const navigate = useNavigate();
-  const [exporting, setExporting] = useState(false);
+  const { exporting, exportCsv } = useCsvExport('problems');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const invalidateProblems = useInvalidateProblems();
   const invalidateReference = useInvalidateReferenceData();
-  const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
-    `presets:${PRESETS_KEY}`,
-    [],
-    PRESETS_KEY,
-  );
-  const [showSaveInput, setShowSaveInput] = useState(false);
-  const [savePresetName, setSavePresetName] = useState('');
   const [showRecurrenceModal, setShowRecurrenceModal] = useState(false);
 
   const status = params.filters.status || 'all';
   const priority = params.filters.priority || 'all';
-
-  const apiParams = useMemo(() => {
-    const p: Record<string, string> = {};
-    if (status !== 'all') p.status = status;
-    if (priority !== 'all') p.priority = priority;
-    if (params.search) p.search = params.search;
-    if (params.sort) {
-      p.sort_by = params.sort;
-      p.sort_dir = params.dir;
-    }
-    for (const [col, val] of Object.entries(params.columnFilters)) {
-      if (val) p[`cf.${col}`] = val;
-    }
-    return p;
-  }, [status, priority, params.search, params.sort, params.dir, params.columnFilters]);
-
-  const { data: listResult, isLoading: loading, isFetching } = useProblemsList(apiParams, params.page);
-  const data: Problem[] = listResult?.problems ?? [];
-  const pagination = listResult?.pagination ?? null;
-  const selectionKey = `${params.page}|${isFetching}|${JSON.stringify(apiParams)}`;
-  const [selectedIds, setSelectedIds] = useResettingState<string[]>([], selectionKey);
 
   const getListParams = useCallback((): Record<string, string> => {
     const lp: Record<string, string> = {};
@@ -141,34 +108,22 @@ export default function ProblemsPage() {
     return lp;
   }, [status, priority, params.search, params.sort, params.dir]);
 
+  const apiParams = useMemo(() => {
+    const p = getListParams();
+    for (const [col, val] of Object.entries(params.columnFilters)) {
+      if (val) p[`cf.${col}`] = val;
+    }
+    return p;
+  }, [getListParams, params.columnFilters]);
+
+  const { data: listResult, isLoading: loading, isFetching } = useProblemsList(apiParams, params.page);
+  const data: Problem[] = listResult?.problems ?? [];
+  const pagination = listResult?.pagination ?? null;
+  const selectionKey = `${params.page}|${isFetching}|${JSON.stringify(apiParams)}`;
+  const [selectedIds, setSelectedIds] = useResettingState<string[]>([], selectionKey);
+
   const columns = useMemo(() => buildColumns(getListParams(), listLabels), [getListParams, listLabels]);
   const hasActiveFilter = !!params.search || status !== 'all' || priority !== 'all' || Object.values(params.columnFilters).some(Boolean);
-  const applyPreset = (preset: FilterPreset) => {
-    update({
-      search: preset.search,
-      filters: { status: preset.status, priority: preset.priority },
-      columnFilters: preset.columnFilters,
-      page: 1,
-    });
-  };
-  const savePreset = () => {
-    if (!savePresetName.trim()) return;
-    const next: FilterPreset[] = [...presets, {
-      id: crypto.randomUUID(),
-      name: savePresetName.trim(),
-      search: params.search,
-      status,
-      priority,
-      columnFilters: { ...params.columnFilters },
-    }];
-    setPresets(next);
-    setSavePresetName('');
-    setShowSaveInput(false);
-  };
-  const deletePreset = (id: string) => {
-    const next = presets.filter((p) => p.id !== id);
-    setPresets(next);
-  };
 
   const handleBulkClose = async () => {
     if (selectedIds.length === 0) return;
@@ -181,67 +136,6 @@ export default function ProblemsPage() {
       invalidateReference.problemPicker();
     } finally {
       setBulkLoading(false);
-    }
-  };
-
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      const allRows = selectedIds.length > 0
-        ? data.filter((row) => selectedIds.includes(row.id))
-        : await (async () => {
-            const apiParams: Record<string, string> = {};
-            if (status !== 'all') apiParams.status = status;
-            if (priority !== 'all') apiParams.priority = priority;
-            if (params.search) apiParams.search = params.search;
-            if (params.sort) {
-              apiParams.sort_by = params.sort;
-              apiParams.sort_dir = params.dir;
-            }
-            for (const [col, val] of Object.entries(params.columnFilters)) {
-              if (val) apiParams[`cf.${col}`] = val;
-            }
-            const firstPage = await problemsApi.list(apiParams, 1, 100);
-            const rows = [...firstPage.problems];
-            for (let page = 2; page <= firstPage.pagination.pages; page += 1) {
-              const nextPage = await problemsApi.list(apiParams, page, 100);
-              rows.push(...nextPage.problems);
-            }
-            return rows;
-          })();
-      const headers = ['number', 'title', 'status', 'priority', 'assignment_group_name', 'assigned_to_name', 'incident_count', 'open_incident_count', 'updated_at', 'created_at'];
-      const getField = (row: Problem, header: string): unknown => {
-        switch (header) {
-          case 'number': return row.number;
-          case 'title': return row.title;
-          case 'status': return row.status;
-          case 'priority': return row.priority;
-          case 'assignment_group_name': return row.assignment_group_name;
-          case 'assigned_to_name': return row.assigned_to_name;
-          case 'incident_count': return row.incident_count;
-          case 'open_incident_count': return row.open_incident_count;
-          case 'updated_at': return row.updated_at;
-          case 'created_at': return row.created_at;
-          default: return '';
-        }
-      };
-      const csvEscape = (value: unknown) => {
-        const str = String(value ?? '');
-        return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-      };
-      const lines = [headers.join(','), ...allRows.map((row) => headers.map((h) => csvEscape(getField(row, h))).join(','))];
-      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = selectedIds.length > 0 ? `problems-selected-${ts}.csv` : `problems-${ts}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } finally {
-      setExporting(false);
     }
   };
 
@@ -266,37 +160,18 @@ export default function ProblemsPage() {
       {showRecurrenceModal && (
         <RecurrenceCandidatesModal onClose={() => setShowRecurrenceModal(false)} />
       )}
-      {isAgent && (presets.length > 0 || hasActiveFilter) && (
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-xs font-medium text-gray-400">{tFilters('saved')}</span>
-          {presets.map((preset) => (
-            <div key={preset.id} className="flex items-center gap-0.5 pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700">
-              <button onClick={() => applyPreset(preset)} className="hover:text-indigo-600 transition-colors">{preset.name}</button>
-              <button onClick={() => deletePreset(preset.id)} className="ml-1 text-gray-300 hover:text-red-500 transition-colors leading-none">&#10005;</button>
-            </div>
-          ))}
-          {showSaveInput ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                autoFocus
-                value={savePresetName}
-                onChange={(e) => setSavePresetName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') { setShowSaveInput(false); setSavePresetName(''); } }}
-                placeholder={tFilters('filterNamePlaceholder')}
-                className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-hidden focus:ring-1 focus:ring-indigo-400 w-36"
-              />
-              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">{tActions('save')}</button>
-              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">{tActions('cancel')}</button>
-            </div>
-          ) : hasActiveFilter && (
-            <button
-              onClick={() => setShowSaveInput(true)}
-              className="px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
-            >
-              + {tFilters('saveCurrent')}
-            </button>
-          )}
-        </div>
+      {isAgent && (
+        <FilterPresetsBar
+          storageKey={PRESETS_KEY}
+          current={{ search: params.search, status, priority, columnFilters: params.columnFilters }}
+          hasActiveFilter={hasActiveFilter}
+          onApply={(preset) => update({
+            search: preset.search,
+            filters: { status: preset.status, priority: preset.priority },
+            columnFilters: preset.columnFilters,
+            page: 1,
+          })}
+        />
       )}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
@@ -324,7 +199,14 @@ export default function ProblemsPage() {
             </button>
           ))}
           {isAgent && (
-            <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exporting}
+              onClick={() => exportCsv(PROBLEM_CSV_HEADERS, selectedIds, data, (page) =>
+                problemsApi.list(apiParams, page, 100).then((r) => ({ rows: r.problems, pages: r.pagination.pages })),
+              )}
+            >
               {exporting ? tList('exporting') : tList('exportCsv')}
             </Button>
           )}

@@ -22,11 +22,14 @@ import {
   resolveCredentialTemplateValues,
   validateAutomationConfig,
 } from '@nova-suite/shared';
-import { loadCredentialSecretsBySlugs } from '../../credentials/vault';
 import { logger } from '../../logger';
 import { sendAutomationEmail } from './automation-send-email';
-import { postChatWebhook } from '../../notifications/webhook-dispatcher';
-import { assertPublicHttpUrl, UnsafeHttpUrlError } from '../../data/public-http-url';
+import {
+  assertPublicHttpUrl,
+  loadCredentialSecretsBySlugs,
+  postChatWebhook,
+  UnsafeHttpUrlError,
+} from '@nova-suite/shared/node';
 
 const router = Router();
 const processStartedAtMs = Date.now();
@@ -2357,7 +2360,7 @@ router.post('/automation/dry-run', async (req: Request, res: Response, next: Nex
     const client = await db.getClient();
     try {
       await db.setTenantContext(client, tenantId, userId, userRoles);
-      const rawCredMap = await loadCredentialSecretsBySlugs(client, tenantId, slugList);
+      const rawCredMap = await loadCredentialSecretsBySlugs(client, config.credentials.masterKey, tenantId, slugList);
       const credMap = await resolveCredentialTemplateValues(tenantId, rawCredMap);
 
       const runPromise = executeAutomationGraph({

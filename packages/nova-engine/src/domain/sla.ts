@@ -325,9 +325,6 @@ export async function resolveSlaDueAt(
   };
 }
 
-/** Alias kept for call sites that prefer the plural name. */
-export const resolveSlaDueAts = resolveSlaDueAt;
-
 export type OlaClockFields = {
   ola_group_id: string | null;
   ola_response_due_at: string | null;

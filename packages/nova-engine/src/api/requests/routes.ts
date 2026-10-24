@@ -5,6 +5,7 @@
 // GET    /api/requests/:id       – get request details
 // POST   /api/requests/:id/approve – approve/reject (admin/fulfiller)
 
+import { randomUUID } from 'node:crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import {
   authenticate,
@@ -423,8 +424,7 @@ router.post(
       const client = getRequestClient(req);
       const { items, requested_for, delivery_info } = req.body;
       const userId = req.user!.id;
-      const { v4: uuidv4 } = await import('uuid');
-      const batchId = uuidv4();
+      const batchId = randomUUID();
 
       const createdRequests: any[] = [];
 

@@ -15,41 +15,6 @@ export type BuilderError = {
   params?: Record<string, string | number>;
 };
 
-export const UNIFIED_PALETTE_TYPES: UnifiedBuilderNodeType[] = [
-  'start',
-  'activity',
-  'decision',
-  'delay',
-  'end',
-  'action.rest',
-  'action.ci.lookup',
-  'action.ci.create',
-  'decision.advanced',
-  'action.notification',
-  'action.ticket',
-  'action.assign',
-  'action.script',
-  'call.workflow',
-];
-
-/** i18n keys under `components.unifiedAutomationDesigner.nodeTypes` (dots in type ids are not valid message paths). */
-export const UNIFIED_NODE_TYPE_MESSAGE_KEYS: Record<UnifiedBuilderNodeType, string> = {
-  start: 'start',
-  activity: 'activity',
-  decision: 'decision',
-  delay: 'delay',
-  end: 'end',
-  'action.rest': 'actionRest',
-  'action.ci.lookup': 'actionCiLookup',
-  'action.ci.create': 'actionCiCreate',
-  'decision.advanced': 'decisionAdvanced',
-  'action.notification': 'actionNotification',
-  'action.ticket': 'actionTicket',
-  'action.assign': 'actionAssign',
-  'action.script': 'actionScript',
-  'call.workflow': 'callWorkflow',
-};
-
 export type UnifiedBuilderNodeData = {
   label: string;
   nodeType?: UnifiedBuilderNodeType;
@@ -123,11 +88,6 @@ export function resolveBuilderNodeType(node: Node<UnifiedBuilderNodeData>): Unif
     return label;
   }
   return 'activity';
-}
-
-export function nextBuilderId(prefix: UnifiedBuilderNodeType): string {
-  const safePrefix = prefix.replace(/[^a-zA-Z0-9]+/g, '_');
-  return `${safePrefix}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function parseBuilderFromConfig(raw: Record<string, unknown>): {

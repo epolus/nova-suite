@@ -9,17 +9,9 @@ export type BuilderState = {
   components: ReportComponentConfig[];
 };
 
-export function createStableId(): string {
-  const cryptoApi = globalThis.crypto as Crypto | undefined;
-  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
-    return cryptoApi.randomUUID();
-  }
-  return `rep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
 export function createTableComponent(): ReportComponentConfig {
   return {
-    id: createStableId(),
+    id: crypto.randomUUID(),
     type: 'table',
     title: 'New table',
     dataset: 'incidents',
@@ -32,7 +24,7 @@ export function createTableComponent(): ReportComponentConfig {
 
 export function createKpiComponent(): ReportComponentConfig {
   return {
-    id: createStableId(),
+    id: crypto.randomUUID(),
     type: 'kpi',
     title: 'New KPI',
     dataset: 'incidents',
@@ -43,7 +35,7 @@ export function createKpiComponent(): ReportComponentConfig {
 
 export function createBarChartComponent(): ReportComponentConfig {
   return {
-    id: createStableId(),
+    id: crypto.randomUUID(),
     type: 'bar_chart',
     title: 'New bar chart',
     dataset: 'incidents',
@@ -56,7 +48,7 @@ export function createBarChartComponent(): ReportComponentConfig {
 
 export function createPieChartComponent(): ReportComponentConfig {
   return {
-    id: createStableId(),
+    id: crypto.randomUUID(),
     type: 'pie_chart',
     title: 'New pie chart',
     dataset: 'incidents',
@@ -82,7 +74,7 @@ export function ensureComponentIds(components: ReportComponentConfig[]): ReportC
     if (typeof component.id === 'string' && component.id.trim().length > 0) {
       return component;
     }
-    return { ...component, id: createStableId() };
+    return { ...component, id: crypto.randomUUID() };
   });
 }
 

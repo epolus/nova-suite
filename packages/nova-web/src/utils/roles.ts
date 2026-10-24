@@ -75,10 +75,6 @@ export function hasReportingCreateRole(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'report_creator', 'report_admin']);
 }
 
-export function hasReportingAdminRole(roles: RoleList): boolean {
-  return hasAnyRole(roles, ['admin', 'report_admin']);
-}
-
 /** War room / postmortem edits (not read-only fulfiller). */
 export function canManageMajorIncidents(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'major_incident_manager']);

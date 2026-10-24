@@ -8,18 +8,15 @@
     "build": "tsc",
     "start": "node dist/worker.js",
     "dev": "tsx watch src/worker.ts",
-    "test": "vitest run src/**/*.test.ts"
+    "test": "vitest run src"
   },
   "dependencies": {
     "@nova-suite/shared": "0.1.4",
     "@temporalio/activity": "^1.24.0",
-    "@temporalio/client": "^1.24.0",
     "@temporalio/worker": "^1.24.0",
     "@temporalio/workflow": "^1.19.0",
     "nodemailer": "^10.1.7",
     "pg": "^8.23.1",
-    "pino": "^10.4.0",
-    "pino-pretty": "^13.2.0",
     "ssh2-sftp-client": "^12.0.1"
   },
   "devDependencies": {

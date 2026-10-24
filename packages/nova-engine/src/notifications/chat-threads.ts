@@ -3,7 +3,7 @@ import type { ChatInboundMessage } from '@nova-suite/shared';
 import { incidentStatusReply } from '@nova-suite/shared';
 import { db } from '../data/db';
 import { logger } from '../logger';
-import { postChatWebhook } from './webhook-dispatcher';
+import { postChatWebhook } from '@nova-suite/shared/node';
 
 type Sql = {
   query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[]; rowCount?: number | null }>;

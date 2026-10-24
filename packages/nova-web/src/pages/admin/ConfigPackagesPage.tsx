@@ -5,6 +5,7 @@ import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
 import { admin } from '../../api/client';
+import { downloadBlob } from '@/utils/download';
 import { formatDateTime } from '../../utils/dateTime';
 import type {
   ConfigDeploymentRun,
@@ -15,16 +16,11 @@ import type {
 type ExportMode = 'catalog' | 'catalog_item' | 'notifications' | 'notification_rule' | 'data_sources' | 'data_source';
 
 function downloadBundle(bundle: ConfigPackageBundle, checksum: string) {
-  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
   const safeName = bundle.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'nova-config-package';
-  a.href = url;
-  a.download = `${safeName}-${checksum.slice(0, 10)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  downloadBlob(
+    new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }),
+    `${safeName}-${checksum.slice(0, 10)}.json`,
+  );
 }
 
 function SummaryPill({ label, value }: { label: string; value: number }) {

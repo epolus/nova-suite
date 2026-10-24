@@ -6,7 +6,7 @@ import {
   isBlockedIp,
   toPublicHttpHref,
   type HostLookup,
-} from './public-http-url';
+} from '@nova-suite/shared/node';
 
 const publicLookup: HostLookup = async () => [{ address: '8.8.8.8', family: 4 }];
 const loopbackLookup: HostLookup = async () => [{ address: '127.0.0.1', family: 4 }];
