@@ -16,22 +16,6 @@ export function useRequestsList(
   });
 }
 
-export function useRequest(id: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.requests.detail(id ?? ''),
-    queryFn: () => requestsApi.get(id!),
-    enabled: !!id,
-  });
-}
-
-export function useRequestTasks(id: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.requests.tasks(id ?? ''),
-    queryFn: () => requestsApi.tasks(id!).then((r) => r.tasks),
-    enabled: !!id,
-  });
-}
-
 export function useInvalidateRequests() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: queryKeys.requests.all });

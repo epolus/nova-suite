@@ -12,5 +12,3 @@ export const CI_CLASS_ICON_VALUES = [
   'laptop',
   'other',
 ] as const;
-
-export type CiClassIconName = (typeof CI_CLASS_ICON_VALUES)[number];

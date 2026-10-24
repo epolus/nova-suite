@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request, uploadFile, BASE, getToken } from '../http';
 import type { Attachment } from '../types';
+import { downloadBlob } from '../../utils/download';
 
 export const attachments = {
   list: (entityType: string, entityId: string) =>
@@ -25,13 +26,7 @@ export const attachments = {
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch(`${BASE}/attachments/${id}/download`, { headers });
     if (!res.ok) throw new Error('Download failed');
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(await res.blob(), fileName);
   },
   previewUrl: async (id: string): Promise<string> => {
     const token = getToken();

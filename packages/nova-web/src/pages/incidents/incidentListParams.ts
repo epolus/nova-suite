@@ -1,11 +1,21 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-export interface FilterPreset {
-  id: string;
-  name: string;
-  search: string;
-  status: string;
-  columnFilters: Record<string, string>;
-}
+import type { Incident } from '@/api/client';
+
+export const INCIDENT_STATUS_OPTIONS = [
+  'active',
+  'all',
+  'new',
+  'assigned',
+  'in_progress',
+  'pending',
+  'resolved',
+  'closed',
+] as const;
+
+export const INCIDENT_CSV_HEADERS: (keyof Incident & string)[] = [
+  'number', 'title', 'status', 'priority', 'impact', 'urgency', 'assigned_to_name', 'assignment_group_name',
+  'caller_name', 'service_name', 'sla_due_at', 'sla_breached', 'created_at', 'updated_at',
+];
 
 export const PRESETS_KEY = 'nova_filter_presets_incidents';
 

@@ -1,26 +1,21 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import type { PoolClient } from 'pg';
-import { config } from '../config';
-
-function requireKey(): string {
-  if (!config.credentials.masterKey || config.credentials.masterKey.length < 16) {
-    throw new Error('CREDENTIALS_MASTER_KEY is not set or is too short (min 16 characters)');
-  }
-  return config.credentials.masterKey;
-}
+import type { Queryable } from './db-checks';
 
 export async function loadCredentialSecretsBySlugs(
-  client: PoolClient,
+  client: Queryable,
+  masterKey: string,
   tenantId: string,
   slugs: string[],
 ): Promise<Record<string, string>> {
   if (slugs.length === 0) return {};
-  const key = requireKey();
+  if (masterKey.length < 16) {
+    throw new Error('CREDENTIALS_MASTER_KEY is not set or is too short (min 16 characters)');
+  }
   const r = await client.query(
     `SELECT slug, pgp_sym_decrypt(secret_enc, $1)::text AS secret
      FROM tenant_credentials
      WHERE tenant_id = $2 AND slug = ANY($3::text[])`,
-    [key, tenantId, slugs],
+    [masterKey, tenantId, slugs],
   );
   const out: Record<string, string> = {};
   for (const row of r.rows as { slug: string; secret: string }[]) {

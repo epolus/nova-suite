@@ -9,8 +9,9 @@ import {
   resolveCredentialTemplateValues,
   toHttpActivityState,
 } from '@nova-suite/shared';
+import { config } from '../config';
 import { withTenantContext } from '../db';
-import { loadCredentialSecretsBySlugs } from '../credentials/vault';
+import { loadCredentialSecretsBySlugs } from '@nova-suite/shared/node';
 import { getEmailProvider } from './email-provider';
 
 export interface ExecuteAutomatedCatalogTaskInput {
@@ -100,7 +101,7 @@ export async function executeAutomatedCatalogTask(
     const request = reqRes.rows[0] as Record<string, unknown>;
     try {
       const slugList = collectCredSlugsFromAutomation(cfg);
-      const rawCredMap = await loadCredentialSecretsBySlugs(client, tenantId, slugList);
+      const rawCredMap = await loadCredentialSecretsBySlugs(client, config.credentials.masterKey, tenantId, slugList);
       const credMap = await resolveCredentialTemplateValues(tenantId, rawCredMap, (msg, meta) =>
         log.info(msg, meta),
       );

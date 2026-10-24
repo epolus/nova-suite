@@ -18,14 +18,6 @@ export const DEFAULT_COLS = [
 ];
 export const PRESETS_KEY = 'nova_filter_presets_request_tasks';
 
-export interface FilterPreset {
-  id: string;
-  name: string;
-  search: string;
-  status: string;
-  columnFilters: Record<string, string>;
-}
-
 export type RequestTaskListLabels = {
   field: ReturnType<typeof useFieldLabel>;
   emDash: string;
@@ -153,23 +145,7 @@ export function buildRequestTaskColumns(listLabels: RequestTaskListLabels): Data
   ];
 }
 
-export const REQUEST_TASK_CSV_HEADERS = [
+export const REQUEST_TASK_CSV_HEADERS: (keyof RequestTaskListItem & string)[] = [
   'number', 'name', 'task_type', 'status', 'request_number', 'service_item_name',
   'assigned_group_name', 'assigned_to_name', 'created_at', 'completed_at',
 ];
-
-export function getRequestTaskCsvField(row: RequestTaskListItem, header: string): unknown {
-  switch (header) {
-    case 'number': return row.number;
-    case 'name': return row.name;
-    case 'task_type': return row.task_type;
-    case 'status': return row.status;
-    case 'request_number': return row.request_number;
-    case 'service_item_name': return row.service_item_name;
-    case 'assigned_group_name': return row.assigned_group_name;
-    case 'assigned_to_name': return row.assigned_to_name;
-    case 'created_at': return row.created_at;
-    case 'completed_at': return row.completed_at;
-    default: return '';
-  }
-}

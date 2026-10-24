@@ -324,13 +324,13 @@ nova-suite/
 │   │       ├── automation-config.ts
 │   │       ├── catalog-links.ts  # Shared catalog link normalization
 │   │       ├── automation-builder-defaults.ts
-│   │       └── automation-fixtures.ts
+│   │       ├── automation-fixtures.ts
+│   │       └── node/             # Node-only helpers (`@nova-suite/shared/node`): safe HTTP, vault, chat webhooks, DB checks
 │   └── nova-worker/              # Temporal worker (activities + workflows)
 │       └── src/
 │           ├── worker.ts
 │           ├── config.ts
 │           ├── db.ts
-│           ├── credentials/      # Secret provider helpers
 │           ├── activities/       # Catalog, datasource, email, incidents, ...
 │           └── workflows/        # Fulfillment, sync, notifications, major incidents, ...
 ├── infra/

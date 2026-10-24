@@ -81,8 +81,6 @@ export const createServiceItemSchema = z.object({
   sla_hours: z.number().int().min(1).optional(),
 });
 
-export const updateServiceItemSchema = createServiceItemSchema.partial();
-
 // ─── Configuration Packages ───
 export const configExternalKeySchema = z
   .string()
@@ -676,25 +674,7 @@ export const addImprovementJournalSchema = z.object({
   content: z.string().min(1).max(10000),
 });
 
-// ─── Type Exports ───
-export type LoginInput = z.infer<typeof loginSchema>;
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type CreateRequestInput = z.infer<typeof createRequestSchema>;
-export type ApproveRequestInput = z.infer<typeof approveRequestSchema>;
-export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
-export type UpdateIncidentInput = z.infer<typeof updateIncidentSchema>;
-export type AddJournalEntryInput = z.infer<typeof addJournalEntrySchema>;
-export type IncidentLinkMajorIncidentInput = z.infer<typeof incidentLinkMajorIncidentSchema>;
-export type CreateProblemInput = z.infer<typeof createProblemSchema>;
-export type UpdateProblemInput = z.infer<typeof updateProblemSchema>;
-export type CreateChangeInput = z.infer<typeof createChangeSchema>;
-export type UpdateChangeInput = z.infer<typeof updateChangeSchema>;
 export const updateCIClassSchema = createCIClassSchema.partial();
 
-export type CreateCIClassInput = z.infer<typeof createCIClassSchema>;
-export type CreateCIInput = z.infer<typeof createCISchema>;
-export type UpdateCIInput = z.infer<typeof updateCISchema>;
-export type CreateCIRelationshipInput = z.infer<typeof createCIRelationshipSchema>;
+export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
 export type CreateMajorIncidentInput = z.infer<typeof createMajorIncidentSchema>;
-export type UpdateMajorIncidentInput = z.infer<typeof updateMajorIncidentSchema>;
-export type MajorIncidentResolveInput = z.infer<typeof majorIncidentResolveSchema>;

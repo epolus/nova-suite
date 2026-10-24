@@ -1,15 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { PoolClient } from 'pg';
 
-export const AI_SETTING_KEYS = [
-  'ai_triage_on_create',
-  'ai_auto_apply_priority',
-  'ess_auto_deflect',
-  'ess_deflect_confidence_threshold',
-] as const;
-
-export type AiSettingKey = (typeof AI_SETTING_KEYS)[number];
-
 export interface TenantAiSettings {
   ai_triage_on_create: boolean;
   ai_auto_apply_priority: boolean;
@@ -40,7 +31,7 @@ export async function loadTenantAiSettings(client: PoolClient): Promise<TenantAi
     `SELECT key, value FROM tenant_settings
      WHERE tenant_id = current_tenant_id()
        AND key = ANY($1::text[])`,
-    [AI_SETTING_KEYS],
+    [Object.keys(DEFAULTS)],
   );
   const map = new Map<string, string>();
   for (const row of res.rows as Array<{ key: string; value: string }>) {
