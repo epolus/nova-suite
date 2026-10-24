@@ -912,8 +912,14 @@ router.post('/:id/tasks/:taskId/complete',
         throw BadRequest('Approval tasks require outcome: approved or rejected');
       }
 
-      // Prevent self-approval: the employee the approval is about cannot approve their own gate (matches createRequestTasks subject = COALESCE(requested_for, requester_id)).
-      if (task.task_type === 'approval' && !isAdmin && approvalSubjectId === userId) {
+      // Prevent classic manager-of-subject self-approval. Explicit assignees
+      // (group_manager) may still decide even when they are the request subject.
+      if (
+        task.task_type === 'approval'
+        && !isAdmin
+        && approvalSubjectId === userId
+        && !task.assigned_to
+      ) {
         throw BadRequest('You cannot approve or reject your own request');
       }
 

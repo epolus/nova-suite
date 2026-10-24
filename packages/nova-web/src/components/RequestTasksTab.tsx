@@ -207,7 +207,11 @@ export default function RequestTasksTab({ filterKey }: Props) {
     const isActive = task.status === 'in_progress';
     const isLoading = actionLoadingId === task.id;
     const approvalSubjectId = task.requested_for ?? task.requester_id;
-    const isSelfApprovalBlocked = task.task_type === 'approval' && approvalSubjectId === user?.id;
+    // Block only classic manager-of-subject self-approval; explicit assignees may decide.
+    const isSelfApprovalBlocked =
+      task.task_type === 'approval'
+      && approvalSubjectId === user?.id
+      && !task.assigned_to;
     const canAssign = task.task_type !== 'approval' && !task.assigned_to && task.status !== 'completed';
     const canApprove = isActive && task.task_type === 'approval' && !isSelfApprovalBlocked;
     const canComplete = isActive && task.task_type !== 'approval';
