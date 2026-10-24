@@ -36,8 +36,13 @@ export function TaskCard({
   const tActions = useTranslations('common.actions');
   const isActive = task.status === 'in_progress';
   const isDone = ['completed', 'skipped', 'rejected', 'failed'].includes(task.status);
+  // Block only classic manager-of-subject self-approval. An explicit assignee
+  // (group_manager) may still decide even when they opened the request.
   const isSelfApprovalBlocked =
-    task.task_type === 'approval' && approvalSubjectId !== undefined && approvalSubjectId === currentUserId;
+    task.task_type === 'approval'
+    && approvalSubjectId !== undefined
+    && approvalSubjectId === currentUserId
+    && !task.assigned_to;
   const canAssign = task.task_type !== 'approval' && !task.assigned_to && Boolean(currentUserId);
   const canApprove = task.task_type === 'approval' && !isSelfApprovalBlocked;
   const canComplete = task.task_type !== 'approval';
