@@ -120,7 +120,7 @@ function ReportBarChart({
   return (
     <ChartContainer
       config={chartConfig(points, seriesLabel)}
-      className="aspect-auto w-full min-h-[160px]"
+      className="!aspect-auto w-full min-h-[160px] min-w-0"
       style={{ height: Math.max(160, rows.length * 32) }}
     >
       <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 12, top: 4, bottom: 4 }}>
@@ -164,8 +164,8 @@ function ReportPieChart({
 }) {
   const rows = chartRows(points);
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <ChartContainer config={chartConfig(points, seriesLabel)} className="aspect-auto min-h-[180px] w-full flex-1">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
+      <ChartContainer config={chartConfig(points, seriesLabel)} className="!aspect-auto min-h-0 min-w-0 w-full flex-1">
         <PieChart>
           <ChartTooltip content={<ChartTooltipContent nameKey="key" />} />
           <Pie
@@ -245,7 +245,7 @@ export function ReportResultCard({
         {result.points.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('noChartData')}</p>
         ) : (
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]">
             <ReportBarChart points={result.points} seriesLabel={title} onOpen={arranging ? undefined : openPoint} />
           </div>
         )}
