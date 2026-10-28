@@ -1,17 +1,13 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { NodeType, type PaletteItemOrGroup, type UISchema } from '@workflowbuilder/sdk';
+import { defineNode, scope } from './defineNode';
 import {
-  getScope,
-  NodeType,
-  sharedProperties,
-  type PaletteItem,
-  type PaletteItemOrGroup,
-  type UISchema,
-} from '@workflowbuilder/sdk';
-import { UNIFIED_BUILDER_NODE_DEFAULTS, UNIFIED_BUILDER_NODE_LABELS } from '@nova-suite/shared';
-import type { UnifiedBuilderNodeType } from '@nova-suite/shared';
-import { NODE_TYPE_ICONS } from './icons';
-
-const scope = getScope;
+  actionApprovalNode,
+  loopForeachNode,
+  parallelForkNode,
+  parallelJoinNode,
+  variablesSetNode,
+} from './extensionNodeTypes';
 
 const methodOptions = [
   { label: 'GET', value: 'GET' },
@@ -58,17 +54,6 @@ const scriptRuntimeOptions = [
   { label: 'JavaScript', value: 'js' },
 ];
 
-function baseUi(extra: UISchema[]): UISchema {
-  return {
-    type: 'VerticalLayout',
-    elements: [
-      { type: 'Text', scope: scope('properties.label'), label: 'Label' },
-      { type: 'TextArea', scope: scope('properties.description'), label: 'Description' },
-      ...extra,
-    ],
-  };
-}
-
 function httpFields(): UISchema[] {
   return [
     { type: 'Select', scope: scope('properties.method'), label: 'Method' },
@@ -78,42 +63,6 @@ function httpFields(): UISchema[] {
     { type: 'Select', scope: scope('properties.onError'), label: 'On error' },
     { type: 'Text', scope: scope('properties.fallbackNodeId'), label: 'Fallback node id' },
   ];
-}
-
-function defineNode(
-  type: UnifiedBuilderNodeType,
-  opts: {
-    templateType?: NodeType;
-    description: string;
-    schemaProperties: Record<string, unknown>;
-    uischemaElements: UISchema[];
-    defaults: Record<string, unknown>;
-  },
-): PaletteItem {
-  const label = UNIFIED_BUILDER_NODE_LABELS[type];
-  const builtDefaults = UNIFIED_BUILDER_NODE_DEFAULTS[type];
-  return {
-    label,
-    description: opts.description,
-    type,
-    icon: NODE_TYPE_ICONS[type],
-    templateType: opts.templateType ?? NodeType.Node,
-    ...(type === 'start' ? { isStartNode: true } : {}),
-    defaultPropertiesData: {
-      label: builtDefaults.label || label,
-      description: opts.description,
-      ...opts.defaults,
-    },
-    schema: {
-      type: 'object',
-      required: ['label'],
-      properties: {
-        ...sharedProperties,
-        ...opts.schemaProperties,
-      },
-    },
-    uischema: baseUi(opts.uischemaElements),
-  } as PaletteItem;
 }
 
 const startNode = defineNode('start', {
@@ -360,11 +309,30 @@ const callWorkflowNode = defineNode('call.workflow', {
 export const workflowNodeTypes: PaletteItemOrGroup[] = [
   {
     label: 'Flow',
-    groupItems: [startNode, activityNode, decisionNode, decisionAdvancedNode, delayNode, endNode],
+    groupItems: [
+      startNode,
+      activityNode,
+      decisionNode,
+      decisionAdvancedNode,
+      delayNode,
+      loopForeachNode,
+      parallelForkNode,
+      parallelJoinNode,
+      variablesSetNode,
+      endNode,
+    ],
   },
   {
     label: 'Actions',
-    groupItems: [actionRestNode, actionCiLookupNode, actionCiCreateNode, actionNotificationNode, actionTicketNode, actionAssignNode],
+    groupItems: [
+      actionRestNode,
+      actionCiLookupNode,
+      actionCiCreateNode,
+      actionNotificationNode,
+      actionTicketNode,
+      actionAssignNode,
+      actionApprovalNode,
+    ],
   },
   {
     label: 'Advanced',

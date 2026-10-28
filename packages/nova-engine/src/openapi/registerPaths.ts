@@ -18,6 +18,9 @@ import {
   loginSchema,
   paginationSchema,
   registerSchema,
+  serviceNowApplySchema,
+  serviceNowConnectionSchema,
+  serviceNowCreateRunSchema,
   updateCIClassSchema,
   updateCISchema,
   updateIncidentSchema,
@@ -538,5 +541,65 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
     summary: 'List recent config package deployment runs',
     request: { query: configPackageRunsQuerySchema },
     responses: { 200: { description: 'Run history' } },
+  });
+
+  const snBase = '/admin/migrations/servicenow';
+  const jsonBody = (schema: z.ZodType) => ({
+    body: { content: { 'application/json': { schema } }, required: true },
+  });
+  registry.registerPath({
+    method: 'post',
+    path: `${snBase}/test-connection`,
+    tags: ['ServiceNow migration'],
+    summary: 'Probe a ServiceNow instance with a vault credential (read-only)',
+    request: jsonBody(serviceNowConnectionSchema),
+    responses: { 200: { description: 'Table access, flow storage and value encoding' } },
+  });
+  registry.registerPath({
+    method: 'get',
+    path: `${snBase}/catalogs`,
+    tags: ['ServiceNow migration'],
+    summary: 'List catalogs, categories and catalog items for selection',
+    request: { query: serviceNowConnectionSchema },
+    responses: { 200: { description: 'Catalog structure' } },
+  });
+  registry.registerPath({
+    method: 'post',
+    path: `${snBase}/runs`,
+    tags: ['ServiceNow migration'],
+    summary: 'Start an extract + transform run (preview only, nothing is applied)',
+    request: jsonBody(serviceNowCreateRunSchema),
+    responses: { 202: { description: 'Run queued' }, 409: { description: 'Another run is in progress' } },
+  });
+  registry.registerPath({
+    method: 'get',
+    path: `${snBase}/runs`,
+    tags: ['ServiceNow migration'],
+    summary: 'List recent migration runs',
+    responses: { 200: { description: 'Run summaries' } },
+  });
+  registry.registerPath({
+    method: 'get',
+    path: `${snBase}/runs/{id}`,
+    tags: ['ServiceNow migration'],
+    summary: 'Get run status, progress and migration report',
+    request: { params: uuidParam },
+    responses: { 200: { description: 'Run' }, 404: { description: 'Not found' } },
+  });
+  registry.registerPath({
+    method: 'get',
+    path: `${snBase}/runs/{id}/package`,
+    tags: ['ServiceNow migration'],
+    summary: 'Get the generated configuration package',
+    request: { params: uuidParam },
+    responses: { 200: { description: 'nova.config-package' }, 409: { description: 'Not ready' } },
+  });
+  registry.registerPath({
+    method: 'post',
+    path: `${snBase}/runs/{id}/apply`,
+    tags: ['ServiceNow migration'],
+    summary: 'Apply selected items from the generated package',
+    request: { params: uuidParam, ...jsonBody(serviceNowApplySchema) },
+    responses: { 200: { description: 'Apply result' }, 400: { description: 'Validation failed' } },
   });
 }

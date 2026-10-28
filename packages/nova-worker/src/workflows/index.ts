@@ -10,6 +10,9 @@ export type { FulfillmentInput, TaskCompletionSignal } from './catalog-fulfillme
 export { dataSourceSync } from './datasource-sync';
 export type { DataSourceSyncInput } from './datasource-sync';
 
+export { serviceNowCatalogMigration } from './servicenow-migration';
+export type { ServiceNowMigrationWorkflowInput } from './servicenow-migration';
+
 export { knowledgeApproval, kbApprovalDecisionSignal } from './knowledge-approval';
 export type { KnowledgeApprovalInput, KnowledgeApprovalDecisionSignal } from './knowledge-approval';
 

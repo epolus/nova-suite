@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.22`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.23`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 

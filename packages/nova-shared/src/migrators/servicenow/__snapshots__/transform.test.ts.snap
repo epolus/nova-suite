@@ -1,0 +1,622 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`transformServiceNowSnapshot (synthetic fixture) > matches the golden package 1`] = `
+{
+  "package": {
+    "contents": {
+      "catalog": {
+        "categories": [
+          {
+            "description": null,
+            "external_key": "sn/ce000000000000000000000000000002",
+            "icon": "folder",
+            "is_active": true,
+            "name": "Hardware / Laptops",
+            "sort_order": 200,
+          },
+          {
+            "description": null,
+            "external_key": "sn/ce000000000000000000000000000003",
+            "icon": "folder",
+            "is_active": true,
+            "name": "Access",
+            "sort_order": 300,
+          },
+          {
+            "description": "Items migrated from ServiceNow without a category in the selection.",
+            "external_key": "sn/uncategorized",
+            "icon": "folder",
+            "is_active": true,
+            "name": "ServiceNow (uncategorized)",
+            "sort_order": 9999,
+          },
+        ],
+        "service_items": [
+          {
+            "approval_required": false,
+            "category_external_key": "sn/ce000000000000000000000000000002",
+            "custom_attributes": {
+              "servicenow": {
+                "catalogs": [
+                  "ca000000000000000000000000000001",
+                ],
+                "flow_name": "Standard Laptop Fulfillment",
+                "flow_sys_id": "f1000000000000000000000000000001",
+                "instance": "https://example.service-now.com",
+                "sys_class_name": "sc_cat_item",
+                "sys_id": "a1000000000000000000000000000001",
+                "unmapped_steps": [
+                  {
+                    "definition": "Create Jira Issue",
+                    "inputs": {
+                      "project": "IT",
+                      "summary": "Laptop {{trigger.request_item.number}}",
+                    },
+                    "label": "11. Create Jira Issue",
+                  },
+                ],
+              },
+            },
+            "description": "Choose a model.
+Delivered within a week.",
+            "external_key": "sn/a1000000000000000000000000000001",
+            "form_schema": {
+              "fields": [
+                {
+                  "label": "Requested for",
+                  "name": "requested_for",
+                  "required": true,
+                  "type": "user_ref",
+                },
+                {
+                  "defaultValue": "MacBook Pro 14"",
+                  "label": "Model",
+                  "name": "laptop_model",
+                  "options": [
+                    "MacBook Pro 14"",
+                    "MacBook Pro 16"",
+                    "ThinkPad X1",
+                  ],
+                  "required": true,
+                  "type": "select",
+                },
+                {
+                  "helpText": "Why do you need it?",
+                  "label": "Business justification",
+                  "name": "justification",
+                  "required": true,
+                  "type": "textarea",
+                },
+                {
+                  "label": "Needed by",
+                  "name": "needed_by",
+                  "type": "date",
+                },
+                {
+                  "defaultValue": "true",
+                  "label": "Include accessories",
+                  "name": "accessories",
+                  "type": "checkbox",
+                },
+                {
+                  "label": "Cost center",
+                  "name": "cost_center",
+                  "type": "text",
+                },
+                {
+                  "label": "Contact email",
+                  "name": "contact_email",
+                  "type": "email",
+                },
+              ],
+            },
+            "icon": "box",
+            "is_active": true,
+            "name": "Standard Laptop",
+            "price": 1299,
+            "short_description": "Request a standard laptop",
+            "sla_hours": 72,
+            "tasks": [
+              {
+                "assigned_group_name": "IT Approvers",
+                "automation_config": {
+                  "approval_mode": "group_members",
+                },
+                "description": null,
+                "external_key": "sn/a1000000000000000000000000000001/approval",
+                "instructions": "Please review and approve or reject this request.",
+                "is_active": true,
+                "name": "Approval",
+                "sla_hours": null,
+                "task_order": 1,
+                "task_type": "approval",
+              },
+              {
+                "assigned_group_name": null,
+                "automation_config": {
+                  "kind": "state_machine",
+                  "schemaVersion": 1,
+                  "startAt": "ask_for_approval",
+                  "states": [
+                    {
+                      "entity": "request",
+                      "fields": {},
+                      "id": "update_record",
+                      "operation": "close",
+                      "transitions": [
+                        {
+                          "to": "end_success",
+                          "when": "success",
+                        },
+                      ],
+                      "type": "action.ticket",
+                    },
+                    {
+                      "id": "subflow",
+                      "input": {
+                        "laptop": "{{request.number}}",
+                      },
+                      "transitions": [
+                        {
+                          "to": "update_record",
+                          "when": "success",
+                        },
+                      ],
+                      "type": "call.workflow",
+                      "workflowType": "sn_notify_asset_team",
+                    },
+                    {
+                      "code": "/* Migrated from ServiceNow (10. Run Script). Port this logic: GlideRecord and other ServiceNow APIs are unavailable.
+var gr = new GlideRecord('alm_asset'); gr.query();
+*/
+throw new Error('ServiceNow script step "run_script" has not been ported yet');
+",
+                      "id": "run_script",
+                      "runtime": "js",
+                      "transitions": [
+                        {
+                          "to": "subflow",
+                          "when": "success",
+                        },
+                      ],
+                      "type": "action.script",
+                    },
+                    {
+                      "entity": "request",
+                      "fields": {
+                        "notes": "Prepared {{loop.for_each.item}}",
+                      },
+                      "id": "add_worknote",
+                      "operation": "update",
+                      "transitions": [
+                        {
+                          "to": "for_each",
+                          "when": "success",
+                        },
+                      ],
+                      "type": "action.ticket",
+                    },
+                    {
+                      "id": "for_each",
+                      "itemsExpr": "{{vars.accessory_list}}",
+                      "transitions": [
+                        {
+                          "to": "add_worknote",
+                          "when": "item",
+                        },
+                        {
+                          "to": "run_script",
+                          "when": "done",
+                        },
+                      ],
+                      "type": "loop.foreach",
+                    },
+                    {
+                      "assignments": {
+                        "accessory_list": "mouse,dock",
+                      },
+                      "id": "set_flow_variables",
+                      "transitions": [
+                        {
+                          "to": "for_each",
+                        },
+                      ],
+                      "type": "variables.set",
+                    },
+                    {
+                      "bodyTemplate": "Model: {{request.form_data.laptop_model}}",
+                      "channel": "email",
+                      "id": "send_email",
+                      "recipientType": "requested_for",
+                      "titleTemplate": "Your laptop {{request.number}}",
+                      "transitions": [
+                        {
+                          "to": "set_flow_variables",
+                          "when": "success",
+                        },
+                      ],
+                      "type": "action.notification",
+                    },
+                    {
+                      "attributes": {
+                        "serial_number": "TBD",
+                      },
+                      "className": "computer",
+                      "id": "create_record",
+                      "method": "POST",
+                      "name": "{{request.number}}",
+                      "transitions": [
+                        {
+                          "to": "set_flow_variables",
+                          "when": "success",
+                        },
+                      ],
+                      "type": "action.ci.create",
+                      "url": "http://nova-engine:4000/api/catalog/automation/ci/create",
+                    },
+                    {
+                      "expression": {
+                        "conditions": [
+                          {
+                            "left": {
+                              "var": "request.form_data.laptop_model",
+                            },
+                            "op": "eq",
+                            "right": "MacBook Pro 16"",
+                          },
+                          {
+                            "left": {
+                              "var": "request.form_data.accessories",
+                            },
+                            "op": "eq",
+                            "right": true,
+                          },
+                        ],
+                        "op": "or",
+                      },
+                      "id": "if",
+                      "transitions": [
+                        {
+                          "to": "create_record",
+                          "when": "true",
+                        },
+                        {
+                          "to": "send_email",
+                          "when": "false",
+                        },
+                      ],
+                      "type": "decision.advanced",
+                    },
+                    {
+                      "assignments": {
+                        "outcome": "approved",
+                      },
+                      "id": "ask_for_approval",
+                      "transitions": [
+                        {
+                          "to": "if",
+                        },
+                      ],
+                      "type": "variables.set",
+                    },
+                    {
+                      "id": "end_success",
+                      "result": "success",
+                      "type": "end",
+                    },
+                  ],
+                },
+                "description": "Migrated from ServiceNow flow f1000000000000000000000000000001.",
+                "external_key": "sn/a1000000000000000000000000000001/flow",
+                "instructions": null,
+                "is_active": true,
+                "name": "Standard Laptop Fulfillment",
+                "sla_hours": null,
+                "task_order": 2,
+                "task_type": "automated",
+              },
+              {
+                "assigned_group_name": "Hardware Desk",
+                "automation_config": {},
+                "description": null,
+                "external_key": "sn/a1000000000000000000000000000001/manual-1",
+                "instructions": "Use the standard image.",
+                "is_active": true,
+                "name": "Image laptop for {{request.requested_for}}",
+                "sla_hours": null,
+                "task_order": 3,
+                "task_type": "manual",
+              },
+              {
+                "assigned_group_name": null,
+                "automation_config": {},
+                "description": null,
+                "external_key": "sn/a1000000000000000000000000000001/manual-2",
+                "instructions": "Migrated from ServiceNow flow "Standard Laptop Fulfillment" step 11. Create Jira Issue. Action "Create Jira Issue" (custom or spoke action) has no Nova equivalent.
+
+Original inputs:
+{
+  "project": "IT",
+  "summary": "Laptop {{trigger.request_item.number}}"
+}",
+                "is_active": true,
+                "name": "Manual step: Create Jira Issue",
+                "sla_hours": null,
+                "task_order": 4,
+                "task_type": "manual",
+              },
+            ],
+          },
+          {
+            "approval_required": false,
+            "category_external_key": "sn/ce000000000000000000000000000003",
+            "custom_attributes": {
+              "servicenow": {
+                "catalogs": [
+                  "ca000000000000000000000000000001",
+                ],
+                "instance": "https://example.service-now.com",
+                "legacy_workflow": "e0000000000000000000000000000001",
+                "sys_class_name": "sc_cat_item",
+                "sys_id": "a1000000000000000000000000000002",
+              },
+            },
+            "description": null,
+            "external_key": "sn/a1000000000000000000000000000002",
+            "form_schema": {
+              "fields": [],
+            },
+            "icon": "box",
+            "is_active": true,
+            "name": "VPN Access",
+            "price": 0,
+            "short_description": "Remote access",
+            "sla_hours": 72,
+            "tasks": [
+              {
+                "assigned_group_name": null,
+                "automation_config": {},
+                "description": null,
+                "external_key": "sn/a1000000000000000000000000000002/fulfill",
+                "instructions": "This item used a ServiceNow legacy workflow. Fulfill manually or build an automation.",
+                "is_active": true,
+                "name": "Fulfill request",
+                "sla_hours": null,
+                "task_order": 1,
+                "task_type": "manual",
+              },
+            ],
+          },
+          {
+            "approval_required": false,
+            "category_external_key": "sn/uncategorized",
+            "custom_attributes": {
+              "servicenow": {
+                "catalogs": [
+                  "ca000000000000000000000000000001",
+                ],
+                "instance": "https://example.service-now.com",
+                "sys_class_name": "sc_cat_item",
+                "sys_id": "a1000000000000000000000000000003",
+              },
+            },
+            "description": null,
+            "external_key": "sn/a1000000000000000000000000000003",
+            "form_schema": {
+              "fields": [],
+            },
+            "icon": "box",
+            "is_active": false,
+            "name": "Office Chair",
+            "price": null,
+            "short_description": null,
+            "sla_hours": 72,
+            "tasks": [
+              {
+                "assigned_group_name": null,
+                "automation_config": {},
+                "description": null,
+                "external_key": "sn/a1000000000000000000000000000003/fulfill",
+                "instructions": "Fulfill this request.",
+                "is_active": true,
+                "name": "Fulfill request",
+                "sla_hours": null,
+                "task_order": 1,
+                "task_type": "manual",
+              },
+            ],
+          },
+        ],
+      },
+      "data_sources": {
+        "sources": [],
+      },
+      "notifications": {
+        "rules": [],
+      },
+      "workflows": {
+        "definitions": [
+          {
+            "definition": {
+              "kind": "state_machine",
+              "schemaVersion": 1,
+              "startAt": "send_email",
+              "states": [
+                {
+                  "bodyTemplate": "Please tag laptop {{request.form_data.laptop}}.",
+                  "channel": "email",
+                  "id": "send_email",
+                  "recipientType": "assets@example.com",
+                  "titleTemplate": "Laptop {{request.form_data.laptop}}",
+                  "transitions": [
+                    {
+                      "to": "end_success",
+                      "when": "success",
+                    },
+                  ],
+                  "type": "action.notification",
+                },
+                {
+                  "id": "end_success",
+                  "result": "success",
+                  "type": "end",
+                },
+              ],
+            },
+            "description": "Migrated from ServiceNow subflow f2000000000000000000000000000001. Lets the asset team know.",
+            "name": "Notify Asset Team",
+            "workflow_type": "sn_notify_asset_team",
+          },
+        ],
+      },
+    },
+    "exported_at": "2026-01-01T00:00:00.000Z",
+    "format": "nova.config-package",
+    "name": "ServiceNow migration (example.service-now.com)",
+    "schema_version": "v00.01.23",
+    "source": {
+      "instance": "https://example.service-now.com",
+    },
+    "version": 1,
+  },
+  "report": {
+    "generatedAt": "2026-01-01T00:00:00.000Z",
+    "instanceUrl": "https://example.service-now.com",
+    "items": [
+      {
+        "automationStateCount": 11,
+        "categoryName": "Hardware / Laptops",
+        "externalKey": "sn/a1000000000000000000000000000001",
+        "fieldCount": 7,
+        "flowName": "Standard Laptop Fulfillment",
+        "name": "Standard Laptop",
+        "notes": [
+          {
+            "code": "scripted_default",
+            "message": "Scripted default value was dropped.",
+            "severity": "info",
+            "subject": "requested_for",
+          },
+          {
+            "code": "variable_dropped",
+            "message": "Label variable is layout-only or unsupported in Nova forms and was dropped.",
+            "severity": "info",
+            "subject": "section_label",
+          },
+          {
+            "code": "reference_unsupported",
+            "message": "Reference to cmn_cost_center has no Nova equivalent; converted to text.",
+            "severity": "warning",
+            "subject": "cost_center",
+          },
+          {
+            "code": "step_placeholder",
+            "message": "Action "Create Jira Issue" (custom or spoke action) has no Nova equivalent. It becomes a manual fulfillment task after the automation.",
+            "severity": "warning",
+            "subject": "11. Create Jira Issue",
+          },
+          {
+            "code": "script_review",
+            "message": "Script step needs manual porting; it fails until reviewed.",
+            "severity": "warning",
+            "subject": "10. Run Script",
+          },
+          {
+            "code": "catalog_task",
+            "message": "Catalog task becomes a manual fulfillment task that runs after the automation.",
+            "severity": "info",
+            "subject": "9. Create Catalog Task",
+          },
+          {
+            "code": "ci_class",
+            "message": "CMDB class cmdb_ci_computer mapped to Nova class "computer"; verify it exists.",
+            "severity": "info",
+            "subject": "3. Create Record",
+          },
+          {
+            "code": "pre_approval",
+            "message": "Leading approval became a catalog approval task before the automation.",
+            "severity": "info",
+            "subject": "1. Ask For Approval (Manager sign-off)",
+          },
+        ],
+        "scriptSteps": 1,
+        "status": "partial",
+        "sysId": "a1000000000000000000000000000001",
+        "taskCount": 4,
+      },
+      {
+        "automationStateCount": 0,
+        "categoryName": "Access",
+        "externalKey": "sn/a1000000000000000000000000000002",
+        "fieldCount": 0,
+        "flowName": null,
+        "name": "VPN Access",
+        "notes": [
+          {
+            "code": "legacy_workflow",
+            "message": "Item uses a legacy workflow, which is not converted; a manual fulfillment task was added.",
+            "severity": "warning",
+          },
+        ],
+        "scriptSteps": 0,
+        "status": "partial",
+        "sysId": "a1000000000000000000000000000002",
+        "taskCount": 1,
+      },
+      {
+        "automationStateCount": 0,
+        "categoryName": "ServiceNow (uncategorized)",
+        "externalKey": "sn/a1000000000000000000000000000003",
+        "fieldCount": 0,
+        "flowName": null,
+        "name": "Office Chair",
+        "notes": [
+          {
+            "code": "category_missing",
+            "message": "Category not in the selection; placed in "ServiceNow (uncategorized)".",
+            "severity": "info",
+          },
+          {
+            "code": "no_flow",
+            "message": "Item has no flow; a manual fulfillment task was added.",
+            "severity": "info",
+          },
+        ],
+        "scriptSteps": 0,
+        "status": "full",
+        "sysId": "a1000000000000000000000000000003",
+        "taskCount": 1,
+      },
+    ],
+    "release": "glide-xanadu-07-02-2024__patch3",
+    "subflows": [
+      {
+        "name": "Notify Asset Team",
+        "notes": [
+          {
+            "code": "recipient_email",
+            "message": "Recipient assets@example.com must exist as a Nova user to receive the email.",
+            "severity": "info",
+            "subject": "1. Send Email",
+          },
+        ],
+        "status": "full",
+        "sysId": "f2000000000000000000000000000001",
+        "workflowType": "sn_notify_asset_team",
+      },
+    ],
+    "totals": {
+      "categories": 3,
+      "fields": 7,
+      "full": 1,
+      "items": 3,
+      "partial": 2,
+      "scriptSteps": 1,
+      "subflows": 1,
+      "unsupported": 0,
+    },
+    "warnings": [],
+  },
+}
+`;

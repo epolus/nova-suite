@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "instanceUrl": "https://example.service-now.com",
+  "extractedAt": "2026-01-01T00:00:00.000Z",
+  "release": "glide-xanadu-07-02-2024__patch3",
+  "catalogs": [
+    { "sys_id": "ca000000000000000000000000000001", "title": "Service Catalog", "description": "", "active": "true" }
+  ],
+  "categories": [
+    { "sys_id": "ce000000000000000000000000000001", "title": "Hardware", "description": "<p>All hardware</p>", "parent": "", "sc_catalog": "ca000000000000000000000000000001", "active": "true", "order": "100" },
+    { "sys_id": "ce000000000000000000000000000002", "title": "Laptops", "description": "", "parent": "ce000000000000000000000000000001", "sc_catalog": "ca000000000000000000000000000001", "active": "true", "order": "200" },
+    { "sys_id": "ce000000000000000000000000000003", "title": "Access", "description": "", "parent": "", "sc_catalog": "ca000000000000000000000000000001", "active": "true", "order": "300" }
+  ],
+  "items": [
+    {
+      "sys_id": "a1000000000000000000000000000001",
+      "name": "Standard Laptop",
+      "short_description": "Request a <b>standard</b> laptop",
+      "description": "<p>Choose a model.</p><p>Delivered within a week.</p>",
+      "category": "ce000000000000000000000000000002",
+      "sc_catalogs": "ca000000000000000000000000000001",
+      "active": "true",
+      "price": "1299.00",
+      "flow_designer_flow": "f1000000000000000000000000000001",
+      "workflow": "",
+      "sys_class_name": "sc_cat_item",
+      "order": "100"
+    },
+    {
+      "sys_id": "a1000000000000000000000000000002",
+      "name": "VPN Access",
+      "short_description": "Remote access",
+      "description": "",
+      "category": "ce000000000000000000000000000003",
+      "sc_catalogs": "ca000000000000000000000000000001",
+      "active": "true",
+      "price": "0",
+      "flow_designer_flow": "",
+      "workflow": "e0000000000000000000000000000001",
+      "sys_class_name": "sc_cat_item",
+      "order": "100"
+    },
+    {
+      "sys_id": "a1000000000000000000000000000003",
+      "name": "Office Chair",
+      "short_description": "",
+      "description": "",
+      "category": "ce000000000000000000000000000099",
+      "sc_catalogs": "ca000000000000000000000000000001",
+      "active": "false",
+      "price": "",
+      "flow_designer_flow": "",
+      "workflow": "",
+      "sys_class_name": "sc_cat_item",
+      "order": "100"
+    }
+  ],
+  "variables": [
+    { "sys_id": "b1000000000000000000000000000001", "name": "laptop_model", "question_text": "Model", "type": "5", "mandatory": "true", "default_value": "mbp14", "order": "100", "cat_item": "a1000000000000000000000000000001", "variable_set": "", "active": "true" },
+    { "sys_id": "b1000000000000000000000000000002", "name": "justification", "question_text": "Business justification", "type": "2", "mandatory": "true", "help_text": "<i>Why</i> do you need it?", "order": "200", "cat_item": "a1000000000000000000000000000001", "variable_set": "", "active": "true" },
+    { "sys_id": "b1000000000000000000000000000003", "name": "needed_by", "question_text": "Needed by", "type": "9", "mandatory": "false", "order": "300", "cat_item": "a1000000000000000000000000000001", "variable_set": "", "active": "true" },
+    { "sys_id": "b1000000000000000000000000000004", "name": "requested_for", "question_text": "Requested for", "type": "31", "mandatory": "true", "default_value": "javascript:gs.getUserID()", "order": "10", "cat_item": "a1000000000000000000000000000001", "variable_set": "", "active": "true" },
+    { "sys_id": "b1000000000000000000000000000005", "name": "accessories", "question_text": "Include accessories", "type": "7", "mandatory": "false", "default_value": "true", "order": "400", "cat_item": "a1000000000000000000000000000001", "variable_set": "", "active": "true" },
+    { "sys_id": "b1000000000000000000000000000006", "name": "section_label", "question_text": "Details", "type": "11", "order": "150", "cat_item": "a1000000000000000000000000000001", "variable_set": "", "active": "true" },
+    { "sys_id": "b1000000000000000000000000000007", "name": "cost_center", "question_text": "Cost center", "type": "8", "reference": "cmn_cost_center", "order": "500", "cat_item": "a1000000000000000000000000000001", "variable_set": "", "active": "true" },
+    { "sys_id": "b1000000000000000000000000000008", "name": "contact_email", "question_text": "Contact email", "type": "26", "order": "10", "cat_item": "", "variable_set": "b2000000000000000000000000000001", "active": "true" }
+  ],
+  "variableSets": [
+    { "sys_id": "b2000000000000000000000000000001", "title": "Contact", "internal_name": "contact", "type": "one_to_one" }
+  ],
+  "variableSetItems": [
+    { "sys_id": "b3000000000000000000000000000001", "sc_cat_item": "a1000000000000000000000000000001", "variable_set": "b2000000000000000000000000000001", "order": "600" }
+  ],
+  "choices": [
+    { "sys_id": "c1000000000000000000000000000001", "question": "b1000000000000000000000000000001", "text": "MacBook Pro 14\"", "value": "mbp14", "order": "100" },
+    { "sys_id": "c1000000000000000000000000000002", "question": "b1000000000000000000000000000001", "text": "MacBook Pro 16\"", "value": "mbp16", "order": "200" },
+    { "sys_id": "c1000000000000000000000000000003", "question": "b1000000000000000000000000000001", "text": "ThinkPad X1", "value": "x1", "order": "300" }
+  ],
+  "flows": [
+    {
+      "sys_id": "f1000000000000000000000000000001",
+      "name": "Standard Laptop Fulfillment",
+      "internal_name": "standard_laptop_fulfillment",
+      "type": "flow",
+      "status": "published",
+      "active": "true",
+      "description": "",
+      "sys_scope": "global",
+      "master_snapshot": "f1000000000000000000000000000101",
+      "latest_snapshot": "",
+      "storage": "v2",
+      "sourceRecordId": "f1000000000000000000000000000101",
+      "triggerName": "Service Catalog",
+      "flowVariables": [{ "name": "accessory_list", "label": "Accessory list", "type": "string" }],
+      "steps": [
+        { "kind": "action", "sysId": "d1000000000000000000000000000001", "uiId": "u1", "parentUiId": "", "order": 1, "comment": "Manager sign-off", "definitionId": "at000000000000000000000000000001", "subflowId": "", "values": { "rules": "ApprovesAnyG[90000000000000000000000000000001]", "table": "sc_req_item" } },
+        { "kind": "logic", "sysId": "d1000000000000000000000000000002", "uiId": "u2", "parentUiId": "", "order": 2, "comment": "", "definitionId": "1d000000000000000000000000000001", "subflowId": "", "values": { "condition": "{{trigger.request_item.variables.laptop_model}}=mbp16^ORaccessories=true" } },
+        { "kind": "action", "sysId": "d1000000000000000000000000000003", "uiId": "u3", "parentUiId": "u2", "order": 3, "comment": "", "definitionId": "at000000000000000000000000000002", "subflowId": "", "values": { "table_name": "cmdb_ci_computer", "values": "name={{trigger.request_item.number}}^serial_number=TBD" } },
+        { "kind": "logic", "sysId": "d1000000000000000000000000000004", "uiId": "u4", "parentUiId": "", "order": 4, "comment": "", "definitionId": "1d000000000000000000000000000002", "subflowId": "", "values": {} },
+        { "kind": "action", "sysId": "d1000000000000000000000000000005", "uiId": "u5", "parentUiId": "u4", "order": 5, "comment": "", "definitionId": "at000000000000000000000000000003", "subflowId": "", "values": { "to": "{{trigger.request_item.requested_for}}", "subject": "Your laptop {{trigger.request_item.number}}", "body": "<p>Model: {{trigger.request_item.variables.laptop_model}}</p>" } },
+        { "kind": "logic", "sysId": "d1000000000000000000000000000006", "uiId": "u6", "parentUiId": "", "order": 6, "comment": "", "definitionId": "1d000000000000000000000000000004", "subflowId": "", "values": { "variables": [{ "name": "accessory_list", "value": "mouse,dock" }] } },
+        { "kind": "logic", "sysId": "d1000000000000000000000000000007", "uiId": "u7", "parentUiId": "", "order": 7, "comment": "", "definitionId": "1d000000000000000000000000000003", "subflowId": "", "values": { "items": "{{flow_variables.accessory_list}}" } },
+        { "kind": "action", "sysId": "d1000000000000000000000000000008", "uiId": "u8", "parentUiId": "u7", "order": 8, "comment": "", "definitionId": "at000000000000000000000000000005", "subflowId": "", "values": { "work_note": "Prepared {{for_each_1.item}}" } },
+        { "kind": "action", "sysId": "d1000000000000000000000000000009", "uiId": "u9", "parentUiId": "", "order": 9, "comment": "", "definitionId": "at000000000000000000000000000004", "subflowId": "", "values": { "assignment_group": "90000000000000000000000000000002", "short_description": "Image laptop for {{trigger.request_item.requested_for}}", "description": "<p>Use the standard image.</p>" } },
+        { "kind": "action", "sysId": "d1000000000000000000000000000010", "uiId": "u10", "parentUiId": "", "order": 10, "comment": "", "definitionId": "at000000000000000000000000000006", "subflowId": "", "values": { "script": "var gr = new GlideRecord('alm_asset'); gr.query();" } },
+        { "kind": "action", "sysId": "d1000000000000000000000000000011", "uiId": "u11", "parentUiId": "", "order": 11, "comment": "", "definitionId": "at000000000000000000000000000007", "subflowId": "", "values": { "project": "IT", "summary": "Laptop {{trigger.request_item.number}}" } },
+        { "kind": "subflow", "sysId": "d1000000000000000000000000000012", "uiId": "u12", "parentUiId": "", "order": 12, "comment": "", "definitionId": "", "subflowId": "f2000000000000000000000000000001", "values": { "laptop": "{{trigger.request_item.number}}" } },
+        { "kind": "action", "sysId": "d1000000000000000000000000000013", "uiId": "u13", "parentUiId": "", "order": 13, "comment": "", "definitionId": "at000000000000000000000000000008", "subflowId": "", "values": { "table_name": "sc_req_item", "values": "state=3" } }
+      ]
+    },
+    {
+      "sys_id": "f2000000000000000000000000000001",
+      "name": "Notify Asset Team",
+      "internal_name": "notify_asset_team",
+      "type": "subflow",
+      "status": "published",
+      "active": "true",
+      "description": "Lets the asset team know.",
+      "sys_scope": "global",
+      "master_snapshot": "",
+      "latest_snapshot": "",
+      "storage": "v2",
+      "sourceRecordId": "f2000000000000000000000000000001",
+      "triggerName": "",
+      "flowVariables": [],
+      "steps": [
+        { "kind": "action", "sysId": "d2000000000000000000000000000001", "uiId": "s1", "parentUiId": "", "order": 1, "comment": "", "definitionId": "at000000000000000000000000000003", "subflowId": "", "values": { "to": "assets@example.com", "subject": "Laptop {{subflow.laptop}}", "body": "Please tag laptop {{subflow.laptop}}." } }
+      ]
+    }
+  ],
+  "actionTypes": [
+    { "sys_id": "at000000000000000000000000000001", "name": "Ask For Approval", "internal_name": "ask_for_approval", "sys_scope": "global", "category": "" },
+    { "sys_id": "at000000000000000000000000000002", "name": "Create Record", "internal_name": "create_record", "sys_scope": "global", "category": "" },
+    { "sys_id": "at000000000000000000000000000003", "name": "Send Email", "internal_name": "send_email", "sys_scope": "global", "category": "" },
+    { "sys_id": "at000000000000000000000000000004", "name": "Create Catalog Task", "internal_name": "create_catalog_task", "sys_scope": "global", "category": "" },
+    { "sys_id": "at000000000000000000000000000005", "name": "Add Worknote", "internal_name": "add_worknote", "sys_scope": "global", "category": "" },
+    { "sys_id": "at000000000000000000000000000006", "name": "Run Script", "internal_name": "run_script", "sys_scope": "global", "category": "" },
+    { "sys_id": "at000000000000000000000000000007", "name": "Create Jira Issue", "internal_name": "create_jira_issue", "sys_scope": "sn_jira_spoke", "category": "" },
+    { "sys_id": "at000000000000000000000000000008", "name": "Update Record", "internal_name": "update_record", "sys_scope": "global", "category": "" }
+  ],
+  "logicDefinitions": [
+    { "sys_id": "1d000000000000000000000000000001", "name": "If", "type": "if" },
+    { "sys_id": "1d000000000000000000000000000002", "name": "Else", "type": "else" },
+    { "sys_id": "1d000000000000000000000000000003", "name": "For Each", "type": "foreach" },
+    { "sys_id": "1d000000000000000000000000000004", "name": "Set Flow Variables", "type": "set_flow_variables" }
+  ],
+  "groups": [
+    { "sys_id": "90000000000000000000000000000001", "name": "IT Approvers" },
+    { "sys_id": "90000000000000000000000000000002", "name": "Hardware Desk" }
+  ],
+  "users": [],
+  "warnings": []
+}

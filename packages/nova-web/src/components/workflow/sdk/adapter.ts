@@ -63,6 +63,16 @@ function nodeDescription(nodeType: UnifiedBuilderNodeType): string {
       return 'Run a short JavaScript step';
     case 'call.workflow':
       return 'Run a published workflow definition';
+    case 'loop.foreach':
+      return 'Repeat the body for each item (edges: item, done)';
+    case 'parallel.fork':
+      return 'Run outgoing branches concurrently until the join';
+    case 'parallel.join':
+      return 'Wait for all parallel branches';
+    case 'action.approval':
+      return 'Pause for a human approval (edges: approved, rejected)';
+    case 'variables.set':
+      return 'Set flow variables available as {{vars.name}}';
     default:
       return UNIFIED_BUILDER_NODE_LABELS[nodeType] ?? nodeType;
   }
@@ -107,6 +117,15 @@ export function toSdkNodes(nodes: Node<UnifiedBuilderNodeData>[]): WorkflowBuild
       ['workflowType', node.data.workflowType],
       ['definitionId', node.data.definitionId],
       ['inputJson', node.data.inputJson],
+      ['itemsExpr', node.data.itemsExpr],
+      ['maxIterations', node.data.maxIterations],
+      ['joinId', node.data.joinId],
+      ['approverType', node.data.approverType],
+      ['approverTemplate', node.data.approverTemplate],
+      ['approvalName', node.data.approvalName],
+      ['instructions', node.data.instructions],
+      ['assignmentsJson', node.data.assignmentsJson],
+      ['extraJson', node.data.extraJson],
     ];
     for (const [key, value] of optional) {
       if (value !== undefined) props[key] = value;
@@ -182,6 +201,15 @@ export function fromSdkNodes(nodes: WorkflowBuilderNode[]): Node<UnifiedBuilderN
         workflowType: typeof props.workflowType === 'string' ? props.workflowType : undefined,
         definitionId: typeof props.definitionId === 'string' ? props.definitionId : undefined,
         inputJson: typeof props.inputJson === 'string' ? props.inputJson : undefined,
+        itemsExpr: typeof props.itemsExpr === 'string' ? props.itemsExpr : undefined,
+        maxIterations: typeof props.maxIterations === 'number' ? props.maxIterations : undefined,
+        joinId: typeof props.joinId === 'string' ? props.joinId : undefined,
+        approverType: typeof props.approverType === 'string' ? props.approverType : undefined,
+        approverTemplate: typeof props.approverTemplate === 'string' ? props.approverTemplate : undefined,
+        approvalName: typeof props.approvalName === 'string' ? props.approvalName : undefined,
+        instructions: typeof props.instructions === 'string' ? props.instructions : undefined,
+        assignmentsJson: typeof props.assignmentsJson === 'string' ? props.assignmentsJson : undefined,
+        extraJson: typeof props.extraJson === 'string' ? props.extraJson : undefined,
       },
     };
   });

@@ -103,6 +103,28 @@ export async function startCatalogFulfillment(params: {
   }
 }
 
+export async function startServiceNowMigration(params: {
+  runId: string;
+  tenantId: string;
+}): Promise<string> {
+  const workflowId = `servicenow-migration-${params.runId}`;
+  try {
+    const cl = await getClient();
+    const handle = await cl.workflow.start('serviceNowCatalogMigration', {
+      taskQueue: TASK_QUEUE,
+      workflowId,
+      args: [params],
+      workflowExecutionTimeout: '6 hours',
+    });
+    logger.info({ workflowId: handle.workflowId, runId: params.runId }, 'Started ServiceNow migration workflow');
+    return handle.workflowId;
+  } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) return workflowId;
+    logger.error({ err, runId: params.runId }, 'Failed to start ServiceNow migration workflow');
+    throw err;
+  }
+}
+
 export async function signalTaskCompleted(
   requestId: string,
   taskId: string,

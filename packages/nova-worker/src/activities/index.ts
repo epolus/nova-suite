@@ -43,6 +43,12 @@ export {
 } from './datasource-activities';
 
 export {
+  extractServiceNowMigrationSnapshot,
+  transformServiceNowMigrationSnapshot,
+  failServiceNowMigration,
+} from './servicenow-migration-activities';
+
+export {
   setKnowledgeArticleStatus,
 } from './knowledge-activities';
 

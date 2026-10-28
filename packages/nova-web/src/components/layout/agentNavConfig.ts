@@ -138,6 +138,7 @@ export const adminSections: RawAdminSection[] = [
       { to: '/admin/data-sources', labelKey: 'admin.dataSources', icon: 'data_sources' },
       { to: '/admin/credentials', labelKey: 'admin.credentials', icon: 'credentials' },
       { to: '/admin/config-packages', labelKey: 'admin.configPackages', icon: 'config_packages' },
+      { to: '/admin/migrations/servicenow', labelKey: 'admin.serviceNowMigration', icon: 'import' },
       { to: '/admin/import', labelKey: 'admin.importData', icon: 'import' },
     ],
   },

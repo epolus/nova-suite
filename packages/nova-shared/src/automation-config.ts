@@ -22,7 +22,18 @@ export const AUTOMATION_STATE_TYPES = [
   'action.assign',
   'action.script',
   'call.workflow',
+  'loop.foreach',
+  'parallel.fork',
+  'parallel.join',
+  'action.approval',
+  'variables.set',
 ] as const;
+
+export const AUTOMATION_APPROVER_TYPES = ['user', 'group', 'group_manager', 'requester_manager'] as const;
+export type AutomationApproverType = (typeof AUTOMATION_APPROVER_TYPES)[number];
+
+export const AUTOMATION_LOOP_DEFAULT_MAX_ITERATIONS = 100;
+export const AUTOMATION_LOOP_MAX_ITERATIONS_LIMIT = 1000;
 
 export type AutomationStateType = (typeof AUTOMATION_STATE_TYPES)[number];
 
@@ -48,6 +59,11 @@ export const UNIFIED_BUILDER_NODE_LABELS: Record<UnifiedBuilderNodeType, string>
   'action.assign': 'Assignment',
   'action.script': 'Script',
   'call.workflow': 'Sub-workflow',
+  'loop.foreach': 'For Each',
+  'parallel.fork': 'Parallel Fork',
+  'parallel.join': 'Parallel Join',
+  'action.approval': 'Approval',
+  'variables.set': 'Set Variables',
 };
 
 export function isUnifiedBuilderNodeType(raw: string): raw is UnifiedBuilderNodeType {
@@ -161,7 +177,43 @@ export type AutomationCallWorkflowState = AutomationStateBase & {
   input?: Record<string, unknown>;
 };
 
+/** Transitions: `item` enters the loop body, `done` exits; the body must route back to this state. */
+export type AutomationLoopForeachState = AutomationStateBase & {
+  type: 'loop.foreach';
+  itemsExpr: string;
+  maxIterations?: number;
+};
+
+/** Every transition starts a branch; branches run concurrently until they reach `joinId`. */
+export type AutomationParallelForkState = AutomationStateBase & {
+  type: 'parallel.fork';
+  joinId: string;
+};
+
+export type AutomationParallelJoinState = AutomationStateBase & {
+  type: 'parallel.join';
+};
+
+/** Suspends the automation until a human decides; transitions: `approved`, `rejected`. */
+export type AutomationApprovalActionState = AutomationStateBase & {
+  type: 'action.approval';
+  approverType?: AutomationApproverType;
+  approverTemplate?: string;
+  name?: string;
+  instructions?: string;
+};
+
+export type AutomationVariablesSetState = AutomationStateBase & {
+  type: 'variables.set';
+  assignments: Record<string, string>;
+};
+
 export type AutomationState =
+  | AutomationLoopForeachState
+  | AutomationParallelForkState
+  | AutomationParallelJoinState
+  | AutomationApprovalActionState
+  | AutomationVariablesSetState
   | AutomationActivityState
   | AutomationRestActionState
   | AutomationCiCreateActionState
@@ -211,6 +263,13 @@ type AutomationValidationState = {
   code?: string;
   workflowType?: string;
   definitionId?: string;
+  itemsExpr?: string;
+  maxIterations?: number;
+  joinId?: string;
+  approverType?: string;
+  approverTemplate?: string;
+  instructions?: string;
+  assignments?: unknown;
 };
 
 function collectCredentialSlugsFromString(raw: string, out: Set<string>): void {
@@ -239,11 +298,14 @@ export function collectCredentialSlugsFromAutomationConfig(raw: unknown): string
       'workflowType',
       'definitionId',
       'recipientType',
+      'itemsExpr',
+      'approverTemplate',
+      'instructions',
     ] as const) {
       const val = state[key];
       if (typeof val === 'string') collectCredentialSlugsFromString(val, out);
     }
-    for (const objKey of ['fields', 'input', 'attributes'] as const) {
+    for (const objKey of ['fields', 'input', 'attributes', 'assignments'] as const) {
       const val = state[objKey];
       if (val && typeof val === 'object') {
         collectCredentialSlugsFromString(JSON.stringify(val), out);
@@ -403,6 +465,48 @@ export function validateAutomationConfig(raw: unknown): string[] {
     } else if (st.type === 'call.workflow') {
       if (!String(st.workflowType || '').trim() && !String(st.definitionId || '').trim()) {
         errors.push(`State "${st.id}" requires workflowType or definitionId`);
+      }
+    } else if (st.type === 'loop.foreach') {
+      if (typeof st.itemsExpr !== 'string' || !st.itemsExpr.trim()) {
+        errors.push(`Loop "${st.id}" requires itemsExpr`);
+      }
+      if (
+        st.maxIterations !== undefined &&
+        (!Number.isInteger(st.maxIterations) || st.maxIterations < 1 || st.maxIterations > AUTOMATION_LOOP_MAX_ITERATIONS_LIMIT)
+      ) {
+        errors.push(`Loop "${st.id}" maxIterations must be an integer between 1 and ${AUTOMATION_LOOP_MAX_ITERATIONS_LIMIT}`);
+      }
+      const labels = new Set(transitions.map((t) => String((t as AutomationTransition).when || '')));
+      if (!labels.has('item') || !labels.has('done')) {
+        errors.push(`Loop "${st.id}" transitions must include when=item and when=done`);
+      }
+    } else if (st.type === 'parallel.fork') {
+      if (typeof st.joinId !== 'string' || !st.joinId.trim()) {
+        errors.push(`Parallel fork "${st.id}" requires joinId`);
+      } else if (byId.get(st.joinId)?.type !== 'parallel.join') {
+        errors.push(`Parallel fork "${st.id}" joinId must reference a parallel.join state`);
+      }
+    } else if (st.type === 'action.approval') {
+      if (st.approverType !== undefined && !(AUTOMATION_APPROVER_TYPES as readonly string[]).includes(st.approverType)) {
+        errors.push(`Approval "${st.id}" approverType must be one of ${AUTOMATION_APPROVER_TYPES.join(', ')}`);
+      }
+      if ((st.approverType === 'user' || st.approverType === 'group' || st.approverType === 'group_manager') &&
+        (typeof st.approverTemplate !== 'string' || !st.approverTemplate.trim())) {
+        errors.push(`Approval "${st.id}" requires approverTemplate for approverType ${st.approverType}`);
+      }
+      const labels = new Set(transitions.map((t) => String((t as AutomationTransition).when || '')));
+      if (!labels.has('approved') || !labels.has('rejected')) {
+        errors.push(`Approval "${st.id}" transitions must include when=approved and when=rejected`);
+      }
+    } else if (st.type === 'variables.set') {
+      const a = st.assignments;
+      if (!a || typeof a !== 'object' || Array.isArray(a) || Object.keys(a).length === 0) {
+        errors.push(`State "${st.id}" requires a non-empty assignments object`);
+      } else {
+        for (const [k, v] of Object.entries(a as Record<string, unknown>)) {
+          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) errors.push(`State "${st.id}" assignment key "${k}" is not a valid variable name`);
+          if (typeof v !== 'string') errors.push(`State "${st.id}" assignment "${k}" must be a string template`);
+        }
       }
     }
 

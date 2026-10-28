@@ -90,15 +90,38 @@ export async function catalogFulfillment(input: FulfillmentInput): Promise<strin
 
     const automatedInGroup = group.filter((t) => !t.requiresUserCompletion && t.taskType === 'automated');
     if (automatedInGroup.length > 0) {
-      const autoResults = await Promise.all(
-        automatedInGroup.map((t) =>
-          executeAutomatedCatalogTask({
-            requestTaskId: t.id,
+      const runAutomated = async (requestTaskId: string) => {
+        let result = await executeAutomatedCatalogTask({
+          requestTaskId,
+          requestId: input.requestId,
+          tenantId: input.tenantId,
+        });
+        // In-flow approvals pause the automation until the child approval task is decided.
+        while (result.suspended) {
+          const approvalTaskId = result.suspended.approvalTaskId;
+          await updateRequestStatus(input.requestId, input.tenantId, 'pending_approval');
+          await condition(() => completedTasks.has(approvalTaskId));
+          const signal = completedTasks.get(approvalTaskId)!;
+          const outcome = signal.outcome === 'rejected' ? 'rejected' : 'approved';
+          await completeRequestTask(
+            approvalTaskId,
+            input.tenantId,
+            outcome === 'rejected' ? 'rejected' : 'completed',
+            outcome,
+            signal.userId,
+            signal.notes,
+          );
+          await updateRequestStatus(input.requestId, input.tenantId, 'in_progress');
+          result = await executeAutomatedCatalogTask({
+            requestTaskId,
             requestId: input.requestId,
             tenantId: input.tenantId,
-          }),
-        ),
-      );
+            resumeOutcome: outcome,
+          });
+        }
+        return result;
+      };
+      const autoResults = await Promise.all(automatedInGroup.map((t) => runAutomated(t.id)));
       if (autoResults.some((r) => !r.ok && r.rejectRequest)) {
         await skipRemainingTasks(input.requestId, input.tenantId);
         await updateRequestStatus(input.requestId, input.tenantId, 'rejected');

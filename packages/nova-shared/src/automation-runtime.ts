@@ -2,7 +2,10 @@
 import {
   type AdvancedCondition,
   type AutomationActivityState,
+  type AutomationApproverType,
   type AutomationBranch,
+  AUTOMATION_LOOP_DEFAULT_MAX_ITERATIONS,
+  AUTOMATION_LOOP_MAX_ITERATIONS_LIMIT,
   type AutomationCiCreateActionState,
   type AutomationCiLookupActionState,
   type AutomationConfig,
@@ -50,6 +53,36 @@ export type ExecuteAutomationGraphParams = {
   requestTaskId?: string;
   callDepth?: number;
   sendEmail?: AutomationSendEmail;
+  /** Overrides the computed step budget (default scales with loop sizes). */
+  maxExecutionSteps?: number;
+  /** When true, `action.approval` suspends the run and returns a checkpoint instead of failing. */
+  allowSuspend?: boolean;
+  /** Continue a run that previously suspended on an approval state. */
+  resume?: { checkpoint: AutomationCheckpoint; outcome: 'approved' | 'rejected' };
+};
+
+export type AutomationLoopIterator = { items: unknown[]; index: number };
+
+export type AutomationCheckpoint = {
+  version: 1;
+  stateId: string;
+  stateResults: Record<string, unknown>;
+  vars: Record<string, unknown>;
+  loops: Record<string, AutomationLoopIterator>;
+  steps: number;
+  trace: string[];
+};
+
+export type AutomationSuspension = {
+  kind: 'approval';
+  stateId: string;
+  approval: {
+    name: string;
+    instructions: string;
+    approverType: AutomationApproverType;
+    approver: string;
+  };
+  checkpoint: AutomationCheckpoint;
 };
 
 export type ExecuteAutomationGraphResult = {
@@ -62,7 +95,21 @@ export type ExecuteAutomationGraphResult = {
   mergePatch: Record<string, unknown>;
   stateResults: Record<string, unknown>;
   warnings: string[];
+  suspended?: AutomationSuspension;
 };
+
+export function computeDefaultMaxExecutionSteps(cfg: AutomationConfig): number {
+  let budget = MAX_EXECUTION_STEPS;
+  for (const s of cfg.states) {
+    if (s.type !== 'loop.foreach') continue;
+    const iterations = Math.min(
+      s.maxIterations ?? AUTOMATION_LOOP_DEFAULT_MAX_ITERATIONS,
+      AUTOMATION_LOOP_MAX_ITERATIONS_LIMIT,
+    );
+    budget += iterations * (cfg.states.length + 1);
+  }
+  return Math.min(budget, 20_000);
+}
 
 function getByPath(obj: unknown, path: string): unknown {
   if (!path) return obj;
@@ -81,8 +128,14 @@ function buildTemplateContext(params: {
   response?: { status: number; bodyText: string; bodyJson: unknown };
   cred?: Record<string, CredentialTemplateValue>;
   state?: Record<string, unknown>;
+  vars?: Record<string, unknown>;
+  loops?: Record<string, AutomationLoopIterator>;
 }): Record<string, unknown> {
-  const { request, response, cred, state } = params;
+  const { request, response, cred, state, vars, loops } = params;
+  const loop: Record<string, unknown> = {};
+  for (const [id, it] of Object.entries(loops ?? {})) {
+    loop[id] = { item: it.items[it.index], index: it.index, count: it.items.length };
+  }
   const formData = (request.form_data as Record<string, unknown>) || {};
   const deliveryInfo = (request.delivery_info as Record<string, unknown>) || {};
   return {
@@ -105,7 +158,40 @@ function buildTemplateContext(params: {
       : {},
     cred: cred ?? {},
     state: state ?? {},
+    vars: vars ?? {},
+    loop,
   };
+}
+
+const SINGLE_PLACEHOLDER = /^\{\{\s*([^}]+?)\s*\}\}$/;
+
+/** Like interpolateString, but a template that is exactly one placeholder keeps the raw (non-string) value. */
+export function resolveTemplateValue(template: string, ctx: Record<string, unknown>): unknown {
+  const m = SINGLE_PLACEHOLDER.exec(template.trim());
+  if (m && !m[1].trim().startsWith('env.')) {
+    return getByPath(ctx, m[1].trim().replace(/\[(\w+)\]/g, '.$1'));
+  }
+  return interpolateString(template, ctx);
+}
+
+export function resolveLoopItems(itemsExpr: string, ctx: Record<string, unknown>): unknown[] {
+  const v = resolveTemplateValue(itemsExpr, ctx);
+  if (Array.isArray(v)) return v;
+  if (v === null || v === undefined) return [];
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (!s) return [];
+    if (s.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(s) as unknown;
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // fall through to comma-separated parsing
+      }
+    }
+    return s.split(',').map((p) => p.trim()).filter(Boolean);
+  }
+  return [v];
 }
 
 function interpolateString(template: string, ctx: Record<string, unknown>): string {
@@ -302,6 +388,14 @@ export function collectCredSlugsFromAutomation(cfg: AutomationConfig): string[] 
       for (const b of [s.onSuccess, s.onFailure]) {
         for (const v of Object.values(b?.mergeFormData || {})) collectCredSlugsFromText(v, slugs);
       }
+    }
+    if (s.type === 'loop.foreach') collectCredSlugsFromText(s.itemsExpr || '', slugs);
+    if (s.type === 'variables.set') {
+      for (const v of Object.values(s.assignments || {})) collectCredSlugsFromText(String(v), slugs);
+    }
+    if (s.type === 'action.approval') {
+      collectCredSlugsFromText(s.approverTemplate || '', slugs);
+      collectCredSlugsFromText(s.instructions || '', slugs);
     }
   }
   return [...slugs];
@@ -502,6 +596,17 @@ async function sleepMs(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+type Terminal = { ok: boolean; message: string; rejectRequest: boolean };
+
+type SegmentOutcome =
+  | { kind: 'terminal'; terminal: Terminal }
+  | { kind: 'reachedStop' }
+  | { kind: 'suspended'; suspension: Omit<AutomationSuspension, 'checkpoint'> };
+
+function normalizeApproverType(raw: unknown): AutomationApproverType {
+  return raw === 'user' || raw === 'group' || raw === 'group_manager' ? raw : 'requester_manager';
+}
+
 export async function executeAutomationGraph(
   params: ExecuteAutomationGraphParams,
 ): Promise<ExecuteAutomationGraphResult> {
@@ -515,272 +620,360 @@ export async function executeAutomationGraph(
     automationSharedKey,
     requestTaskId,
     sendEmail,
+    resume,
   } = params;
   const callDepth = params.callDepth ?? 0;
   const persistFormData =
     params.persistFormData ?? Boolean(client && requestId);
+  const maxSteps = params.maxExecutionSteps ?? computeDefaultMaxExecutionSteps(cfg);
   const skipOrders = new Set<number>();
   const mergePatch: Record<string, unknown> = {};
-  const trace: string[] = [];
-  const stateResults: Record<string, unknown> = {};
+  const trace: string[] = resume ? [...resume.checkpoint.trace] : [];
+  const stateResults: Record<string, unknown> = resume ? { ...resume.checkpoint.stateResults } : {};
+  const vars: Record<string, unknown> = resume ? { ...resume.checkpoint.vars } : {};
+  const loops: Record<string, AutomationLoopIterator> = resume ? { ...resume.checkpoint.loops } : {};
   const warnings: string[] = [];
   const byId = new Map(cfg.states.map((s) => [s.id, s]));
-
-  let step = 0;
-  let current: string | null = cfg.startAt;
+  const counter = { step: resume ? resume.checkpoint.steps : 0 };
   let lastResponse: { status: number; bodyText: string; bodyJson: unknown } | undefined;
-  let terminal: { ok: boolean; message: string; rejectRequest: boolean } | null = null;
 
-  while (step < MAX_EXECUTION_STEPS && current) {
-    step += 1;
-    const state = byId.get(current);
-    if (!state) {
-      terminal = { ok: false, message: `Unknown state id: ${current}`, rejectRequest: false };
-      break;
-    }
-    trace.push(`${step}:${state.id}:${state.type}`);
+  const ctxNow = () =>
+    buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults, vars, loops });
+  const term = (ok: boolean, message: string, rejectRequest = false): SegmentOutcome => ({
+    kind: 'terminal',
+    terminal: { ok, message, rejectRequest },
+  });
 
-    if (state.type === 'end') {
-      const endOk = state.result !== 'failure';
-      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
-      const branch = endOk ? state.onSuccess : state.onFailure;
-      const fx = applyBranchEffects(branch, ctx, mergePatch, skipOrders);
-      terminal = {
-        ok: endOk,
-        message: endOk ? 'Reached end state (success)' : 'Reached end state (failure)',
-        rejectRequest: fx.rejectRequest,
-      };
-      break;
-    }
+  async function runSegment(startId: string | null, stopAt: string | null): Promise<SegmentOutcome> {
+    let current: string | null = startId;
+    while (current) {
+      if (stopAt && current === stopAt) return { kind: 'reachedStop' };
+      if (counter.step >= maxSteps) break;
+      counter.step += 1;
+      const step = counter.step;
+      const state = byId.get(current);
+      if (!state) return term(false, `Unknown state id: ${current}`);
+      trace.push(`${step}:${state.id}:${state.type}`);
 
-    if (state.type === 'delay') {
-      const delaySec = Math.max(1, Math.min(Number(state.delaySeconds || 1), 3600));
-      let delayMs = delaySec * 1000;
-      if (maxDelayMs !== undefined && delayMs > maxDelayMs) {
-        warnings.push(`Delay state ${state.id} capped from ${delaySec}s to ${maxDelayMs}ms`);
-        delayMs = maxDelayMs;
-      }
-      await sleepMs(delayMs);
-      current = selectTransition(state.transitions, null);
-      if (!current) {
-        terminal = { ok: true, message: `Delay state ${state.id} has no next transition`, rejectRequest: false };
-        break;
-      }
-      continue;
-    }
-
-    if (state.type === 'decision') {
-      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
-      const branchBool = evaluateDecision(state.condition, ctx);
-      const when = branchBool ? 'true' : 'false';
-      stateResults[state.id] = { result: branchBool };
-      mergePatch[`automation_${state.id}_result`] = branchBool;
-      mergePatch[`automation_${state.id}_when`] = when;
-      current = selectTransition(state.transitions, when);
-      if (!current) {
-        terminal = { ok: false, message: `Decision state ${state.id} has no ${when} transition`, rejectRequest: false };
-        break;
-      }
-      continue;
-    }
-
-    if (state.type === 'decision.advanced') {
-      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
-      const branchBool = evaluateAdvancedCondition(state.expression, ctx);
-      const when = branchBool ? 'true' : 'false';
-      stateResults[state.id] = { result: branchBool };
-      mergePatch[`automation_${state.id}_result`] = branchBool;
-      mergePatch[`automation_${state.id}_when`] = when;
-      current = selectTransition(state.transitions, when);
-      if (!current) {
-        terminal = { ok: false, message: `Decision state ${state.id} has no ${when} transition`, rejectRequest: false };
-        break;
-      }
-      continue;
-    }
-
-    if (
-      state.type === 'action.notification' ||
-      state.type === 'action.ticket' ||
-      state.type === 'action.assign' ||
-      state.type === 'action.script' ||
-      state.type === 'call.workflow'
-    ) {
-      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
-      let native = {
-        ok: false,
-        message: `Unsupported action state type: ${state.type}`,
-        result: undefined as unknown,
-      };
-      try {
-        const executed = await executeNativeLibraryState({
-          state,
-          ctx,
-          request,
-          client,
-          requestId,
-          requestTaskId,
-          sendEmail,
-          callDepth,
-          runSubgraph: async (nestedCfg, nestedRequest) => {
-            const nested = await executeAutomationGraph({
-              ...params,
-              cfg: nestedCfg,
-              request: nestedRequest,
-              persistFormData: false,
-              callDepth: callDepth + 1,
-            });
-            return {
-              ok: nested.ok,
-              message: nested.message,
-              result: {
-                trace: nested.trace,
-                stateResults: nested.stateResults,
-                mergePatch: nested.mergePatch,
-                warnings: nested.warnings,
-              },
-            };
-          },
-        });
-        if (executed) native = { ok: executed.ok, message: executed.message, result: executed.result };
-      } catch (err) {
-        native = {
-          ok: false,
-          message: err instanceof Error ? err.message : String(err),
-          result: undefined,
-        };
+      if (state.type === 'end') {
+        const endOk = state.result !== 'failure';
+        const branch = endOk ? state.onSuccess : state.onFailure;
+        const fx = applyBranchEffects(branch, ctxNow(), mergePatch, skipOrders);
+        return term(endOk, endOk ? 'Reached end state (success)' : 'Reached end state (failure)', fx.rejectRequest);
       }
 
-      lastResponse = {
-        status: native.ok ? 200 : 500,
-        bodyText: native.message,
-        bodyJson: native.result,
-      };
-      stateResults[state.id] = {
-        ok: native.ok,
-        status: lastResponse.status,
-        body: native.result !== undefined ? native.result : native.message,
-        text: native.message,
-      };
-      mergePatch[`automation_${state.id}_ok`] = native.ok;
-      mergePatch[`automation_${state.id}_status`] = lastResponse.status;
-
-      if (native.ok) {
-        current = selectTransition(state.transitions, 'success') || selectTransition(state.transitions, null);
-        if (!current) {
-          terminal = { ok: true, message: native.message, rejectRequest: false };
-          break;
+      if (state.type === 'delay') {
+        const delaySec = Math.max(1, Math.min(Number(state.delaySeconds || 1), 3600));
+        let delayMs = delaySec * 1000;
+        if (maxDelayMs !== undefined && delayMs > maxDelayMs) {
+          warnings.push(`Delay state ${state.id} capped from ${delaySec}s to ${maxDelayMs}ms`);
+          delayMs = maxDelayMs;
         }
+        await sleepMs(delayMs);
+        current = selectTransition(state.transitions, null);
+        if (!current) return term(true, `Delay state ${state.id} has no next transition`);
         continue;
       }
 
-      current = selectTransition(state.transitions, 'failure');
-      if (!current) {
-        terminal = { ok: false, message: native.message, rejectRequest: false };
-        break;
+      if (state.type === 'decision' || state.type === 'decision.advanced') {
+        const ctx = ctxNow();
+        const branchBool = state.type === 'decision'
+          ? evaluateDecision(state.condition, ctx)
+          : evaluateAdvancedCondition(state.expression, ctx);
+        const when = branchBool ? 'true' : 'false';
+        stateResults[state.id] = { result: branchBool };
+        mergePatch[`automation_${state.id}_result`] = branchBool;
+        mergePatch[`automation_${state.id}_when`] = when;
+        current = selectTransition(state.transitions, when);
+        if (!current) return term(false, `Decision state ${state.id} has no ${when} transition`);
+        continue;
       }
-      continue;
-    }
 
-    if (
-      state.type !== 'activity' &&
-      state.type !== 'action.rest' &&
-      state.type !== 'action.ci.create' &&
-      state.type !== 'action.ci.lookup'
-    ) {
-      throw new Error(`Unsupported action state type: ${(state as AutomationState).type}`);
-    }
-
-    const activity = state;
-    const attempts = Math.max(1, Math.min(Number(activity.retryAttempts || 1), 10));
-    const backoffMs = Math.max(0, Math.min(Number(activity.retryBackoffSec || 0), 300)) * 1000;
-
-    let lastErr: string | null = null;
-    let http: { ok: boolean; status: number; bodyText: string; bodyJson: unknown } | null = null;
-
-    for (let i = 1; i <= attempts; i += 1) {
-      const ctx = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
-      const resolvedActivity = toHttpActivityState(activity, ctx);
-      try {
-        http = await runHttpStep(resolvedActivity, ctx, automationSharedKey);
-        if (http.ok) break;
-        lastErr = `HTTP ${http.status}`;
-      } catch (err) {
-        lastErr = err instanceof Error ? err.message : String(err);
+      if (state.type === 'variables.set') {
+        const ctx = ctxNow();
+        const assigned: Record<string, unknown> = {};
+        for (const [key, tmpl] of Object.entries(state.assignments || {})) {
+          assigned[key] = resolveTemplateValue(String(tmpl), ctx);
+          vars[key] = assigned[key];
+        }
+        stateResults[state.id] = { ok: true, body: assigned };
+        current = selectTransition(state.transitions, null);
+        if (!current) return term(true, `Variables state ${state.id} has no next transition`);
+        continue;
       }
-      if (i < attempts && backoffMs > 0) await sleepMs(backoffMs);
-    }
 
-    const effectiveResponse =
-      http || { ok: false, status: 0, bodyText: lastErr || 'Request failed', bodyJson: undefined };
-    lastResponse = {
-      status: effectiveResponse.status,
-      bodyText: effectiveResponse.bodyText,
-      bodyJson: effectiveResponse.bodyJson,
-    };
-    const ctxAfter = buildTemplateContext({ request, response: lastResponse, cred: credMap, state: stateResults });
-    stateResults[state.id] = {
-      ok: effectiveResponse.ok,
-      status: effectiveResponse.status,
-      body: effectiveResponse.bodyJson !== undefined ? effectiveResponse.bodyJson : effectiveResponse.bodyText,
-      text: effectiveResponse.bodyText,
-    };
-    mergePatch[`automation_${state.id}_status`] = effectiveResponse.status;
-    mergePatch[`automation_${state.id}_ok`] = effectiveResponse.ok;
+      if (state.type === 'loop.foreach') {
+        const max = Math.max(
+          1,
+          Math.min(state.maxIterations ?? AUTOMATION_LOOP_DEFAULT_MAX_ITERATIONS, AUTOMATION_LOOP_MAX_ITERATIONS_LIMIT),
+        );
+        let it = loops[state.id];
+        if (!it) {
+          it = { items: resolveLoopItems(state.itemsExpr, ctxNow()), index: -1 };
+          loops[state.id] = it;
+        }
+        it.index += 1;
+        if (it.index < it.items.length && it.index < max) {
+          current = selectTransition(state.transitions, 'item');
+        } else {
+          if (it.items.length > max) {
+            warnings.push(`Loop ${state.id} stopped after maxIterations=${max} (${it.items.length} items)`);
+          }
+          stateResults[state.id] = { ok: true, iterations: Math.min(it.items.length, max) };
+          delete loops[state.id];
+          current = selectTransition(state.transitions, 'done');
+        }
+        if (!current) return term(false, `Loop state ${state.id} has no matching transition`);
+        continue;
+      }
 
-    if (effectiveResponse.ok) {
-      const fx = applyBranchEffects(activity.onSuccess, ctxAfter, mergePatch, skipOrders);
-      current = fx.nextStateId || selectTransition(activity.transitions, 'success') || selectTransition(activity.transitions, null);
-      if (!current) {
-        terminal = { ok: true, message: `Activity ${activity.id} completed`, rejectRequest: fx.rejectRequest };
-        break;
+      if (state.type === 'parallel.fork') {
+        const branches = (state.transitions || []).map((t) => t.to);
+        const outcomes = await Promise.all(branches.map((b) => runSegment(b, state.joinId)));
+        if (outcomes.some((o) => o.kind === 'suspended')) {
+          return term(false, `Approval steps inside parallel branches are not supported (fork ${state.id})`);
+        }
+        const failed = outcomes.find((o) => o.kind === 'terminal' && !o.terminal.ok);
+        if (failed) return failed;
+        const ended = outcomes.find((o) => o.kind === 'terminal');
+        if (ended) return ended;
+        stateResults[state.id] = { ok: true, branches: branches.length };
+        current = state.joinId;
+        if (stopAt && current === stopAt) return { kind: 'reachedStop' };
+        continue;
       }
-      if (fx.rejectRequest) {
-        terminal = { ok: false, message: `Activity ${activity.id} requested rejectRequest`, rejectRequest: true };
-        break;
-      }
-      continue;
-    }
 
-    const fxFailure = applyBranchEffects(activity.onFailure, ctxAfter, mergePatch, skipOrders);
-    if (activity.onError === 'continue') {
-      current = fxFailure.nextStateId || selectTransition(activity.transitions, 'success') || selectTransition(activity.transitions, null);
-      if (!current) {
-        terminal = { ok: true, message: `Activity ${activity.id} continued after error`, rejectRequest: fxFailure.rejectRequest };
-        break;
+      if (state.type === 'parallel.join') {
+        current = selectTransition(state.transitions, null);
+        if (!current) return term(true, `Join state ${state.id} has no next transition`);
+        continue;
       }
-      continue;
-    }
-    if (activity.onError === 'fallback' && activity.fallbackNodeId) {
-      current = activity.fallbackNodeId;
-      if (fxFailure.rejectRequest) {
-        terminal = { ok: false, message: `Activity ${activity.id} requested rejectRequest`, rejectRequest: true };
-        break;
-      }
-      continue;
-    }
 
-    current = fxFailure.nextStateId || selectTransition(activity.transitions, 'failure');
-    if (!current) {
-      terminal = {
-        ok: false,
-        message: `Activity ${activity.id} failed: ${effectiveResponse.status || lastErr || 'unknown error'}`,
-        rejectRequest: fxFailure.rejectRequest,
+      if (state.type === 'action.approval') {
+        const ctx = ctxNow();
+        if (params.dryRun) {
+          warnings.push(`Approval ${state.id} auto-approved in dry-run`);
+          stateResults[state.id] = { ok: true, outcome: 'approved', body: { outcome: 'approved' } };
+          current = selectTransition(state.transitions, 'approved');
+          if (!current) return term(true, `Approval ${state.id} has no approved transition`);
+          continue;
+        }
+        if (!params.allowSuspend) {
+          return term(false, `Approval step ${state.id} requires a catalog fulfillment context`);
+        }
+        return {
+          kind: 'suspended',
+          suspension: {
+            kind: 'approval',
+            stateId: state.id,
+            approval: {
+              name: interpolateString(state.name || 'Approval', ctx),
+              instructions: interpolateString(state.instructions || '', ctx),
+              approverType: normalizeApproverType(state.approverType),
+              approver: interpolateString(state.approverTemplate || '', ctx),
+            },
+          },
+        };
+      }
+
+      if (
+        state.type === 'action.notification' ||
+        state.type === 'action.ticket' ||
+        state.type === 'action.assign' ||
+        state.type === 'action.script' ||
+        state.type === 'call.workflow'
+      ) {
+        const ctx = ctxNow();
+        let native = {
+          ok: false,
+          message: `Unsupported action state type: ${state.type}`,
+          result: undefined as unknown,
+        };
+        try {
+          const executed = await executeNativeLibraryState({
+            state,
+            ctx,
+            request,
+            client,
+            requestId,
+            requestTaskId,
+            sendEmail,
+            callDepth,
+            runSubgraph: async (nestedCfg, nestedRequest) => {
+              const nested = await executeAutomationGraph({
+                ...params,
+                cfg: nestedCfg,
+                request: nestedRequest,
+                persistFormData: false,
+                callDepth: callDepth + 1,
+                maxExecutionSteps: undefined,
+                allowSuspend: false,
+                resume: undefined,
+              });
+              return {
+                ok: nested.ok,
+                message: nested.message,
+                result: {
+                  trace: nested.trace,
+                  stateResults: nested.stateResults,
+                  mergePatch: nested.mergePatch,
+                  warnings: nested.warnings,
+                },
+              };
+            },
+          });
+          if (executed) native = { ok: executed.ok, message: executed.message, result: executed.result };
+        } catch (err) {
+          native = {
+            ok: false,
+            message: err instanceof Error ? err.message : String(err),
+            result: undefined,
+          };
+        }
+
+        lastResponse = {
+          status: native.ok ? 200 : 500,
+          bodyText: native.message,
+          bodyJson: native.result,
+        };
+        stateResults[state.id] = {
+          ok: native.ok,
+          status: lastResponse.status,
+          body: native.result !== undefined ? native.result : native.message,
+          text: native.message,
+        };
+        mergePatch[`automation_${state.id}_ok`] = native.ok;
+        mergePatch[`automation_${state.id}_status`] = lastResponse.status;
+
+        if (native.ok) {
+          current = selectTransition(state.transitions, 'success') || selectTransition(state.transitions, null);
+          if (!current) return term(true, native.message);
+          continue;
+        }
+
+        current = selectTransition(state.transitions, 'failure');
+        if (!current) return term(false, native.message);
+        continue;
+      }
+
+      if (
+        state.type !== 'activity' &&
+        state.type !== 'action.rest' &&
+        state.type !== 'action.ci.create' &&
+        state.type !== 'action.ci.lookup'
+      ) {
+        throw new Error(`Unsupported action state type: ${(state as AutomationState).type}`);
+      }
+
+      const activity = state;
+      const attempts = Math.max(1, Math.min(Number(activity.retryAttempts || 1), 10));
+      const backoffMs = Math.max(0, Math.min(Number(activity.retryBackoffSec || 0), 300)) * 1000;
+
+      let lastErr: string | null = null;
+      let http: { ok: boolean; status: number; bodyText: string; bodyJson: unknown } | null = null;
+
+      for (let i = 1; i <= attempts; i += 1) {
+        const ctx = ctxNow();
+        const resolvedActivity = toHttpActivityState(activity, ctx);
+        try {
+          http = await runHttpStep(resolvedActivity, ctx, automationSharedKey);
+          if (http.ok) break;
+          lastErr = `HTTP ${http.status}`;
+        } catch (err) {
+          lastErr = err instanceof Error ? err.message : String(err);
+        }
+        if (i < attempts && backoffMs > 0) await sleepMs(backoffMs);
+      }
+
+      const effectiveResponse =
+        http || { ok: false, status: 0, bodyText: lastErr || 'Request failed', bodyJson: undefined };
+      lastResponse = {
+        status: effectiveResponse.status,
+        bodyText: effectiveResponse.bodyText,
+        bodyJson: effectiveResponse.bodyJson,
       };
-      break;
+      const ctxAfter = ctxNow();
+      stateResults[state.id] = {
+        ok: effectiveResponse.ok,
+        status: effectiveResponse.status,
+        body: effectiveResponse.bodyJson !== undefined ? effectiveResponse.bodyJson : effectiveResponse.bodyText,
+        text: effectiveResponse.bodyText,
+      };
+      mergePatch[`automation_${state.id}_status`] = effectiveResponse.status;
+      mergePatch[`automation_${state.id}_ok`] = effectiveResponse.ok;
+
+      if (effectiveResponse.ok) {
+        const fx = applyBranchEffects(activity.onSuccess, ctxAfter, mergePatch, skipOrders);
+        current = fx.nextStateId || selectTransition(activity.transitions, 'success') || selectTransition(activity.transitions, null);
+        if (!current) return term(true, `Activity ${activity.id} completed`, fx.rejectRequest);
+        if (fx.rejectRequest) return term(false, `Activity ${activity.id} requested rejectRequest`, true);
+        continue;
+      }
+
+      const fxFailure = applyBranchEffects(activity.onFailure, ctxAfter, mergePatch, skipOrders);
+      if (activity.onError === 'continue') {
+        current = fxFailure.nextStateId || selectTransition(activity.transitions, 'success') || selectTransition(activity.transitions, null);
+        if (!current) return term(true, `Activity ${activity.id} continued after error`, fxFailure.rejectRequest);
+        continue;
+      }
+      if (activity.onError === 'fallback' && activity.fallbackNodeId) {
+        current = activity.fallbackNodeId;
+        if (fxFailure.rejectRequest) return term(false, `Activity ${activity.id} requested rejectRequest`, true);
+        continue;
+      }
+
+      current = fxFailure.nextStateId || selectTransition(activity.transitions, 'failure');
+      if (!current) {
+        return term(
+          false,
+          `Activity ${activity.id} failed: ${effectiveResponse.status || lastErr || 'unknown error'}`,
+          fxFailure.rejectRequest,
+        );
+      }
+      if (fxFailure.rejectRequest) return term(false, `Activity ${activity.id} requested rejectRequest`, true);
     }
-    if (fxFailure.rejectRequest) {
-      terminal = { ok: false, message: `Activity ${activity.id} requested rejectRequest`, rejectRequest: true };
-      break;
+    if (!current) return term(false, 'Automation stopped without reaching an end state');
+    return term(false, `Automation exceeded max execution steps (${maxSteps})`);
+  }
+
+  let startId: string | null = cfg.startAt;
+  if (resume) {
+    const approvalState = byId.get(resume.checkpoint.stateId);
+    if (!approvalState || approvalState.type !== 'action.approval') {
+      startId = null;
+    } else {
+      const outcome = resume.outcome;
+      stateResults[approvalState.id] = { ok: true, outcome, status: 200, body: { outcome } };
+      mergePatch[`automation_${approvalState.id}_outcome`] = outcome;
+      trace.push(`resume:${approvalState.id}:${outcome}`);
+      startId = selectTransition(approvalState.transitions, outcome);
     }
   }
 
-  if (!terminal) {
-    terminal = {
-      ok: false,
-      message: `Automation exceeded max execution steps (${MAX_EXECUTION_STEPS})`,
-      rejectRequest: false,
+  const outcome: SegmentOutcome = startId
+    ? await runSegment(startId, null)
+    : term(false, `Cannot resume: checkpoint state ${resume?.checkpoint.stateId ?? ''} is not an approval step`);
+
+  let suspended: AutomationSuspension | undefined;
+  let terminal: Terminal;
+  if (outcome.kind === 'suspended') {
+    suspended = {
+      ...outcome.suspension,
+      checkpoint: {
+        version: 1,
+        stateId: outcome.suspension.stateId,
+        stateResults,
+        vars,
+        loops,
+        steps: counter.step,
+        trace,
+      },
     };
+    terminal = { ok: true, message: `Suspended on approval ${outcome.suspension.stateId}`, rejectRequest: false };
+  } else if (outcome.kind === 'reachedStop') {
+    terminal = { ok: true, message: 'Reached stop state', rejectRequest: false };
+  } else {
+    terminal = outcome.terminal;
   }
 
   if (persistFormData && client && requestId && Object.keys(mergePatch).length > 0) {
@@ -803,10 +996,13 @@ export async function executeAutomationGraph(
       skipTaskOrders: [...skipOrders],
       rejectRequest: terminal.rejectRequest,
       message: terminal.message,
+      ...(suspended ? { suspendedAt: suspended.stateId } : {}),
     },
     trace,
     mergePatch,
     stateResults,
     warnings,
+    ...(suspended ? { suspended } : {}),
   };
 }
+

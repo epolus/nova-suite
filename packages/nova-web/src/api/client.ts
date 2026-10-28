@@ -18,6 +18,7 @@ export { alerts } from './domains/alerts';
 export type { ImprovementSource } from './domains/improvements';
 export { reports } from './domains/reports';
 export { admin } from './domains/admin';
+export { migrations } from './domains/migrations';
 export { cmdb } from './domains/cmdb';
 export { knowledge } from './domains/knowledge';
 export { notifications } from './domains/notifications';
