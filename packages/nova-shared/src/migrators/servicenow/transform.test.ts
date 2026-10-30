@@ -75,6 +75,7 @@ describe('data pills', () => {
     expect(translatePillPath('trigger.request_item.variables.laptop_model', c)).toBe('request.form_data.laptop_model');
     expect(translatePillPath('trigger.request_item.number', c)).toBe('request.number');
     expect(translatePillPath('trigger.request_item.requested_for', c)).toBe('request.requested_for');
+    expect(translatePillPath('trigger.request_item.variables.requested_for', c)).toBe('request.requested_for');
     expect(translatePillPath('flow_variables.count', c)).toBe('vars.count');
     expect(translatePillPath('look_up_record_1.Record.name', c)).toBe('state.lookup.body.name');
     expect(translatePillPath('for_each_1.item.name', c)).toBe('loop.each.item.name');
@@ -276,7 +277,7 @@ describe('transformServiceNowSnapshot (synthetic fixture)', () => {
     ]);
     expect(laptop.tasks[0].assigned_group_name).toBe('IT Approvers');
     expect(laptop.form_schema.fields.map((f) => f.name)).toEqual([
-      'requested_for', 'laptop_model', 'justification', 'needed_by', 'accessories', 'cost_center', 'contact_email',
+      'laptop_model', 'justification', 'needed_by', 'accessories', 'cost_center', 'contact_email',
     ]);
 
     const automation = laptop.tasks[1].automation_config as unknown as AutomationConfig;

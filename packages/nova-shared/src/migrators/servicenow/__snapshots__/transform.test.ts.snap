@@ -63,12 +63,6 @@ Delivered within a week.",
             "form_schema": {
               "fields": [
                 {
-                  "label": "Requested for",
-                  "name": "requested_for",
-                  "required": true,
-                  "type": "user_ref",
-                },
-                {
                   "defaultValue": "MacBook Pro 14"",
                   "label": "Model",
                   "name": "laptop_model",
@@ -452,13 +446,13 @@ throw new Error('ServiceNow script step "run_script" has not been ported yet');
         "automationStateCount": 13,
         "categoryName": "Hardware / Laptops",
         "externalKey": "sn/a1000000000000000000000000000001",
-        "fieldCount": 7,
+        "fieldCount": 6,
         "flowName": "Standard Laptop Fulfillment",
         "name": "Standard Laptop",
         "notes": [
           {
-            "code": "scripted_default",
-            "message": "Scripted default value was dropped.",
+            "code": "requested_for_variable",
+            "message": "Requested for is collected in the cart, so this variable was not added to the catalog form.",
             "severity": "info",
             "subject": "requested_for",
           },
@@ -569,7 +563,7 @@ throw new Error('ServiceNow script step "run_script" has not been ported yet');
     "subflows": [],
     "totals": {
       "categories": 3,
-      "fields": 7,
+      "fields": 6,
       "full": 1,
       "items": 3,
       "partial": 2,

@@ -55,6 +55,9 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
     if (['request_item', 'current', 'requested_item', 'ritm', 'table_record'].includes((rest[0] ?? '').toLowerCase())) {
       rest = rest.slice(1);
     }
+    if ((rest[0] ?? '').toLowerCase() === 'variables' && (rest[1] ?? '').toLowerCase() === 'requested_for') {
+      return ['request.requested_for', ...rest.slice(2)].join('.');
+    }
     if ((rest[0] ?? '').toLowerCase() === 'variables' && rest[1]) {
       const mapping = ctx.fields.get(rest[1]);
       const fieldName = mapping?.fieldName ?? rest[1].toLowerCase();

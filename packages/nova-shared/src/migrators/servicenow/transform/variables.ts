@@ -133,6 +133,10 @@ export function convertVariables(
       notes.warn('variable_unnamed', `A ${typeLabel} variable without a name was skipped.`, label);
       continue;
     }
+    if (v.type === 31 || v.name.toLowerCase() === 'requested_for') {
+      notes.info('requested_for_variable', 'Requested for is collected in the cart, so this variable was not added to the catalog form.', v.name);
+      continue;
+    }
     const name = sanitizeFieldName(v.name, used);
     const field: NovaFormField = { name, label: truncate(label, 200), type: 'text' };
     let mapValue: (s: string) => unknown = identity;
@@ -171,9 +175,8 @@ export function convertVariables(
       case 16:
       case 28:
         break;
-      case 8:
-      case 31: {
-        const table = v.type === 31 ? 'sys_user' : v.reference;
+      case 8: {
+        const table = v.reference;
         if (table === 'sys_user') field.type = 'user_ref';
         else if (table.startsWith('cmdb_ci')) {
           field.type = 'cmdb_ref';
