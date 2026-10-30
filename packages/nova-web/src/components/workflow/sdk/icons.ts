@@ -21,5 +21,6 @@ export const NODE_TYPE_ICONS: Record<UnifiedBuilderNodeType, IconType> = {
   'parallel.fork': 'ArrowsSplit',
   'parallel.join': 'ArrowsMerge',
   'action.approval': 'SealCheck',
+  'action.task': 'ClipboardText',
   'variables.set': 'BracketsCurly',
 };

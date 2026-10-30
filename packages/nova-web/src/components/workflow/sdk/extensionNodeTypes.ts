@@ -64,6 +64,31 @@ export const actionApprovalNode = defineNode('action.approval', {
   },
 });
 
+export const actionTaskNode = defineNode('action.task', {
+  description: 'Create a manual task and wait until it is completed',
+  schemaProperties: {
+    taskName: { type: 'string' },
+    instructions: { type: 'string' },
+    groupTemplate: { type: 'string' },
+    assigneeTemplate: { type: 'string' },
+    waitForCompletion: { type: 'boolean' },
+  },
+  uischemaElements: [
+    { type: 'Text', scope: scope('properties.taskName'), label: 'Task name' },
+    { type: 'TextArea', scope: scope('properties.instructions'), label: 'Instructions' },
+    { type: 'Text', scope: scope('properties.groupTemplate'), label: 'Assignment group (name or id)' },
+    { type: 'Text', scope: scope('properties.assigneeTemplate'), label: 'Assignee (user id or email)' },
+    { type: 'Switch', scope: scope('properties.waitForCompletion'), label: 'Wait for completion' },
+  ],
+  defaults: {
+    taskName: 'Fulfill {{request.number}}',
+    instructions: '',
+    groupTemplate: '',
+    assigneeTemplate: '',
+    waitForCompletion: true,
+  },
+});
+
 export const variablesSetNode = defineNode('variables.set', {
   description: 'Set flow variables available as {{vars.name}}',
   schemaProperties: {

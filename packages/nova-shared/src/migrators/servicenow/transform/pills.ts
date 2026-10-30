@@ -4,7 +4,7 @@ import type { FieldMapping } from './variables';
 
 export type StepAlias = {
   stateId: string;
-  kind: 'action' | 'approval' | 'loop' | 'subflow';
+  kind: 'action' | 'approval' | 'loop' | 'subflow' | 'inline_subflow';
 };
 
 export type PillContext = {
@@ -13,7 +13,24 @@ export type PillContext = {
   aliases: Map<string, StepAlias>;
   isSubflow: boolean;
   notes: NoteCollector;
+  /** Lower-cased, space-free trigger aliases such as "servicecatalog_1". */
+  triggerAliases?: Set<string>;
+  /** Inlined subflow: input values as written by the caller, resolved in the caller's scope. */
+  subflowInputs?: { values: Record<string, unknown>; parent: PillContext };
+  /** Inlined subflow: prefix of the flow variables that hold its outputs. */
+  outputPrefix?: string;
 };
+
+const SINGLE_PILL_RE = /^\{\{\s*([^}]+?)\s*\}\}$/;
+
+/** The caller's value for an inlined subflow input pill such as `subflow.requested_item.number`. */
+function subflowInput(parts: string[], ctx: PillContext): { raw: string; rest: string[] } | null {
+  if (!ctx.subflowInputs) return null;
+  const name = parts[1] ?? '';
+  const value = Object.entries(ctx.subflowInputs.values).find(([k]) => k.toLowerCase() === name.toLowerCase())?.[1];
+  if (value === undefined || value === null) return null;
+  return { raw: typeof value === 'string' ? value : JSON.stringify(value), rest: parts.slice(2) };
+}
 
 const REQUEST_FIELD_MAP: Record<string, string> = {
   sys_id: 'request.id',
@@ -24,6 +41,7 @@ const REQUEST_FIELD_MAP: Record<string, string> = {
   opened_by: 'request.requester_id',
   request: 'request.id',
   assigned_to: 'request.assigned_to',
+  cat_item: 'request.service_item_name',
 };
 
 /** Translates the inside of a `{{...}}` data pill to a Nova template path, or null when unknown. */
@@ -32,7 +50,7 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
   const parts = path.split('.');
   const head = (parts[0] ?? '').toLowerCase();
 
-  if (head === 'trigger' || head === 'trigger_inputs') {
+  if (head === 'trigger' || head === 'trigger_inputs' || ctx.triggerAliases?.has(head)) {
     let rest = parts.slice(1);
     if (['request_item', 'current', 'requested_item', 'ritm', 'table_record'].includes((rest[0] ?? '').toLowerCase())) {
       rest = rest.slice(1);
@@ -46,7 +64,8 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
     if ((rest[0] ?? '').toLowerCase() === 'request' && rest[1]) rest = rest.slice(1);
     const field = (rest[0] ?? 'sys_id').toLowerCase();
     if (REQUEST_FIELD_MAP[field]) {
-      if (rest.length > 1) {
+      const itemName = field === 'cat_item' && rest.length === 2 && rest[1].toLowerCase() === 'name';
+      if (rest.length > 1 && !itemName) {
         ctx.notes.warn('pill_dot_walk', `Dot-walked pill "${path}" is not supported; using ${REQUEST_FIELD_MAP[field]}.`, path);
       }
       return REQUEST_FIELD_MAP[field];
@@ -61,6 +80,16 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
   }
 
   if (head === 'subflow' || head === 'subflow_inputs' || head === 'inputs') {
+    const input = subflowInput(parts, ctx);
+    if (input) {
+      const pill = SINGLE_PILL_RE.exec(input.raw.trim());
+      if (pill) return translatePillPath([pill[1], ...input.rest].join('.'), ctx.subflowInputs!.parent);
+      return null;
+    }
+    if (ctx.subflowInputs) {
+      ctx.notes.warn('pill_subflow_input', `Subflow input "${parts[1] ?? ''}" is not set by the calling flow.`, path);
+      return null;
+    }
     if (!ctx.isSubflow) {
       ctx.notes.warn('pill_subflow_input', `Subflow input pill "${path}" used outside a subflow.`, path);
     }
@@ -76,6 +105,9 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
     }
     if (alias.kind === 'approval') {
       return `state.${alias.stateId}.body.outcome`;
+    }
+    if (alias.kind === 'inline_subflow') {
+      return ['vars', `${alias.stateId}_${(rest[0] ?? '').replace(/[^A-Za-z0-9_]/g, '_')}`, ...rest.slice(1)].join('.');
     }
     if (alias.kind === 'subflow') {
       ctx.notes.warn('pill_subflow_output', `Subflow output pill "${path}" maps to the sub-workflow result; verify it.`, path);
@@ -94,6 +126,11 @@ const PILL_RE = /\{\{\s*([^}]+?)\s*\}\}/g;
 /** Rewrites every data pill in a string; unknown pills are left as-is and reported. */
 export function translateTemplate(value: string, ctx: PillContext): string {
   return value.replace(PILL_RE, (whole, inner: string) => {
+    const parts = inner.trim().replace(/\s+/g, '').split('.');
+    const input = ['subflow', 'subflow_inputs', 'inputs'].includes((parts[0] ?? '').toLowerCase()) ? subflowInput(parts, ctx) : null;
+    if (input && input.rest.length === 0 && !SINGLE_PILL_RE.test(input.raw.trim())) {
+      return translateTemplate(input.raw, ctx.subflowInputs!.parent);
+    }
     const mapped = translatePillPath(inner, ctx);
     if (mapped === null) {
       ctx.notes.warn('pill_unresolved', `Data pill "${inner}" could not be translated.`, inner);

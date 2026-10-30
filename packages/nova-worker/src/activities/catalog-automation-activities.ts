@@ -9,6 +9,7 @@ import {
   resolveCredentialTemplateValues,
   toHttpActivityState,
   type AutomationCheckpoint,
+  type AutomationResumeOutcome,
   type AutomationSuspension,
 } from '@nova-suite/shared';
 import { config } from '../config';
@@ -20,8 +21,8 @@ export interface ExecuteAutomatedCatalogTaskInput {
   requestTaskId: string;
   requestId: string;
   tenantId: string;
-  /** Set when resuming after an in-flow approval decided by a human. */
-  resumeOutcome?: 'approved' | 'rejected';
+  /** Set when resuming after an in-flow approval or manual task was completed by a human. */
+  resumeOutcome?: AutomationResumeOutcome;
 }
 
 export interface ExecuteAutomatedCatalogTaskResult {
@@ -29,9 +30,12 @@ export interface ExecuteAutomatedCatalogTaskResult {
   message?: string;
   rejectRequest?: boolean;
   skipTaskOrders?: number[];
-  /** The automation is paused until this approval request_task is decided. */
-  suspended?: { approvalTaskId: string };
+  /** The automation is paused until this child request_task (approval or manual) is completed. */
+  suspended?: { approvalTaskId: string; taskKind?: 'approval' | 'manual' };
 }
+
+type ApprovalSuspension = Extract<AutomationSuspension, { kind: 'approval' }>;
+type TaskSuspension = Extract<AutomationSuspension, { kind: 'task' }>;
 
 type QueryClient = {
   query: (sql: string, values?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }>;
@@ -43,7 +47,7 @@ async function resolveApprovalAssignee(
   client: QueryClient,
   tenantId: string,
   request: Record<string, unknown>,
-  approval: AutomationSuspension['approval'],
+  approval: ApprovalSuspension['approval'],
 ): Promise<{ assignedTo: string | null; assignedGroupId: string | null; note: string | null }> {
   const approver = approval.approver.trim();
   const byIdOrName = UUID_RE.test(approver) ? approver : null;
@@ -87,7 +91,7 @@ async function createInFlowApprovalTask(
   parentTaskId: string,
   taskOrder: number,
   request: Record<string, unknown>,
-  approval: AutomationSuspension['approval'],
+  approval: ApprovalSuspension['approval'],
 ): Promise<string> {
   const assignee = await resolveApprovalAssignee(client, tenantId, request, approval);
   const seq = await client.query("SELECT nextval('task_number_seq')");
@@ -127,6 +131,63 @@ async function createInFlowApprovalTask(
     );
   }
   return approvalTaskId;
+}
+
+async function createInFlowManualTask(
+  client: QueryClient,
+  tenantId: string,
+  requestId: string,
+  parentTaskId: string,
+  taskOrder: number,
+  task: TaskSuspension['task'],
+): Promise<string> {
+  const notes: string[] = [];
+  let assignedGroupId: string | null = null;
+  const group = task.group.trim();
+  if (group) {
+    const r = await client.query(
+      `SELECT id FROM assignment_groups
+       WHERE tenant_id = $1 AND (($2::uuid IS NOT NULL AND id = $2::uuid) OR lower(name) = lower($3))
+       LIMIT 1`,
+      [tenantId, UUID_RE.test(group) ? group : null, group],
+    );
+    assignedGroupId = (r.rows[0]?.id as string | undefined) ?? null;
+    if (!assignedGroupId) notes.push(`Assignment group "${group}" not found.`);
+  }
+  let assignedTo: string | null = null;
+  const assignee = task.assignee.trim();
+  if (assignee) {
+    const r = await client.query(
+      `SELECT id FROM users
+       WHERE tenant_id = $1 AND (($2::uuid IS NOT NULL AND id = $2::uuid) OR lower(email) = lower($3))
+       LIMIT 1`,
+      [tenantId, UUID_RE.test(assignee) ? assignee : null, assignee],
+    );
+    assignedTo = (r.rows[0]?.id as string | undefined) ?? null;
+    if (!assignedTo) notes.push(`Assignee "${assignee}" not found.`);
+  }
+  const seq = await client.query("SELECT nextval('task_number_seq')");
+  const number = `TASK${String(seq.rows[0].nextval).padStart(7, '0')}`;
+  const inserted = await client.query(
+    `INSERT INTO request_tasks (
+       tenant_id, number, request_id, parent_task_id, task_order, name, instructions, task_type,
+       assigned_to, assigned_group_id, status, started_at, notes
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'manual', $8, $9, 'in_progress', now(), $10)
+     RETURNING id`,
+    [
+      tenantId,
+      number,
+      requestId,
+      parentTaskId,
+      taskOrder,
+      task.name.slice(0, 255) || 'Manual task',
+      task.instructions || null,
+      assignedTo,
+      assignedGroupId,
+      notes.length ? notes.join(' ') : null,
+    ],
+  );
+  return inserted.rows[0].id as string;
 }
 
 function parseCheckpoint(raw: unknown): AutomationCheckpoint | null {
@@ -203,7 +264,11 @@ export async function executeAutomatedCatalogTask(
     }
 
     const reqRes = await client.query(
-      `SELECT id, number, status, form_data, delivery_info, requester_id, requested_for FROM requests WHERE id = $1`,
+      `SELECT r.id, r.number, r.status, r.form_data, r.delivery_info, r.requester_id, r.requested_for,
+              si.name AS service_item_name
+       FROM requests r
+       LEFT JOIN service_items si ON si.id = r.service_item_id
+       WHERE r.id = $1`,
       [requestId],
     );
     if (reqRes.rows.length === 0) {
@@ -218,16 +283,21 @@ export async function executeAutomatedCatalogTask(
     const request = reqRes.rows[0] as Record<string, unknown>;
     if (!resumeOutcome && row.automation_checkpoint) {
       const pending = await client.query(
-        `SELECT id FROM request_tasks
-         WHERE parent_task_id = $1 AND task_type = 'approval' AND status IN ('pending', 'in_progress')
+        `SELECT id, task_type FROM request_tasks
+         WHERE parent_task_id = $1 AND task_type IN ('approval', 'manual') AND status IN ('pending', 'in_progress')
          ORDER BY created_at DESC LIMIT 1`,
         [requestTaskId],
       );
       if (pending.rows[0]) {
-        return { ok: true, message: 'Awaiting in-flow approval', suspended: { approvalTaskId: pending.rows[0].id as string } };
+        const taskKind = pending.rows[0].task_type === 'manual' ? 'manual' : 'approval';
+        return {
+          ok: true,
+          message: `Awaiting in-flow ${taskKind} task`,
+          suspended: { approvalTaskId: pending.rows[0].id as string, taskKind },
+        };
       }
     }
-    let resume: { checkpoint: AutomationCheckpoint; outcome: 'approved' | 'rejected' } | undefined;
+    let resume: { checkpoint: AutomationCheckpoint; outcome: AutomationResumeOutcome } | undefined;
     if (resumeOutcome) {
       const checkpoint = parseCheckpoint(row.automation_checkpoint);
       if (!checkpoint) {
@@ -248,7 +318,7 @@ export async function executeAutomatedCatalogTask(
       );
 
       const emailProvider = getEmailProvider();
-      const result = await executeAutomationGraph({
+      const run = (resumeWith: typeof resume) => executeAutomationGraph({
         cfg,
         request,
         credMap,
@@ -263,8 +333,31 @@ export async function executeAutomatedCatalogTask(
         },
         onLog: (msg, meta) => log.info(msg, meta),
         allowSuspend: true,
-        resume,
+        resume: resumeWith,
       });
+      let result = await run(resume);
+      const taskOrder = Number(row.task_order);
+      // Manual tasks that do not wait are created and the automation continues immediately.
+      while (result.suspended?.kind === 'task' && !result.suspended.task.wait) {
+        await createInFlowManualTask(client, tenantId, requestId, requestTaskId, taskOrder, result.suspended.task);
+        result = await run({ checkpoint: result.suspended.checkpoint, outcome: 'completed' });
+      }
+
+      if (result.suspended?.kind === 'task') {
+        const manualTaskId = await createInFlowManualTask(
+          client,
+          tenantId,
+          requestId,
+          requestTaskId,
+          taskOrder,
+          result.suspended.task,
+        );
+        await client.query(
+          `UPDATE request_tasks SET automation_checkpoint = $1::jsonb, notes = $2 WHERE id = $3`,
+          [JSON.stringify(result.suspended.checkpoint), truncateNotes(JSON.stringify(result.notes)), requestTaskId],
+        );
+        return { ok: true, message: result.message, suspended: { approvalTaskId: manualTaskId, taskKind: 'manual' } };
+      }
 
       if (result.suspended) {
         const approvalTaskId = await createInFlowApprovalTask(
@@ -272,7 +365,7 @@ export async function executeAutomatedCatalogTask(
           tenantId,
           requestId,
           requestTaskId,
-          Number(row.task_order),
+          taskOrder,
           request,
           result.suspended.approval,
         );
@@ -280,7 +373,7 @@ export async function executeAutomatedCatalogTask(
           `UPDATE request_tasks SET automation_checkpoint = $1::jsonb, notes = $2 WHERE id = $3`,
           [JSON.stringify(result.suspended.checkpoint), truncateNotes(JSON.stringify(result.notes)), requestTaskId],
         );
-        return { ok: true, message: result.message, suspended: { approvalTaskId } };
+        return { ok: true, message: result.message, suspended: { approvalTaskId, taskKind: 'approval' } };
       }
 
       await client.query(
@@ -311,6 +404,7 @@ export async function executeAutomatedCatalogTask(
 }
 
 export const __test__ = {
+  createInFlowManualTask,
   evaluateAdvancedCondition,
   toHttpActivityState,
 };

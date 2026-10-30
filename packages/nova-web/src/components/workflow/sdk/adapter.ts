@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { Edge, Node } from '@xyflow/react';
-import type { NodeType, WorkflowBuilderEdge, WorkflowBuilderNode } from '@workflowbuilder/sdk';
+import { getHandleId, type NodeType, type WorkflowBuilderEdge, type WorkflowBuilderNode } from '@workflowbuilder/sdk';
 import { isUnifiedBuilderNodeType, UNIFIED_BUILDER_NODE_LABELS } from '@nova-suite/shared';
 import type { UnifiedBuilderNodeType } from '@nova-suite/shared';
 import {
@@ -71,6 +71,8 @@ function nodeDescription(nodeType: UnifiedBuilderNodeType): string {
       return 'Wait for all parallel branches';
     case 'action.approval':
       return 'Pause for a human approval (edges: approved, rejected)';
+    case 'action.task':
+      return 'Create a manual task and wait until it is completed';
     case 'variables.set':
       return 'Set flow variables available as {{vars.name}}';
     default:
@@ -123,6 +125,9 @@ export function toSdkNodes(nodes: Node<UnifiedBuilderNodeData>[]): WorkflowBuild
       ['approverType', node.data.approverType],
       ['approverTemplate', node.data.approverTemplate],
       ['approvalName', node.data.approvalName],
+      ['taskName', node.data.taskName],
+      ['groupTemplate', node.data.groupTemplate],
+      ['waitForCompletion', node.data.waitForCompletion],
       ['instructions', node.data.instructions],
       ['assignmentsJson', node.data.assignmentsJson],
       ['extraJson', node.data.extraJson],
@@ -145,15 +150,57 @@ export function toSdkNodes(nodes: Node<UnifiedBuilderNodeData>[]): WorkflowBuild
   });
 }
 
-export function toSdkEdges(edges: Edge[]): WorkflowBuilderEdge[] {
+/** Decision-node templates only render edges that hang off an inner branch handle. */
+function isDecisionCanvasType(nodeType: string | undefined): boolean {
+  return nodeType === 'decision' || nodeType === 'decision.advanced';
+}
+
+function decisionBranchInnerId(edge: Edge): string {
+  const existing = typeof edge.sourceHandle === 'string' ? edge.sourceHandle : '';
+  const match = /^source:inner:(.+)$/.exec(existing);
+  if (match?.[1]) return match[1];
+  // Keep ids stable across reloads so branch order does not reshuffle.
+  const label = typeof edge.label === 'string' && edge.label ? edge.label : 'branch';
+  return `${edge.source}__${label}`;
+}
+
+export function toSdkEdges(
+  edges: Edge[],
+  nodes: Array<Node<UnifiedBuilderNodeData> | WorkflowBuilderNode> = [],
+): WorkflowBuilderEdge[] {
+  const decisionIds = new Set(
+    nodes
+      .filter((n) => {
+        const raw = 'data' in n && n.data && typeof n.data === 'object'
+          ? ('nodeType' in n.data
+            ? (n.data as { nodeType?: string }).nodeType
+            : (n.data as { type?: string }).type)
+          : undefined;
+        return isDecisionCanvasType(typeof raw === 'string' ? raw : undefined);
+      })
+      .map((n) => n.id),
+  );
   return edges.map((edge) => {
     const label = typeof edge.label === 'string' ? edge.label : undefined;
+    const data = label !== undefined ? { label } : {};
+    if (!decisionIds.has(edge.source)) {
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: 'labelEdge',
+        data,
+      };
+    }
+    const innerId = decisionBranchInnerId(edge);
     return {
-      id: edge.id,
+      // SDK decision templates key branches by edge id === inner handle id.
+      id: innerId,
       source: edge.source,
       target: edge.target,
       type: 'labelEdge',
-      ...(label !== undefined ? { data: { label } } : { data: {} }),
+      sourceHandle: getHandleId({ handleType: 'source', innerId }),
+      data,
     };
   });
 }
@@ -207,6 +254,9 @@ export function fromSdkNodes(nodes: WorkflowBuilderNode[]): Node<UnifiedBuilderN
         approverType: typeof props.approverType === 'string' ? props.approverType : undefined,
         approverTemplate: typeof props.approverTemplate === 'string' ? props.approverTemplate : undefined,
         approvalName: typeof props.approvalName === 'string' ? props.approvalName : undefined,
+        taskName: typeof props.taskName === 'string' ? props.taskName : undefined,
+        groupTemplate: typeof props.groupTemplate === 'string' ? props.groupTemplate : undefined,
+        waitForCompletion: typeof props.waitForCompletion === 'boolean' ? props.waitForCompletion : undefined,
         instructions: typeof props.instructions === 'string' ? props.instructions : undefined,
         assignmentsJson: typeof props.assignmentsJson === 'string' ? props.assignmentsJson : undefined,
         extraJson: typeof props.extraJson === 'string' ? props.extraJson : undefined,
@@ -224,6 +274,40 @@ export function fromSdkEdges(edges: WorkflowBuilderEdge[]): Edge[] {
   }));
 }
 
+/**
+ * Decision-node templates only draw branch handles listed in
+ * `properties.decisionBranches`. Edges that reference those handles must use
+ * the same `sourceHandle`, or React Flow drops them.
+ */
+function attachDecisionBranches(
+  nodes: WorkflowBuilderNode[],
+  edges: WorkflowBuilderEdge[],
+): WorkflowBuilderNode[] {
+  return nodes.map((node) => {
+    if (node.type !== SDK_CANVAS_TYPE.DecisionNode) return node;
+    const outs = edges.filter((e) => e.source === node.id && typeof e.sourceHandle === 'string');
+    if (outs.length === 0) return node;
+    const decisionBranches = outs.map((edge, index) => ({
+      id: edge.id,
+      sourceHandle: edge.sourceHandle as string,
+      label: typeof edge.data?.label === 'string' && edge.data.label
+        ? edge.data.label
+        : `Branch #${index + 1}`,
+      conditions: [] as unknown[],
+    }));
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        properties: {
+          ...node.data.properties,
+          decisionBranches,
+        },
+      },
+    };
+  });
+}
+
 export function loadSdkGraphFromConfig(raw: Record<string, unknown>): {
   nodes: WorkflowBuilderNode[];
   edges: WorkflowBuilderEdge[];
@@ -234,9 +318,10 @@ export function loadSdkGraphFromConfig(raw: Record<string, unknown>): {
     return { nodes: [], edges: [], error: parsed.error };
   }
   const laidOut = autoLayoutBuilderGraph(parsed.nodes, parsed.edges);
+  const edges = toSdkEdges(parsed.edges, laidOut);
   return {
-    nodes: toSdkNodes(laidOut),
-    edges: toSdkEdges(parsed.edges),
+    nodes: attachDecisionBranches(toSdkNodes(laidOut), edges),
+    edges,
   };
 }
 

@@ -26,6 +26,7 @@ export const AUTOMATION_STATE_TYPES = [
   'parallel.fork',
   'parallel.join',
   'action.approval',
+  'action.task',
   'variables.set',
 ] as const;
 
@@ -63,6 +64,7 @@ export const UNIFIED_BUILDER_NODE_LABELS: Record<UnifiedBuilderNodeType, string>
   'parallel.fork': 'Parallel Fork',
   'parallel.join': 'Parallel Join',
   'action.approval': 'Approval',
+  'action.task': 'Manual Task',
   'variables.set': 'Set Variables',
 };
 
@@ -203,6 +205,21 @@ export type AutomationApprovalActionState = AutomationStateBase & {
   instructions?: string;
 };
 
+/**
+ * Creates a manual fulfillment task. With `wait` (default) the automation suspends until the
+ * task is completed. Transition: `success`.
+ */
+export type AutomationManualTaskState = AutomationStateBase & {
+  type: 'action.task';
+  name: string;
+  instructions?: string;
+  /** Assignment group name or id; templated. */
+  groupTemplate?: string;
+  /** Assignee user id or email; templated. */
+  assigneeTemplate?: string;
+  wait?: boolean;
+};
+
 export type AutomationVariablesSetState = AutomationStateBase & {
   type: 'variables.set';
   assignments: Record<string, string>;
@@ -213,6 +230,7 @@ export type AutomationState =
   | AutomationParallelForkState
   | AutomationParallelJoinState
   | AutomationApprovalActionState
+  | AutomationManualTaskState
   | AutomationVariablesSetState
   | AutomationActivityState
   | AutomationRestActionState
@@ -265,6 +283,7 @@ type AutomationValidationState = {
   definitionId?: string;
   itemsExpr?: string;
   maxIterations?: number;
+  wait?: unknown;
   joinId?: string;
   approverType?: string;
   approverTemplate?: string;
@@ -498,6 +517,9 @@ export function validateAutomationConfig(raw: unknown): string[] {
       if (!labels.has('approved') || !labels.has('rejected')) {
         errors.push(`Approval "${st.id}" transitions must include when=approved and when=rejected`);
       }
+    } else if (st.type === 'action.task') {
+      if (typeof st.name !== 'string' || !st.name.trim()) errors.push(`Manual task "${st.id}" requires name`);
+      if (st.wait !== undefined && typeof st.wait !== 'boolean') errors.push(`Manual task "${st.id}" wait must be a boolean`);
     } else if (st.type === 'variables.set') {
       const a = st.assignments;
       if (!a || typeof a !== 'object' || Array.isArray(a) || Object.keys(a).length === 0) {

@@ -38,6 +38,53 @@ describe('UnifiedAutomationDesigner contract', () => {
     expect(validateAutomationConfig(serialized.config)).toEqual([]);
   });
 
+  it('attaches decision branch sourceHandles so true/false edges render', () => {
+    const loaded = loadSdkGraphFromConfig({
+      kind: 'state_machine',
+      schemaVersion: 1,
+      startAt: 'gate',
+      states: [
+        {
+          id: 'gate',
+          type: 'decision.advanced',
+          expression: { op: 'eq', left: { var: 'vars.x' }, right: '1' },
+          transitions: [{ to: 'yes', when: 'true' }, { to: 'no', when: 'false' }],
+        },
+        { id: 'yes', type: 'end', result: 'success' },
+        { id: 'no', type: 'end', result: 'failure' },
+      ],
+    });
+    expect(loaded.error).toBeUndefined();
+    const fromGate = loaded.edges.filter((e) => e.source === 'gate');
+    expect(fromGate).toHaveLength(2);
+    for (const edge of fromGate) {
+      expect(edge.sourceHandle).toMatch(/^source:inner:/);
+      expect(edge.id).toBe(String(edge.sourceHandle).replace(/^source:inner:/, ''));
+      expect(['true', 'false']).toContain(edge.data?.label);
+    }
+    const gate = loaded.nodes.find((n) => n.id === 'gate')!;
+    const branches = (gate.data.properties as { decisionBranches?: Array<{ sourceHandle: string; label: string }> })
+      .decisionBranches ?? [];
+    expect(branches).toHaveLength(2);
+    expect(branches.map((b) => b.sourceHandle).sort()).toEqual(
+      fromGate.map((e) => e.sourceHandle).sort(),
+    );
+    const serialized = serializeSdkGraphToConfig(loaded.nodes, loaded.edges);
+    expect(serialized.errors).toEqual([]);
+    expect(serialized.config).toMatchObject({
+      startAt: 'gate',
+      states: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'gate',
+          transitions: expect.arrayContaining([
+            expect.objectContaining({ when: 'true' }),
+            expect.objectContaining({ when: 'false' }),
+          ]),
+        }),
+      ]),
+    });
+  });
+
   it('round-trips stub library nodes through SDK adapter', () => {
     const fixture = getAutomationConfigFixture('stubLibraryNodes');
     const loaded = loadSdkGraphFromConfig(fixture);

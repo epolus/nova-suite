@@ -105,6 +105,8 @@ export function transformServiceNowSnapshot(
     groups: new Map(snapshot.groups.map((g) => [g.sys_id, g])),
     users: new Map(snapshot.users.map((u) => [u.sys_id, u])),
     subflowTypes: new Map(),
+    flows: flowsById,
+    calledSubflows: new Set(),
   };
 
   const itemFlowIds = new Set(snapshot.items.map((i) => i.flow_designer_flow).filter(Boolean));
@@ -116,29 +118,6 @@ export function transformServiceNowSnapshot(
     while (usedTypes.has(type)) type = `sn_${slugify(sf.internal_name || sf.name, 56)}_${i++}`;
     usedTypes.add(type);
     lookups.subflowTypes.set(sf.sys_id, type);
-  }
-
-  const workflowDefinitions: MigrationWorkflowDefinition[] = [];
-  const subflowReports: MigrationSubflowReport[] = [];
-  for (const sf of subflows) {
-    if (itemFlowIds.has(sf.sys_id) && sf.type !== 'subflow') continue;
-    const notes = new NoteCollector();
-    const result = convertFlow(sf, { lookups, fields: new Map(), notes, isSubflow: true, extractPreApproval: false });
-    if (result.manualTasks.length > 0) {
-      notes.warn('subflow_manual_steps', `${result.manualTasks.length} step(s) could not be converted and are skipped inside the sub-workflow.`);
-    }
-    const workflowType = lookups.subflowTypes.get(sf.sys_id)!;
-    if (result.config) {
-      workflowDefinitions.push({
-        name: truncate(sf.name || workflowType, 255),
-        workflow_type: workflowType,
-        description: truncate(`Migrated from ServiceNow subflow ${sf.sys_id}. ${htmlToText(sf.description)}`.trim(), 2000),
-        definition: result.config,
-      });
-    } else if (!notes.notes.some((n) => n.severity === 'error')) {
-      notes.error('subflow_empty', 'Subflow produced no executable steps.');
-    }
-    subflowReports.push({ sysId: sf.sys_id, name: sf.name, workflowType, status: notes.status(), notes: notes.notes });
   }
 
   const categoryKeys = new Map<string, MigrationCategory>();
@@ -189,6 +168,7 @@ export function transformServiceNowSnapshot(
 
     const tasks: MigrationCatalogTask[] = [];
     let order = 1;
+    let approvalRequired = false;
     let flow: ServiceNowFlow | undefined;
     let stateCount = 0;
     let scriptSteps = 0;
@@ -228,10 +208,13 @@ export function transformServiceNowSnapshot(
         const result = convertFlow(flow, { lookups, fields: mappings, notes, isSubflow: false, extractPreApproval: true });
         scriptSteps = result.scriptSteps;
         if (result.unmappedSteps.length > 0) servicenowAttrs.unmapped_steps = result.unmappedSteps;
-        if (result.preApproval) {
+        if (result.preApproval?.approverType === 'requester_manager') {
+          // Runtime injects a manager-approval task when service_items.approval_required is set.
+          approvalRequired = true;
+        } else if (result.preApproval) {
           tasks.push({
             external_key: `${key}/approval`,
-            name: 'Approval',
+            name: result.preApproval.name,
             description: null,
             instructions: 'Please review and approve or reject this request.',
             task_type: 'approval',
@@ -259,20 +242,6 @@ export function transformServiceNowSnapshot(
         } else if (notes.notes.some((n) => n.severity === 'error')) {
           manualFallback(`The ServiceNow flow "${flow.name}" could not be converted automatically; fulfill manually.`);
         }
-        result.manualTasks.forEach((t, i) => {
-          tasks.push({
-            external_key: `${key}/manual-${i + 1}`,
-            name: t.name,
-            description: null,
-            instructions: t.instructions || null,
-            task_type: 'manual',
-            task_order: order++,
-            assigned_group_name: t.assignedGroupName,
-            sla_hours: null,
-            automation_config: {},
-            is_active: true,
-          });
-        });
         if (tasks.length === 0) manualFallback('The ServiceNow flow had no steps to convert.');
       }
     } else if (item.workflow) {
@@ -295,7 +264,7 @@ export function transformServiceNowSnapshot(
       price: item.price !== null && item.price >= 0 ? item.price : null,
       custom_attributes: { servicenow: servicenowAttrs },
       form_schema: { fields },
-      approval_required: false,
+      approval_required: approvalRequired,
       sla_hours: 72,
       is_active: item.active,
       tasks,
@@ -313,6 +282,32 @@ export function transformServiceNowSnapshot(
       scriptSteps,
       notes: notes.notes,
     });
+  }
+
+  // Subflows are inlined into their callers; only those that could not be inlined become sub-workflows.
+  const workflowDefinitions: MigrationWorkflowDefinition[] = [];
+  const subflowReports: MigrationSubflowReport[] = [];
+  const converted = new Set<string>();
+  for (let pending = [...lookups.calledSubflows]; pending.length > 0; pending = [...lookups.calledSubflows].filter((id) => !converted.has(id))) {
+    for (const id of pending) {
+      converted.add(id);
+      const sf = flowsById.get(id);
+      const workflowType = lookups.subflowTypes.get(id);
+      if (!sf || !workflowType) continue;
+      const notes = new NoteCollector();
+      const result = convertFlow(sf, { lookups, fields: new Map(), notes, isSubflow: true, extractPreApproval: false });
+      if (result.config) {
+        workflowDefinitions.push({
+          name: truncate(sf.name || workflowType, 255),
+          workflow_type: workflowType,
+          description: truncate(`Migrated from ServiceNow subflow ${sf.sys_id}. ${htmlToText(sf.description)}`.trim(), 2000),
+          definition: result.config,
+        });
+      } else if (!notes.notes.some((n) => n.severity === 'error')) {
+        notes.error('subflow_empty', 'Subflow produced no executable steps.');
+      }
+      subflowReports.push({ sysId: sf.sys_id, name: sf.name, workflowType, status: notes.status(), notes: notes.notes });
+    }
   }
 
   const categories = [...categoryKeys.values()];

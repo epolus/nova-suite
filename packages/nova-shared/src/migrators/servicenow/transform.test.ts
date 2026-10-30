@@ -123,12 +123,136 @@ describe('encoded queries', () => {
   });
 });
 
+describe('transformServiceNowSnapshot (subflows and catalog tasks)', () => {
+  const now = new Date('2026-01-01T00:00:00Z');
+  /** Mirrors a typical Service Catalog flow: approval subflow (referenced by snapshot), then tasks. */
+  function snapshotWithSubflow() {
+    const snap = fixture();
+    snap.logicDefinitions.push({ sys_id: '1d000000000000000000000000000005', name: 'Assign Subflow Outputs', type: 'assign_subflow_outputs' });
+    snap.groups.push({ sys_id: '90000000000000000000000000000003', name: 'Procurement' });
+    const step = (over: Record<string, unknown>) => ({
+      kind: 'action', sysId: `x${String(over.uiId)}`, parentUiId: '', comment: '', definitionId: '', subflowId: '', values: {}, ...over,
+    });
+    const main = snap.flows[0];
+    main.steps = [
+      step({ kind: 'subflow', uiId: 'm1', order: 1, subflowId: 'snap0000000000000000000000000001',
+        values: { ritm: '{{Service Catalog_1.request_item}}' } }),
+      step({ kind: 'logic', uiId: 'm2', order: 2, definitionId: '1d000000000000000000000000000001',
+        values: { condition: '{{manager_approval_1.approval_state}}=approved' } }),
+      step({ uiId: 'm3', parentUiId: 'm2', order: 3, definitionId: 'at000000000000000000000000000004', values: {
+        ah_short_description: 'Order {{Service Catalog_1.request_item.number}}',
+        ah_fields: 'assignment_group={"display":"Procurement","value":"90000000000000000000000000000003"}^description=Place the order',
+        ah_wait: 'true',
+      } }),
+      step({ uiId: 'm4', order: 4, definitionId: 'at000000000000000000000000000003', values: {
+        ah_to: '{{Service Catalog_1.request_item.requested_for}}',
+        ah_subject: 'Update',
+        ah_body: '<p>Item <span data-pillvalue="{{Service Catalog_1.request_item.number}}"><span class="data_pill">Number</span></span></p>',
+      } }),
+    ] as typeof main.steps;
+    const sub = snap.flows[1];
+    Object.assign(sub, { sys_id: 'snap0000000000000000000000000001', name: 'Manager Approval', internal_name: 'manager_approval' });
+    sub.steps = [
+      step({ uiId: 's1', order: 1, definitionId: 'at000000000000000000000000000001', values: { table: '{{subflow.ritm}}' } }),
+      step({ kind: 'logic', uiId: 's2', order: 2, definitionId: '1d000000000000000000000000000005',
+        values: { approval_state: '{{ask_for_approval_1.approval_state}}' } }),
+    ] as typeof sub.steps;
+    return snap;
+  }
+
+  it('inlines the subflow and keeps every step connected', () => {
+    const { package: pkg } = transformServiceNowSnapshot(snapshotWithSubflow(), { schemaVersion: 'v00.01.23', now });
+    const laptop = pkg.contents.catalog.service_items.find((i) => i.name === 'Standard Laptop')!;
+    expect(laptop.tasks.map((t) => t.task_type)).toEqual(['automated']);
+    const automation = laptop.tasks[0].automation_config as AutomationConfig;
+    expect(validateAutomationConfig(automation)).toEqual([]);
+    expect(pkg.contents.workflows.definitions).toEqual([]);
+
+    const byId = new Map(automation.states.map((s) => [s.id, s]));
+    const reachable = new Set<string>();
+    const visit = (id: string) => {
+      if (reachable.has(id)) return;
+      reachable.add(id);
+      for (const t of (byId.get(id) as { transitions?: Array<{ to: string }> }).transitions ?? []) visit(t.to);
+    };
+    visit(automation.startAt);
+    expect([...byId.keys()].filter((id) => !reachable.has(id))).toEqual([]);
+
+    expect(automation.startAt).toBe('ask_for_approval');
+    expect(byId.get('ask_for_approval')).toMatchObject({
+      type: 'action.approval', name: 'Manager Approval',
+      transitions: expect.arrayContaining([{ to: 'ask_for_approval_rejected', when: 'rejected' }]),
+    });
+    expect(byId.get('ask_for_approval_rejected')).toMatchObject({ assignments: { sn_approval_rejected: 'true' } });
+    const outputs = automation.states.find((s) => s.type === 'variables.set' && 'manager_approval_approval_state' in s.assignments);
+    expect(outputs).toBeDefined();
+    expect(byId.get('if')).toMatchObject({
+      expression: { op: 'eq', left: { var: 'vars.manager_approval_approval_state' }, right: 'approved' },
+    });
+    expect(byId.get('create_catalog_task')).toMatchObject({
+      type: 'action.task', name: 'Order {{request.number}}', instructions: 'Place the order',
+      groupTemplate: 'Procurement', transitions: [{ to: 'send_email', when: 'success' }],
+    });
+    expect((byId.get('create_catalog_task') as { wait?: boolean }).wait).not.toBe(false);
+    expect(byId.get('send_email')).toMatchObject({
+      recipientType: 'requested_for', bodyTemplate: 'Item {{request.number}}', transitions: [{ to: 'finish', when: 'success' }],
+    });
+    expect(byId.get('finish')).toMatchObject({ transitions: [{ to: 'end_rejected', when: 'true' }, { to: 'end_success', when: 'false' }] });
+    expect(byId.get('end_rejected')).toMatchObject({ result: 'failure', onFailure: { rejectRequest: true } });
+  });
+
+  it('collapses approval-gate subflows into a single approval that rejects the request', () => {
+    const snap = fixture();
+    snap.logicDefinitions.push(
+      { sys_id: '1d000000000000000000000000000005', name: 'Assign Subflow Outputs', type: 'assign_subflow_outputs' },
+      { sys_id: '1d000000000000000000000000000006', name: 'End', type: 'end' },
+    );
+    const step = (over: Record<string, unknown>) => ({
+      kind: 'action', sysId: `g${String(over.uiId)}`, parentUiId: '', comment: '', definitionId: '', subflowId: '', values: {}, ...over,
+    });
+    const main = snap.flows[0];
+    main.steps = [
+      step({ kind: 'subflow', uiId: 'm1', order: 1, subflowId: 'snap0000000000000000000000000001',
+        values: { ritm: '{{Service Catalog_1.request_item}}' } }),
+      step({ kind: 'logic', uiId: 'm2', order: 2, definitionId: '1d000000000000000000000000000001',
+        values: { condition: '{{manager_approval_1.rejected}}=true' } }),
+      step({ kind: 'logic', uiId: 'm2e', parentUiId: 'm2', order: 3, definitionId: '1d000000000000000000000000000006', values: {} }),
+      step({ uiId: 'm3', order: 4, definitionId: 'at000000000000000000000000000003', values: {
+        ah_to: '{{Service Catalog_1.request_item.requested_for}}', ah_subject: 'Go', ah_body: 'ok',
+      } }),
+    ] as typeof main.steps;
+    const sub = snap.flows[1];
+    Object.assign(sub, { sys_id: 'snap0000000000000000000000000001', name: 'Manager Approval', internal_name: 'manager_approval' });
+    sub.steps = [
+      step({ uiId: 's1', order: 1, definitionId: 'at000000000000000000000000000001', values: {} }),
+      step({ kind: 'logic', uiId: 's2', order: 2, definitionId: '1d000000000000000000000000000001',
+        values: { condition: '{{ask_for_approval_1.approval_state}}=rejected' } }),
+      step({ kind: 'logic', uiId: 's2a', parentUiId: 's2', order: 2.1, definitionId: '1d000000000000000000000000000005',
+        values: { rejected: 'true' } }),
+      step({ kind: 'logic', uiId: 's2e', parentUiId: 's2', order: 2.2, definitionId: '1d000000000000000000000000000006', values: {} }),
+    ] as typeof sub.steps;
+
+    const { package: pkg } = transformServiceNowSnapshot(snap, { schemaVersion: 'v00.01.23', now });
+    const laptop = pkg.contents.catalog.service_items.find((i) => i.name === 'Standard Laptop')!;
+    // Leading manager approval becomes the service-item flag; only the automation task remains.
+    expect(laptop.approval_required).toBe(true);
+    expect(laptop.tasks.map((t) => t.task_type)).toEqual(['automated']);
+    const automation = laptop.tasks[0].automation_config as AutomationConfig;
+    expect(validateAutomationConfig(automation)).toEqual([]);
+    expect(automation.startAt).toBe('send_email');
+    expect(automation.states.map((s) => s.id).sort()).toEqual(['end_success', 'send_email']);
+    expect(automation.states.find((s) => s.id === 'send_email')).toMatchObject({
+      transitions: [{ to: 'end_success', when: 'success' }],
+    });
+  });
+});
+
 describe('transformServiceNowSnapshot (synthetic fixture)', () => {
   const now = new Date('2026-01-01T00:00:00Z');
 
   it('produces a valid package and report', () => {
     const { package: pkg, report } = transformServiceNowSnapshot(fixture(), { schemaVersion: 'v00.01.23', now });
-    expect(report.totals).toMatchObject({ items: 3, full: 1, partial: 2, unsupported: 0, subflows: 1, scriptSteps: 1 });
+    expect(report.totals).toMatchObject({ items: 3, full: 1, partial: 2, unsupported: 0, subflows: 0, scriptSteps: 1 });
 
     const laptop = pkg.contents.catalog.service_items.find((i) => i.name === 'Standard Laptop')!;
     expect(laptop.category_external_key).toBe('sn/ce000000000000000000000000000002');
@@ -137,11 +261,8 @@ describe('transformServiceNowSnapshot (synthetic fixture)', () => {
     expect(laptop.tasks.map((t) => [t.external_key.split('/').pop(), t.task_type, t.task_order])).toEqual([
       ['approval', 'approval', 1],
       ['flow', 'automated', 2],
-      ['manual-1', 'manual', 3],
-      ['manual-2', 'manual', 4],
     ]);
     expect(laptop.tasks[0].assigned_group_name).toBe('IT Approvers');
-    expect(laptop.tasks[2].assigned_group_name).toBe('Hardware Desk');
     expect(laptop.form_schema.fields.map((f) => f.name)).toEqual([
       'requested_for', 'laptop_model', 'justification', 'needed_by', 'accessories', 'cost_center', 'contact_email',
     ]);
@@ -157,16 +278,22 @@ describe('transformServiceNowSnapshot (synthetic fixture)', () => {
       for_each: 'loop.foreach',
       add_worknote: 'action.ticket',
       run_script: 'action.script',
-      subflow: 'call.workflow',
+      create_catalog_task: 'action.task',
+      create_jira_issue: 'action.task',
+      send_email_2: 'action.notification',
       update_record: 'action.ticket',
     });
+    expect(automation.states.find((s) => s.id === 'create_catalog_task')).toMatchObject({
+      groupTemplate: 'Hardware Desk',
+      transitions: [{ to: 'run_script', when: 'success' }],
+    });
+    expect(automation.states.some((s) => s.id === 'finish')).toBe(false);
     const cond = automation.states.find((s) => s.id === 'if') as { expression: unknown };
     expect(JSON.stringify(cond.expression)).toContain('"right":true');
 
     const legacy = report.items.find((i) => i.name === 'VPN Access')!;
     expect(legacy.notes.map((n) => n.code)).toContain('legacy_workflow');
-    expect(pkg.contents.workflows.definitions).toHaveLength(1);
-    expect(pkg.contents.workflows.definitions[0].workflow_type).toBe('sn_notify_asset_team');
+    expect(pkg.contents.workflows.definitions).toEqual([]);
   });
 
   it('matches the golden package', () => {
@@ -180,7 +307,20 @@ describe('transformServiceNowSnapshot (synthetic fixture)', () => {
     expect(onlyVpn.contents.catalog.service_items).toHaveLength(1);
     expect(onlyVpn.contents.catalog.categories.map((c) => c.name)).toEqual(['Access']);
     expect(onlyVpn.contents.workflows.definitions).toHaveLength(0);
+  });
+
+  it('keeps sub-workflows called transitively by the selected items', () => {
+    const { package: pkg } = transformServiceNowSnapshot(fixture(), { schemaVersion: 'v00.01.23', now });
+    const call = (workflowType: string) => ({
+      kind: 'state_machine', schemaVersion: 1, startAt: 'c', states: [{ id: 'c', type: 'call.workflow', workflowType }],
+    });
+    pkg.contents.catalog.service_items[0].tasks[1].automation_config = call('sn_a');
+    pkg.contents.workflows.definitions = [
+      { name: 'A', workflow_type: 'sn_a', description: '', definition: call('sn_b') as never },
+      { name: 'B', workflow_type: 'sn_b', description: '', definition: call('sn_b') as never },
+      { name: 'C', workflow_type: 'sn_c', description: '', definition: call('sn_c') as never },
+    ];
     const laptop = selectPackageItems(pkg, ['sn/a1000000000000000000000000000001']);
-    expect(laptop.contents.workflows.definitions.map((d) => d.workflow_type)).toEqual(['sn_notify_asset_team']);
+    expect(laptop.contents.workflows.definitions.map((d) => d.workflow_type)).toEqual(['sn_a', 'sn_b']);
   });
 });

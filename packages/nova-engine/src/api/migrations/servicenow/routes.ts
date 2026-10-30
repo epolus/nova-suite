@@ -231,6 +231,24 @@ router.get('/runs/:id/package', async (req: Request, res: Response, next: NextFu
 
 type GroupResolution = { created: string[]; unassigned: string[] };
 
+/** Group names on catalog tasks and on manual-task/group-approval steps inside automations. */
+function packageGroupNames(pkg: MigrationConfigPackage): string[] {
+  const names = new Set<string>();
+  for (const item of pkg.contents.catalog.service_items) {
+    for (const task of item.tasks) {
+      if (task.assigned_group_name) names.add(task.assigned_group_name);
+      const states = (task.automation_config as { states?: Array<Record<string, unknown>> }).states ?? [];
+      for (const st of states) {
+        const group = st.type === 'action.task'
+          ? st.groupTemplate
+          : st.type === 'action.approval' && st.approverType === 'group' ? st.approverTemplate : undefined;
+        if (typeof group === 'string' && group.trim() && !group.includes('{{')) names.add(group.trim());
+      }
+    }
+  }
+  return [...names];
+}
+
 /** Creates or clears assignment groups the package references but the tenant lacks. */
 async function resolvePackageGroups(
   tenantId: string,
@@ -239,8 +257,7 @@ async function resolvePackageGroups(
   pkg: MigrationConfigPackage,
   createMissing: boolean,
 ): Promise<GroupResolution> {
-  const names = [...new Set(pkg.contents.catalog.service_items.flatMap((i) =>
-    i.tasks.map((t) => t.assigned_group_name).filter((n): n is string => Boolean(n))))];
+  const names = packageGroupNames(pkg);
   if (names.length === 0) return { created: [], unassigned: [] };
   return db.withTenantTransaction(tenantId, userId, roles.join(','), async (client) => {
     const found = await client.query<{ name: string }>(

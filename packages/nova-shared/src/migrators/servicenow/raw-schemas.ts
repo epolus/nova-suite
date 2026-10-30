@@ -118,12 +118,27 @@ export const snFlowInstanceSchema = z.object({
   flow: snField,
   ui_id: snField,
   parent_ui_id: snField,
-  order: snInt,
+  /** Nested steps use dotted orders such as "2.1". */
+  order: snNumber.transform((v) => v ?? 0),
   comment: snField,
   values: snField,
   action_type: snField,
   logic_definition: snField,
   subflow: snField,
+  /** Compressed input values of v2 subflow instances (their `values` column is empty). */
+  subflow_inputs: snField,
+});
+
+/** Published subflow snapshot; subflow instances reference these instead of sys_hub_flow. */
+export const snFlowSnapshotSchema = z.object({
+  sys_id: snField,
+  name: snField,
+  internal_name: snField,
+  type: snField,
+  active: snBool,
+  description: snField,
+  sys_scope: snField,
+  parent_flow: snField,
 });
 
 export const snTriggerInstanceSchema = z.object({

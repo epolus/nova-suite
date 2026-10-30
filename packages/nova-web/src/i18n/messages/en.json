@@ -3556,6 +3556,7 @@
         "actionInvalidAttributes": "Action \"{label}\" has invalid attributes JSON.",
         "loopNeedsItemDone": "For Each \"{label}\" needs item/done labeled transitions.",
         "approvalNeedsApprovedRejected": "Approval \"{label}\" needs approved/rejected labeled transitions.",
+        "taskRequiresName": "Manual task \"{label}\" requires a task name.",
         "forkNeedsJoin": "Parallel fork \"{label}\" must reference an existing Parallel Join node id."
       }
     },

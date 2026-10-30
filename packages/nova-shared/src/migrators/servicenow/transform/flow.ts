@@ -16,6 +16,9 @@ import { htmlToText, normalizeKey, slugify, truncate } from './text';
 import type { FieldMapping } from './variables';
 
 export const MAX_AUTOMATION_STATES = 80;
+export const MAX_SUBFLOW_INLINE_DEPTH = 4;
+/** Set when a ServiceNow approval is rejected; the flow then ends by rejecting the request. */
+export const APPROVAL_REJECTED_VAR = 'sn_approval_rejected';
 
 export type FlowLookups = {
   actionTypes: Map<string, SnActionType>;
@@ -24,22 +27,17 @@ export type FlowLookups = {
   users: Map<string, SnUser>;
   /** Subflow sys_id -> Nova workflow_type. */
   subflowTypes: Map<string, string>;
-};
-
-export type ManualTaskOut = {
-  name: string;
-  instructions: string;
-  assignedGroupName: string | null;
-  /** ServiceNow step order, used to keep manual tasks in flow order. */
-  order: number;
+  /** Extracted flows by sys_id, used to inline subflows into their callers. */
+  flows: Map<string, ServiceNowFlow>;
+  /** Subflows that could not be inlined and are called as sub-workflows; filled during conversion. */
+  calledSubflows: Set<string>;
 };
 
 export type UnmappedStep = { label: string; definition: string; inputs: Record<string, unknown> };
 
 export type FlowConversionResult = {
   config: AutomationConfig | null;
-  preApproval: { approverType: 'requester_manager' | 'group'; groupName: string | null } | null;
-  manualTasks: ManualTaskOut[];
+  preApproval: { name: string; approverType: 'requester_manager' | 'group'; groupName: string | null } | null;
   unmappedSteps: UnmappedStep[];
   scriptSteps: number;
 };
@@ -49,7 +47,7 @@ type StepClass =
   | 'subflow_outputs' | 'unsupported_logic'
   | 'approval' | 'catalog_task' | 'create_record' | 'update_record' | 'lookup' | 'email' | 'notification'
   | 'log' | 'worknote' | 'rest' | 'script' | 'wait_condition' | 'delete_record' | 'custom'
-  | 'subflow';
+  | 'subflow' | 'inline_subflow';
 
 type FlowNode = {
   step: ServiceNowStep;
@@ -58,6 +56,17 @@ type FlowNode = {
   label: string;
   stateId: string;
   children: FlowNode[];
+  /** Name of the ServiceNow flow or subflow the step belongs to. */
+  flowName: string;
+  /** Pill scope of the flow this step belongs to. */
+  ctx: PillContext;
+  /** For inlined subflows: the pill scope of the subflow's own steps. */
+  innerCtx?: PillContext;
+  /**
+   * Approval that replaced an "approval gate" subflow whose caller then ends on reject.
+   * Rejected goes straight to the flow's reject finish instead of through if/assign/end scaffolding.
+   */
+  rejectToFinish?: boolean;
 };
 
 function str(v: unknown): string {
@@ -73,6 +82,30 @@ function pick(values: Record<string, unknown>, ...keys: string[]): string {
     if (v !== undefined && v !== null && str(v) !== '') return str(v);
   }
   return '';
+}
+
+/** Reference inputs arrive as a sys_id or as `{"display":"Procurement","value":"<sys_id>"}`. */
+function referenceValue(raw: string): { id: string; display: string } {
+  const text = raw.trim();
+  if (text.startsWith('{')) {
+    try {
+      const o = JSON.parse(text) as Record<string, unknown>;
+      return { id: str(o.value), display: str(o.display ?? o.display_value) };
+    } catch {
+      // fall through
+    }
+  }
+  return /^[0-9a-f]{32}$/.test(text) ? { id: text, display: '' } : { id: '', display: text };
+}
+
+/** Pills reference the trigger by its name, e.g. `{{Service Catalog_1.request_item}}`. */
+function triggerAliasesFor(triggerName: string): Set<string> {
+  const base = triggerName.replace(/\s+/g, '').toLowerCase();
+  return new Set(base ? [`${base}_1`, base] : []);
+}
+
+export function subflowOutputVar(prefix: string, output: string): string {
+  return `${prefix}_${output.replace(/[^A-Za-z0-9_]/g, '_')}`;
 }
 
 function publicInputs(values: Record<string, unknown>): Record<string, unknown> {
@@ -117,7 +150,7 @@ function classifyAction(def: SnActionType | undefined, values: Record<string, un
   return 'custom';
 }
 
-function buildTree(flow: ServiceNowFlow, lookups: FlowLookups): FlowNode[] {
+function buildTree(flow: ServiceNowFlow, lookups: FlowLookups, ctx: PillContext): FlowNode[] {
   const nodes = flow.steps.map((step): FlowNode => {
     let cls: StepClass;
     let defName: string;
@@ -134,7 +167,7 @@ function buildTree(flow: ServiceNowFlow, lookups: FlowLookups): FlowNode[] {
       defName = def?.name || def?.internal_name || 'Action';
     }
     const label = `${step.order}. ${defName}${step.comment ? ` (${truncate(step.comment, 60)})` : ''}`;
-    return { step, cls, defName, label, stateId: '', children: [] };
+    return { step, cls, defName, label, stateId: '', children: [], flowName: flow.name, ctx };
   });
   const byUi = new Map(nodes.map((n) => [n.step.uiId, n]));
   const roots: FlowNode[] = [];
@@ -151,6 +184,45 @@ function buildTree(flow: ServiceNowFlow, lookups: FlowLookups): FlowNode[] {
   return roots;
 }
 
+/**
+ * Replaces subflow calls with the subflow's own steps. Nova sub-workflows cannot pause for
+ * approvals or manual tasks and only receive plain values, so ServiceNow subflows (which pass
+ * records such as the requested item) run correctly only when inlined.
+ */
+function inlineSubflows(
+  nodes: FlowNode[],
+  lookups: FlowLookups,
+  depth: number,
+  stack: string[],
+): void {
+  for (const n of nodes) {
+    if (n.cls === 'subflow') {
+      const sub = lookups.flows.get(n.step.subflowId);
+      const cyclic = stack.includes(n.step.subflowId);
+      if (sub && sub.steps.length > 0 && !cyclic && depth < MAX_SUBFLOW_INLINE_DEPTH) {
+        const inner: PillContext = {
+          fields: n.ctx.fields,
+          aliases: new Map(),
+          isSubflow: true,
+          notes: n.ctx.notes,
+          subflowInputs: { values: publicInputs(n.step.values), parent: n.ctx },
+        };
+        n.cls = 'inline_subflow';
+        n.defName = sub.name || 'Subflow';
+        n.label = `${n.step.order}. Subflow: ${n.defName}`;
+        n.innerCtx = inner;
+        n.children = buildTree(sub, lookups, inner);
+        inlineSubflows(n.children, lookups, depth + 1, [...stack, n.step.subflowId]);
+        continue;
+      }
+      if (cyclic || (sub && depth >= MAX_SUBFLOW_INLINE_DEPTH)) {
+        n.ctx.notes.warn('subflow_not_inlined', `Subflow "${sub?.name ?? n.step.subflowId}" is recursive or nested too deeply; it is called as a sub-workflow.`, n.label);
+      }
+    }
+    inlineSubflows(n.children, lookups, depth, stack);
+  }
+}
+
 function walk(nodes: FlowNode[], fn: (n: FlowNode, inParallel: boolean) => void, inParallel = false): void {
   for (const n of nodes) {
     fn(n, inParallel);
@@ -158,10 +230,94 @@ function walk(nodes: FlowNode[], fn: (n: FlowNode, inParallel: boolean) => void,
   }
 }
 
+/** Steps that do not affect control flow when deciding if a branch is exit-only. */
+function isNoiseStep(n: FlowNode): boolean {
+  return n.cls === 'log' || (n.cls === 'container' && n.children.every(isNoiseStep));
+}
+
+function isExitOnlyBranch(nodes: FlowNode[]): boolean {
+  return nodes.every((n) => {
+    if (isNoiseStep(n) || n.cls === 'end' || n.cls === 'subflow_outputs') return true;
+    if (n.cls === 'container') return isExitOnlyBranch(n.children);
+    return false;
+  });
+}
+
+/**
+ * Catalog flows wrap "Ask For Approval" in a tiny subflow (approve → if rejected → set output → end)
+ * and then check that output in the parent. Inlining that literally creates a chain of if/assign/end
+ * nodes; collapse it to one approval whose reject path ends the flow.
+ */
+function matchApprovalGate(children: FlowNode[]): FlowNode | null {
+  const meaningful = children.filter((n) => !isNoiseStep(n));
+  if (meaningful.length === 0 || meaningful.length > 2) return null;
+  if (meaningful[0].cls !== 'approval') return null;
+  if (meaningful.length === 2) {
+    if (meaningful[1].cls !== 'if' || !isExitOnlyBranch(meaningful[1].children)) return null;
+  }
+  return meaningful[0];
+}
+
+const FLATTEN_SINGLE = new Set<StepClass>(['email', 'notification', 'worknote', 'log']);
+
+/**
+ * Removes approval-gate scaffolding and lifts single-action subflows (e.g. email wrappers) so the
+ * Nova graph matches the catalog author's intent instead of Flow Designer's nesting.
+ */
+function simplifyInlinedSubflows(nodes: FlowNode[]): void {
+  for (const n of nodes) simplifyInlinedSubflows(n.children);
+
+  for (let i = 0; i < nodes.length; i += 1) {
+    const n = nodes[i];
+    if (n.cls !== 'inline_subflow') continue;
+
+    const gate = matchApprovalGate(n.children);
+    const next = nodes[i + 1];
+    if (gate && next?.cls === 'if' && isExitOnlyBranch(next.children)) {
+      const elseNode = nodes[i + 2];
+      if (elseNode?.cls === 'else' && !isExitOnlyBranch(elseNode.children)) continue;
+      n.cls = 'approval';
+      n.flowName = n.defName;
+      n.label = `${n.step.order}. ${n.defName}`;
+      n.step = {
+        ...gate.step,
+        uiId: n.step.uiId,
+        sysId: n.step.sysId,
+        order: n.step.order,
+        parentUiId: n.step.parentUiId,
+        comment: gate.step.comment || n.defName,
+      };
+      n.children = [];
+      n.innerCtx = undefined;
+      n.rejectToFinish = true;
+      const remove = elseNode?.cls === 'else' && isExitOnlyBranch(elseNode.children) ? 2 : 1;
+      nodes.splice(i + 1, remove);
+      continue;
+    }
+
+    const meaningful = n.children.filter((c) => !isNoiseStep(c));
+    if (meaningful.length === 1 && FLATTEN_SINGLE.has(meaningful[0].cls)) {
+      const child = meaningful[0];
+      const inputs = n.innerCtx?.subflowInputs?.values ?? {};
+      child.step = {
+        ...child.step,
+        uiId: n.step.uiId,
+        sysId: n.step.sysId,
+        order: n.step.order,
+        parentUiId: n.step.parentUiId,
+        values: { ...child.step.values, ...publicInputs(inputs) },
+      };
+      // Keep the child's pill scope so `{{subflow.*}}` inputs still resolve.
+      nodes[i] = child;
+    }
+  }
+}
+
 function aliasKind(cls: StepClass): StepAlias['kind'] {
   if (cls === 'approval') return 'approval';
   if (cls === 'foreach') return 'loop';
   if (cls === 'subflow') return 'subflow';
+  if (cls === 'inline_subflow') return 'inline_subflow';
   return 'action';
 }
 
@@ -193,18 +349,28 @@ export function convertFlow(
   },
 ): FlowConversionResult {
   const { lookups, notes } = opts;
-  const roots = buildTree(flow, lookups);
-  const aliases = new Map<string, StepAlias>();
-  const ctx: PillContext = { fields: opts.fields, aliases, isSubflow: opts.isSubflow, notes };
+  const rootCtx: PillContext = {
+    fields: opts.fields,
+    aliases: new Map(),
+    isSubflow: opts.isSubflow,
+    notes,
+    triggerAliases: triggerAliasesFor(flow.triggerName),
+  };
+  const roots = buildTree(flow, lookups, rootCtx);
+  inlineSubflows(roots, lookups, 0, [flow.sys_id]);
+  simplifyInlinedSubflows(roots);
+  /** Pill scope of the step being compiled; switched while compiling inlined subflows. */
+  let ctx = rootCtx;
   const states: AutomationState[] = [];
-  const manualTasks: ManualTaskOut[] = [];
   const unmappedSteps: UnmappedStep[] = [];
   let scriptSteps = 0;
   let preApproval: FlowConversionResult['preApproval'] = null;
+  /** True when some in-flow approval can reject without going straight to end_rejected. */
+  let needsRejectFlag = false;
 
   // Assign stable state ids and pill aliases in flow order before compiling back to front.
-  const usedIds = new Set<string>(['end_success']);
-  const perDefCount = new Map<string, number>();
+  const usedIds = new Set<string>(['end_success', 'end_rejected', 'finish']);
+  const perDefCount = new Map<PillContext, Map<string, number>>();
   walk(roots, (n, inParallel) => {
     const base = slugify(n.defName);
     let id = base;
@@ -212,35 +378,58 @@ export function convertFlow(
     while (usedIds.has(id)) id = `${base}_${++i}`;
     usedIds.add(id);
     n.stateId = id;
+    const counts = perDefCount.get(n.ctx) ?? new Map<string, number>();
+    perDefCount.set(n.ctx, counts);
     const defKey = normalizeKey(n.defName);
-    const count = (perDefCount.get(defKey) ?? 0) + 1;
-    perDefCount.set(defKey, count);
+    const count = (counts.get(defKey) ?? 0) + 1;
+    counts.set(defKey, count);
     const alias: StepAlias = { stateId: id, kind: aliasKind(n.cls) };
     for (const key of [n.step.uiId, n.step.sysId, `${defKey}_${count}`]) {
-      if (key) aliases.set(key.toLowerCase(), alias);
+      if (key) n.ctx.aliases.set(key.toLowerCase(), alias);
     }
-    if (n.cls === 'approval' && inParallel) {
-      notes.warn('approval_in_parallel', 'Approvals inside parallel branches are not supported at runtime.', n.label);
-    }
-    if (n.cls === 'approval' && opts.isSubflow) {
-      notes.warn('approval_in_subflow', 'Approvals inside subflows fail at runtime; move the approval into the calling flow.', n.label);
+    if (n.innerCtx) n.innerCtx.outputPrefix = id;
+    if (n.cls === 'approval') {
+      if (!n.rejectToFinish) needsRejectFlag = true; // cleared later if the only approvals are lifted to catalog tasks
+      if (inParallel) {
+        notes.warn('approval_in_parallel', 'Approvals inside parallel branches are not supported at runtime.', n.label);
+      }
+      if (opts.isSubflow && !n.ctx.subflowInputs) {
+        notes.warn('approval_in_subflow', 'Approvals inside sub-workflows fail at runtime; call this subflow from a flow so it is inlined.', n.label);
+      }
     }
   });
 
+  /** Where ServiceNow "End" goes: the caller of an inlined subflow, or the end of the flow. */
+  const finishId = needsRejectFlag && !opts.isSubflow ? 'finish' : 'end_success';
+  let endTarget: string | null = null;
+
   const addState = (s: AutomationState) => states.push(s);
 
-  const placeholder = (n: FlowNode, reason: string): void => {
-    notes.warn('step_placeholder', `${reason} It becomes a manual fulfillment task after the automation.`, n.label);
+  const manualTask = (
+    n: FlowNode,
+    next: string,
+    task: { name: string; instructions: string; group?: string | null; assignee?: string; wait?: boolean },
+  ): string => {
+    addState({
+      id: n.stateId,
+      type: 'action.task',
+      name: truncate(task.name, 255),
+      ...(task.instructions ? { instructions: truncate(task.instructions, 4000) } : {}),
+      ...(task.group ? { groupTemplate: task.group } : {}),
+      ...(task.assignee ? { assigneeTemplate: task.assignee } : {}),
+      ...(task.wait === false ? { wait: false } : {}),
+      transitions: [{ to: next, when: 'success' }],
+    });
+    return n.stateId;
+  };
+
+  const placeholder = (n: FlowNode, reason: string, next: string): string => {
+    notes.warn('step_placeholder', `${reason} It becomes a manual task in the flow.`, n.label);
     const inputs = publicInputs(n.step.values);
     unmappedSteps.push({ label: n.label, definition: n.defName, inputs });
-    manualTasks.push({
-      name: truncate(`Manual step: ${n.defName}`, 255),
-      instructions: truncate(
-        `Migrated from ServiceNow flow "${flow.name}" step ${n.label}. ${reason}\n\nOriginal inputs:\n${JSON.stringify(inputs, null, 2)}`,
-        4000,
-      ),
-      assignedGroupName: null,
-      order: n.step.order,
+    return manualTask(n, next, {
+      name: `Manual step: ${n.defName}`,
+      instructions: `Migrated from ServiceNow flow "${n.flowName}" step ${n.label}. ${reason}\n\nOriginal inputs:\n${JSON.stringify(inputs, null, 2)}`,
     });
   };
 
@@ -302,12 +491,32 @@ export function convertFlow(
         const groupResolved = approver.type === 'group' &&
           [...lookups.groups.values()].some((g) => g.name === approver.template);
         if (opts.extractPreApproval && roots[0] === n && (approver.type === 'requester_manager' || groupResolved)) {
+          const isManager = approver.type === 'requester_manager';
           preApproval = {
-            approverType: approver.type === 'group' ? 'group' : 'requester_manager',
-            groupName: approver.type === 'group' ? approver.template : null,
+            name: truncate(n.step.comment || n.flowName || 'Approval', 200),
+            approverType: isManager ? 'requester_manager' : 'group',
+            groupName: isManager ? null : approver.template,
           };
-          notes.info('pre_approval', 'Leading approval became a catalog approval task before the automation.', n.label);
-          addState({ id, type: 'variables.set', assignments: { outcome: 'approved' }, transitions: [{ to: next }] });
+          notes.info(
+            isManager ? 'manager_approval' : 'pre_approval',
+            isManager
+              ? 'Leading manager approval became the service item "Manager approval" setting.'
+              : 'Leading approval became a catalog approval task before the automation.',
+            n.label,
+          );
+          return next;
+        }
+        if (n.rejectToFinish) {
+          // Gate subflows end the parent flow on reject; skip the if/assign/end scaffolding.
+          addState({
+            id,
+            type: 'action.approval',
+            approverType: approver.type,
+            ...(approver.template ? { approverTemplate: approver.template } : {}),
+            name: truncate(n.step.comment || n.flowName || 'Approval', 200),
+            instructions: 'Migrated from ServiceNow. Approve or reject this request.',
+            transitions: [{ to: next, when: 'approved' }, { to: 'end_rejected', when: 'rejected' }],
+          });
           return id;
         }
         addState({
@@ -315,24 +524,37 @@ export function convertFlow(
           type: 'action.approval',
           approverType: approver.type,
           ...(approver.template ? { approverTemplate: approver.template } : {}),
-          name: truncate(n.step.comment || `${flow.name}: approval`, 200),
+          name: truncate(n.step.comment || n.flowName || 'Approval', 200),
           instructions: 'Migrated from ServiceNow. Approve or reject this request.',
-          transitions: [{ to: next, when: 'approved' }, { to: next, when: 'rejected' }],
+          transitions: [{ to: next, when: 'approved' }, { to: `${id}_rejected`, when: 'rejected' }],
+        });
+        addState({
+          id: `${id}_rejected`,
+          type: 'variables.set',
+          assignments: { [APPROVAL_REJECTED_VAR]: 'true' },
+          transitions: [{ to: next }],
         });
         return id;
       }
       case 'catalog_task': {
-        const groupId = pick(values, 'assignment_group');
-        const groupName = resolveGroupName(groupId);
-        if (groupId && !groupName) notes.warn('task_group_unresolved', `Assignment group ${groupId} not found.`, n.label);
-        manualTasks.push({
-          name: truncate(htmlToText(translateTemplate(pick(values, 'short_description', 'name'), ctx)) || 'Catalog task', 255),
-          instructions: truncate(htmlToText(translateTemplate(pick(values, 'description', 'instructions'), ctx)), 4000),
-          assignedGroupName: groupName,
-          order: n.step.order,
+        const fields = Object.fromEntries(
+          parseFieldAssignments(pick(values, 'ah_fields', 'fields')).map(({ field, value }) => [field, value]),
+        );
+        const group = referenceValue(fields.assignment_group || pick(values, 'ah_assignment_group', 'assignment_group'));
+        const groupName = (group.id && resolveGroupName(group.id)) || group.display || null;
+        if (group.id && !groupName) notes.warn('task_group_unresolved', `Assignment group ${group.id} not found.`, n.label);
+        const user = referenceValue(fields.assigned_to || pick(values, 'ah_assigned_to', 'assigned_to'));
+        const assignee = user.id ? lookups.users.get(user.id)?.email || '' : '';
+        if (user.id && !assignee) notes.warn('task_assignee_unresolved', `Assignee ${user.display || user.id} not found; the task is assigned to the group only.`, n.label);
+        const waitRaw = pick(values, 'ah_wait', 'wait', 'wait_for_completion').toLowerCase();
+        notes.info('catalog_task', 'Catalog task becomes a manual task inside the flow.', n.label);
+        return manualTask(n, next, {
+          name: htmlToText(translateTemplate(pick(values, 'ah_short_description', 'short_description', 'name') || fields.short_description || '', ctx)) || 'Catalog task',
+          instructions: htmlToText(translateTemplate(fields.description || pick(values, 'ah_description', 'description', 'instructions'), ctx)),
+          group: groupName,
+          assignee,
+          wait: !['0', 'false'].includes(waitRaw),
         });
-        notes.info('catalog_task', 'Catalog task becomes a manual fulfillment task that runs after the automation.', n.label);
-        return next;
       }
       case 'create_record': {
         const fields = fieldAssignments(n);
@@ -361,8 +583,7 @@ export function convertFlow(
           notes.info('ci_class', `CMDB class ${table} mapped to Nova class "${table.replace(/^cmdb_ci_?/, '') || 'ci'}"; verify it exists.`, n.label);
           return id;
         }
-        placeholder(n, `Create Record on ${table || 'an unknown table'} has no Nova equivalent.`);
-        return next;
+        return placeholder(n, `Create Record on ${table || 'an unknown table'} has no Nova equivalent.`, next);
       }
       case 'update_record': {
         const fields = fieldAssignments(n);
@@ -396,8 +617,7 @@ export function convertFlow(
           notes.info('request_update_skipped', 'Request field updates have no Nova equivalent and were skipped.', n.label);
           return next;
         }
-        placeholder(n, `Update Record on ${table || 'an unknown table'} has no Nova equivalent.`);
-        return next;
+        return placeholder(n, `Update Record on ${table || 'an unknown table'} has no Nova equivalent.`, next);
       }
       case 'lookup': {
         if (table.startsWith('cmdb_ci')) {
@@ -425,7 +645,7 @@ export function convertFlow(
       }
       case 'email':
       case 'notification': {
-        const to = pick(values, 'to', 'recipients', 'users', 'recipient');
+        const to = pick(values, 'ah_to', 'to', 'recipients', 'users', 'recipient');
         let recipientType = 'requester';
         const toPath = singlePillPath(to, ctx);
         if (toPath === 'request.requested_for') recipientType = 'requested_for';
@@ -437,8 +657,11 @@ export function convertFlow(
         }
         else if (/^[0-9a-f]{32}$/.test(to) && lookups.users.get(to)?.email) recipientType = lookups.users.get(to)!.email;
         else if (to) notes.warn('recipient_unresolved', `Recipient "${truncate(to, 80)}" could not be mapped; sending to the requester.`, n.label);
-        const subject = pick(values, 'subject', 'title');
-        const body = pick(values, 'body', 'message', 'html');
+        const subject = pick(
+          values,
+          'ah_subject', 'subject', 'title', 'emal_subject', 'email_subject',
+        );
+        const body = pick(values, 'ah_body', 'body', 'message', 'html');
         if (n.cls === 'notification' && !subject) {
           notes.warn('notification_template', 'ServiceNow notification records are not migrated; a generic email is sent instead.', n.label);
         }
@@ -447,8 +670,8 @@ export function convertFlow(
           type: 'action.notification',
           channel: 'email',
           recipientType,
-          titleTemplate: translateTemplate(subject || 'Update on {{request.number}}', ctx),
-          bodyTemplate: translateTemplate(htmlToText(body) || 'Your request {{request.number}} was updated.', ctx),
+          titleTemplate: htmlToText(translateTemplate(subject || 'Update on {{request.number}}', ctx)),
+          bodyTemplate: htmlToText(translateTemplate(body, ctx)) || 'Your request {{request.number}} was updated.',
           transitions: success,
         });
         return id;
@@ -466,8 +689,7 @@ export function convertFlow(
         const path = pick(values, 'resource_path', 'path');
         const url = translateTemplate(`${base.replace(/\/+$/, '')}${path ? `/${path.replace(/^\/+/, '')}` : ''}`, ctx);
         if (!url) {
-          placeholder(n, 'REST step without a resolvable endpoint (likely a connection alias).');
-          return next;
+          return placeholder(n, 'REST step without a resolvable endpoint (likely a connection alias).', next);
         }
         const headersRaw = values.headers ?? values.request_headers;
         const headers: Record<string, string> = {};
@@ -501,14 +723,11 @@ export function convertFlow(
         return id;
       }
       case 'wait_condition':
-        placeholder(n, 'Wait For Condition is not supported.');
-        return next;
+        return placeholder(n, 'Wait For Condition is not supported.', next);
       case 'delete_record':
-        placeholder(n, 'Delete Record is not supported.');
-        return next;
+        return placeholder(n, 'Delete Record is not supported.', next);
       default:
-        placeholder(n, `Action "${n.defName}" (custom or spoke action) has no Nova equivalent.`);
-        return next;
+        return placeholder(n, `Action "${n.defName}" (custom or spoke action) has no Nova equivalent.`, next);
     }
   };
 
@@ -522,6 +741,7 @@ export function convertFlow(
     }
     for (let i = conds.length - 1; i >= 0; i -= 1) {
       const n = conds[i];
+      ctx = n.ctx;
       const expression = encodedQueryToCondition(pick(n.step.values, 'condition', 'conditions', 'condition_string'), ctx);
       const trueEntry = compileSeq(n.children, next);
       addState({
@@ -537,7 +757,15 @@ export function convertFlow(
 
   const compileNode = (n: FlowNode, next: string): string => {
     const values = n.step.values;
+    ctx = n.ctx;
     switch (n.cls) {
+      case 'inline_subflow': {
+        const savedEnd = endTarget;
+        endTarget = next;
+        const entry = compileSeq(n.children, next);
+        endTarget = savedEnd;
+        return entry;
+      }
       case 'foreach': {
         const raw = pick(values, 'items', 'list', 'input', 'records', 'array');
         if (!raw) notes.warn('foreach_items', 'For Each without a recognizable items input.', n.label);
@@ -565,8 +793,7 @@ export function convertFlow(
         }
         return compileSeq(n.children, next);
       case 'end':
-        addState({ id: n.stateId, type: 'end', result: 'success' });
-        return n.stateId;
+        return endTarget ?? finishId;
       case 'setvars': {
         const assignments: Record<string, string> = {};
         const source = Array.isArray(values.variables)
@@ -593,9 +820,18 @@ export function convertFlow(
         addState({ id: n.stateId, type: 'delay', delaySeconds: seconds, transitions: [{ to: next }] });
         return n.stateId;
       }
-      case 'subflow_outputs':
-        notes.info('subflow_outputs', 'Assign Subflow Outputs is not needed in Nova and was skipped.', n.label);
-        return compileSeq(n.children, next);
+      case 'subflow_outputs': {
+        const prefix = n.ctx.outputPrefix;
+        const outputs = Object.entries(publicInputs(values));
+        if (!prefix || outputs.length === 0) {
+          notes.info('subflow_outputs', 'Assign Subflow Outputs is not needed in Nova and was skipped.', n.label);
+          return compileSeq(n.children, next);
+        }
+        const assignments: Record<string, string> = {};
+        for (const [k, v] of outputs) assignments[subflowOutputVar(prefix, k)] = translateTemplate(str(v), ctx);
+        addState({ id: n.stateId, type: 'variables.set', assignments, transitions: [{ to: compileSeq(n.children, next) }] });
+        return n.stateId;
+      }
       case 'unsupported_logic':
         notes.warn('logic_unsupported', `Flow logic "${n.defName}" is not supported; its inner steps run once in sequence.`, n.label);
         return compileSeq(n.children, next);
@@ -605,10 +841,8 @@ export function convertFlow(
         return compileSeq(n.children, next);
       case 'subflow': {
         const workflowType = lookups.subflowTypes.get(n.step.subflowId);
-        if (!workflowType) {
-          placeholder(n, `Subflow ${n.step.subflowId} was not extracted.`);
-          return next;
-        }
+        if (!workflowType) return placeholder(n, `Subflow ${n.step.subflowId} was not extracted.`, next);
+        lookups.calledSubflows.add(n.step.subflowId);
         const input = translateUnknown(publicInputs(values), ctx) as Record<string, unknown>;
         addState({ id: n.stateId, type: 'call.workflow', workflowType, input, transitions: [{ to: next, when: 'success' }] });
         return n.stateId;
@@ -641,10 +875,31 @@ export function convertFlow(
     return entry;
   }
 
-  const startAt = compileSeq(roots, 'end_success');
+  let startAt = compileSeq(roots, finishId);
+  if (finishId === 'finish' && !states.some((s) => s.type === 'action.approval')) {
+    // The only approval became the catalog pre-approval; nothing in the flow can reject.
+    for (const s of states) {
+      for (const t of (s as { transitions?: Array<{ to: string }> }).transitions ?? []) {
+        if (t.to === 'finish') t.to = 'end_success';
+      }
+    }
+    if (startAt === 'finish') startAt = 'end_success';
+  } else if (finishId === 'finish') {
+    addState({
+      id: 'finish',
+      type: 'decision.advanced',
+      expression: { op: 'eq', left: { var: `vars.${APPROVAL_REJECTED_VAR}` }, right: 'true' },
+      transitions: [{ to: 'end_rejected', when: 'true' }, { to: 'end_success', when: 'false' }],
+    });
+  }
+  const referencesRejectEnd = finishId === 'finish' || states.some((s) =>
+    ((s as { transitions?: Array<{ to: string }> }).transitions ?? []).some((t) => t.to === 'end_rejected'));
+  if (referencesRejectEnd) {
+    addState({ id: 'end_rejected', type: 'end', result: 'failure', onFailure: { rejectRequest: true } });
+  }
   addState({ id: 'end_success', type: 'end', result: 'success' });
 
-  const meaningful = states.filter((s) => s.id !== 'end_success');
+  const meaningful = states.filter((s) => !['end_success', 'end_rejected', 'finish'].includes(s.id));
   let config: AutomationConfig | null = null;
   if (meaningful.length > 0) {
     const candidate: AutomationConfig = {
@@ -665,7 +920,6 @@ export function convertFlow(
     }
   }
 
-  manualTasks.sort((a, b) => a.order - b.order);
   unmappedSteps.reverse();
-  return { config, preApproval, manualTasks, unmappedSteps, scriptSteps };
+  return { config, preApproval, unmappedSteps, scriptSteps };
 }

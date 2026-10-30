@@ -203,3 +203,45 @@ describe('action.approval', () => {
     expect(result.message).toContain('parallel branches');
   });
 });
+
+describe('action.task', () => {
+  const taskGraph = () => graph('order', [
+    {
+      id: 'order',
+      type: 'action.task',
+      name: 'Order {{request.number}}',
+      instructions: 'Place the order',
+      groupTemplate: 'Procurement',
+      transitions: [{ to: 'after', when: 'success' }],
+    },
+    { id: 'after', type: 'variables.set', assignments: { done: 'yes' }, transitions: [{ to: 'ok' }] },
+  ]);
+
+  it('fails outside a fulfillment context', async () => {
+    const result = await run(taskGraph());
+    expect(result.ok).toBe(false);
+  });
+
+  it('continues in dry-run with a warning', async () => {
+    const result = await run(taskGraph(), { dryRun: true });
+    expect(result.ok).toBe(true);
+    expect(visits(result.trace, 'after')).toBe(1);
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it('suspends with the rendered task and continues on completion', async () => {
+    const cfg = taskGraph();
+    const first = await run(cfg, { allowSuspend: true });
+    expect(first.suspended).toMatchObject({
+      kind: 'task',
+      stateId: 'order',
+      task: { name: 'Order REQ1', instructions: 'Place the order', group: 'Procurement', wait: true },
+    });
+    expect(visits(first.trace, 'after')).toBe(0);
+    const checkpoint = JSON.parse(JSON.stringify(first.suspended!.checkpoint));
+    const resumed = await run(cfg, { allowSuspend: true, resume: { checkpoint, outcome: 'completed' } });
+    expect(resumed.ok).toBe(true);
+    expect(resumed.suspended).toBeUndefined();
+    expect(visits(resumed.trace, 'after')).toBe(1);
+  });
+});

@@ -126,7 +126,7 @@ Delivered within a week.",
                 "external_key": "sn/a1000000000000000000000000000001/approval",
                 "instructions": "Please review and approve or reject this request.",
                 "is_active": true,
-                "name": "Approval",
+                "name": "Manager sign-off",
                 "sla_hours": null,
                 "task_order": 1,
                 "task_type": "approval",
@@ -136,7 +136,7 @@ Delivered within a week.",
                 "automation_config": {
                   "kind": "state_machine",
                   "schemaVersion": 1,
-                  "startAt": "ask_for_approval",
+                  "startAt": "if",
                   "states": [
                     {
                       "entity": "request",
@@ -152,18 +152,36 @@ Delivered within a week.",
                       "type": "action.ticket",
                     },
                     {
-                      "id": "subflow",
-                      "input": {
-                        "laptop": "{{request.number}}",
-                      },
+                      "bodyTemplate": "Please tag laptop {{request.number}}.",
+                      "channel": "email",
+                      "id": "send_email_2",
+                      "recipientType": "assets@example.com",
+                      "titleTemplate": "Laptop {{request.number}}",
                       "transitions": [
                         {
                           "to": "update_record",
                           "when": "success",
                         },
                       ],
-                      "type": "call.workflow",
-                      "workflowType": "sn_notify_asset_team",
+                      "type": "action.notification",
+                    },
+                    {
+                      "id": "create_jira_issue",
+                      "instructions": "Migrated from ServiceNow flow "Standard Laptop Fulfillment" step 11. Create Jira Issue. Action "Create Jira Issue" (custom or spoke action) has no Nova equivalent.
+
+Original inputs:
+{
+  "project": "IT",
+  "summary": "Laptop {{trigger.request_item.number}}"
+}",
+                      "name": "Manual step: Create Jira Issue",
+                      "transitions": [
+                        {
+                          "to": "send_email_2",
+                          "when": "success",
+                        },
+                      ],
+                      "type": "action.task",
                     },
                     {
                       "code": "/* Migrated from ServiceNow (10. Run Script). Port this logic: GlideRecord and other ServiceNow APIs are unavailable.
@@ -175,11 +193,24 @@ throw new Error('ServiceNow script step "run_script" has not been ported yet');
                       "runtime": "js",
                       "transitions": [
                         {
-                          "to": "subflow",
+                          "to": "create_jira_issue",
                           "when": "success",
                         },
                       ],
                       "type": "action.script",
+                    },
+                    {
+                      "groupTemplate": "Hardware Desk",
+                      "id": "create_catalog_task",
+                      "instructions": "Use the standard image.",
+                      "name": "Image laptop for {{request.requested_for}}",
+                      "transitions": [
+                        {
+                          "to": "run_script",
+                          "when": "success",
+                        },
+                      ],
+                      "type": "action.task",
                     },
                     {
                       "entity": "request",
@@ -205,7 +236,7 @@ throw new Error('ServiceNow script step "run_script" has not been ported yet');
                           "when": "item",
                         },
                         {
-                          "to": "run_script",
+                          "to": "create_catalog_task",
                           "when": "done",
                         },
                       ],
@@ -288,16 +319,12 @@ throw new Error('ServiceNow script step "run_script" has not been ported yet');
                       "type": "decision.advanced",
                     },
                     {
-                      "assignments": {
-                        "outcome": "approved",
+                      "id": "end_rejected",
+                      "onFailure": {
+                        "rejectRequest": true,
                       },
-                      "id": "ask_for_approval",
-                      "transitions": [
-                        {
-                          "to": "if",
-                        },
-                      ],
-                      "type": "variables.set",
+                      "result": "failure",
+                      "type": "end",
                     },
                     {
                       "id": "end_success",
@@ -314,36 +341,6 @@ throw new Error('ServiceNow script step "run_script" has not been ported yet');
                 "sla_hours": null,
                 "task_order": 2,
                 "task_type": "automated",
-              },
-              {
-                "assigned_group_name": "Hardware Desk",
-                "automation_config": {},
-                "description": null,
-                "external_key": "sn/a1000000000000000000000000000001/manual-1",
-                "instructions": "Use the standard image.",
-                "is_active": true,
-                "name": "Image laptop for {{request.requested_for}}",
-                "sla_hours": null,
-                "task_order": 3,
-                "task_type": "manual",
-              },
-              {
-                "assigned_group_name": null,
-                "automation_config": {},
-                "description": null,
-                "external_key": "sn/a1000000000000000000000000000001/manual-2",
-                "instructions": "Migrated from ServiceNow flow "Standard Laptop Fulfillment" step 11. Create Jira Issue. Action "Create Jira Issue" (custom or spoke action) has no Nova equivalent.
-
-Original inputs:
-{
-  "project": "IT",
-  "summary": "Laptop {{trigger.request_item.number}}"
-}",
-                "is_active": true,
-                "name": "Manual step: Create Jira Issue",
-                "sla_hours": null,
-                "task_order": 4,
-                "task_type": "manual",
               },
             ],
           },
@@ -435,39 +432,7 @@ Original inputs:
         "rules": [],
       },
       "workflows": {
-        "definitions": [
-          {
-            "definition": {
-              "kind": "state_machine",
-              "schemaVersion": 1,
-              "startAt": "send_email",
-              "states": [
-                {
-                  "bodyTemplate": "Please tag laptop {{request.form_data.laptop}}.",
-                  "channel": "email",
-                  "id": "send_email",
-                  "recipientType": "assets@example.com",
-                  "titleTemplate": "Laptop {{request.form_data.laptop}}",
-                  "transitions": [
-                    {
-                      "to": "end_success",
-                      "when": "success",
-                    },
-                  ],
-                  "type": "action.notification",
-                },
-                {
-                  "id": "end_success",
-                  "result": "success",
-                  "type": "end",
-                },
-              ],
-            },
-            "description": "Migrated from ServiceNow subflow f2000000000000000000000000000001. Lets the asset team know.",
-            "name": "Notify Asset Team",
-            "workflow_type": "sn_notify_asset_team",
-          },
-        ],
+        "definitions": [],
       },
     },
     "exported_at": "2026-01-01T00:00:00.000Z",
@@ -484,7 +449,7 @@ Original inputs:
     "instanceUrl": "https://example.service-now.com",
     "items": [
       {
-        "automationStateCount": 11,
+        "automationStateCount": 13,
         "categoryName": "Hardware / Laptops",
         "externalKey": "sn/a1000000000000000000000000000001",
         "fieldCount": 7,
@@ -510,8 +475,14 @@ Original inputs:
             "subject": "cost_center",
           },
           {
+            "code": "recipient_email",
+            "message": "Recipient assets@example.com must exist as a Nova user to receive the email.",
+            "severity": "info",
+            "subject": "1. Send Email",
+          },
+          {
             "code": "step_placeholder",
-            "message": "Action "Create Jira Issue" (custom or spoke action) has no Nova equivalent. It becomes a manual fulfillment task after the automation.",
+            "message": "Action "Create Jira Issue" (custom or spoke action) has no Nova equivalent. It becomes a manual task in the flow.",
             "severity": "warning",
             "subject": "11. Create Jira Issue",
           },
@@ -523,7 +494,7 @@ Original inputs:
           },
           {
             "code": "catalog_task",
-            "message": "Catalog task becomes a manual fulfillment task that runs after the automation.",
+            "message": "Catalog task becomes a manual task inside the flow.",
             "severity": "info",
             "subject": "9. Create Catalog Task",
           },
@@ -543,7 +514,7 @@ Original inputs:
         "scriptSteps": 1,
         "status": "partial",
         "sysId": "a1000000000000000000000000000001",
-        "taskCount": 4,
+        "taskCount": 2,
       },
       {
         "automationStateCount": 0,
@@ -590,22 +561,7 @@ Original inputs:
       },
     ],
     "release": "glide-xanadu-07-02-2024__patch3",
-    "subflows": [
-      {
-        "name": "Notify Asset Team",
-        "notes": [
-          {
-            "code": "recipient_email",
-            "message": "Recipient assets@example.com must exist as a Nova user to receive the email.",
-            "severity": "info",
-            "subject": "1. Send Email",
-          },
-        ],
-        "status": "full",
-        "sysId": "f2000000000000000000000000000001",
-        "workflowType": "sn_notify_asset_team",
-      },
-    ],
+    "subflows": [],
     "totals": {
       "categories": 3,
       "fields": 7,
@@ -613,7 +569,7 @@ Original inputs:
       "items": 3,
       "partial": 2,
       "scriptSteps": 1,
-      "subflows": 1,
+      "subflows": 0,
       "unsupported": 0,
     },
     "warnings": [],

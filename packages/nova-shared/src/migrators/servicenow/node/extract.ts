@@ -8,6 +8,7 @@ import {
   snCatItemSchema,
   snFlowInstanceSchema,
   snFlowSchema,
+  snFlowSnapshotSchema,
   snFlowVariableSchema,
   snGroupSchema,
   snLogicDefinitionSchema,
@@ -178,6 +179,14 @@ export async function extractServiceNowSnapshot(
       snFlowSchema,
       await safeListIn('sys_hub_flow', 'sys_id', batch, fieldsOf(snFlowSchema)),
     );
+    const missing = batch.filter((id) => !flowRows.some((f) => f.sys_id === id));
+    for (const snap of parseRows(
+      snFlowSnapshotSchema,
+      await safeListIn('sys_hub_flow_snapshot', 'sys_id', missing, fieldsOf(snFlowSnapshotSchema)),
+    )) {
+      const { parent_flow: _parent, ...rest } = snap;
+      flowRows.push({ ...rest, status: 'published', master_snapshot: '', latest_snapshot: '' });
+    }
     const found = new Set(flowRows.map((f) => f.sys_id));
     for (const id of batch) if (!found.has(id)) warnings.push(`Flow ${id} could not be read.`);
 
@@ -247,8 +256,9 @@ export async function extractServiceNowSnapshot(
             let values: Record<string, unknown>;
             if (storage === 'v2') {
               const decoded = decodeFlowValues(r.values);
-              if (decoded.encoding === 'unknown') undecodable += 1;
-              values = decoded.values;
+              const inputs = kind === 'subflow' ? decodeFlowValues(r.subflow_inputs) : null;
+              if (decoded.encoding === 'unknown' || inputs?.encoding === 'unknown') undecodable += 1;
+              values = { ...decoded.values, ...inputs?.values };
             } else {
               values = v1Values.get(r.sys_id) ?? {};
             }

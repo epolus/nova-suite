@@ -180,6 +180,27 @@ describe('extractServiceNowSnapshot', () => {
     expect(one.flows).toEqual([]);
   });
 
+  it('resolves subflows referenced by snapshot and decodes subflow_inputs', async () => {
+    const { client } = clientFor({
+      ...tables,
+      sys_hub_flow: [{ sys_id: 'f1', name: 'Laptop flow', type: 'flow', master_snapshot: 's1', active: 'true' }],
+      sys_hub_flow_snapshot: [{ sys_id: 'snap2', name: 'Notify', type: 'subflow', active: 'true', parent_flow: 'f2' }],
+      sys_hub_sub_flow_instance_v2: [{
+        sys_id: 'sf1', flow: 's1', ui_id: 'u2', order: '2', subflow: 'snap2', values: '',
+        subflow_inputs: gz({ inputs: [{ name: 'ritm', value: '{{Service Catalog_1.request_item}}' }] }),
+      }],
+      sys_hub_action_instance: [{ sys_id: 'a2', flow: 'snap2', ui_id: 'u3', order: '2.1', action_type: 'at1' }],
+    });
+    const snap = await extractServiceNowSnapshot(client);
+    const main = snap.flows.find((f) => f.sys_id === 'f1')!;
+    expect(main.steps.find((s) => s.kind === 'subflow')).toMatchObject({
+      subflowId: 'snap2', values: { ritm: '{{Service Catalog_1.request_item}}' },
+    });
+    const sub = snap.flows.find((f) => f.sys_id === 'snap2')!;
+    expect(sub).toMatchObject({ name: 'Notify', type: 'subflow' });
+    expect(sub.steps).toHaveLength(1);
+  });
+
   it('turns table ACL errors into warnings', async () => {
     const { client } = clientFor(tables, { statusByTable: { sys_hub_flow: 403 } });
     const snap = await extractServiceNowSnapshot(client);

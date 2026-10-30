@@ -6,7 +6,7 @@ const DESIGNER_MANAGED_STATE_KEYS = new Set([
   'condition', 'expression', 'delaySeconds', 'result', 'className', 'name', 'displayName', 'attributes', 'channel',
   'recipientType', 'titleTemplate', 'bodyTemplate', 'entity', 'operation', 'fields', 'target', 'assigneeTemplate',
   'groupIdTemplate', 'runtime', 'code', 'workflowType', 'definitionId', 'input', 'itemsExpr', 'maxIterations',
-  'joinId', 'approverType', 'approverTemplate', 'instructions', 'assignments',
+  'joinId', 'approverType', 'approverTemplate', 'instructions', 'assignments', 'groupTemplate', 'wait',
 ]);
 
 /** Collects state keys the designer has no editor for, so they survive a load/save round trip. */
@@ -102,6 +102,18 @@ export function serializeExtensionState(
         ...(data.approverTemplate ? { approverTemplate: data.approverTemplate } : {}),
         ...(data.approvalName ? { name: data.approvalName } : {}),
         ...(data.instructions ? { instructions: data.instructions } : {}),
+        transitions,
+      };
+    case 'action.task':
+      if (!data.taskName?.trim()) errors.push({ code: 'taskRequiresName', params: { label: data.label } });
+      return {
+        id,
+        type,
+        name: data.taskName || '',
+        ...(data.instructions ? { instructions: data.instructions } : {}),
+        ...(data.groupTemplate ? { groupTemplate: data.groupTemplate } : {}),
+        ...(data.assigneeTemplate ? { assigneeTemplate: data.assigneeTemplate } : {}),
+        ...(data.waitForCompletion === false ? { wait: false } : {}),
         transitions,
       };
     case 'variables.set':

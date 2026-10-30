@@ -60,6 +60,9 @@ export type UnifiedBuilderNodeData = {
   approverType?: string;
   approverTemplate?: string;
   approvalName?: string;
+  taskName?: string;
+  groupTemplate?: string;
+  waitForCompletion?: boolean;
   instructions?: string;
   assignmentsJson?: string;
   /** JSON of state keys the designer has no editor for (e.g. headers, body, onSuccess); round-tripped on save. */
@@ -145,7 +148,7 @@ export function parseBuilderFromConfig(raw: Record<string, unknown>): {
         fallbackNodeId: typeof s.fallbackNodeId === 'string' ? s.fallbackNodeId : undefined,
         endResult: s.result === 'failure' ? 'failure' : 'success',
         className: typeof s.className === 'string' ? s.className : '',
-        ciName: t !== 'action.approval' && typeof s.name === 'string' ? s.name : '',
+        ciName: t !== 'action.approval' && t !== 'action.task' && typeof s.name === 'string' ? s.name : '',
         displayName: typeof s.displayName === 'string' ? s.displayName : '',
         attributesJson: JSON.stringify(
           s.attributes && typeof s.attributes === 'object' && !Array.isArray(s.attributes) ? s.attributes : {},
@@ -180,6 +183,9 @@ export function parseBuilderFromConfig(raw: Record<string, unknown>): {
         approverType: typeof s.approverType === 'string' ? s.approverType : undefined,
         approverTemplate: typeof s.approverTemplate === 'string' ? s.approverTemplate : undefined,
         approvalName: t === 'action.approval' && typeof s.name === 'string' ? s.name : undefined,
+        taskName: t === 'action.task' && typeof s.name === 'string' ? s.name : undefined,
+        groupTemplate: typeof s.groupTemplate === 'string' ? s.groupTemplate : undefined,
+        waitForCompletion: t === 'action.task' ? s.wait !== false : undefined,
         instructions: typeof s.instructions === 'string' ? s.instructions : undefined,
         assignmentsJson: stringifyJsonField(s.assignments),
         extraJson: extractExtraJson(s),

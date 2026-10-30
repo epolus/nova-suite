@@ -55,10 +55,10 @@ export type ExecuteAutomationGraphParams = {
   sendEmail?: AutomationSendEmail;
   /** Overrides the computed step budget (default scales with loop sizes). */
   maxExecutionSteps?: number;
-  /** When true, `action.approval` suspends the run and returns a checkpoint instead of failing. */
+  /** When true, `action.approval` and `action.task` suspend the run and return a checkpoint instead of failing. */
   allowSuspend?: boolean;
-  /** Continue a run that previously suspended on an approval state. */
-  resume?: { checkpoint: AutomationCheckpoint; outcome: 'approved' | 'rejected' };
+  /** Continue a run that previously suspended on an approval or manual task state. */
+  resume?: { checkpoint: AutomationCheckpoint; outcome: AutomationResumeOutcome };
 };
 
 export type AutomationLoopIterator = { items: unknown[]; index: number };
@@ -73,17 +73,32 @@ export type AutomationCheckpoint = {
   trace: string[];
 };
 
-export type AutomationSuspension = {
-  kind: 'approval';
-  stateId: string;
-  approval: {
-    name: string;
-    instructions: string;
-    approverType: AutomationApproverType;
-    approver: string;
-  };
-  checkpoint: AutomationCheckpoint;
-};
+export type AutomationResumeOutcome = 'approved' | 'rejected' | 'completed';
+
+export type AutomationSuspension =
+  | {
+      kind: 'approval';
+      stateId: string;
+      approval: {
+        name: string;
+        instructions: string;
+        approverType: AutomationApproverType;
+        approver: string;
+      };
+      checkpoint: AutomationCheckpoint;
+    }
+  | {
+      kind: 'task';
+      stateId: string;
+      task: {
+        name: string;
+        instructions: string;
+        group: string;
+        assignee: string;
+        wait: boolean;
+      };
+      checkpoint: AutomationCheckpoint;
+    };
 
 export type ExecuteAutomationGraphResult = {
   ok: boolean;
@@ -397,6 +412,9 @@ export function collectCredSlugsFromAutomation(cfg: AutomationConfig): string[] 
       collectCredSlugsFromText(s.approverTemplate || '', slugs);
       collectCredSlugsFromText(s.instructions || '', slugs);
     }
+    if (s.type === 'action.task') {
+      for (const t of [s.name, s.instructions, s.groupTemplate, s.assigneeTemplate]) collectCredSlugsFromText(t || '', slugs);
+    }
   }
   return [...slugs];
 }
@@ -601,7 +619,11 @@ type Terminal = { ok: boolean; message: string; rejectRequest: boolean };
 type SegmentOutcome =
   | { kind: 'terminal'; terminal: Terminal }
   | { kind: 'reachedStop' }
-  | { kind: 'suspended'; suspension: Omit<AutomationSuspension, 'checkpoint'> };
+  | { kind: 'suspended'; suspension: SuspensionWithoutCheckpoint };
+
+type SuspensionWithoutCheckpoint = AutomationSuspension extends infer S
+  ? S extends AutomationSuspension ? Omit<S, 'checkpoint'> : never
+  : never;
 
 function normalizeApproverType(raw: unknown): AutomationApproverType {
   return raw === 'user' || raw === 'group' || raw === 'group_manager' ? raw : 'requester_manager';
@@ -731,7 +753,7 @@ export async function executeAutomationGraph(
         const branches = (state.transitions || []).map((t) => t.to);
         const outcomes = await Promise.all(branches.map((b) => runSegment(b, state.joinId)));
         if (outcomes.some((o) => o.kind === 'suspended')) {
-          return term(false, `Approval steps inside parallel branches are not supported (fork ${state.id})`);
+          return term(false, `Approval and manual task steps inside parallel branches are not supported (fork ${state.id})`);
         }
         const failed = outcomes.find((o) => o.kind === 'terminal' && !o.terminal.ok);
         if (failed) return failed;
@@ -774,6 +796,28 @@ export async function executeAutomationGraph(
             },
           },
         };
+      }
+
+      if (state.type === 'action.task') {
+        const ctx = ctxNow();
+        const task = {
+          name: interpolateString(state.name || 'Manual task', ctx),
+          instructions: interpolateString(state.instructions || '', ctx),
+          group: interpolateString(state.groupTemplate || '', ctx),
+          assignee: interpolateString(state.assigneeTemplate || '', ctx),
+          wait: state.wait !== false,
+        };
+        if (params.dryRun) {
+          warnings.push(`Manual task ${state.id} ("${task.name}") skipped in dry-run`);
+          stateResults[state.id] = { ok: true, status: 200, body: { outcome: 'completed', ...task } };
+          current = selectTransition(state.transitions, 'success') || selectTransition(state.transitions, null);
+          if (!current) return term(true, `Manual task ${state.id} has no next transition`);
+          continue;
+        }
+        if (!params.allowSuspend) {
+          return term(false, `Manual task step ${state.id} requires a catalog fulfillment context`);
+        }
+        return { kind: 'suspended', suspension: { kind: 'task', stateId: state.id, task } };
       }
 
       if (
@@ -939,7 +983,11 @@ export async function executeAutomationGraph(
   let startId: string | null = cfg.startAt;
   if (resume) {
     const approvalState = byId.get(resume.checkpoint.stateId);
-    if (!approvalState || approvalState.type !== 'action.approval') {
+    if (approvalState?.type === 'action.task') {
+      stateResults[approvalState.id] = { ok: true, status: 200, body: { outcome: 'completed' } };
+      trace.push(`resume:${approvalState.id}:completed`);
+      startId = selectTransition(approvalState.transitions, 'success') || selectTransition(approvalState.transitions, null);
+    } else if (!approvalState || approvalState.type !== 'action.approval' || resume.outcome === 'completed') {
       startId = null;
     } else {
       const outcome = resume.outcome;
@@ -952,7 +1000,7 @@ export async function executeAutomationGraph(
 
   const outcome: SegmentOutcome = startId
     ? await runSegment(startId, null)
-    : term(false, `Cannot resume: checkpoint state ${resume?.checkpoint.stateId ?? ''} is not an approval step`);
+    : term(false, `Cannot resume: checkpoint state ${resume?.checkpoint.stateId ?? ''} is not a resumable approval or task step`);
 
   let suspended: AutomationSuspension | undefined;
   let terminal: Terminal;
@@ -969,7 +1017,7 @@ export async function executeAutomationGraph(
         trace,
       },
     };
-    terminal = { ok: true, message: `Suspended on approval ${outcome.suspension.stateId}`, rejectRequest: false };
+    terminal = { ok: true, message: `Suspended on ${outcome.suspension.kind} ${outcome.suspension.stateId}`, rejectRequest: false };
   } else if (outcome.kind === 'reachedStop') {
     terminal = { ok: true, message: 'Reached stop state', rejectRequest: false };
   } else {

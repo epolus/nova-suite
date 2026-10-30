@@ -10,16 +10,30 @@ const ENTITIES: Record<string, string> = {
   '&nbsp;': ' ',
 };
 
+function decodeEntities(html: string): string {
+  return html
+    .replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (m) => ENTITIES[m] ?? m)
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCharCode(Number(n)));
+}
+
 /** Catalog descriptions are HTML in ServiceNow; Nova stores plain text. */
 export function htmlToText(html: string): string {
   if (!html) return '';
-  return html
+  // Decode first so double-encoded markup (&lt;p&gt;) becomes tags we can strip.
+  let text = html;
+  for (let i = 0; i < 3; i += 1) {
+    const next = decodeEntities(text);
+    if (next === text) break;
+    text = next;
+  }
+  return text
+    // Flow Designer data pills render as nested spans; keep the pill and drop its display label.
+    .replace(/<span\b[^>]*\bclass="data_pill\b[^"]*"[^>]*>[^<]*<\/span>/gi, '')
+    .replace(/<span\b[^>]*\bdata-pillvalue="([^"]*)"[^>]*>\s*<\/span>/gi, '$1')
     .replace(/<\s*br\s*\/?>/gi, '\n')
     .replace(/<\/\s*(p|div|li|h[1-6]|tr)\s*>/gi, '\n')
     .replace(/<\s*li[^>]*>/gi, '- ')
     .replace(/<[^>]+>/g, '')
-    .replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (m) => ENTITIES[m] ?? m)
-    .replace(/&#(\d+);/g, (_, n: string) => String.fromCharCode(Number(n)))
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

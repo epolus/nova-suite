@@ -96,18 +96,19 @@ export async function catalogFulfillment(input: FulfillmentInput): Promise<strin
           requestId: input.requestId,
           tenantId: input.tenantId,
         });
-        // In-flow approvals pause the automation until the child approval task is decided.
+        // In-flow approvals and manual tasks pause the automation until the child task is completed.
         while (result.suspended) {
-          const approvalTaskId = result.suspended.approvalTaskId;
-          await updateRequestStatus(input.requestId, input.tenantId, 'pending_approval');
-          await condition(() => completedTasks.has(approvalTaskId));
-          const signal = completedTasks.get(approvalTaskId)!;
-          const outcome = signal.outcome === 'rejected' ? 'rejected' : 'approved';
+          const childTaskId = result.suspended.approvalTaskId;
+          const isManual = result.suspended.taskKind === 'manual';
+          if (!isManual) await updateRequestStatus(input.requestId, input.tenantId, 'pending_approval');
+          await condition(() => completedTasks.has(childTaskId));
+          const signal = completedTasks.get(childTaskId)!;
+          const outcome = isManual ? 'completed' : signal.outcome === 'rejected' ? 'rejected' : 'approved';
           await completeRequestTask(
-            approvalTaskId,
+            childTaskId,
             input.tenantId,
             outcome === 'rejected' ? 'rejected' : 'completed',
-            outcome,
+            isManual ? null : outcome,
             signal.userId,
             signal.notes,
           );

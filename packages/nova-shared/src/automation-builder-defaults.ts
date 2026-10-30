@@ -39,6 +39,9 @@ export type UnifiedBuilderNodeDefaults = {
   approverType?: string;
   approverTemplate?: string;
   approvalName?: string;
+  taskName?: string;
+  groupTemplate?: string;
+  waitForCompletion?: boolean;
   instructions?: string;
   assignmentsJson?: string;
 };
@@ -151,6 +154,15 @@ export const UNIFIED_BUILDER_NODE_DEFAULTS: Record<UnifiedBuilderNodeType, Unifi
     approverTemplate: '',
     approvalName: 'Approval for {{request.number}}',
     instructions: 'Please review and approve or reject this request.',
+  },
+  'action.task': {
+    label: 'manual-task',
+    nodeType: 'action.task',
+    taskName: 'Fulfill {{request.number}}',
+    instructions: '',
+    groupTemplate: '',
+    assigneeTemplate: '',
+    waitForCompletion: true,
   },
   'variables.set': {
     label: 'set-variables',

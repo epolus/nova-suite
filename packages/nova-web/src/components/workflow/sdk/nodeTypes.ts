@@ -3,6 +3,7 @@ import { NodeType, type PaletteItemOrGroup, type UISchema } from '@workflowbuild
 import { defineNode, scope } from './defineNode';
 import {
   actionApprovalNode,
+  actionTaskNode,
   loopForeachNode,
   parallelForkNode,
   parallelJoinNode,
@@ -332,6 +333,7 @@ export const workflowNodeTypes: PaletteItemOrGroup[] = [
       actionTicketNode,
       actionAssignNode,
       actionApprovalNode,
+      actionTaskNode,
     ],
   },
   {
