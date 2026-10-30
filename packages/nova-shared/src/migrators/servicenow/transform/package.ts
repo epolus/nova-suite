@@ -206,6 +206,7 @@ export function transformServiceNowSnapshot(
         }
         if (!flow.active) notes.info('flow_inactive', 'The ServiceNow flow is inactive; it was converted anyway.');
         const result = convertFlow(flow, { lookups, fields: mappings, notes, isSubflow: false, extractPreApproval: true });
+        for (const id of result.calledSubflowIds) lookups.calledSubflows.add(id);
         scriptSteps = result.scriptSteps;
         if (result.unmappedSteps.length > 0) servicenowAttrs.unmapped_steps = result.unmappedSteps;
         if (result.preApproval?.approverType === 'requester_manager') {
@@ -296,6 +297,7 @@ export function transformServiceNowSnapshot(
       if (!sf || !workflowType) continue;
       const notes = new NoteCollector();
       const result = convertFlow(sf, { lookups, fields: new Map(), notes, isSubflow: true, extractPreApproval: false });
+      for (const id of result.calledSubflowIds) lookups.calledSubflows.add(id);
       if (result.config) {
         workflowDefinitions.push({
           name: truncate(sf.name || workflowType, 255),

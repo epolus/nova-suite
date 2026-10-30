@@ -166,13 +166,16 @@ async function createInFlowManualTask(
     assignedTo = (r.rows[0]?.id as string | undefined) ?? null;
     if (!assignedTo) notes.push(`Assignee "${assignee}" not found.`);
   }
+  // Non-waiting tasks are recorded for audit but completed immediately so fulfillment gates do not stall.
+  const wait = task.wait !== false;
+  if (!wait) notes.push('Created without waiting; marked completed so the flow can continue.');
   const seq = await client.query("SELECT nextval('task_number_seq')");
   const number = `TASK${String(seq.rows[0].nextval).padStart(7, '0')}`;
   const inserted = await client.query(
     `INSERT INTO request_tasks (
        tenant_id, number, request_id, parent_task_id, task_order, name, instructions, task_type,
-       assigned_to, assigned_group_id, status, started_at, notes
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'manual', $8, $9, 'in_progress', now(), $10)
+       assigned_to, assigned_group_id, status, started_at, completed_at, notes
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'manual', $8, $9, $10, now(), $11, $12)
      RETURNING id`,
     [
       tenantId,
@@ -184,6 +187,8 @@ async function createInFlowManualTask(
       task.instructions || null,
       assignedTo,
       assignedGroupId,
+      wait ? 'in_progress' : 'completed',
+      wait ? null : new Date(),
       notes.length ? notes.join(' ') : null,
     ],
   );
@@ -224,6 +229,7 @@ export async function skipRequestTasksByOrders(
            notes = COALESCE(notes, '') || E'\nSkipped by catalog automation branch.',
            completed_at = now()
        WHERE request_id = $1 AND task_order = ANY($2::int[])
+         AND parent_task_id IS NULL
          AND status IN ('pending', 'in_progress')`,
       [requestId, taskOrders],
     );

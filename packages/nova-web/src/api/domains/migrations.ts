@@ -17,7 +17,10 @@ export const migrations = {
   serviceNowTestConnection: (conn: ServiceNowConnection) =>
     request<ServiceNowProbeResult>(`${BASE}/test-connection`, { method: 'POST', body: JSON.stringify(conn) }),
   serviceNowCatalogs: (conn: ServiceNowConnection) =>
-    request<ServiceNowCatalogBrowse>(`${BASE}/catalogs?${new URLSearchParams({ ...conn }).toString()}`),
+    request<ServiceNowCatalogBrowse>(`${BASE}/catalogs/browse`, {
+      method: 'POST',
+      body: JSON.stringify(conn),
+    }),
   serviceNowStartRun: (conn: ServiceNowConnection, options: Partial<ServiceNowExtractOptions>) =>
     request<{ id: string; status: string }>(`${BASE}/runs`, {
       method: 'POST',

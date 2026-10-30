@@ -475,6 +475,11 @@ throw new Error('ServiceNow script step "run_script" has not been ported yet');
             "subject": "cost_center",
           },
           {
+            "code": "flow_variables",
+            "message": "Flow declares 1 flow variable(s); only values set by steps are migrated (declarations alone are not seeded into vars).",
+            "severity": "info",
+          },
+          {
             "code": "recipient_email",
             "message": "Recipient assets@example.com must exist as a Nova user to receive the email.",
             "severity": "info",

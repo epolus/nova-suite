@@ -3296,6 +3296,9 @@ CREATE TABLE migration_runs (
   completed_at           timestamptz
 );
 CREATE INDEX idx_migration_runs_tenant_created ON migration_runs (tenant_id, created_at DESC);
+CREATE UNIQUE INDEX uq_migration_runs_one_active
+  ON migration_runs (tenant_id)
+  WHERE status IN ('queued', 'extracting', 'transforming', 'applying');
 CREATE TRIGGER trg_migration_runs_updated_at
   BEFORE UPDATE ON migration_runs
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();

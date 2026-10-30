@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS migration_runs (
 CREATE INDEX IF NOT EXISTS idx_migration_runs_tenant_created
   ON migration_runs (tenant_id, created_at DESC);
 
+-- At most one in-flight ServiceNow migration per tenant.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_migration_runs_one_active
+  ON migration_runs (tenant_id)
+  WHERE status IN ('queued', 'extracting', 'transforming', 'applying');
+
 DROP TRIGGER IF EXISTS trg_migration_runs_updated_at ON migration_runs;
 CREATE TRIGGER trg_migration_runs_updated_at
   BEFORE UPDATE ON migration_runs

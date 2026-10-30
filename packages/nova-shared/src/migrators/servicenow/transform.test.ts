@@ -121,6 +121,18 @@ describe('encoded queries', () => {
       { field: 'state', value: '3' },
     ]);
   });
+
+  it('fails closed on unknown operators and unparsed queries', () => {
+    const notes = new NoteCollector();
+    const c = encodedQueryToCondition('priorityBETWEEN1@2', { fields: new Map(), aliases: new Map(), isSubflow: false, notes });
+    expect(c).toEqual({ op: 'eq', left: 1, right: 0 });
+    expect(notes.notes.some((n) => n.code === 'condition_operator' || n.code === 'condition_unparsed')).toBe(true);
+
+    const notes2 = new NoteCollector();
+    const empty = encodedQueryToCondition('ORDERBYpriority', { fields: new Map(), aliases: new Map(), isSubflow: false, notes: notes2 });
+    expect(empty).toEqual({ op: 'eq', left: 1, right: 0 });
+    expect(notes2.notes.some((n) => n.code === 'condition_unparsed')).toBe(true);
+  });
 });
 
 describe('transformServiceNowSnapshot (subflows and catalog tasks)', () => {

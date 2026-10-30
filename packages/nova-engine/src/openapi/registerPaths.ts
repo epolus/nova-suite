@@ -556,11 +556,11 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
     responses: { 200: { description: 'Table access, flow storage and value encoding' } },
   });
   registry.registerPath({
-    method: 'get',
-    path: `${snBase}/catalogs`,
+    method: 'post',
+    path: `${snBase}/catalogs/browse`,
     tags: ['ServiceNow migration'],
-    summary: 'List catalogs, categories and catalog items for selection',
-    request: { query: serviceNowConnectionSchema },
+    summary: 'List catalogs, categories and catalog items for selection (credential in body, not query)',
+    request: jsonBody(serviceNowConnectionSchema),
     responses: { 200: { description: 'Catalog structure' } },
   });
   registry.registerPath({

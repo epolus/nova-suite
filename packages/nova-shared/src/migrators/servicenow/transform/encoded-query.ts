@@ -68,6 +68,8 @@ export function parseEncodedQuery(query: string): EncodedTerm[][][] {
 }
 
 const ALWAYS_TRUE: AdvancedCondition = { op: 'eq', left: 1, right: 1 };
+/** Fail-closed for unknown/unparsed operators so branches do not silently always run. */
+const ALWAYS_FALSE: AdvancedCondition = { op: 'eq', left: 1, right: 0 };
 
 function combine(op: 'and' | 'or', conditions: AdvancedCondition[]): AdvancedCondition {
   if (conditions.length === 0) return ALWAYS_TRUE;
@@ -134,8 +136,8 @@ function termToCondition(term: EncodedTerm, ctx: PillContext): AdvancedCondition
     case 'ANYTHING':
       return ALWAYS_TRUE;
     default:
-      ctx.notes.warn('condition_operator', `Condition operator ${term.op} is not supported; treated as true.`, term.field);
-      return ALWAYS_TRUE;
+      ctx.notes.warn('condition_operator', `Condition operator ${term.op} is not supported; treated as false.`, term.field);
+      return ALWAYS_FALSE;
   }
 }
 
@@ -144,8 +146,8 @@ export function encodedQueryToCondition(query: string, ctx: PillContext): Advanc
   if (!q) return ALWAYS_TRUE;
   const groups = parseEncodedQuery(q);
   if (groups.length === 0) {
-    ctx.notes.warn('condition_unparsed', `Condition "${q.slice(0, 120)}" could not be parsed; treated as true.`);
-    return ALWAYS_TRUE;
+    ctx.notes.warn('condition_unparsed', `Condition "${q.slice(0, 120)}" could not be parsed; treated as false.`);
+    return ALWAYS_FALSE;
   }
   return combine(
     'or',

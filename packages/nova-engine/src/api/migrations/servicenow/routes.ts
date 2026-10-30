@@ -12,7 +12,7 @@ import {
 } from '@nova-suite/shared/node';
 import { db } from '../../../data/db';
 import { authenticate, requireRole, setTenantRLS, releaseTenantClient, getRequestClient } from '../../../middleware/auth';
-import { validateBody, validateQuery } from '../../../middleware/validate';
+import { validateBody } from '../../../middleware/validate';
 import { AppError, BadRequest, Conflict, NotFound } from '../../../middleware/errorHandler';
 import { config } from '../../../config';
 import { recordAuditEvent } from '../../../audit/events';
@@ -86,36 +86,41 @@ router.post('/test-connection', validateBody(connectionSchema), async (req: Requ
 
 const ITEM_LIST_LIMIT = 2000;
 
-router.get('/catalogs', validateQuery(connectionSchema), async (req: Request, res: Response, next: NextFunction) => {
+async function browseCatalogs(client: ServiceNowClient) {
+  const [catalogs, categories, items] = await Promise.all([
+    client.list('sc_catalog', { query: 'active=true^ORDERBYtitle', fields: 'sys_id,title,description' }),
+    client.list('sc_category', { query: 'active=true^ORDERBYtitle', fields: 'sys_id,title,parent,sc_catalog' }),
+    client.list('sc_cat_item', {
+      query: 'sys_class_nameNOT INsc_cat_item_guide,sc_cat_item_content,sc_cat_item_wizard^ORDERBYname',
+      fields: 'sys_id,name,short_description,category,sc_catalogs,active,flow_designer_flow,workflow,sys_class_name',
+      limit: ITEM_LIST_LIMIT,
+    }),
+  ]);
+  return {
+    catalogs,
+    categories,
+    items: items.map((i) => ({
+      sys_id: String(i.sys_id ?? ''),
+      name: String(i.name ?? ''),
+      short_description: String(i.short_description ?? ''),
+      category: String(i.category ?? ''),
+      catalogs: String(i.sc_catalogs ?? '').split(',').filter(Boolean),
+      active: String(i.active) === 'true',
+      has_flow: Boolean(i.flow_designer_flow),
+      has_legacy_workflow: Boolean(i.workflow),
+      record_producer: String(i.sys_class_name) === 'sc_cat_item_producer',
+    })),
+    truncated: items.length >= ITEM_LIST_LIMIT,
+  };
+}
+
+/** Prefer POST so credential_slug is not logged in query strings / Referer. */
+router.post('/catalogs/browse', validateBody(connectionSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const q = req.query as unknown as z.infer<typeof connectionSchema>;
-    const client = await buildClient(req, q.instance_url, q.credential_slug);
+    const body = req.body as z.infer<typeof connectionSchema>;
+    const client = await buildClient(req, body.instance_url, body.credential_slug);
     try {
-      const [catalogs, categories, items] = await Promise.all([
-        client.list('sc_catalog', { query: 'active=true^ORDERBYtitle', fields: 'sys_id,title,description' }),
-        client.list('sc_category', { query: 'active=true^ORDERBYtitle', fields: 'sys_id,title,parent,sc_catalog' }),
-        client.list('sc_cat_item', {
-          query: 'sys_class_nameNOT INsc_cat_item_guide,sc_cat_item_content,sc_cat_item_wizard^ORDERBYname',
-          fields: 'sys_id,name,short_description,category,sc_catalogs,active,flow_designer_flow,workflow,sys_class_name',
-          limit: ITEM_LIST_LIMIT,
-        }),
-      ]);
-      res.json({
-        catalogs,
-        categories,
-        items: items.map((i) => ({
-          sys_id: String(i.sys_id ?? ''),
-          name: String(i.name ?? ''),
-          short_description: String(i.short_description ?? ''),
-          category: String(i.category ?? ''),
-          catalogs: String(i.sc_catalogs ?? '').split(',').filter(Boolean),
-          active: String(i.active) === 'true',
-          has_flow: Boolean(i.flow_designer_flow),
-          has_legacy_workflow: Boolean(i.workflow),
-          record_producer: String(i.sys_class_name) === 'sc_cat_item_producer',
-        })),
-        truncated: items.length >= ITEM_LIST_LIMIT,
-      });
+      res.json(await browseCatalogs(client));
     } catch (err) {
       throw serviceNowError(err);
     }
@@ -133,26 +138,35 @@ router.post('/runs', validateBody(createRunSchema), async (req: Request, res: Re
     } catch (err) {
       throw BadRequest(err instanceof Error ? err.message : 'Invalid instance URL');
     }
-    const cred = await db.getOne(
-      'SELECT 1 FROM tenant_credentials WHERE tenant_id = $1 AND slug = $2',
-      [req.user!.tenant_id, body.credential_slug],
+    const tenantId = req.user!.tenant_id;
+    const runId = await db.withTenantTransaction(
+      tenantId,
+      req.user!.id,
+      req.user!.roles.join(','),
+      async (client) => {
+        // Serialize concurrent starts per tenant (partial unique index is the durable guard).
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))', [`migration:${tenantId}`]);
+        const cred = await client.query(
+          'SELECT 1 FROM tenant_credentials WHERE tenant_id = $1 AND slug = $2',
+          [tenantId, body.credential_slug],
+        );
+        if (cred.rowCount === 0) throw BadRequest(`Credential "${body.credential_slug}" was not found in the vault`);
+        const active = await client.query(
+          `SELECT id FROM migration_runs
+           WHERE tenant_id = $1 AND status IN ('queued', 'extracting', 'transforming', 'applying')
+           LIMIT 1`,
+          [tenantId],
+        );
+        if ((active.rowCount ?? 0) > 0) throw Conflict('Another migration run is in progress');
+        const inserted = await client.query<{ id: string }>(
+          `INSERT INTO migration_runs (tenant_id, source, instance_url, credential_slug, options, created_by)
+           VALUES ($1, 'servicenow', $2, $3, $4::jsonb, $5)
+           RETURNING id`,
+          [tenantId, instanceUrl, body.credential_slug, JSON.stringify(body.options), req.user!.id],
+        );
+        return inserted.rows[0]!.id;
+      },
     );
-    if (!cred) throw BadRequest(`Credential "${body.credential_slug}" was not found in the vault`);
-    const active = await db.getOne(
-      `SELECT id FROM migration_runs
-       WHERE tenant_id = $1 AND status IN ('queued', 'extracting', 'transforming', 'applying')
-       LIMIT 1`,
-      [req.user!.tenant_id],
-    );
-    if (active) throw Conflict('Another migration run is in progress');
-
-    const row = await db.getOne<{ id: string }>(
-      `INSERT INTO migration_runs (tenant_id, source, instance_url, credential_slug, options, created_by)
-       VALUES ($1, 'servicenow', $2, $3, $4::jsonb, $5)
-       RETURNING id`,
-      [req.user!.tenant_id, instanceUrl, body.credential_slug, JSON.stringify(body.options), req.user!.id],
-    );
-    const runId = row!.id;
     try {
       await startServiceNowMigration({ runId, tenantId: req.user!.tenant_id });
     } catch (err) {
@@ -278,10 +292,25 @@ async function resolvePackageGroups(
       }
       return { created: missing, unassigned: [] };
     }
-    const missingSet = new Set(missing);
+    const missingSet = new Set(missing.map((n) => n.toLowerCase()));
     for (const item of pkg.contents.catalog.service_items) {
       for (const task of item.tasks) {
-        if (task.assigned_group_name && missingSet.has(task.assigned_group_name)) task.assigned_group_name = null;
+        if (task.assigned_group_name && missingSet.has(task.assigned_group_name.toLowerCase())) {
+          task.assigned_group_name = null;
+        }
+        const states = (task.automation_config as { states?: Array<Record<string, unknown>> } | null)?.states;
+        if (!states) continue;
+        for (const st of states) {
+          if (st.type === 'action.task' && typeof st.groupTemplate === 'string'
+            && missingSet.has(st.groupTemplate.trim().toLowerCase())) {
+            st.groupTemplate = '';
+          }
+          if (st.type === 'action.approval' && st.approverType === 'group'
+            && typeof st.approverTemplate === 'string'
+            && missingSet.has(st.approverTemplate.trim().toLowerCase())) {
+            st.approverTemplate = '';
+          }
+        }
       }
     }
     return { created: [], unassigned: missing };
@@ -362,5 +391,10 @@ router.post('/runs/:id/apply', validateBody(applySchema), async (req: Request, r
     next(err);
   }
 });
+
+export const __test__ = {
+  packageGroupNames,
+  resolvePackageGroups,
+};
 
 export default router;

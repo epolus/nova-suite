@@ -520,6 +520,10 @@ export function validateAutomationConfig(raw: unknown): string[] {
     } else if (st.type === 'action.task') {
       if (typeof st.name !== 'string' || !st.name.trim()) errors.push(`Manual task "${st.id}" requires name`);
       if (st.wait !== undefined && typeof st.wait !== 'boolean') errors.push(`Manual task "${st.id}" wait must be a boolean`);
+      const labels = new Set(transitions.map((t) => String((t as AutomationTransition).when || '')));
+      if (![...labels].some((w) => w === 'success' || w === '')) {
+        errors.push(`Manual task "${st.id}" transitions must include when=success (or a default transition)`);
+      }
     } else if (st.type === 'variables.set') {
       const a = st.assignments;
       if (!a || typeof a !== 'object' || Array.isArray(a) || Object.keys(a).length === 0) {

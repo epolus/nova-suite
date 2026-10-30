@@ -103,8 +103,15 @@ export default function ReviewStep({ run, onApplied }: { run: MigrationRunDetail
                   <input
                     type="checkbox"
                     aria-label="select all"
-                    checked={selected.size === report.items.length && report.items.length > 0}
-                    onChange={(e) => setSelected(e.target.checked ? new Set(report.items.map((i) => i.externalKey)) : new Set())}
+                    checked={
+                      report.items.filter((i) => i.status !== 'unsupported').every((i) => selected.has(i.externalKey))
+                      && report.items.some((i) => i.status !== 'unsupported')
+                    }
+                    onChange={(e) => setSelected(
+                      e.target.checked
+                        ? new Set(report.items.filter((i) => i.status !== 'unsupported').map((i) => i.externalKey))
+                        : new Set(),
+                    )}
                   />
                 </th>
                 <th className="text-left px-3 py-2 font-medium">{t('review.item')}</th>

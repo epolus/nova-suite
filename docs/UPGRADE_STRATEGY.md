@@ -144,6 +144,15 @@ If a migration must be reversed:
 2. Never use `DROP` in a rollback — always add/modify
 3. Example: if you added a NOT NULL constraint, add a migration to remove it
 
+## ServiceNow migrator (`v00.01.23`)
+
+Apply `infra/postgres/migrations/v00.01.23__servicenow_migrator.sql` **before** rolling out engine/worker builds that:
+
+- Write `migration_runs` (extract/transform Temporal activities)
+- Create in-flow `request_tasks` with `parent_task_id` / `automation_checkpoint` (`action.task`, in-flow approvals)
+
+Also keep `CATALOG_AUTOMATION_SHARED_KEY` identical on engine and worker — in-flow HTTP steps and catalog automation endpoints require it (see [`docs/ENVIRONMENT.md`](ENVIRONMENT.md)).
+
 ## Pre-Deploy Checklist
 
 - [ ] All migrations are backward-compatible

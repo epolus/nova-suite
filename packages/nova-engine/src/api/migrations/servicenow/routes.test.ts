@@ -37,7 +37,7 @@ vi.mock('../../../middleware/auth', async (importOriginal) => {
   };
 });
 
-const { default: router } = await import('./routes');
+const { default: router, __test__ } = await import('./routes');
 const { errorHandler } = await import('../../../middleware/errorHandler');
 
 const TENANT = '11111111-1111-4111-8111-111111111111';
@@ -86,7 +86,7 @@ describe('ServiceNow migration routes: access control', () => {
     ['GET', '/runs'],
     ['POST', '/runs'],
     ['POST', '/test-connection'],
-    ['GET', '/catalogs?instance_url=acme&credential_slug=sn_prod'],
+    ['POST', '/catalogs/browse'],
     ['POST', '/runs/11111111-1111-4111-8111-111111111111/apply'],
   ])('forbids non-admins on %s %s', async (method, path) => {
     const res = await call(path, agent, { method, body: method === 'POST' ? runBody : undefined });
@@ -113,39 +113,57 @@ describe('ServiceNow migration routes: runs', () => {
     expect(mocks.db.getOne).not.toHaveBeenCalled();
   });
 
+  function mockCreateRunTx(opts: {
+    cred?: boolean;
+    active?: boolean;
+    runId?: string;
+  }) {
+    mocks.db.withTenantTransaction.mockImplementation(async (_t, _u, _r, fn) => {
+      const client = {
+        query: vi.fn(async (sql: string) => {
+          if (sql.includes('pg_advisory_xact_lock')) return { rows: [], rowCount: 0 };
+          if (sql.includes('FROM tenant_credentials')) {
+            return opts.cred === false ? { rows: [], rowCount: 0 } : { rows: [{ '?column?': 1 }], rowCount: 1 };
+          }
+          if (sql.includes("status IN ('queued'")) {
+            return opts.active
+              ? { rows: [{ id: 'other' }], rowCount: 1 }
+              : { rows: [], rowCount: 0 };
+          }
+          if (sql.includes('INSERT INTO migration_runs')) {
+            return { rows: [{ id: opts.runId ?? 'run-1' }], rowCount: 1 };
+          }
+          return { rows: [], rowCount: 0 };
+        }),
+      };
+      return fn(client);
+    });
+  }
+
   it('requires the credential to exist in the vault', async () => {
-    mocks.db.getOne.mockResolvedValueOnce(null);
+    mockCreateRunTx({ cred: false });
     const res = await call('/runs', admin, { method: 'POST', body: runBody });
     expect(res.status).toBe(400);
     expect(mocks.startServiceNowMigration).not.toHaveBeenCalled();
   });
 
   it('refuses a second concurrent run', async () => {
-    mocks.db.getOne.mockResolvedValueOnce({ '?column?': 1 }).mockResolvedValueOnce({ id: 'other' });
+    mockCreateRunTx({ active: true });
     const res = await call('/runs', admin, { method: 'POST', body: runBody });
     expect(res.status).toBe(409);
   });
 
   it('queues a run and starts the workflow', async () => {
-    mocks.db.getOne
-      .mockResolvedValueOnce({ '?column?': 1 })
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'run-1' });
+    mockCreateRunTx({ runId: 'run-1' });
     const res = await call('/runs', admin, { method: 'POST', body: runBody });
     expect(res.status).toBe(202);
     expect(await res.json()).toEqual({ id: 'run-1', status: 'queued' });
-    expect(mocks.db.getOne.mock.calls[2][1]).toEqual(
-      [TENANT, 'https://acme.service-now.com', 'sn_prod', expect.any(String), 'u-admin'],
-    );
     expect(mocks.startServiceNowMigration).toHaveBeenCalledWith({ runId: 'run-1', tenantId: TENANT });
     expect(mocks.recordAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'servicenow_migration_started' }));
   });
 
   it('marks the run failed when Temporal is unavailable', async () => {
-    mocks.db.getOne
-      .mockResolvedValueOnce({ '?column?': 1 })
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'run-2' });
+    mockCreateRunTx({ runId: 'run-2' });
     mocks.startServiceNowMigration.mockRejectedValueOnce(new Error('down'));
     const res = await call('/runs', admin, { method: 'POST', body: runBody });
     expect(res.status).toBe(503);
@@ -171,16 +189,71 @@ describe('ServiceNow migration routes: runs', () => {
 });
 
 describe('migration_runs table policy', () => {
-  const sql = readFileSync(
+  const migrationSql = readFileSync(
     join(__dirname, '../../../../../../infra/postgres/migrations/v00.01.23__servicenow_migrator.sql'),
+    'utf8',
+  );
+  const rlsSql = readFileSync(
+    join(__dirname, '../../../../../../infra/postgres/rls.sql'),
     'utf8',
   );
 
   it('forces RLS and restricts rows to admin and system roles of the tenant', () => {
-    expect(sql).toMatch(/ALTER TABLE migration_runs FORCE ROW LEVEL SECURITY/);
-    const policy = sql.slice(sql.indexOf('CREATE POLICY tenant_isolation_migration_runs'));
+    expect(migrationSql).toMatch(/ALTER TABLE migration_runs FORCE ROW LEVEL SECURITY/);
+    const policy = migrationSql.slice(migrationSql.indexOf('CREATE POLICY tenant_isolation_migration_runs'));
     expect(policy).toMatch(/USING \(\s*tenant_id = current_tenant_id\(\)/);
     expect(policy).toMatch(/WITH CHECK/);
     expect(policy.match(/current_user_has_role\('admin', 'system'\)/g)).toHaveLength(2);
+  });
+
+  it('keeps migration and rls.sql policies in lockstep', () => {
+    const extract = (sql: string) => {
+      const start = sql.indexOf('CREATE POLICY tenant_isolation_migration_runs');
+      expect(start).toBeGreaterThanOrEqual(0);
+      const chunk = sql.slice(start, start + 400);
+      return chunk.replace(/\s+/g, ' ').trim();
+    };
+    expect(extract(rlsSql)).toContain("current_user_has_role('admin', 'system')");
+    expect(extract(migrationSql)).toContain("current_user_has_role('admin', 'system')");
+    expect(migrationSql).toMatch(/uq_migration_runs_one_active/);
+  });
+});
+
+describe('resolvePackageGroups', () => {
+  it('strips missing groups from automation states when not creating them', async () => {
+    const pkg = {
+      contents: {
+        catalog: {
+          service_items: [{
+            tasks: [{
+              assigned_group_name: 'Missing Group',
+              automation_config: {
+                states: [
+                  { type: 'action.task', groupTemplate: 'Missing Group' },
+                  { type: 'action.approval', approverType: 'group', approverTemplate: 'Missing Group' },
+                  { type: 'action.task', groupTemplate: 'Known Group' },
+                ],
+              },
+            }],
+          }],
+        },
+      },
+    } as Parameters<typeof __test__.resolvePackageGroups>[3];
+
+    mocks.db.withTenantTransaction.mockImplementation(async (_t, _u, _r, fn) => {
+      const client = {
+        query: vi.fn(async () => ({ rows: [{ name: 'Known Group' }] })),
+      };
+      return fn(client);
+    });
+
+    const result = await __test__.resolvePackageGroups(TENANT, 'u-admin', ['admin'], pkg, false);
+    expect(result.unassigned).toEqual(['Missing Group']);
+    const task = pkg.contents.catalog.service_items[0].tasks[0];
+    expect(task.assigned_group_name).toBeNull();
+    const states = (task.automation_config as { states: Array<Record<string, unknown>> }).states;
+    expect(states[0].groupTemplate).toBe('');
+    expect(states[1].approverTemplate).toBe('');
+    expect(states[2].groupTemplate).toBe('Known Group');
   });
 });

@@ -36,11 +36,12 @@ export default function ServiceNowMigrationPage() {
         const { run: next } = await migrations.serviceNowRun(runId);
         if (cancelled) return;
         setRun(next);
-        if (ACTIVE_STATUSES.includes(next.status) && next.status !== 'applying') {
+        if (ACTIVE_STATUSES.includes(next.status)) {
           timer = setTimeout(() => void poll(), POLL_MS);
           return;
         }
-        if (next.report) setStep('review');
+        if (next.status === 'ready' && next.report) setStep('review');
+        else if (next.status === 'applied' && next.report) setStep('review');
         else if (next.status === 'failed') setError(next.error ?? t('status.failed'));
         loadRuns();
       } catch (err) {
