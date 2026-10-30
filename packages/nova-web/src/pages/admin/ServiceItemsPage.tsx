@@ -10,7 +10,7 @@ import SearchBar from '../../components/SearchBar';
 import { useTheme } from '../../context/ThemeContext';
 import { formatCurrency } from '../../utils/currency';
 import AuthImage from './AuthImage';
-import ServiceItemForm from './ServiceItemForm';
+import ServiceItemForm, { formatCustomAttribute } from './ServiceItemForm';
 
 export default function ServiceItemsPage() {
   const t = useTranslations('pages.admin.serviceItems');
@@ -131,7 +131,7 @@ export default function ServiceItemsPage() {
                 <div className="flex flex-wrap gap-1 mt-2">
                   {Object.entries(item.custom_attributes as Record<string, unknown>).slice(0, 3).map(([k, v]) => (
                     <span key={k} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">
-                      {k}: {String(v)}
+                      {k}: {formatCustomAttribute(v)}
                     </span>
                   ))}
                   {Object.keys(item.custom_attributes as Record<string, unknown>).length > 3 && (
