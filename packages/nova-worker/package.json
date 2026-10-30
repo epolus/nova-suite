@@ -15,7 +15,7 @@
     "@temporalio/activity": "^1.24.0",
     "@temporalio/worker": "^1.24.0",
     "@temporalio/workflow": "^1.19.0",
-    "nodemailer": "^10.1.7",
+    "nodemailer": "^10.2.1",
     "pg": "^8.23.1",
     "ssh2-sftp-client": "^12.0.1"
   },
