@@ -30,10 +30,6 @@ import { validateAndApplyConfigPackage } from '../../config-packages/service';
 const router = Router();
 router.use(authenticate, requireRole('admin'), setTenantRLS, releaseTenantClient);
 
-const connectionSchema = serviceNowConnectionSchema;
-const createRunSchema = serviceNowCreateRunSchema;
-const applySchema = serviceNowApplySchema;
-
 const RUN_SUMMARY_COLUMNS = `id, source, instance_url, credential_slug, options, status, progress, error,
   config_package_run_id, created_by, created_at, updated_at, completed_at,
   report->'totals' AS totals`;
@@ -70,9 +66,9 @@ async function buildClient(req: Request, instanceUrlRaw: string, slug: string): 
   }
 }
 
-router.post('/test-connection', validateBody(connectionSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/test-connection', validateBody(serviceNowConnectionSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const body = req.body as z.infer<typeof connectionSchema>;
+    const body = req.body as z.infer<typeof serviceNowConnectionSchema>;
     const client = await buildClient(req, body.instance_url, body.credential_slug);
     try {
       res.json(await probeServiceNowInstance(client));
@@ -115,9 +111,9 @@ async function browseCatalogs(client: ServiceNowClient) {
 }
 
 /** Prefer POST so credential_slug is not logged in query strings / Referer. */
-router.post('/catalogs/browse', validateBody(connectionSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/catalogs/browse', validateBody(serviceNowConnectionSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const body = req.body as z.infer<typeof connectionSchema>;
+    const body = req.body as z.infer<typeof serviceNowConnectionSchema>;
     const client = await buildClient(req, body.instance_url, body.credential_slug);
     try {
       res.json(await browseCatalogs(client));
@@ -129,9 +125,9 @@ router.post('/catalogs/browse', validateBody(connectionSchema), async (req: Requ
   }
 });
 
-router.post('/runs', validateBody(createRunSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/runs', validateBody(serviceNowCreateRunSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const body = req.body as z.infer<typeof createRunSchema>;
+    const body = req.body as z.infer<typeof serviceNowCreateRunSchema>;
     let instanceUrl: string;
     try {
       instanceUrl = normalizeServiceNowInstanceUrl(body.instance_url);
@@ -244,6 +240,17 @@ router.get('/runs/:id/package', async (req: Request, res: Response, next: NextFu
 });
 
 type GroupResolution = { created: string[]; unassigned: string[] };
+type AutomationState = Record<string, unknown>;
+
+function stateGroupTemplate(st: AutomationState): { key: 'groupTemplate' | 'approverTemplate'; value: string } | null {
+  if (st.type === 'action.task' && typeof st.groupTemplate === 'string') {
+    return { key: 'groupTemplate', value: st.groupTemplate };
+  }
+  if (st.type === 'action.approval' && st.approverType === 'group' && typeof st.approverTemplate === 'string') {
+    return { key: 'approverTemplate', value: st.approverTemplate };
+  }
+  return null;
+}
 
 /** Group names on catalog tasks and on manual-task/group-approval steps inside automations. */
 function packageGroupNames(pkg: MigrationConfigPackage): string[] {
@@ -251,12 +258,10 @@ function packageGroupNames(pkg: MigrationConfigPackage): string[] {
   for (const item of pkg.contents.catalog.service_items) {
     for (const task of item.tasks) {
       if (task.assigned_group_name) names.add(task.assigned_group_name);
-      const states = (task.automation_config as { states?: Array<Record<string, unknown>> }).states ?? [];
+      const states = (task.automation_config as { states?: AutomationState[] }).states ?? [];
       for (const st of states) {
-        const group = st.type === 'action.task'
-          ? st.groupTemplate
-          : st.type === 'action.approval' && st.approverType === 'group' ? st.approverTemplate : undefined;
-        if (typeof group === 'string' && group.trim() && !group.includes('{{')) names.add(group.trim());
+        const group = stateGroupTemplate(st);
+        if (group && group.value.trim() && !group.value.includes('{{')) names.add(group.value.trim());
       }
     }
   }
@@ -298,18 +303,11 @@ async function resolvePackageGroups(
         if (task.assigned_group_name && missingSet.has(task.assigned_group_name.toLowerCase())) {
           task.assigned_group_name = null;
         }
-        const states = (task.automation_config as { states?: Array<Record<string, unknown>> } | null)?.states;
+        const states = (task.automation_config as { states?: AutomationState[] } | null)?.states;
         if (!states) continue;
         for (const st of states) {
-          if (st.type === 'action.task' && typeof st.groupTemplate === 'string'
-            && missingSet.has(st.groupTemplate.trim().toLowerCase())) {
-            st.groupTemplate = '';
-          }
-          if (st.type === 'action.approval' && st.approverType === 'group'
-            && typeof st.approverTemplate === 'string'
-            && missingSet.has(st.approverTemplate.trim().toLowerCase())) {
-            st.approverTemplate = '';
-          }
+          const group = stateGroupTemplate(st);
+          if (group && missingSet.has(group.value.trim().toLowerCase())) st[group.key] = '';
         }
       }
     }
@@ -317,12 +315,12 @@ async function resolvePackageGroups(
   });
 }
 
-router.post('/runs/:id/apply', validateBody(applySchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/runs/:id/apply', validateBody(serviceNowApplySchema), async (req: Request, res: Response, next: NextFunction) => {
   const tenantId = req.user!.tenant_id;
   let claimed: { id: string; previous: string } | null = null;
   try {
     const id = runIdParam(req);
-    const body = req.body as z.infer<typeof applySchema>;
+    const body = req.body as z.infer<typeof serviceNowApplySchema>;
     const row = await db.getOne<{ package: MigrationConfigPackage | null; previous: string }>(
       `WITH prev AS (
          SELECT id, status FROM migration_runs

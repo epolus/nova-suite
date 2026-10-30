@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { describe, expect, it } from 'vitest';
-import { convertFlow, parseDurationSeconds, type FlowLookups } from './transform/flow';
+import { convertFlow, type FlowLookups } from './transform/flow';
+import { parseDurationSeconds } from './transform/step-values';
 import { NoteCollector } from './transform/report';
 import type { ServiceNowFlow, ServiceNowStep } from './snapshot';
 
@@ -25,7 +26,6 @@ function emptyLookups(over: Partial<FlowLookups> = {}): FlowLookups {
     users: new Map(),
     subflowTypes: new Map(),
     flows: new Map(),
-    calledSubflows: new Set(),
     ...over,
   };
 }
@@ -160,7 +160,7 @@ describe('convertFlow compile branches', () => {
     expect(notes.notes.some((n) => n.code === 'flow_variables')).toBe(true);
   });
 
-  it('returns calledSubflowIds without mutating lookups.calledSubflows', () => {
+  it('returns calledSubflowIds for subflows that stay as calls', () => {
     const lookups = emptyLookups({
       subflowTypes: new Map([['sf1', 'sn_helper']]),
       flows: new Map(),
@@ -179,7 +179,6 @@ describe('convertFlow compile branches', () => {
       { lookups, fields: new Map(), notes, isSubflow: false, extractPreApproval: false },
     );
     expect(result.calledSubflowIds).toEqual(['sf1']);
-    expect(lookups.calledSubflows.size).toBe(0);
     expect(result.config?.states.some((s) => s.type === 'call.workflow')).toBe(true);
   });
 });

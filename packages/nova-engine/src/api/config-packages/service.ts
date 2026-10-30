@@ -404,6 +404,19 @@ export async function validateBundle(
 ): Promise<ValidationReport> {
   const issues: ValidationIssue[] = [];
   const changes: PackageChange[] = [];
+  const recordExternalKeyChange = async (
+    type: PackageChange['type'],
+    table: string,
+    externalKey: string,
+    name: string,
+  ) => {
+    changes.push({
+      type,
+      external_key: externalKey,
+      name,
+      action: await existsByExternalKey(client, table, tenantId, externalKey) ? 'update' : 'create',
+    });
+  };
 
   if (bundle.schema_version !== config.db.expectedSchemaVersion) {
     issues.push({
@@ -465,12 +478,7 @@ export async function validateBundle(
   const packagedCategoryKeys = new Set(bundle.contents.catalog.categories.map((category) => category.external_key));
 
   for (const category of bundle.contents.catalog.categories) {
-    changes.push({
-      type: 'category',
-      external_key: category.external_key,
-      name: category.name,
-      action: await existsByExternalKey(client, 'service_categories', tenantId, category.external_key) ? 'update' : 'create',
-    });
+    await recordExternalKeyChange('category', 'service_categories', category.external_key, category.name);
   }
 
   for (const [itemIndex, item] of bundle.contents.catalog.service_items.entries()) {
@@ -501,12 +509,7 @@ export async function validateBundle(
       }
     }
 
-    changes.push({
-      type: 'service_item',
-      external_key: item.external_key,
-      name: item.name,
-      action: await existsByExternalKey(client, 'service_items', tenantId, item.external_key) ? 'update' : 'create',
-    });
+    await recordExternalKeyChange('service_item', 'service_items', item.external_key, item.name);
 
     addDuplicateKeyIssues(
       issues,
@@ -569,12 +572,7 @@ export async function validateBundle(
           message: `Target process is missing environment variable(s): ${missingEnv.join(', ')}`,
         });
       }
-      changes.push({
-        type: 'catalog_task',
-        external_key: task.external_key,
-        name: task.name,
-        action: await existsByExternalKey(client, 'catalog_tasks', tenantId, task.external_key) ? 'update' : 'create',
-      });
+      await recordExternalKeyChange('catalog_task', 'catalog_tasks', task.external_key, task.name);
     }
   }
 
@@ -624,12 +622,7 @@ export async function validateBundle(
         }
       }
     }
-    changes.push({
-      type: 'notification_rule',
-      external_key: rule.external_key,
-      name: rule.name,
-      action: await existsByExternalKey(client, 'notification_rules', tenantId, rule.external_key) ? 'update' : 'create',
-    });
+    await recordExternalKeyChange('notification_rule', 'notification_rules', rule.external_key, rule.name);
   }
 
   for (const [sourceIndex, source] of bundle.contents.data_sources.sources.entries()) {
@@ -672,12 +665,7 @@ export async function validateBundle(
         message: `Data source "${source.name}" references auth without credential_slug; inline secrets are not exported and must be configured on the target`,
       });
     }
-    changes.push({
-      type: 'data_source',
-      external_key: source.external_key,
-      name: source.name,
-      action: await existsByExternalKey(client, 'data_sources', tenantId, source.external_key) ? 'update' : 'create',
-    });
+    await recordExternalKeyChange('data_source', 'data_sources', source.external_key, source.name);
   }
 
   const summary = summarize(changes, issues);

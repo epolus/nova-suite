@@ -106,8 +106,8 @@ export function transformServiceNowSnapshot(
     users: new Map(snapshot.users.map((u) => [u.sys_id, u])),
     subflowTypes: new Map(),
     flows: flowsById,
-    calledSubflows: new Set(),
   };
+  const calledSubflows = new Set<string>();
 
   const itemFlowIds = new Set(snapshot.items.map((i) => i.flow_designer_flow).filter(Boolean));
   const subflows = snapshot.flows.filter((f) => !itemFlowIds.has(f.sys_id) || f.type === 'subflow');
@@ -178,18 +178,24 @@ export function transformServiceNowSnapshot(
       sys_class_name: item.sys_class_name,
       catalogs: item.sc_catalogs ? item.sc_catalogs.split(',') : [],
     };
-    const manualFallback = (reason: string) => {
+    const pushTask = (task: Pick<MigrationCatalogTask, 'external_key' | 'name' | 'task_type'> & Partial<MigrationCatalogTask>) => {
       tasks.push({
-        external_key: `${key}/fulfill`,
-        name: 'Fulfill request',
         description: null,
-        instructions: truncate(reason, 4000),
-        task_type: 'manual',
-        task_order: order++,
+        instructions: null,
         assigned_group_name: null,
         sla_hours: null,
         automation_config: {},
         is_active: true,
+        ...task,
+        task_order: order++,
+      });
+    };
+    const manualFallback = (reason: string) => {
+      pushTask({
+        external_key: `${key}/fulfill`,
+        name: 'Fulfill request',
+        instructions: truncate(reason, 4000),
+        task_type: 'manual',
       });
     };
 
@@ -206,39 +212,30 @@ export function transformServiceNowSnapshot(
         }
         if (!flow.active) notes.info('flow_inactive', 'The ServiceNow flow is inactive; it was converted anyway.');
         const result = convertFlow(flow, { lookups, fields: mappings, notes, isSubflow: false, extractPreApproval: true });
-        for (const id of result.calledSubflowIds) lookups.calledSubflows.add(id);
+        for (const id of result.calledSubflowIds) calledSubflows.add(id);
         scriptSteps = result.scriptSteps;
         if (result.unmappedSteps.length > 0) servicenowAttrs.unmapped_steps = result.unmappedSteps;
         if (result.preApproval?.approverType === 'requester_manager') {
           // Runtime injects a manager-approval task when service_items.approval_required is set.
           approvalRequired = true;
         } else if (result.preApproval) {
-          tasks.push({
+          pushTask({
             external_key: `${key}/approval`,
             name: result.preApproval.name,
-            description: null,
             instructions: 'Please review and approve or reject this request.',
             task_type: 'approval',
-            task_order: order++,
             assigned_group_name: result.preApproval.groupName,
-            sla_hours: null,
             automation_config: { approval_mode: 'group_members' },
-            is_active: true,
           });
         }
         if (result.config) {
           stateCount = result.config.states.length;
-          tasks.push({
+          pushTask({
             external_key: `${key}/flow`,
             name: truncate(flow.name || 'Automation', 255),
             description: truncate(`Migrated from ServiceNow flow ${flow.sys_id}.`, 2000),
-            instructions: null,
             task_type: 'automated',
-            task_order: order++,
-            assigned_group_name: null,
-            sla_hours: null,
             automation_config: result.config as unknown as Record<string, unknown>,
-            is_active: true,
           });
         } else if (notes.notes.some((n) => n.severity === 'error')) {
           manualFallback(`The ServiceNow flow "${flow.name}" could not be converted automatically; fulfill manually.`);
@@ -289,7 +286,7 @@ export function transformServiceNowSnapshot(
   const workflowDefinitions: MigrationWorkflowDefinition[] = [];
   const subflowReports: MigrationSubflowReport[] = [];
   const converted = new Set<string>();
-  for (let pending = [...lookups.calledSubflows]; pending.length > 0; pending = [...lookups.calledSubflows].filter((id) => !converted.has(id))) {
+  for (let pending = [...calledSubflows]; pending.length > 0; pending = [...calledSubflows].filter((id) => !converted.has(id))) {
     for (const id of pending) {
       converted.add(id);
       const sf = flowsById.get(id);
@@ -297,7 +294,7 @@ export function transformServiceNowSnapshot(
       if (!sf || !workflowType) continue;
       const notes = new NoteCollector();
       const result = convertFlow(sf, { lookups, fields: new Map(), notes, isSubflow: true, extractPreApproval: false });
-      for (const id of result.calledSubflowIds) lookups.calledSubflows.add(id);
+      for (const id of result.calledSubflowIds) calledSubflows.add(id);
       if (result.config) {
         workflowDefinitions.push({
           name: truncate(sf.name || workflowType, 255),

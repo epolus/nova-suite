@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type { ServiceNowProbeResult } from '../snapshot';
 import { ServiceNowApiError, type ServiceNowClient } from './client';
 import { decodeFlowValues } from './decode';
+
+export type { ServiceNowProbeResult };
 
 export const SERVICENOW_PROBE_TABLES = [
   'sc_catalog',
@@ -27,16 +30,6 @@ export const SERVICENOW_PROBE_TABLES = [
 
 /** Tables without which a migration cannot produce anything useful. */
 const REQUIRED_TABLES = new Set(['sc_category', 'sc_cat_item', 'item_option_new']);
-
-export type ServiceNowProbeResult = {
-  ok: boolean;
-  instanceUrl: string;
-  release: string | null;
-  tables: Array<{ table: string; ok: boolean; status: number; total: number | null; error?: string }>;
-  flowStorage: 'v1' | 'v2' | 'mixed' | 'unknown';
-  valueEncoding: 'json' | 'compressed' | 'mixed' | 'unknown' | 'n/a';
-  messages: string[];
-};
 
 export async function probeServiceNowInstance(client: ServiceNowClient): Promise<ServiceNowProbeResult> {
   const messages: string[] = [];

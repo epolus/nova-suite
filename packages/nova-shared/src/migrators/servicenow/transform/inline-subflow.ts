@@ -61,6 +61,21 @@ function matchApprovalGate(children: FlowNode[]): FlowNode | null {
 
 const FLATTEN_SINGLE = new Set<StepClass>(['email', 'notification', 'worknote', 'log']);
 
+function withCallerIdentity(
+  step: FlowNode['step'],
+  caller: FlowNode['step'],
+  extra: Partial<FlowNode['step']> = {},
+): FlowNode['step'] {
+  return {
+    ...step,
+    ...extra,
+    uiId: caller.uiId,
+    sysId: caller.sysId,
+    order: caller.order,
+    parentUiId: caller.parentUiId,
+  };
+}
+
 /**
  * Removes approval-gate scaffolding and lifts single-action subflows (e.g. email wrappers) so the
  * Nova graph matches the catalog author's intent instead of Flow Designer's nesting.
@@ -80,14 +95,7 @@ export function simplifyInlinedSubflows(nodes: FlowNode[]): void {
       n.cls = 'approval';
       n.flowName = n.defName;
       n.label = `${n.step.order}. ${n.defName}`;
-      n.step = {
-        ...gate.step,
-        uiId: n.step.uiId,
-        sysId: n.step.sysId,
-        order: n.step.order,
-        parentUiId: n.step.parentUiId,
-        comment: gate.step.comment || n.defName,
-      };
+      n.step = withCallerIdentity(gate.step, n.step, { comment: gate.step.comment || n.defName });
       n.children = [];
       n.innerCtx = undefined;
       n.rejectToFinish = true;
@@ -100,14 +108,9 @@ export function simplifyInlinedSubflows(nodes: FlowNode[]): void {
     if (meaningful.length === 1 && FLATTEN_SINGLE.has(meaningful[0].cls)) {
       const child = meaningful[0];
       const inputs = n.innerCtx?.subflowInputs?.values ?? {};
-      child.step = {
-        ...child.step,
-        uiId: n.step.uiId,
-        sysId: n.step.sysId,
-        order: n.step.order,
-        parentUiId: n.step.parentUiId,
+      child.step = withCallerIdentity(child.step, n.step, {
         values: { ...child.step.values, ...publicInputs(inputs) },
-      };
+      });
       // Keep the child's pill scope so `{{subflow.*}}` inputs still resolve.
       nodes[i] = child;
     }

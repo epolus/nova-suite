@@ -20,7 +20,6 @@ import {
   type FlowLookups,
   type UnmappedStep,
 } from './flow-types';
-import { subflowOutputVar } from './flow-helpers';
 import { inlineSubflows, simplifyInlinedSubflows } from './inline-subflow';
 import {
   parseDurationSeconds,
@@ -32,17 +31,11 @@ import {
 } from './step-values';
 import { aliasKind, buildTree, type FlowNode, walk } from './tree';
 
-export {
-  APPROVAL_REJECTED_VAR,
-  MAX_AUTOMATION_STATES,
-  MAX_SUBFLOW_INLINE_DEPTH,
-  type FlowConversionResult,
-  type FlowLookups,
-  type UnmappedStep,
-} from './flow-types';
-export { subflowOutputVar } from './flow-helpers';
-export { classifyAction, classifyLogic, type StepClass } from './classify';
-export { parseDurationSeconds, pick, publicInputs, referenceValue, str } from './step-values';
+export type { FlowLookups } from './flow-types';
+
+function subflowOutputVar(prefix: string, output: string): string {
+  return `${prefix}_${output.replace(/[^A-Za-z0-9_]/g, '_')}`;
+}
 
 const INCIDENT_IMPACT: Record<string, string> = { '1': 'high', '2': 'medium', '3': 'low' };
 const INCIDENT_STATE: Record<string, string> = {
@@ -206,12 +199,13 @@ export function convertFlow(
     switch (n.cls) {
       case 'approval': {
         const approver = resolveApprover(n);
+        const name = truncate(n.step.comment || n.flowName || 'Approval', 200);
         const groupResolved = approver.type === 'group' &&
           [...lookups.groups.values()].some((g) => g.name === approver.template);
         if (opts.extractPreApproval && roots[0] === n && (approver.type === 'requester_manager' || groupResolved)) {
           const isManager = approver.type === 'requester_manager';
           preApproval = {
-            name: truncate(n.step.comment || n.flowName || 'Approval', 200),
+            name,
             approverType: isManager ? 'requester_manager' : 'group',
             groupName: isManager ? null : approver.template,
           };
@@ -224,34 +218,24 @@ export function convertFlow(
           );
           return next;
         }
-        if (n.rejectToFinish) {
-          // Gate subflows end the parent flow on reject; skip the if/assign/end scaffolding.
-          addState({
-            id,
-            type: 'action.approval',
-            approverType: approver.type,
-            ...(approver.template ? { approverTemplate: approver.template } : {}),
-            name: truncate(n.step.comment || n.flowName || 'Approval', 200),
-            instructions: 'Migrated from ServiceNow. Approve or reject this request.',
-            transitions: [{ to: next, when: 'approved' }, { to: 'end_rejected', when: 'rejected' }],
-          });
-          return id;
-        }
+        const rejectTo = n.rejectToFinish ? 'end_rejected' : `${id}_rejected`;
         addState({
           id,
           type: 'action.approval',
           approverType: approver.type,
           ...(approver.template ? { approverTemplate: approver.template } : {}),
-          name: truncate(n.step.comment || n.flowName || 'Approval', 200),
+          name,
           instructions: 'Migrated from ServiceNow. Approve or reject this request.',
-          transitions: [{ to: next, when: 'approved' }, { to: `${id}_rejected`, when: 'rejected' }],
+          transitions: [{ to: next, when: 'approved' }, { to: rejectTo, when: 'rejected' }],
         });
-        addState({
-          id: `${id}_rejected`,
-          type: 'variables.set',
-          assignments: { [APPROVAL_REJECTED_VAR]: 'true' },
-          transitions: [{ to: next }],
-        });
+        if (!n.rejectToFinish) {
+          addState({
+            id: `${id}_rejected`,
+            type: 'variables.set',
+            assignments: { [APPROVAL_REJECTED_VAR]: 'true' },
+            transitions: [{ to: next }],
+          });
+        }
         return id;
       }
       case 'catalog_task': {

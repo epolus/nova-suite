@@ -1,26 +1,13 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import type { MigrationConfigPackage, MigrationReport } from '@nova-suite/shared/migrators/servicenow';
+import type {
+  MigrationConfigPackage,
+  MigrationReport,
+  ServiceNowExtractOptions,
+  ServiceNowProbeResult,
+} from '@nova-suite/shared/migrators/servicenow';
 import type { ConfigPackageValidationReport } from './configPackages';
 
-export type { MigrationConfigPackage, MigrationReport };
-
-export interface ServiceNowProbeTable {
-  table: string;
-  ok: boolean;
-  status: number;
-  total: number | null;
-  error?: string;
-}
-
-export interface ServiceNowProbeResult {
-  ok: boolean;
-  instanceUrl: string;
-  release: string | null;
-  tables: ServiceNowProbeTable[];
-  flowStorage: 'v1' | 'v2' | 'mixed' | 'unknown';
-  valueEncoding: 'json' | 'compressed' | 'mixed' | 'unknown' | 'n/a';
-  messages: string[];
-}
+export type { MigrationConfigPackage, MigrationReport, ServiceNowExtractOptions, ServiceNowProbeResult };
 
 export interface ServiceNowConnection {
   instance_url: string;
@@ -42,15 +29,6 @@ export interface ServiceNowCatalogBrowse {
     record_producer: boolean;
   }>;
   truncated: boolean;
-}
-
-export interface ServiceNowExtractOptions {
-  catalogIds: string[];
-  categoryIds: string[];
-  itemIds: string[];
-  includeRecordProducers: boolean;
-  includeInactive: boolean;
-  maxItems: number;
 }
 
 export type MigrationRunStatus = 'queued' | 'extracting' | 'transforming' | 'ready' | 'applying' | 'applied' | 'failed';

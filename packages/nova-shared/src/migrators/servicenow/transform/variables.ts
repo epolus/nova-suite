@@ -169,7 +169,7 @@ export function convertVariables(
         break;
       case 6:
       case 16:
-        field.type = 'text';
+      case 28:
         break;
       case 8:
       case 31: {
@@ -220,9 +220,6 @@ export function convertVariables(
       case 27:
         field.type = 'text';
         field.pattern = '^https?://.+';
-        break;
-      case 28:
-        field.type = 'text';
         break;
       case 29:
         field.type = 'text';

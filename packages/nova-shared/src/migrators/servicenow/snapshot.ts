@@ -66,6 +66,16 @@ export type ServiceNowStep = z.infer<typeof serviceNowStepSchema>;
 export type ServiceNowFlow = z.infer<typeof serviceNowFlowSchema>;
 export type ServiceNowSnapshot = z.infer<typeof serviceNowSnapshotSchema>;
 
+export type ServiceNowProbeResult = {
+  ok: boolean;
+  instanceUrl: string;
+  release: string | null;
+  tables: Array<{ table: string; ok: boolean; status: number; total: number | null; error?: string }>;
+  flowStorage: 'v1' | 'v2' | 'mixed' | 'unknown';
+  valueEncoding: 'json' | 'compressed' | 'mixed' | 'unknown' | 'n/a';
+  messages: string[];
+};
+
 export const serviceNowExtractOptionsSchema = z.object({
   catalogIds: z.array(z.string().regex(/^[0-9a-f]{32}$/)).max(50).default([]),
   categoryIds: z.array(z.string().regex(/^[0-9a-f]{32}$/)).max(200).default([]),

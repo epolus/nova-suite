@@ -64,7 +64,7 @@ async function main(): Promise<void> {
     { itemIds: items.split(',').map((s) => s.trim()).filter(Boolean) },
     (stage, detail) => console.log(`[extract] ${stage}${detail ? ` ${JSON.stringify(detail)}` : ''}`),
   );
-  const { report, package: pkg } = transformServiceNowSnapshot(snapshot, { schemaVersion: 'v00.01.23' });
+  const { report } = transformServiceNowSnapshot(snapshot, { schemaVersion: 'v00.01.23' });
   console.log(JSON.stringify(report.totals, null, 2));
   for (const item of report.items) {
     console.log(`${item.status.padEnd(11)} ${item.name}`);
@@ -80,7 +80,7 @@ async function main(): Promise<void> {
     const out = transformServiceNowSnapshot(clean, { schemaVersion: 'v00.01.23', now: new Date('2026-01-01T00:00:00Z') });
     writeFileSync(join(dir, 'expected-package.json'), `${JSON.stringify(out.package, null, 2)}\n`);
     writeFileSync(join(dir, 'expected-report.json'), `${JSON.stringify(out.report, null, 2)}\n`);
-    console.log(`Wrote sanitized fixtures to ${dir} (package size ${JSON.stringify(pkg).length} bytes)`);
+    console.log(`Wrote sanitized fixtures to ${dir} (package size ${JSON.stringify(out.package).length} bytes)`);
   }
 }
 

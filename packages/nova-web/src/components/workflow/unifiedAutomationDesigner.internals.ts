@@ -8,7 +8,7 @@ import {
   UNIFIED_BUILDER_DEFAULT_AUTOMATION_CONFIG,
   UNIFIED_BUILDER_PARSE_FALLBACK_EXPRESSION,
 } from '@nova-suite/shared';
-import type { AutomationStateType, UnifiedBuilderNodeType } from '@nova-suite/shared';
+import type { AutomationStateType, UnifiedBuilderNodeDefaults, UnifiedBuilderNodeType } from '@nova-suite/shared';
 import {
   extractExtraJson,
   parseExtraJson,
@@ -22,49 +22,9 @@ export type BuilderError = {
   params?: Record<string, string | number>;
 };
 
-export type UnifiedBuilderNodeData = {
-  label: string;
+export type UnifiedBuilderNodeData = Omit<UnifiedBuilderNodeDefaults, 'nodeType'> & {
   nodeType?: UnifiedBuilderNodeType;
-  method?: string;
-  url?: string;
-  condition?: string;
-  delaySeconds?: number;
-  retryAttempts?: number;
-  retryBackoffSec?: number;
-  onError?: 'fail' | 'continue' | 'fallback';
   fallbackNodeId?: string;
-  endResult?: 'success' | 'failure';
-  className?: string;
-  ciName?: string;
-  displayName?: string;
-  attributesJson?: string;
-  expressionJson?: string;
-  channel?: string;
-  recipientType?: string;
-  titleTemplate?: string;
-  bodyTemplate?: string;
-  entity?: string;
-  operation?: string;
-  fieldsJson?: string;
-  target?: string;
-  assigneeTemplate?: string;
-  groupIdTemplate?: string;
-  runtime?: string;
-  code?: string;
-  workflowType?: string;
-  definitionId?: string;
-  inputJson?: string;
-  itemsExpr?: string;
-  maxIterations?: number;
-  joinId?: string;
-  approverType?: string;
-  approverTemplate?: string;
-  approvalName?: string;
-  taskName?: string;
-  groupTemplate?: string;
-  waitForCompletion?: boolean;
-  instructions?: string;
-  assignmentsJson?: string;
   /** JSON of state keys the designer has no editor for (e.g. headers, body, onSuccess); round-tripped on save. */
   extraJson?: string;
 };

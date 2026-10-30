@@ -43,6 +43,24 @@ type QueryClient = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+async function findTenantRow(
+  client: QueryClient,
+  table: 'users' | 'assignment_groups',
+  columns: string,
+  tenantId: string,
+  raw: string,
+  match: string,
+): Promise<Record<string, unknown> | undefined> {
+  const id = UUID_RE.test(raw) ? raw : null;
+  const r = await client.query(
+    `SELECT ${columns} FROM ${table}
+     WHERE tenant_id = $1 AND (($2::uuid IS NOT NULL AND id = $2::uuid) OR ${match})
+     LIMIT 1`,
+    [tenantId, id, raw],
+  );
+  return r.rows[0];
+}
+
 async function resolveApprovalAssignee(
   client: QueryClient,
   tenantId: string,
@@ -50,25 +68,18 @@ async function resolveApprovalAssignee(
   approval: ApprovalSuspension['approval'],
 ): Promise<{ assignedTo: string | null; assignedGroupId: string | null; note: string | null }> {
   const approver = approval.approver.trim();
-  const byIdOrName = UUID_RE.test(approver) ? approver : null;
   if (approval.approverType === 'user') {
-    const r = await client.query(
-      `SELECT id FROM users
-       WHERE tenant_id = $1 AND (($2::uuid IS NOT NULL AND id = $2::uuid) OR lower(email) = lower($3) OR lower(user_id) = lower($3))
-       LIMIT 1`,
-      [tenantId, byIdOrName, approver],
+    const row = await findTenantRow(
+      client, 'users', 'id', tenantId, approver,
+      'lower(email) = lower($3) OR lower(user_id) = lower($3)',
     );
-    const id = (r.rows[0]?.id as string | undefined) ?? null;
+    const id = (row?.id as string | undefined) ?? null;
     return { assignedTo: id, assignedGroupId: null, note: id ? null : `Approver user "${approver}" not found.` };
   }
   if (approval.approverType === 'group' || approval.approverType === 'group_manager') {
-    const r = await client.query(
-      `SELECT id, manager_id FROM assignment_groups
-       WHERE tenant_id = $1 AND (($2::uuid IS NOT NULL AND id = $2::uuid) OR lower(name) = lower($3))
-       LIMIT 1`,
-      [tenantId, byIdOrName, approver],
+    const row = await findTenantRow(
+      client, 'assignment_groups', 'id, manager_id', tenantId, approver, 'lower(name) = lower($3)',
     );
-    const row = r.rows[0];
     if (!row) return { assignedTo: null, assignedGroupId: null, note: `Approver group "${approver}" not found.` };
     if (approval.approverType === 'group') return { assignedTo: null, assignedGroupId: row.id as string, note: null };
     const managerId = (row.manager_id as string | null) ?? null;
@@ -145,25 +156,15 @@ async function createInFlowManualTask(
   let assignedGroupId: string | null = null;
   const group = task.group.trim();
   if (group) {
-    const r = await client.query(
-      `SELECT id FROM assignment_groups
-       WHERE tenant_id = $1 AND (($2::uuid IS NOT NULL AND id = $2::uuid) OR lower(name) = lower($3))
-       LIMIT 1`,
-      [tenantId, UUID_RE.test(group) ? group : null, group],
-    );
-    assignedGroupId = (r.rows[0]?.id as string | undefined) ?? null;
+    const row = await findTenantRow(client, 'assignment_groups', 'id', tenantId, group, 'lower(name) = lower($3)');
+    assignedGroupId = (row?.id as string | undefined) ?? null;
     if (!assignedGroupId) notes.push(`Assignment group "${group}" not found.`);
   }
   let assignedTo: string | null = null;
   const assignee = task.assignee.trim();
   if (assignee) {
-    const r = await client.query(
-      `SELECT id FROM users
-       WHERE tenant_id = $1 AND (($2::uuid IS NOT NULL AND id = $2::uuid) OR lower(email) = lower($3))
-       LIMIT 1`,
-      [tenantId, UUID_RE.test(assignee) ? assignee : null, assignee],
-    );
-    assignedTo = (r.rows[0]?.id as string | undefined) ?? null;
+    const row = await findTenantRow(client, 'users', 'id', tenantId, assignee, 'lower(email) = lower($3)');
+    assignedTo = (row?.id as string | undefined) ?? null;
     if (!assignedTo) notes.push(`Assignee "${assignee}" not found.`);
   }
   // Non-waiting tasks are recorded for audit but completed immediately so fulfillment gates do not stall.
@@ -213,6 +214,18 @@ function parseCheckpoint(raw: unknown): AutomationCheckpoint | null {
 function truncateNotes(s: string, max = 8000): string {
   if (s.length <= max) return s;
   return `${s.slice(0, max)}…`;
+}
+
+async function storeSuspensionCheckpoint(
+  client: QueryClient,
+  requestTaskId: string,
+  checkpoint: unknown,
+  notes: unknown,
+): Promise<void> {
+  await client.query(
+    `UPDATE request_tasks SET automation_checkpoint = $1::jsonb, notes = $2 WHERE id = $3`,
+    [JSON.stringify(checkpoint), truncateNotes(JSON.stringify(notes)), requestTaskId],
+  );
 }
 
 export async function skipRequestTasksByOrders(
@@ -358,10 +371,7 @@ export async function executeAutomatedCatalogTask(
           taskOrder,
           result.suspended.task,
         );
-        await client.query(
-          `UPDATE request_tasks SET automation_checkpoint = $1::jsonb, notes = $2 WHERE id = $3`,
-          [JSON.stringify(result.suspended.checkpoint), truncateNotes(JSON.stringify(result.notes)), requestTaskId],
-        );
+        await storeSuspensionCheckpoint(client, requestTaskId, result.suspended.checkpoint, result.notes);
         return { ok: true, message: result.message, suspended: { approvalTaskId: manualTaskId, taskKind: 'manual' } };
       }
 
@@ -375,10 +385,7 @@ export async function executeAutomatedCatalogTask(
           request,
           result.suspended.approval,
         );
-        await client.query(
-          `UPDATE request_tasks SET automation_checkpoint = $1::jsonb, notes = $2 WHERE id = $3`,
-          [JSON.stringify(result.suspended.checkpoint), truncateNotes(JSON.stringify(result.notes)), requestTaskId],
-        );
+        await storeSuspensionCheckpoint(client, requestTaskId, result.suspended.checkpoint, result.notes);
         return { ok: true, message: result.message, suspended: { approvalTaskId, taskKind: 'approval' } };
       }
 

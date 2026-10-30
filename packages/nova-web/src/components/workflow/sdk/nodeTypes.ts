@@ -55,6 +55,15 @@ const scriptRuntimeOptions = [
   { label: 'JavaScript', value: 'js' },
 ];
 
+const httpSchemaProperties = {
+  method: { type: 'string', options: methodOptions },
+  url: { type: 'string' },
+  retryAttempts: { type: 'number', minimum: 1 },
+  retryBackoffSec: { type: 'number', minimum: 0 },
+  onError: { type: 'string', options: onErrorOptions },
+  fallbackNodeId: { type: 'string' },
+};
+
 function httpFields(): UISchema[] {
   return [
     { type: 'Select', scope: scope('properties.method'), label: 'Method' },
@@ -68,22 +77,12 @@ function httpFields(): UISchema[] {
 
 const startNode = defineNode('start', {
   templateType: NodeType.StartNode,
-  description: 'Workflow entry point',
   schemaProperties: {},
   uischemaElements: [],
-  defaults: {},
 });
 
 const activityNode = defineNode('activity', {
-  description: 'HTTP activity step',
-  schemaProperties: {
-    method: { type: 'string', options: methodOptions },
-    url: { type: 'string' },
-    retryAttempts: { type: 'number', minimum: 1 },
-    retryBackoffSec: { type: 'number', minimum: 0 },
-    onError: { type: 'string', options: onErrorOptions },
-    fallbackNodeId: { type: 'string' },
-  },
+  schemaProperties: httpSchemaProperties,
   uischemaElements: httpFields(),
   defaults: {
     method: 'GET',
@@ -96,54 +95,34 @@ const activityNode = defineNode('activity', {
 
 const decisionNode = defineNode('decision', {
   templateType: NodeType.DecisionNode,
-  description: 'Branch on a template condition',
   schemaProperties: {
     condition: { type: 'string' },
   },
   uischemaElements: [
     { type: 'Text', scope: scope('properties.condition'), label: 'Condition' },
   ],
-  defaults: {
-    condition: '{{response.status}}',
-  },
 });
 
 const delayNode = defineNode('delay', {
-  description: 'Wait before continuing',
   schemaProperties: {
     delaySeconds: { type: 'number', minimum: 1, maximum: 3600 },
   },
   uischemaElements: [
     { type: 'Text', scope: scope('properties.delaySeconds'), label: 'Delay seconds' },
   ],
-  defaults: {
-    delaySeconds: 5,
-  },
 });
 
 const endNode = defineNode('end', {
-  description: 'Terminal success or failure',
   schemaProperties: {
     endResult: { type: 'string', options: endResultOptions },
   },
   uischemaElements: [
     { type: 'Select', scope: scope('properties.endResult'), label: 'Result' },
   ],
-  defaults: {
-    endResult: 'success',
-  },
 });
 
 const actionRestNode = defineNode('action.rest', {
-  description: 'REST HTTP action',
-  schemaProperties: {
-    method: { type: 'string', options: methodOptions },
-    url: { type: 'string' },
-    retryAttempts: { type: 'number', minimum: 1 },
-    retryBackoffSec: { type: 'number', minimum: 0 },
-    onError: { type: 'string', options: onErrorOptions },
-    fallbackNodeId: { type: 'string' },
-  },
+  schemaProperties: httpSchemaProperties,
   uischemaElements: httpFields(),
   defaults: {
     method: 'GET',
@@ -155,7 +134,6 @@ const actionRestNode = defineNode('action.rest', {
 });
 
 const actionCiLookupNode = defineNode('action.ci.lookup', {
-  description: 'Look up a configuration item',
   schemaProperties: {
     url: { type: 'string' },
     className: { type: 'string' },
@@ -174,7 +152,6 @@ const actionCiLookupNode = defineNode('action.ci.lookup', {
 });
 
 const actionCiCreateNode = defineNode('action.ci.create', {
-  description: 'Create a configuration item',
   schemaProperties: {
     url: { type: 'string' },
     className: { type: 'string' },
@@ -200,20 +177,15 @@ const actionCiCreateNode = defineNode('action.ci.create', {
 
 const decisionAdvancedNode = defineNode('decision.advanced', {
   templateType: NodeType.DecisionNode,
-  description: 'Branch on an advanced expression',
   schemaProperties: {
     expressionJson: { type: 'string' },
   },
   uischemaElements: [
     { type: 'TextArea', scope: scope('properties.expressionJson'), label: 'Expression JSON' },
   ],
-  defaults: {
-    expressionJson: '{\n  "op": "gt",\n  "left": { "var": "state.lookup.body.count" },\n  "right": 0\n}',
-  },
 });
 
 const actionNotificationNode = defineNode('action.notification', {
-  description: 'Send an in-app or email notification',
   schemaProperties: {
     channel: { type: 'string', options: notificationChannelOptions },
     recipientType: { type: 'string' },
@@ -226,16 +198,9 @@ const actionNotificationNode = defineNode('action.notification', {
     { type: 'Text', scope: scope('properties.titleTemplate'), label: 'Title template' },
     { type: 'TextArea', scope: scope('properties.bodyTemplate'), label: 'Body template' },
   ],
-  defaults: {
-    channel: 'in_app',
-    recipientType: 'assignee',
-    titleTemplate: 'Update on {{request.number}}',
-    bodyTemplate: 'Catalog automation needs your attention.',
-  },
 });
 
 const actionTicketNode = defineNode('action.ticket', {
-  description: 'Create or update an incident or request',
   schemaProperties: {
     entity: { type: 'string', options: ticketEntityOptions },
     operation: { type: 'string', options: ticketOperationOptions },
@@ -246,15 +211,9 @@ const actionTicketNode = defineNode('action.ticket', {
     { type: 'Select', scope: scope('properties.operation'), label: 'Operation' },
     { type: 'TextArea', scope: scope('properties.fieldsJson'), label: 'Fields JSON' },
   ],
-  defaults: {
-    entity: 'incident',
-    operation: 'work_note',
-    fieldsJson: '{\n  "work_note": "Automation update for {{request.number}}"\n}',
-  },
 });
 
 const actionAssignNode = defineNode('action.assign', {
-  description: 'Assign the current catalog task to a user or group',
   schemaProperties: {
     target: { type: 'string', options: assignTargetOptions },
     assigneeTemplate: { type: 'string' },
@@ -265,15 +224,9 @@ const actionAssignNode = defineNode('action.assign', {
     { type: 'Text', scope: scope('properties.assigneeTemplate'), label: 'Assignee template' },
     { type: 'Text', scope: scope('properties.groupIdTemplate'), label: 'Group id template' },
   ],
-  defaults: {
-    target: 'group',
-    assigneeTemplate: '',
-    groupIdTemplate: '{{request.form_data.assignment_group_id}}',
-  },
 });
 
 const actionScriptNode = defineNode('action.script', {
-  description: 'Run a short JavaScript step',
   schemaProperties: {
     runtime: { type: 'string', options: scriptRuntimeOptions },
     code: { type: 'string' },
@@ -282,14 +235,9 @@ const actionScriptNode = defineNode('action.script', {
     { type: 'Select', scope: scope('properties.runtime'), label: 'Runtime' },
     { type: 'TextArea', scope: scope('properties.code'), label: 'Code' },
   ],
-  defaults: {
-    runtime: 'js',
-    code: 'return { ok: true };\n',
-  },
 });
 
 const callWorkflowNode = defineNode('call.workflow', {
-  description: 'Run a published workflow definition',
   schemaProperties: {
     workflowType: { type: 'string' },
     definitionId: { type: 'string' },
@@ -300,11 +248,6 @@ const callWorkflowNode = defineNode('call.workflow', {
     { type: 'Text', scope: scope('properties.definitionId'), label: 'Definition id' },
     { type: 'TextArea', scope: scope('properties.inputJson'), label: 'Input JSON' },
   ],
-  defaults: {
-    workflowType: 'catalog-fulfillment',
-    definitionId: '',
-    inputJson: '{\n  "requestId": "{{request.id}}"\n}',
-  },
 });
 
 export const workflowNodeTypes: PaletteItemOrGroup[] = [

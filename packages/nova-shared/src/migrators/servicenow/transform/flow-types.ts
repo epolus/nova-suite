@@ -17,11 +17,6 @@ export type FlowLookups = {
   subflowTypes: Map<string, string>;
   /** Extracted flows by sys_id, used to inline subflows into their callers. */
   flows: Map<string, ServiceNowFlow>;
-  /**
-   * @deprecated Prefer collecting `calledSubflowIds` from `convertFlow` results.
-   * Still updated by package.ts when merging conversion results.
-   */
-  calledSubflows: Set<string>;
 };
 
 export type UnmappedStep = { label: string; definition: string; inputs: Record<string, unknown> };

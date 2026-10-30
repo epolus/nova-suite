@@ -12,6 +12,29 @@ import { NODE_TYPE_ICONS } from './icons';
 
 export const scope = getScope;
 
+export const NODE_DESCRIPTIONS: Record<UnifiedBuilderNodeType, string> = {
+  start: 'Workflow entry point',
+  activity: 'HTTP activity step',
+  decision: 'Branch on a template condition',
+  delay: 'Wait before continuing',
+  end: 'Terminal success or failure',
+  'action.rest': 'REST HTTP action',
+  'action.ci.lookup': 'Look up a configuration item',
+  'action.ci.create': 'Create a configuration item',
+  'decision.advanced': 'Branch on an advanced expression',
+  'action.notification': 'Send an in-app or email notification',
+  'action.ticket': 'Create or update an incident or request',
+  'action.assign': 'Assign the current catalog task to a user or group',
+  'action.script': 'Run a short JavaScript step',
+  'call.workflow': 'Run a published workflow definition',
+  'loop.foreach': 'Repeat the body for each item (edges: item, done)',
+  'parallel.fork': 'Run outgoing branches concurrently until the join',
+  'parallel.join': 'Wait for all parallel branches',
+  'action.approval': 'Pause for a human approval (edges: approved, rejected)',
+  'action.task': 'Create a manual task and wait until it is completed',
+  'variables.set': 'Set flow variables available as {{vars.name}}',
+};
+
 function baseUi(extra: UISchema[]): UISchema {
   return {
     type: 'VerticalLayout',
@@ -23,29 +46,38 @@ function baseUi(extra: UISchema[]): UISchema {
   };
 }
 
+/** Palette defaults from the shared table, without the canvas label and type. */
+function sharedPaletteDefaults(type: UnifiedBuilderNodeType): Record<string, unknown> {
+  const rest: Record<string, unknown> = { ...UNIFIED_BUILDER_NODE_DEFAULTS[type] };
+  delete rest.label;
+  delete rest.nodeType;
+  return rest;
+}
+
 export function defineNode(
   type: UnifiedBuilderNodeType,
   opts: {
     templateType?: NodeType;
-    description: string;
     schemaProperties: Record<string, unknown>;
     uischemaElements: UISchema[];
-    defaults: Record<string, unknown>;
+    /** Overrides shared defaults. Omit when the palette matches UNIFIED_BUILDER_NODE_DEFAULTS. */
+    defaults?: Record<string, unknown>;
   },
 ): PaletteItem {
   const label = UNIFIED_BUILDER_NODE_LABELS[type];
   const builtDefaults = UNIFIED_BUILDER_NODE_DEFAULTS[type];
+  const description = NODE_DESCRIPTIONS[type];
   return {
     label,
-    description: opts.description,
+    description,
     type,
     icon: NODE_TYPE_ICONS[type],
     templateType: opts.templateType ?? NodeType.Node,
     ...(type === 'start' ? { isStartNode: true } : {}),
     defaultPropertiesData: {
       label: builtDefaults.label || label,
-      description: opts.description,
-      ...opts.defaults,
+      description,
+      ...(opts.defaults ?? sharedPaletteDefaults(type)),
     },
     schema: {
       type: 'object',
