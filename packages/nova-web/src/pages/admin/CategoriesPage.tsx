@@ -2,7 +2,8 @@
 import { useCallback, useMemo } from 'react';
 import { useTranslations } from 'use-intl';
 import { catalog, type Category } from '../../api/client';
-import { CatalogItemIcon, isCatalogItemIcon } from './catalogItemIcons';
+import { CatalogItemIcon } from './catalogItemIcons';
+import { isCatalogItemIcon } from './catalogItemIconSet';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
 
 function categoryPayload(data: Record<string, unknown>, invalidSortOrder: string) {
