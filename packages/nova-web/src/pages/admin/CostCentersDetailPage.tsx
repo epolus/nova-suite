@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import {
   admin,
@@ -11,6 +11,7 @@ import {
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
+import CostCenterRelatedLists from './cost-centers/CostCenterRelatedLists';
 
 function compareValues(a: unknown, b: unknown): number {
   if (a == null && b == null) return 0;
@@ -25,7 +26,6 @@ export default function CostCentersDetailPage() {
   const tActions = useTranslations('common.actions');
   const tFields = useTranslations('common.fields');
   const tStates = useTranslations('common.states');
-  const tTable = useTranslations('common.table');
   const noneOption = `— ${tStates('none')} —`;
   const { id } = useParams<{ id: string }>();
   const isNew = !id || id === 'new';
@@ -373,73 +373,10 @@ export default function CostCentersDetailPage() {
         </Card>
 
         {!isNew && current && (
-          <>
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-gray-700">
-                  {t('relatedDepartments', { count: relatedDepartments.length })}
-                </h2>
-              </div>
-              {relatedDepartments.length === 0 ? (
-                <p className="text-sm text-gray-500">{t('noRelatedDepartments')}</p>
-              ) : (
-                <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
-                  {relatedDepartments.map((dept) => (
-                    <li key={dept.id}>
-                      <Link
-                        to={`/admin/departments/${dept.id}`}
-                        className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{dept.name}</p>
-                          {dept.parent_department_name && (
-                            <p className="text-xs text-gray-500 truncate">{dept.parent_department_name}</p>
-                          )}
-                        </div>
-                        <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          dept.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {dept.is_active ? tStates('active') : tStates('inactive')}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-gray-700">
-                  {t('relatedUsers', { count: relatedUsers.length })}
-                </h2>
-              </div>
-              {relatedUsers.length === 0 ? (
-                <p className="text-sm text-gray-500">{t('noRelatedUsers')}</p>
-              ) : (
-                <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
-                  {relatedUsers.map((user) => (
-                    <li key={user.id}>
-                      <Link
-                        to={`/admin/users/${user.id}`}
-                        className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{user.display_name}</p>
-                          <p className="text-xs text-gray-500 truncate">{user.email || tTable('emDash')}</p>
-                        </div>
-                        <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          user.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {user.is_active ? tStates('active') : tStates('inactive')}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          </>
+          <CostCenterRelatedLists
+            departments={relatedDepartments}
+            users={relatedUsers}
+          />
         )}
       </div>
     </>
