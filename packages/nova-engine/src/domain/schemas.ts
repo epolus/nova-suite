@@ -13,11 +13,11 @@ export const uuidSchema = z.guid();
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
-}).passthrough();
+}).loose();
 
 export const rankedSuggestionsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(5),
-}).passthrough();
+}).loose();
 
 const e164PhoneSchema = z.preprocess(
   (value) => {
@@ -446,12 +446,12 @@ export const adminCreateUserSchema = z.object({
   display_name: z.string().min(1).max(255),
   phone: e164PhoneSchema.optional().nullable(),
   mobile: e164PhoneSchema.optional().nullable(),
-}).passthrough();
+}).loose();
 
 export const adminUpdateUserSchema = z.object({
   phone: e164PhoneSchema.optional().nullable(),
   mobile: e164PhoneSchema.optional().nullable(),
-}).passthrough();
+}).loose();
 
 export const createCabMeetingSchema = z.object({
   title: z.string().min(1).max(255),
