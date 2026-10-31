@@ -284,9 +284,14 @@ export async function executeAutomatedCatalogTask(
 
     const reqRes = await client.query(
       `SELECT r.id, r.number, r.status, r.form_data, r.delivery_info, r.requester_id, r.requested_for,
-              si.name AS service_item_name
+              r.notes, r.created_at,
+              si.name AS service_item_name,
+              requester.email AS requester_email,
+              COALESCE(subject.email, requester.email) AS requested_for_email
        FROM requests r
        LEFT JOIN service_items si ON si.id = r.service_item_id
+       LEFT JOIN users requester ON requester.id = r.requester_id
+       LEFT JOIN users subject ON subject.id = r.requested_for
        WHERE r.id = $1`,
       [requestId],
     );

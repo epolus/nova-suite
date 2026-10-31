@@ -105,7 +105,10 @@ async function resolveUserIds(
   const assignedTo = asString(request.assigned_to);
 
   if (token === 'requester' && isUuid(requesterId)) ids.add(requesterId);
-  if ((token === 'requested_for' || token === 'requestedFor') && isUuid(requestedFor)) ids.add(requestedFor);
+  if (token === 'requested_for' || token === 'requestedFor') {
+    const subject = isUuid(requestedFor) ? requestedFor : requesterId;
+    if (isUuid(subject)) ids.add(subject);
+  }
   if (token === 'assignee' && isUuid(assignedTo)) ids.add(assignedTo);
 
   if (token === 'assignee' && requestTaskId && isUuid(requestTaskId)) {
@@ -118,14 +121,17 @@ async function resolveUserIds(
   }
 
   const requestId = asString(request.id);
-  if (ids.size === 0 && isUuid(requestId) && (token === 'requester' || token === 'requested_for' || token === 'assignee')) {
+  if (ids.size === 0 && isUuid(requestId) && (token === 'requester' || token === 'requested_for' || token === 'requestedFor' || token === 'assignee')) {
     const req = await client.query(
       `SELECT requester_id, requested_for FROM requests WHERE id = $1::uuid`,
       [requestId],
     );
     const row = req.rows[0] || {};
     if (token === 'requester' && isUuid(asString(row.requester_id))) ids.add(asString(row.requester_id));
-    if (token === 'requested_for' && isUuid(asString(row.requested_for))) ids.add(asString(row.requested_for));
+    if (token === 'requested_for' || token === 'requestedFor') {
+      const subject = isUuid(asString(row.requested_for)) ? asString(row.requested_for) : asString(row.requester_id);
+      if (isUuid(subject)) ids.add(subject);
+    }
   }
 
   return [...ids];
