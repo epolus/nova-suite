@@ -3367,12 +3367,16 @@
       "searchCi": "Search CMDB{suffix}...",
       "searchCiSuffix": " ({class})",
       "searchUser": "Search users...",
+      "searchLocation": "Search locations...",
       "noCiFound": "No CIs found",
       "noCiMatching": "No CIs matching \"{query}\"",
       "noUserFound": "No users found",
       "noUserMatching": "No users matching \"{query}\"",
+      "noLocationFound": "No locations found",
+      "noLocationMatching": "No locations matching \"{query}\"",
       "searching": "Searching...",
       "loadingUsers": "Loading users...",
+      "loadingLocations": "Loading locations...",
       "selected": "Selected: {name}"
     },
     "formBuilder": {
@@ -3386,7 +3390,8 @@
         "select": "Dropdown",
         "multiselect": "Multi-select",
         "cmdbRef": "CMDB Reference",
-        "userRef": "User Reference"
+        "userRef": "User Reference",
+        "locationRef": "Location Reference"
       },
       "addField": "Add Field",
       "editField": "Edit Field",

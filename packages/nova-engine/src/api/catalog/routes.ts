@@ -369,6 +369,19 @@ router.get('/categories', async (req: Request, res: Response, next: NextFunction
   }
 });
 
+// ─── GET /api/catalog/locations (for location_ref fields) ───
+router.get('/locations', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const result = await client.query(
+      'SELECT id, name, city, is_active FROM locations ORDER BY name',
+    );
+    res.json({ locations: result.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── POST /api/catalog/categories ───
 router.post(
   '/categories',

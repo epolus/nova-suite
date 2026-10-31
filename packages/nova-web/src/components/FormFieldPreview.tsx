@@ -40,6 +40,10 @@ export default function FormFieldPreview({ fields }: { fields: FormField[] }) {
               <div className="w-full h-9 border border-gray-200 rounded-lg bg-gray-50 px-3 flex items-center text-xs text-gray-400">
                 {t('fieldTypes.userRef')}...
               </div>
+            ) : f.type === 'location_ref' ? (
+              <div className="w-full h-9 border border-gray-200 rounded-lg bg-gray-50 px-3 flex items-center text-xs text-gray-400">
+                {t('fieldTypes.locationRef')}...
+              </div>
             ) : (
               <div className="w-full h-9 border border-gray-200 rounded-lg bg-gray-50 px-3 flex items-center text-xs text-gray-400">
                 {f.placeholder || f.type}

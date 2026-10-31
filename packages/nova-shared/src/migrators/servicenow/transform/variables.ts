@@ -13,7 +13,8 @@ export type NovaFormFieldType =
   | 'select'
   | 'multiselect'
   | 'cmdb_ref'
-  | 'user_ref';
+  | 'user_ref'
+  | 'location_ref';
 
 export type NovaFormField = {
   name: string;
@@ -178,7 +179,10 @@ export function convertVariables(
       case 8: {
         const table = v.reference;
         if (table === 'sys_user') field.type = 'user_ref';
-        else if (table.startsWith('cmdb_ci')) {
+        else if (table.toLowerCase() === 'cmn_location') {
+          field.type = 'location_ref';
+          notes.info('location_reference', 'Reference to cmn_location mapped to a Nova location.', v.name);
+        } else if (table.startsWith('cmdb_ci')) {
           field.type = 'cmdb_ref';
           notes.info('cmdb_reference', `Reference to ${table}; set the CI class filter in the form builder if needed.`, v.name);
         } else {

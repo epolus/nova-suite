@@ -15,7 +15,7 @@ import { isFulfillerRole } from '../../utils/roles';
 import { useFieldLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
 import { TaskCard } from './RequestTaskCard';
-import { ResolvedCmdbRef, ResolvedUserRef } from './ResolvedRefs';
+import { ResolvedCmdbRef, ResolvedUserRef, ResolvedLocationRef } from './ResolvedRefs';
 import { RequestDetailSidebar } from './RequestDetailSidebar';
 
 export default function RequestDetail() {
@@ -310,6 +310,8 @@ export default function RequestDetail() {
                         <ResolvedCmdbRef ciId={String(value)} />
                       ) : fieldDef?.type === 'user_ref' && value ? (
                         <ResolvedUserRef userId={String(value)} />
+                      ) : fieldDef?.type === 'location_ref' && value ? (
+                        <ResolvedLocationRef locationId={String(value)} />
                       ) : fieldDef?.type === 'checkbox' ? (
                         value === 'true' ? tStates('yes') : tStates('no')
                       ) : (

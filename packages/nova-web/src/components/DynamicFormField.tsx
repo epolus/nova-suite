@@ -5,6 +5,7 @@ import type { FormField } from '../api/client';
 import { cmdb } from '../api/client';
 import UserDateInput from './UserDateInput';
 import { UserRefPicker } from './UserRefPicker';
+import { LocationRefPicker } from './LocationRefPicker';
 import { useFieldControl } from './ui/fieldControl';
 
 interface Props {
@@ -103,6 +104,15 @@ export default function DynamicFormField({ field, value, onChange }: Props) {
         />
       ) : field.type === 'user_ref' ? (
         <UserRefPicker
+          id={fieldControl.id}
+          name={fieldControl.name}
+          ariaLabel={labelText}
+          value={value}
+          onChange={onChange}
+          placeholder={field.placeholder}
+        />
+      ) : field.type === 'location_ref' ? (
+        <LocationRefPicker
           id={fieldControl.id}
           name={fieldControl.name}
           ariaLabel={labelText}

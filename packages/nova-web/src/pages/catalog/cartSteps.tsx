@@ -10,7 +10,7 @@ import UserDateInput from '../../components/UserDateInput';
 import { catalogPictureFrameBaseClass } from './catalogPictureFrame';
 import { formatCurrency } from '../../utils/currency';
 import { useStatusLabel } from '@/i18n/hooks';
-import { ResolvedCmdbRef, ResolvedUserRef } from '../requests/ResolvedRefs';
+import { ResolvedCmdbRef, ResolvedUserRef, ResolvedLocationRef } from '../requests/ResolvedRefs';
 
 const STEP_KEYS = ['review', 'delivery', 'confirm'] as const;
 
@@ -133,6 +133,8 @@ export function ReviewStep({ items, onRemove, onUpdate, currencyCode }: {
                           <ResolvedCmdbRef ciId={String(v)} />
                         ) : fieldDef?.type === 'user_ref' && v ? (
                           <ResolvedUserRef userId={String(v)} />
+                        ) : fieldDef?.type === 'location_ref' && v ? (
+                          <ResolvedLocationRef locationId={String(v)} />
                         ) : fieldDef?.type === 'checkbox' ? (
                           String(v) === 'true' ? tStates('yes') : tStates('no')
                         ) : (

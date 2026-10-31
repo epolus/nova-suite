@@ -34,6 +34,7 @@ describe('convertVariables', () => {
       variable({ sys_id: 'yn', name: 'agree', type: 1 }),
       variable({ sys_id: 'sel', name: 'size', type: 5, default_value: 'l' }),
       variable({ sys_id: 'u', name: 'who', type: 8, reference: 'sys_user' }),
+      variable({ sys_id: 'loc', name: 'site', type: 8, reference: 'cmn_location' }),
       variable({ sys_id: 'ci', name: 'device', type: 8, reference: 'cmdb_ci_computer' }),
       variable({ sys_id: 'dt', name: 'when', type: 10 }),
       variable({ sys_id: 'lbl', name: 'heading', type: 11 }),
@@ -44,6 +45,7 @@ describe('convertVariables', () => {
       ['agree', 'checkbox'],
       ['size', 'select'],
       ['who', 'user_ref'],
+      ['site', 'location_ref'],
       ['device', 'cmdb_ref'],
       ['when', 'date'],
       ['apps', 'textarea'],
@@ -53,7 +55,7 @@ describe('convertVariables', () => {
     expect(mappings.get('agree')!.mapValue('true')).toBe(true);
     expect(mappings.get('size')!.mapValue('s')).toBe('Small');
     expect(notes.notes.map((n) => n.code)).toEqual(
-      expect.arrayContaining(['variable_dropped', 'list_collector', 'datetime_to_date']),
+      expect.arrayContaining(['variable_dropped', 'list_collector', 'datetime_to_date', 'location_reference']),
     );
   });
 });

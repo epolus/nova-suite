@@ -2,7 +2,7 @@
 import type { FormField } from '../api/client';
 
 export const FIELD_TYPE_VALUES: FormField['type'][] = [
-  'text', 'textarea', 'number', 'email', 'date', 'checkbox', 'select', 'multiselect', 'cmdb_ref', 'user_ref',
+  'text', 'textarea', 'number', 'email', 'date', 'checkbox', 'select', 'multiselect', 'cmdb_ref', 'user_ref', 'location_ref',
 ];
 
 export const TYPE_COLORS: Record<string, string> = {
@@ -16,7 +16,15 @@ export const TYPE_COLORS: Record<string, string> = {
   multiselect: 'bg-cyan-100 text-cyan-700',
   cmdb_ref: 'bg-amber-100 text-amber-700',
   user_ref: 'bg-indigo-100 text-indigo-700',
+  location_ref: 'bg-teal-100 text-teal-700',
 };
+
+export function fieldTypeMessageKey(type: string): string {
+  if (type === 'cmdb_ref') return 'cmdbRef';
+  if (type === 'user_ref') return 'userRef';
+  if (type === 'location_ref') return 'locationRef';
+  return type;
+}
 
 export function slugify(label: string): string {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');

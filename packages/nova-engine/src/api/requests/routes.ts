@@ -359,6 +359,15 @@ router.post(
               throw BadRequest(`${field.label || field.name}: Referenced user not found`);
             }
           }
+          if (field.type === 'location_ref') {
+            const locationCheck = await client.query(
+              'SELECT id FROM locations WHERE id = $1 AND is_active = true',
+              [val],
+            );
+            if (locationCheck.rows.length === 0) {
+              throw BadRequest(`${field.label || field.name}: Referenced location not found`);
+            }
+          }
         }
       }
 
@@ -476,6 +485,15 @@ router.post(
                 const userCheck = await client.query('SELECT id FROM users WHERE id = $1', [val]);
                 if (userCheck.rows.length === 0) {
                   throw BadRequest(`${serviceItem.name} - ${field.label || field.name}: Referenced user not found`);
+                }
+              }
+              if (field.type === 'location_ref') {
+                const locationCheck = await client.query(
+                  'SELECT id FROM locations WHERE id = $1 AND is_active = true',
+                  [val],
+                );
+                if (locationCheck.rows.length === 0) {
+                  throw BadRequest(`${serviceItem.name} - ${field.label || field.name}: Referenced location not found`);
                 }
               }
             }
