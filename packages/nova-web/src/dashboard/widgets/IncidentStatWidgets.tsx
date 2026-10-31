@@ -25,7 +25,7 @@ export default function OpenIncidentsStatWidget(_props: DashboardWidgetProps) {
       label={t('openIncidents')}
       value={data.open_total}
       accent="indigo"
-      icon={DashboardIcons.incident('w-5 h-5')}
+      icon={<DashboardIcons.incident className="size-5" />}
       link="/incidents"
     />
   );
@@ -52,7 +52,7 @@ export function SlaBreachedStatWidget(_props: DashboardWidgetProps) {
       value={data.sla_breached}
       accent="red"
       emphasize
-      icon={DashboardIcons.sla('w-5 h-5')}
+      icon={<DashboardIcons.sla className="size-5" />}
       link="/incidents?sla_breached=true"
     />
   );
@@ -91,7 +91,7 @@ export function AssignedToMeStatWidget(_props: DashboardWidgetProps) {
       label={t('assignedToMe')}
       value={value}
       accent="emerald"
-      icon={DashboardIcons.queue('w-5 h-5')}
+      icon={<DashboardIcons.queue className="size-5" />}
       link="/incidents?assigned_to_me=true"
       hint={t('assignedHint')}
     />

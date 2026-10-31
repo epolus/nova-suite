@@ -24,6 +24,16 @@ export function isFulfillerRole(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'fulfiller']);
 }
 
+/** Alert list and correlation hints. */
+export function canViewAlerts(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'event_operator', 'event_manager']);
+}
+
+/** Create and edit alert definitions. */
+export function canManageAlertDefinitions(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'event_manager']);
+}
+
 export function hasConfigurationRole(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'fulfiller', 'configuration_manager']);
 }
@@ -52,17 +62,12 @@ export function hasReportingAdminRole(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'report_admin']);
 }
 
-/** List/detail/banner for major incidents (read-only for fulfillers). */
-export function canViewMajorIncidents(req: Request): boolean {
-  return hasAnyRole(req, ['admin', 'fulfiller', 'major_incident_manager']);
-}
-
 /** Accept, war room actions, postmortem edits, standalone major incident create. */
 export function canManageMajorIncidents(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'major_incident_manager']);
 }
 
-/** Promote from incident (fulfiller path) or full create. */
-export function canCreateMajorIncidentRecord(req: Request): boolean {
-  return hasAnyRole(req, ['admin', 'fulfiller', 'major_incident_manager']);
+/** Continual improvement register. ESS users are excluded. */
+export function canAccessImprovements(req: Request): boolean {
+  return hasChangeRole(req) || hasProblemRole(req) || canManageMajorIncidents(req);
 }

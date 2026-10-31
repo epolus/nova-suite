@@ -3,7 +3,16 @@ import { request, uploadFile, BASE } from '../http';
 import type { AllCatalogTask, CatalogTask, Category, ServiceItem } from '../types';
 
 export const catalog = {
-  categories: () => request<{ categories: Category[] }>('/catalog/categories'),
+  categories: (options?: { includeInactive?: boolean }) =>
+    request<{ categories: Category[] }>(
+      `/catalog/categories${options?.includeInactive ? '?include_inactive=true' : ''}`,
+    ),
+  createCategory: (data: { name: string; description?: string; icon?: string; sort_order?: number }) =>
+    request<Category>('/catalog/categories', { method: 'POST', body: JSON.stringify(data) }),
+  updateCategory: (
+    id: string,
+    data: { name?: string; description?: string | null; icon?: string; sort_order?: number; is_active?: boolean },
+  ) => request<Category>(`/catalog/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   items: (categoryId?: string) =>
     request<{ items: ServiceItem[] }>(
       `/catalog/items${categoryId ? `?category_id=${categoryId}` : ''}`,
@@ -13,8 +22,11 @@ export const catalog = {
     request<ServiceItem>('/catalog/items', { method: 'POST', body: JSON.stringify(data) }),
   updateItem: (id: string, data: Partial<ServiceItem>) =>
     request<ServiceItem>(`/catalog/items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteItem: (id: string) =>
-    request<{ success: boolean }>(`/catalog/items/${id}`, { method: 'DELETE' }),
+  deleteItem: (id: string, options?: { permanent?: boolean }) =>
+    request<{ success: boolean; deleted_tasks?: number; error?: string }>(
+      `/catalog/items/${id}${options?.permanent ? '?permanent=true' : ''}`,
+      { method: 'DELETE' },
+    ),
   uploadPicture: (itemId: string, file: File) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -26,6 +38,7 @@ export const catalog = {
   allItems: () =>
     request<{ items: ServiceItem[] }>('/catalog/items?include_inactive=true'),
   allTasks: () => request<{ tasks: AllCatalogTask[] }>('/catalog/tasks'),
+  locations: () => request<{ locations: { id: string; name: string; city: string | null; is_active: boolean }[] }>('/catalog/locations'),
   itemTasks: (itemId: string) => request<{ tasks: CatalogTask[] }>(`/catalog/items/${itemId}/tasks`),
   createItemTask: (itemId: string, data: Partial<CatalogTask>) =>
     request<CatalogTask>(`/catalog/items/${itemId}/tasks`, { method: 'POST', body: JSON.stringify(data) }),

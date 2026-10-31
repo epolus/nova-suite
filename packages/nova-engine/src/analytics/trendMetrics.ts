@@ -87,18 +87,10 @@ export function getTrendMetric(dataset: string, metric: string): TrendMetricDef 
   return METRIC_MAP.get(metricKey(dataset, metric));
 }
 
-export function listTrendMetrics(): TrendMetricDef[] {
-  return [...TREND_METRICS];
-}
-
 export function listTrendMetricsForRoles(roles: string[]): TrendMetricDef[] {
   const normalized = roles.map((role) => role.trim().toLowerCase());
   return TREND_METRICS.filter((def) => {
     if (!def.requiredRoles || def.requiredRoles.length === 0) return true;
     return def.requiredRoles.some((role) => normalized.includes(role.toLowerCase()));
   });
-}
-
-export function listSnapshotTrendMetrics(): TrendMetricDef[] {
-  return TREND_METRICS.filter((def) => def.kind === 'snapshot' && def.countSql);
 }

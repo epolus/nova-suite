@@ -6,12 +6,14 @@ export interface Category {
   description: string | null;
   icon: string;
   sort_order: number;
+  is_active: boolean;
+  item_count?: number;
 }
 
 export interface FormField {
   name: string;
   label?: string;
-  type: 'text' | 'textarea' | 'date' | 'number' | 'email' | 'checkbox' | 'select' | 'multiselect' | 'cmdb_ref' | 'user_ref';
+  type: 'text' | 'textarea' | 'date' | 'number' | 'email' | 'checkbox' | 'select' | 'multiselect' | 'cmdb_ref' | 'user_ref' | 'location_ref';
   required?: boolean;
   options?: string[];
   placeholder?: string;
@@ -40,6 +42,7 @@ export interface ServiceItem {
   sla_hours: number;
   is_active: boolean;
   category_name?: string;
+  task_count?: number;
 }
 
 export interface ServiceRequest {

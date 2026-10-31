@@ -37,7 +37,7 @@ type CatalogFulfillmentPayload = {
 };
 
 type NotificationDispatchPayload = {
-  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
+  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident' | 'alert';
   triggerKey: string;
   entityId: string;
   actorUserId?: string | null;
@@ -451,12 +451,12 @@ export async function enqueueCatalogFulfillmentStartJob(params: {
 
 export async function enqueueNotificationDispatchStartJob(params: {
   tenantId: string;
-  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
+  entityType: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident' | 'alert';
   triggerKey: string;
   entityId: string;
   actorUserId?: string | null;
   queryable?: Queryable;
-}): Promise<void> {
+}): Promise<string> {
   const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
   const workflowId = `notification-dispatch-${params.entityType}-${params.entityId}-${params.triggerKey}-${uniqueSuffix}`;
   await runWithQueryable(
@@ -477,6 +477,7 @@ export async function enqueueNotificationDispatchStartJob(params: {
       }),
     ],
   );
+  return workflowId;
 }
 
 export async function enqueueIncidentEscalationStartJob(params: {

@@ -13,10 +13,15 @@ import { AppError, BadRequest } from '../../middleware/errorHandler';
 import { ENTITY_DEFS } from '../import/entity-defs';
 import { startDataSourceSync, cancelDataSourceSchedule } from '../../temporal/workflows';
 import { enqueueDataSourceScheduleStartJob } from '../../temporal/workflow-start-queue';
-import { assertPublicHttpUrl, fetchPublicHttp, fetchValidatedPublicHttp, UnsafeHttpUrlError } from '../../data/public-http-url';
+import {
+  assertPublicHttpUrl,
+  fetchPublicHttp,
+  fetchValidatedPublicHttp,
+  loadCredentialSecretsBySlugs,
+  UnsafeHttpUrlError,
+} from '@nova-suite/shared/node';
 import { createIntuneConnector } from '../../discovery/intune';
 import { syncDiscoveredDevices } from '../../discovery/sync';
-import { loadCredentialSecretsBySlugs } from '../../credentials/vault';
 
 const router = Router();
 router.use(authenticate, requireRole('admin'), setTenantRLS, releaseTenantClient);
@@ -396,6 +401,7 @@ router.post('/discovery/intune/sync', async (req: Request, res: Response, next: 
     if (slug) {
       const secrets = await loadCredentialSecretsBySlugs(
         getRequestClient(req),
+        config.credentials.masterKey,
         req.user!.tenant_id,
         [slug],
       );

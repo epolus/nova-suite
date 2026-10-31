@@ -98,7 +98,10 @@ export default function RequestTaskDetailPage() {
   const isActive = task.status === 'in_progress';
   const canTakeAction = task.status === 'pending' || isActive;
   const approvalSubjectId = task.requested_for ?? task.requester_id;
-  const isSelfApprovalBlocked = task.task_type === 'approval' && approvalSubjectId === user?.id;
+  const isSelfApprovalBlocked =
+    task.task_type === 'approval'
+    && approvalSubjectId === user?.id
+    && !task.assigned_to;
   const canAssignToMe = canTakeAction && task.task_type !== 'approval' && !task.assigned_to;
   const canApproveReject = isActive && task.task_type === 'approval' && !isSelfApprovalBlocked;
   const canComplete = isActive && task.task_type !== 'approval';

@@ -9,7 +9,8 @@ When adding or refactoring pages in `packages/nova-web`, follow these convention
 - Use [`useListParams`](packages/nova-web/src/hooks/useListParams.ts) for search, sort, filters, and column visibility (synced to URL + preferences).
 - Use [`DataTable`](packages/nova-web/src/components/DataTable.tsx) for tabular data with pagination and bulk actions.
 - Use [`PageHeader`](packages/nova-web/src/components/PageHeader.tsx) for consistent page chrome.
-- Extract list constants to a `*ListConfig.ts` file alongside the page (see `incidentListConfig.ts`).
+- Use [`FilterPresetsBar`](packages/nova-web/src/components/FilterPresetsBar.tsx) for saved filters and [`useCsvExport`](packages/nova-web/src/hooks/useCsvExport.ts) for CSV export.
+- Extract list constants to a `*ListConfig.ts` file alongside the page (see `changeListConfig.ts`).
 - Prefer TanStack Query hooks from `hooks/queries/` for server state instead of raw `useEffect` + `fetch`.
 
 ### Detail pages
@@ -43,5 +44,5 @@ When adding or refactoring pages in `packages/nova-web`, follow these convention
 
 ### i18n
 
-- Add keys to all locale files under `src/i18n/messages/`.
+- Add new keys to `src/i18n/messages/en.json` only. Other locales fall back to English via `mergeMessages` (see `packages/nova-web/src/i18n/README.md`).
 - Use `useTranslations('<namespace>')` from `use-intl`.

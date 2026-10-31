@@ -1,10 +1,15 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { log } from '@temporalio/activity';
 import type { PoolClient } from 'pg';
+import { config } from '../config';
 import { withTenantContext } from '../db';
 import SftpClient from 'ssh2-sftp-client';
-import { decryptCredentialSecret } from '../credentials/vault';
-import { assertPublicHttpUrl, fetchPublicHttp, fetchValidatedPublicHttp } from '../public-http-url';
+import {
+  assertPublicHttpUrl,
+  fetchPublicHttp,
+  fetchValidatedPublicHttp,
+  loadCredentialSecretsBySlugs,
+} from '@nova-suite/shared/node';
 
 interface SourceConfig {
   url?: string;
@@ -68,7 +73,7 @@ async function resolveSourceConfigSecrets(
 ): Promise<SourceConfig> {
   const slug = typeof cfg.credential_slug === 'string' ? cfg.credential_slug.trim() : '';
   if (!slug) return cfg;
-  const secret = await decryptCredentialSecret(client, tenantId, slug);
+  const { [slug]: secret } = await loadCredentialSecretsBySlugs(client, config.credentials.masterKey, tenantId, [slug]);
   const next: SourceConfig = { ...cfg };
   if (next.auth_type === 'oauth2') {
     next.oauth2_client_secret = secret;

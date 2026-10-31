@@ -27,6 +27,7 @@ export const TRIGGER_DEFS = [
   { entity: 'major_incident', id: 'major_incident.resolve_requested' },
   { entity: 'major_incident', id: 'major_incident.stakeholder_update' },
   { entity: 'major_incident', id: 'major_incident.declared' },
+  { entity: 'alert', id: 'alert.firing' },
 ] as const;
 
 export const RECIPIENT_IDS = [
@@ -51,6 +52,7 @@ export const ENTITY_OPTIONS: NotificationRule['entity_type'][] = [
   'problem',
   'knowledge',
   'major_incident',
+  'alert',
 ];
 
 export const TEMPLATE_LOCALES = ['en', 'de', 'de-ch', 'fr', 'it'] as const;

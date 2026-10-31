@@ -1,0 +1,46 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+.report-viewer-grid .react-grid-layout {
+  position: relative;
+}
+
+.report-viewer-grid .react-grid-item {
+  transition: box-shadow 150ms ease, transform 200ms ease;
+}
+
+.report-viewer-grid .react-grid-item > div {
+  height: 100%;
+}
+
+.report-viewer-grid .react-grid-item.react-draggable-dragging {
+  z-index: 20;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);
+}
+
+.report-viewer-grid .react-grid-item.react-grid-placeholder {
+  background: rgb(99 102 241);
+  opacity: 0.12;
+  border-radius: 0.75rem;
+}
+
+.report-viewer-grid:not(.report-viewer-grid--arranging) .react-resizable-handle {
+  display: none !important;
+}
+
+.report-viewer-grid--arranging .react-grid-item > .react-resizable-handle {
+  z-index: 20;
+  opacity: 0;
+}
+
+.report-viewer-grid--arranging .react-grid-item:hover > .react-resizable-handle,
+.report-viewer-grid--arranging .react-grid-item.resizing > .react-resizable-handle {
+  opacity: 1;
+}
+
+.report-viewer-grid--arranging .react-grid-item > .react-resizable-handle::after {
+  border-color: rgb(99 102 241);
+}
+
+html.dark .report-viewer-grid .react-grid-item.react-draggable-dragging {
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45);
+}

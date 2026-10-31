@@ -15,9 +15,11 @@ export const agentNav: RawNavItemDef[] = [
   { to: '/requests', labelKey: 'agent.requests', icon: 'request' },
   { to: '/request-tasks', labelKey: 'agent.requestTasks', icon: 'request_tasks' },
   { to: '/incidents', labelKey: 'agent.incidents', icon: 'incident' },
+  { to: '/alerts', labelKey: 'agent.alerts', icon: 'incident' },
   { to: '/major-incidents', labelKey: 'agent.majorIncidents', icon: 'major_incident' },
   { to: '/problems', labelKey: 'agent.problems', icon: 'problem' },
   { to: '/changes', labelKey: 'agent.changes', icon: 'change' },
+  { to: '/improvements', labelKey: 'agent.improvements', icon: 'check' },
   { to: '/assets', labelKey: 'agent.assets', icon: 'assets' },
   { to: '/releases', labelKey: 'agent.releases', icon: 'releases' },
   { to: '/reports', labelKey: 'agent.reports', icon: 'reports' },
@@ -25,6 +27,7 @@ export const agentNav: RawNavItemDef[] = [
 ];
 
 export const catalogDesignerNav: RawNavItemDef[] = [
+  { to: '/admin/categories', labelKey: 'admin.categories', icon: 'catalog' },
   { to: '/admin/service-items', labelKey: 'admin.serviceItems', icon: 'service_item' },
   { to: '/admin/catalog-tasks', labelKey: 'admin.catalogTasks', icon: 'request_tasks' },
 ];
@@ -56,10 +59,12 @@ export function useFullWidthContent(pathname: string): boolean {
     '/my-todo',
     '/my-groups',
     '/incidents',
+    '/alerts',
     '/major-incidents',
     '/requests',
     '/request-tasks',
     '/changes',
+    '/improvements',
     '/assets',
     '/releases',
     '/problems',
@@ -97,6 +102,7 @@ export const adminSections: RawAdminSection[] = [
     icon: 'catalog',
     items: [
       { to: '/admin/services', labelKey: 'admin.services', icon: 'services' },
+      { to: '/admin/categories', labelKey: 'admin.categories', icon: 'catalog' },
       { to: '/admin/service-items', labelKey: 'admin.serviceItems', icon: 'service_item' },
       { to: '/admin/catalog-tasks', labelKey: 'admin.catalogTasks', icon: 'request_tasks' },
     ],
@@ -110,6 +116,7 @@ export const adminSections: RawAdminSection[] = [
       { to: '/admin/sla-config', labelKey: 'admin.slaConfiguration', icon: 'sla' },
       { to: '/admin/business-calendars', labelKey: 'admin.businessCalendars', icon: 'sla' },
       { to: '/admin/notification-config', labelKey: 'admin.notificationWorkflows', icon: 'notifications' },
+      { to: '/admin/alert-definitions', labelKey: 'admin.alertDefinitions', icon: 'notifications' },
       { to: '/admin/notification-deliveries', labelKey: 'admin.notificationDeliveries', icon: 'notification_deliveries' },
       { to: '/admin/change-management', labelKey: 'admin.changeManagement', icon: 'change' },
       { to: '/admin/knowledge-workflows', labelKey: 'admin.knowledgeWorkflows', icon: 'knowledge' },
@@ -133,6 +140,7 @@ export const adminSections: RawAdminSection[] = [
       { to: '/admin/data-sources', labelKey: 'admin.dataSources', icon: 'data_sources' },
       { to: '/admin/credentials', labelKey: 'admin.credentials', icon: 'credentials' },
       { to: '/admin/config-packages', labelKey: 'admin.configPackages', icon: 'config_packages' },
+      { to: '/admin/migrations/servicenow', labelKey: 'admin.serviceNowMigration', icon: 'import' },
       { to: '/admin/import', labelKey: 'admin.importData', icon: 'import' },
     ],
   },

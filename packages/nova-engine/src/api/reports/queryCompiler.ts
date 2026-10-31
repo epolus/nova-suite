@@ -27,6 +27,7 @@ export interface ReportSort {
 }
 
 export interface TableComponentConfig {
+  id?: string;
   type: 'table';
   dataset: ReportDatasetKey;
   columns: string[];
@@ -36,6 +37,7 @@ export interface TableComponentConfig {
 }
 
 export interface KpiComponentConfig {
+  id?: string;
   type: 'kpi';
   dataset: ReportDatasetKey;
   metric: ReportKpiMetric;
@@ -44,6 +46,7 @@ export interface KpiComponentConfig {
 }
 
 export interface ChartComponentConfig {
+  id?: string;
   type: 'bar_chart' | 'pie_chart';
   dataset: ReportDatasetKey;
   group_by: string;
@@ -259,12 +262,21 @@ export function compileChartQuery(config: ChartComponentConfig, maxBuckets = 20)
   };
 }
 
+function readComponentId(raw: Record<string, unknown>): string | undefined {
+  if (typeof raw.id !== 'string') return undefined;
+  const id = raw.id.trim();
+  if (!id || id.length > 80 || !/^[a-zA-Z0-9_-]+$/.test(id)) return undefined;
+  return id;
+}
+
 export function normalizeComponentConfig(input: unknown): ReportComponentConfig {
   if (!input || typeof input !== 'object') throw new AppError(400, 'Invalid component config');
   const raw = input as Record<string, unknown>;
+  const id = readComponentId(raw);
   const type = String(raw.type || '').trim() as ReportComponentType;
   if (type === 'table') {
     return {
+      id,
       type,
       dataset: String(raw.dataset || '').trim() as ReportDatasetKey,
       columns: Array.isArray(raw.columns) ? raw.columns.map((col) => String(col)) : [],
@@ -281,6 +293,7 @@ export function normalizeComponentConfig(input: unknown): ReportComponentConfig 
 
   if (type === 'kpi') {
     return {
+      id,
       type,
       dataset: String(raw.dataset || '').trim() as ReportDatasetKey,
       metric: String(raw.metric || '').trim() as ReportKpiMetric,
@@ -291,6 +304,7 @@ export function normalizeComponentConfig(input: unknown): ReportComponentConfig 
 
   if (type === 'bar_chart' || type === 'pie_chart') {
     return {
+      id,
       type,
       dataset: String(raw.dataset || '').trim() as ReportDatasetKey,
       group_by: String(raw.group_by || '').trim(),

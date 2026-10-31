@@ -29,11 +29,15 @@ import { createEssIncident } from '../../domain/incidents/create-ess-incident';
 import { suggestActiveKnownErrors } from '../../domain/known-errors';
 import { schedulePostCreateAiAssist } from '../../ai/post-create';
 import {
+  pauseOlaClock,
   pauseSlaClock,
   resolveSlaDueAt,
+  resumeOlaClock,
   resumeSlaClock,
   shouldPauseSlaForPending,
   SLA_PAUSE_REASONS,
+  olaMarks,
+  startOlaClock,
 } from '../../domain/sla';
 import {
   signalIncidentResolved,
@@ -44,8 +48,11 @@ import {
   enqueueIncidentEscalationStartJob,
   enqueueNotificationDispatchStartJob,
 } from '../../temporal/workflow-start-queue';
-import { isFulfillerRole } from '../roles';
+import { canViewAlerts, isFulfillerRole } from '../roles';
 import { logger } from '../../logger';
+import { replyIncidentStatus } from '../../notifications/chat-threads';
+import { correlateAlerts } from '../../ai/rca-correlation';
+import { storedAlertAdapter } from '../../domain/event-correlation';
 
 const router = Router();
 
@@ -59,9 +66,30 @@ async function clearPendingAndResumeSla(
     sla_paused_ms: number | string | null;
     response_due_at: string | Date | null;
     sla_due_at: string | Date | null;
+    ola_paused_at?: string | Date | null;
+    ola_paused_ms?: number | string | null;
+    ola_response_due_at?: string | Date | null;
+    ola_resolution_due_at?: string | Date | null;
   },
 ): Promise<void> {
-  if (!incident.sla_paused_at) {
+  const slaResumed = incident.sla_paused_at
+    ? resumeSlaClock({
+      sla_paused_at: incident.sla_paused_at,
+      sla_paused_ms: incident.sla_paused_ms,
+      response_due_at: incident.response_due_at,
+      sla_due_at: incident.sla_due_at,
+    })
+    : null;
+  const olaResumed = incident.ola_paused_at
+    ? resumeOlaClock({
+      ola_paused_at: incident.ola_paused_at,
+      ola_paused_ms: incident.ola_paused_ms ?? 0,
+      ola_response_due_at: incident.ola_response_due_at ?? null,
+      ola_resolution_due_at: incident.ola_resolution_due_at ?? null,
+    })
+    : null;
+
+  if (!slaResumed && !olaResumed) {
     await client.query(
       `UPDATE incidents
        SET pending_reason = NULL,
@@ -76,12 +104,6 @@ async function clearPendingAndResumeSla(
     return;
   }
 
-  const resumed = resumeSlaClock({
-    sla_paused_at: incident.sla_paused_at,
-    sla_paused_ms: incident.sla_paused_ms,
-    response_due_at: incident.response_due_at,
-    sla_due_at: incident.sla_due_at,
-  });
   await client.query(
     `UPDATE incidents
      SET pending_reason = NULL,
@@ -89,18 +111,27 @@ async function clearPendingAndResumeSla(
            WHEN resolution_code = ANY($2::text[]) THEN NULL
            ELSE resolution_code
          END,
-         sla_paused_at = NULL,
-         sla_paused_ms = $3,
-         response_due_at = $4,
-         sla_due_at = $5,
+         sla_paused_at = $3,
+         sla_paused_ms = $4,
+         response_due_at = $5,
+         sla_due_at = $6,
+         ola_paused_at = $7,
+         ola_paused_ms = $8,
+         ola_response_due_at = $9,
+         ola_resolution_due_at = $10,
          updated_at = now()
      WHERE id = $1`,
     [
       incident.id,
       PAUSE_REASON_LIST,
-      resumed.sla_paused_ms,
-      resumed.response_due_at,
-      resumed.sla_due_at,
+      slaResumed ? slaResumed.sla_paused_at : incident.sla_paused_at,
+      slaResumed ? slaResumed.sla_paused_ms : incident.sla_paused_ms,
+      slaResumed ? slaResumed.response_due_at : incident.response_due_at,
+      slaResumed ? slaResumed.sla_due_at : incident.sla_due_at,
+      olaResumed ? olaResumed.ola_paused_at : (incident.ola_paused_at ?? null),
+      olaResumed ? olaResumed.ola_paused_ms : (incident.ola_paused_ms ?? 0),
+      olaResumed ? olaResumed.ola_response_due_at : (incident.ola_response_due_at ?? null),
+      olaResumed ? olaResumed.ola_resolution_due_at : (incident.ola_resolution_due_at ?? null),
     ],
   );
 }
@@ -111,6 +142,18 @@ async function markIncidentResponded(
 ): Promise<void> {
   await client.query(
     `UPDATE incidents SET responded_at = now() WHERE id = $1 AND responded_at IS NULL`,
+    [incidentId],
+  );
+}
+
+async function markOlaResponded(
+  client: { query: (sql: string, params?: unknown[]) => Promise<unknown> },
+  incidentId: string,
+): Promise<void> {
+  await client.query(
+    `UPDATE incidents
+     SET ola_responded_at = now()
+     WHERE id = $1 AND ola_responded_at IS NULL AND ola_response_due_at IS NOT NULL`,
     [incidentId],
   );
 }
@@ -370,6 +413,7 @@ router.post(
         category: category || null,
         serviceId: service_id || null,
       });
+      const ola = await startOlaClock(client, assignment_group_id || null);
 
       const result = await client.query(
         `INSERT INTO incidents (
@@ -377,13 +421,16 @@ router.post(
           status, impact, urgency, priority,
           assigned_to, assignment_group_id, caller_id,
           contact_info, service_id, configuration_item_id,
-          category, subcategory, sla_due_at, response_due_at, sla_definition_id
+          category, subcategory, sla_due_at, response_due_at, sla_definition_id,
+          ola_group_id, ola_response_due_at, ola_resolution_due_at, ola_responded_at,
+          ola_paused_at, ola_paused_ms
         ) VALUES (
           current_tenant_id(), $1, $2, $3, $4,
           $5, $6, $7, $8,
           $9, $10, $11,
           $12, $13, $14,
-          $15, $16, $17, $18, $19
+          $15, $16, $17, $18, $19,
+          $20, $21, $22, $23, $24, $25
         ) RETURNING *`,
         [
           number, request_id || null, title, description || null,
@@ -392,6 +439,8 @@ router.post(
           contact_info || null, service_id || null, configuration_item_id || null,
           category || null, subcategory || null, sla.resolutionDueAt, sla.responseDueAt,
           sla.slaDefinitionId,
+          ola.ola_group_id, ola.ola_response_due_at, ola.ola_resolution_due_at, ola.ola_responded_at,
+          ola.ola_paused_at, ola.ola_paused_ms,
         ],
       );
 
@@ -544,6 +593,7 @@ router.patch(
           [ids],
         );
       } else if (action === 'assign_group') {
+        const ola = await startOlaClock(client, value || null);
         await client.query(
           `UPDATE incidents i
            SET
@@ -559,9 +609,19 @@ router.patch(
                ) THEN i.assigned_to
                ELSE NULL
              END,
+             ola_group_id = $3,
+             ola_response_due_at = $4,
+             ola_resolution_due_at = $5,
+             ola_responded_at = NULL,
+             ola_paused_ms = 0,
+             ola_paused_at = CASE
+               WHEN $3::uuid IS NULL THEN NULL
+               WHEN i.sla_paused_at IS NOT NULL THEN now()
+               ELSE NULL
+             END,
              updated_at = NOW()
            WHERE i.id = ANY($2::uuid[]) AND i.status NOT IN ('closed', 'cancelled')`,
-          [value || null, ids],
+          [value || null, ids, ola.ola_group_id, ola.ola_response_due_at, ola.ola_resolution_due_at],
         );
       } else {
         res.status(400).json({ error: 'Unknown action' }); return;
@@ -1064,10 +1124,43 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       [req.params.id],
     );
 
-    res.json({ ...incident, linked_major_incidents: links.rows });
+    const marks = olaMarks(incident);
+    res.json({
+      ...incident,
+      linked_major_incidents: links.rows,
+      ola_response_mark: marks.response,
+      ola_resolution_mark: marks.resolution,
+    });
   } catch (err) {
     next(err);
   }
+});
+
+// ─── GET /api/incidents/:id/correlations ───
+router.get('/:id/correlations', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!canViewAlerts(req)) {
+      res.json({ hints: [] });
+      return;
+    }
+    const client = getRequestClient(req);
+    const incident = await client.query(
+      `SELECT id, title, description, configuration_item_id, service_id, created_at
+       FROM incidents WHERE id = $1`,
+      [req.params.id],
+    );
+    const row = incident.rows[0] as {
+      id: string;
+      title: string;
+      description: string | null;
+      configuration_item_id: string | null;
+      service_id: string | null;
+      created_at: string;
+    } | undefined;
+    if (!row) throw NotFound('Incident not found');
+    const hints = await correlateAlerts(row, storedAlertAdapter(client));
+    res.json({ hints });
+  } catch (err) { next(err); }
 });
 
 // ─── GET /api/incidents/:id/known-errors ───
@@ -1475,6 +1568,18 @@ router.patch(
         updates.resolution_code = null;
       }
       const resumeOnLeave = leavingPending && current.sla_paused_at;
+      const groupChanged = updates.assignment_group_id !== undefined
+        && updates.assignment_group_id !== current.assignment_group_id;
+      if (groupChanged && !['resolved', 'closed', 'cancelled'].includes(nextStatus)) {
+        const clock = await startOlaClock(client, updates.assignment_group_id || null, {
+          paused: nextStatus === 'pending' && shouldPauseSlaForPending(nextReason),
+        });
+        Object.assign(updates, clock);
+      }
+      const olaActive = Boolean(
+        (updates.ola_response_due_at ?? current.ola_response_due_at)
+        || (updates.ola_resolution_due_at ?? current.ola_resolution_due_at),
+      );
 
       if (enteringPendingPause) {
         const paused = pauseSlaClock({
@@ -1485,6 +1590,14 @@ router.patch(
         });
         updates.sla_paused_at = paused.sla_paused_at;
         updates.sla_paused_ms = paused.sla_paused_ms;
+        if (!groupChanged && olaActive) {
+          Object.assign(updates, pauseOlaClock({
+            ola_paused_at: current.ola_paused_at,
+            ola_paused_ms: current.ola_paused_ms,
+            ola_response_due_at: current.ola_response_due_at,
+            ola_resolution_due_at: current.ola_resolution_due_at,
+          }));
+        }
       } else if (resumeOnLeave) {
         const resumed = resumeSlaClock({
           sla_paused_at: current.sla_paused_at,
@@ -1496,6 +1609,14 @@ router.patch(
         updates.sla_paused_ms = resumed.sla_paused_ms;
         updates.response_due_at = resumed.response_due_at;
         updates.sla_due_at = resumed.sla_due_at;
+        if (!groupChanged && current.ola_paused_at) {
+          Object.assign(updates, resumeOlaClock({
+            ola_paused_at: current.ola_paused_at,
+            ola_paused_ms: current.ola_paused_ms,
+            ola_response_due_at: current.ola_response_due_at,
+            ola_resolution_due_at: current.ola_resolution_due_at,
+          }));
+        }
       }
 
       // Resolved requires solution notes.
@@ -1539,6 +1660,15 @@ router.patch(
       ) {
         updates.responded_at = new Date().toISOString();
       }
+      if (isFulfiller && nextStatus === 'in_progress' && current.status !== 'in_progress') {
+        const olaDue = updates.ola_response_due_at !== undefined
+          ? updates.ola_response_due_at
+          : current.ola_response_due_at;
+        const olaResponded = updates.ola_responded_at !== undefined
+          ? updates.ola_responded_at
+          : current.ola_responded_at;
+        if (olaDue && !olaResponded) updates.ola_responded_at = new Date().toISOString();
+      }
 
       // Build dynamic UPDATE
       const setClauses: string[] = [];
@@ -1571,6 +1701,15 @@ router.patch(
            VALUES (current_tenant_id(), $1, $2, 'state_change', $3)`,
           [incidentId, req.user!.id, `Status changed from ${current.status} to ${updates.status}`],
         );
+        try {
+          await replyIncidentStatus(client, {
+            id: String(incidentId),
+            number: String(current.number),
+            status: String(updates.status),
+          });
+        } catch (err) {
+          logger.warn({ err, incidentId }, 'Chat status reply failed');
+        }
 
         // Signal escalation workflow when incident is resolved/closed/cancelled
         if (['resolved', 'closed', 'cancelled'].includes(updates.status)) {
@@ -1705,7 +1844,8 @@ router.post(
       const incident = await client.query(
         `SELECT id, caller_id, number, title, status, resolution_code, pending_reason,
                 assigned_to, assignment_group_id, responded_at,
-                sla_paused_at, sla_paused_ms, response_due_at, sla_due_at
+                sla_paused_at, sla_paused_ms, response_due_at, sla_due_at,
+                ola_paused_at, ola_paused_ms, ola_response_due_at, ola_resolution_due_at
          FROM incidents
          WHERE id = $1`,
         [req.params.id],
@@ -1760,6 +1900,10 @@ router.post(
           sla_paused_ms: incident.rows[0].sla_paused_ms,
           response_due_at: incident.rows[0].response_due_at,
           sla_due_at: incident.rows[0].sla_due_at,
+          ola_paused_at: incident.rows[0].ola_paused_at,
+          ola_paused_ms: incident.rows[0].ola_paused_ms,
+          ola_response_due_at: incident.rows[0].ola_response_due_at,
+          ola_resolution_due_at: incident.rows[0].ola_resolution_due_at,
         });
         await client.query(
           `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
@@ -1770,6 +1914,15 @@ router.post(
             'Status changed from pending to in_progress after caller response',
           ],
         );
+        try {
+          await replyIncidentStatus(client, {
+            id: String(req.params.id),
+            number: String(incident.rows[0].number),
+            status: 'in_progress',
+          });
+        } catch (err) {
+          logger.warn({ err, incidentId: req.params.id }, 'Chat status reply failed');
+        }
 
         const assignedTo = incident.rows[0].assigned_to as string | null;
         const assignmentGroupId = incident.rows[0].assignment_group_id as string | null;
@@ -1821,7 +1974,8 @@ router.post(
       // Work note means active processing has started.
       if (entry_type === 'work_note') {
         const current = await client.query(
-          `SELECT status, sla_paused_at, sla_paused_ms, response_due_at, sla_due_at, pending_reason
+          `SELECT status, sla_paused_at, sla_paused_ms, response_due_at, sla_due_at, pending_reason,
+                  ola_paused_at, ola_paused_ms, ola_response_due_at, ola_resolution_due_at
            FROM incidents WHERE id = $1`,
           [req.params.id],
         );
@@ -1838,6 +1992,15 @@ router.post(
              VALUES (current_tenant_id(), $1, $2, 'state_change', $3)`,
             [req.params.id, req.user!.id, `Status changed from ${status} to in_progress`],
           );
+          try {
+            await replyIncidentStatus(client, {
+              id: String(req.params.id),
+              number: String(incident.rows[0].number),
+              status: 'in_progress',
+            });
+          } catch (err) {
+            logger.warn({ err, incidentId: req.params.id }, 'Chat status reply failed');
+          }
         }
         if (status === 'pending' || current.rows[0]?.sla_paused_at) {
           await clearPendingAndResumeSla(client, {
@@ -1846,6 +2009,10 @@ router.post(
             sla_paused_ms: current.rows[0]?.sla_paused_ms,
             response_due_at: current.rows[0]?.response_due_at,
             sla_due_at: current.rows[0]?.sla_due_at,
+            ola_paused_at: current.rows[0]?.ola_paused_at,
+            ola_paused_ms: current.rows[0]?.ola_paused_ms,
+            ola_response_due_at: current.rows[0]?.ola_response_due_at,
+            ola_resolution_due_at: current.rows[0]?.ola_resolution_due_at,
           });
         }
       }
@@ -1854,6 +2021,9 @@ router.post(
       const workNoteLeavesNew = entry_type === 'work_note' && incident.rows[0].status === 'new';
       if (isFulfiller && !incident.rows[0].responded_at && (visibleToCaller || workNoteLeavesNew)) {
         await markIncidentResponded(client, String(req.params.id));
+      }
+      if (isFulfiller && (entry_type === 'work_note' || visibleToCaller)) {
+        await markOlaResponded(client, String(req.params.id));
       }
 
       res.status(201).json(result.rows[0]);

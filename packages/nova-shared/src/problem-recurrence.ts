@@ -77,6 +77,6 @@ SELECT
 FROM grouped g
 LEFT JOIN configuration_items ci ON ci.id = g.configuration_item_id
 LEFT JOIN services s ON s.id = g.service_id
-WHERE g.seed_id = (SELECT min(x) FROM unnest(g.incident_ids) AS x)
+WHERE g.seed_id = g.incident_ids[1]
 ORDER BY g.incident_count DESC, g.avg_similarity DESC
 LIMIT 50`;

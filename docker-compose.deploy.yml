@@ -6,7 +6,7 @@
 #   docker compose -f docker-compose.deploy.yml up -d
 #
 # Every component comes from one Docker Hub repository, distinguished by a tag
-# prefix. Pin NOVA_TAG to a release (e.g. 0.1.2) for anything but a trial.
+# prefix. Pin NOVA_TAG to a release (e.g. 0.1.4) for anything but a trial.
 # Deliberately free of bind mounts so no repository files are needed at runtime.
 
 services:
@@ -83,7 +83,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nova}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-nova_runtime}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD}}
-      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.17}
+      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.23}
       JWT_PRIVATE_KEY_PATH: /secrets/jwt-private.pem
       JWT_PUBLIC_KEY_PATH: /secrets/jwt-public.pem
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
@@ -92,6 +92,7 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-1}
       NODE_ENV: ${NODE_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      NOVA_INBOUND_WEBHOOK_SECRET: ${NOVA_INBOUND_WEBHOOK_SECRET:-}
       TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
       TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-nova-itsm}
@@ -172,7 +173,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nova}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-nova_runtime}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD}}
-      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.17}
+      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.23}
       TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
       TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-nova-itsm}

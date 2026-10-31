@@ -55,7 +55,12 @@ app.use(helmet({
   },
 }));
 app.use(cors({ origin: config.cors.origin }));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, _res, buf) => {
+    (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+  },
+}));
 app.use(metricsMiddleware);
 
 const authLimiter = rateLimit({
@@ -104,7 +109,7 @@ app.get('/health', async (_req, res) => {
   const status = dbOk && temporalOk && workerRecent && schemaCompatible ? 'healthy' : 'degraded';
   res.status(status === 'healthy' ? 200 : 503).json({
     status,
-    version: '0.1.2',
+    version: '0.1.4',
     timestamp: new Date().toISOString(),
     checks: {
       database: dbOk ? 'connected' : 'disconnected',

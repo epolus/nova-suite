@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import {
+  canManageAlertDefinitions,
   hasChangeRole,
   hasConfigurationRole,
   hasKnowledgeRole,
@@ -16,7 +17,11 @@ export function canAccessAdminRoute(pathname: string, roles: string[] | undefine
   const r = roles ?? [];
   if (!pathname.startsWith('/admin')) return true;
 
-  if (pathname.startsWith('/admin/service-items') || pathname.startsWith('/admin/catalog-tasks')) {
+  if (
+    pathname.startsWith('/admin/categories')
+    || pathname.startsWith('/admin/service-items')
+    || pathname.startsWith('/admin/catalog-tasks')
+  ) {
     return isAdminRole(r) || isCatalogDesignerRole(r);
   }
   if (pathname.startsWith('/admin/ci-classes')) {
@@ -27,6 +32,9 @@ export function canAccessAdminRoute(pathname: string, roles: string[] | undefine
   }
   if (pathname.startsWith('/admin/knowledge-workflows')) {
     return hasKnowledgeRole(r);
+  }
+  if (pathname.startsWith('/admin/alert-definitions')) {
+    return canManageAlertDefinitions(r);
   }
   if (pathname.startsWith('/admin/credentials')) {
     return isAdminRole(r) || hasRole(r, 'credential_manager') || isCatalogDesignerRole(r);

@@ -22,6 +22,18 @@ function getApprovalMode(task: TaskDefinition): 'group_members' | 'group_manager
   return mode === 'group_manager' ? 'group_manager' : 'group_members';
 }
 
+/** Prefer the form's target group; only fall back to the catalog task group when the form omits both. */
+export function resolveGroupManagerLookup(input: {
+  targetGroupId?: string;
+  targetGroupName?: string;
+  fallbackGroupId: string;
+}): { id: string | null; name: string | null } {
+  const id = input.targetGroupId?.trim() || null;
+  const name = input.targetGroupName?.trim() || null;
+  if (id || name) return { id, name };
+  return { id: input.fallbackGroupId, name: null };
+}
+
 function automatedRunsWithoutUserSignal(task: TaskDefinition): boolean {
   if (task.taskType !== 'automated') return false;
   const raw = task.automationConfig;
@@ -111,29 +123,32 @@ export async function createRequestTasks(
       let assignedTo: string | null = isManagerApproval ? subjectManagerId || null : null;
       let assignedGroupId = task.assignedGroupId;
       if (task.taskType === 'approval' && task.assignedGroupId && approvalMode === 'group_manager') {
-        const requestedGroupId = typeof requestFormData.target_group_id === 'string'
-          ? requestFormData.target_group_id.trim()
-          : '';
-        const requestedGroupName = typeof requestFormData.target_group_name === 'string'
-          ? requestFormData.target_group_name.trim()
-          : '';
-        const managerLookupKey = requestedGroupId || requestedGroupName || task.assignedGroupId;
+        const lookup = resolveGroupManagerLookup({
+          targetGroupId: typeof requestFormData.target_group_id === 'string'
+            ? requestFormData.target_group_id
+            : undefined,
+          targetGroupName: typeof requestFormData.target_group_name === 'string'
+            ? requestFormData.target_group_name
+            : undefined,
+          fallbackGroupId: task.assignedGroupId,
+        });
+        const managerLookupKey = lookup.id || lookup.name || task.assignedGroupId;
         if (!groupManagerCache.has(managerLookupKey)) {
           const managerResult = await client.query(
             `SELECT manager_id
              FROM assignment_groups
              WHERE tenant_id = $1
                AND (
-                 id = $2
-                 OR lower(name) = lower($3)
+                 ($2::uuid IS NOT NULL AND id = $2::uuid)
+                 OR ($3::text <> '' AND lower(name) = lower($3))
                )
              ORDER BY CASE
-               WHEN id = $2 THEN 0
-               WHEN lower(name) = lower($3) THEN 1
+               WHEN $2::uuid IS NOT NULL AND id = $2::uuid THEN 0
+               WHEN $3::text <> '' AND lower(name) = lower($3) THEN 1
                ELSE 2
              END
              LIMIT 1`,
-            [tenantId, requestedGroupId || task.assignedGroupId, requestedGroupName || ''],
+            [tenantId, lookup.id, lookup.name || ''],
           );
           groupManagerCache.set(
             managerLookupKey,
@@ -316,14 +331,16 @@ export async function getPendingTaskCount(
 ): Promise<number> {
   return withTenantContext(tenantId, async (client) => {
     const result = await client.query(
-      `SELECT count(*) FROM request_tasks WHERE request_id = $1 AND task_order = $2 AND status IN ('pending', 'in_progress')`,
+      `SELECT count(*) FROM request_tasks
+       WHERE request_id = $1 AND task_order = $2 AND status IN ('pending', 'in_progress')
+         AND parent_task_id IS NULL`,
       [requestId, taskOrder],
     );
     return parseInt(result.rows[0].count as string, 10);
   });
 }
 
-/** Task IDs that still need a taskCompleted signal (matches pending/in_progress after automation/skip). */
+/** Top-level task IDs that still need a taskCompleted signal (in-flow children are owned by automation). */
 export async function getAwaitingHumanTaskIds(
   requestId: string,
   tenantId: string,
@@ -333,6 +350,7 @@ export async function getAwaitingHumanTaskIds(
     const result = await client.query(
       `SELECT id FROM request_tasks
        WHERE request_id = $1 AND task_order = $2 AND status IN ('pending', 'in_progress')
+         AND parent_task_id IS NULL
        ORDER BY created_at ASC`,
       [requestId, taskOrder],
     );

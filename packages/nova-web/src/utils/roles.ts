@@ -11,6 +11,8 @@ const AGENT_ROLES = new Set([
   'report_viewer',
   'report_creator',
   'report_admin',
+  'event_operator',
+  'event_manager',
 ]);
 
 type RoleList = string[] | undefined;
@@ -43,6 +45,16 @@ export function isFulfillerRole(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'fulfiller']);
 }
 
+/** Alert list and correlation hints. */
+export function canViewAlerts(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'event_operator', 'event_manager']);
+}
+
+/** Create and edit alert definitions. */
+export function canManageAlertDefinitions(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'event_manager']);
+}
+
 export function hasConfigurationRole(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'fulfiller', 'configuration_manager']);
 }
@@ -63,10 +75,6 @@ export function hasReportingCreateRole(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'report_creator', 'report_admin']);
 }
 
-export function hasReportingAdminRole(roles: RoleList): boolean {
-  return hasAnyRole(roles, ['admin', 'report_admin']);
-}
-
 /** War room / postmortem edits (not read-only fulfiller). */
 export function canManageMajorIncidents(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'major_incident_manager']);
@@ -75,6 +83,11 @@ export function canManageMajorIncidents(roles: RoleList): boolean {
 /** Promote from incident or create MI record (includes fulfiller). */
 export function canCreateMajorIncidentRecord(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'fulfiller', 'major_incident_manager']);
+}
+
+/** Continual improvement register. Matches the API: admin, fulfiller, change_manager, problem, major_incident_manager. */
+export function canAccessImprovements(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'fulfiller', 'change_manager', 'problem', 'major_incident_manager']);
 }
 
 export function hasAnyRole(roles: RoleList, required: string[]): boolean {

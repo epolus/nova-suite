@@ -5,6 +5,7 @@
 // GET    /api/requests/:id       – get request details
 // POST   /api/requests/:id/approve – approve/reject (admin/fulfiller)
 
+import { randomUUID } from 'node:crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import {
   authenticate,
@@ -41,6 +42,16 @@ interface FormFieldDef {
   ci_class?: string;
 }
 
+function isEmailAddress(val: string): boolean {
+  const at = val.indexOf('@');
+  if (at <= 0 || val.indexOf('@', at + 1) !== -1 || /\s/.test(val)) return false;
+  const domain = val.slice(at + 1);
+  for (let i = 1; i < domain.length - 1; i++) {
+    if (domain[i] === '.') return true;
+  }
+  return false;
+}
+
 function validateFormData(
   fields: FormFieldDef[],
   data: Record<string, unknown>,
@@ -65,7 +76,7 @@ function validateFormData(
     }
 
     if (field.type === 'email' && val) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+      if (!isEmailAddress(val)) {
         errors[field.name] = 'Invalid email address';
         continue;
       }
@@ -348,6 +359,15 @@ router.post(
               throw BadRequest(`${field.label || field.name}: Referenced user not found`);
             }
           }
+          if (field.type === 'location_ref') {
+            const locationCheck = await client.query(
+              'SELECT id FROM locations WHERE id = $1 AND is_active = true',
+              [val],
+            );
+            if (locationCheck.rows.length === 0) {
+              throw BadRequest(`${field.label || field.name}: Referenced location not found`);
+            }
+          }
         }
       }
 
@@ -423,8 +443,7 @@ router.post(
       const client = getRequestClient(req);
       const { items, requested_for, delivery_info } = req.body;
       const userId = req.user!.id;
-      const { v4: uuidv4 } = await import('uuid');
-      const batchId = uuidv4();
+      const batchId = randomUUID();
 
       const createdRequests: any[] = [];
 
@@ -466,6 +485,15 @@ router.post(
                 const userCheck = await client.query('SELECT id FROM users WHERE id = $1', [val]);
                 if (userCheck.rows.length === 0) {
                   throw BadRequest(`${serviceItem.name} - ${field.label || field.name}: Referenced user not found`);
+                }
+              }
+              if (field.type === 'location_ref') {
+                const locationCheck = await client.query(
+                  'SELECT id FROM locations WHERE id = $1 AND is_active = true',
+                  [val],
+                );
+                if (locationCheck.rows.length === 0) {
+                  throw BadRequest(`${serviceItem.name} - ${field.label || field.name}: Referenced location not found`);
                 }
               }
             }
@@ -912,8 +940,14 @@ router.post('/:id/tasks/:taskId/complete',
         throw BadRequest('Approval tasks require outcome: approved or rejected');
       }
 
-      // Prevent self-approval: the employee the approval is about cannot approve their own gate (matches createRequestTasks subject = COALESCE(requested_for, requester_id)).
-      if (task.task_type === 'approval' && !isAdmin && approvalSubjectId === userId) {
+      // Prevent classic manager-of-subject self-approval. Explicit assignees
+      // (group_manager) may still decide even when they are the request subject.
+      if (
+        task.task_type === 'approval'
+        && !isAdmin
+        && approvalSubjectId === userId
+        && !task.assigned_to
+      ) {
         throw BadRequest('You cannot approve or reject your own request');
       }
 

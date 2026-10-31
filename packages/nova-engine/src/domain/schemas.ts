@@ -4,6 +4,7 @@
 
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import { serviceNowExtractOptionsSchema } from '@nova-suite/shared/migrators/servicenow';
 
 extendZodWithOpenApi(z);
 
@@ -66,11 +67,19 @@ export const createCategorySchema = z.object({
   sort_order: z.number().int().min(0).optional(),
 });
 
+export const updateCategorySchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  icon: z.string().max(50).optional(),
+  sort_order: z.number().int().min(0).optional(),
+  is_active: z.boolean().optional(),
+});
+
 export const createServiceItemSchema = z.object({
   category_id: uuidSchema,
   name: z.string().min(1).max(255),
-  short_description: z.string().max(500).optional(),
-  description: z.string().max(5000).optional(),
+  short_description: z.string().max(500).nullable().optional(),
+  description: z.string().max(5000).nullable().optional(),
   icon: z.string().max(50).optional(),
   price: z.number().min(0).optional().nullable(),
   custom_attributes: z.record(z.string(), z.unknown()).default({}),
@@ -80,8 +89,6 @@ export const createServiceItemSchema = z.object({
   approval_required: z.boolean().default(false),
   sla_hours: z.number().int().min(1).optional(),
 });
-
-export const updateServiceItemSchema = createServiceItemSchema.partial();
 
 // ─── Configuration Packages ───
 export const configExternalKeySchema = z
@@ -149,7 +156,7 @@ export const configPackageNotificationRuleSchema = z.object({
   external_key: configExternalKeySchema,
   name: z.string().min(1).max(255),
   description: nullableStringSchema,
-  entity_type: z.enum(['incident', 'request', 'change', 'problem', 'knowledge', 'major_incident']).default('incident'),
+  entity_type: z.enum(['incident', 'request', 'change', 'problem', 'knowledge', 'major_incident', 'alert']).default('incident'),
   trigger_key: z.string().min(1).max(100),
   recipient_type: z.string().min(1).max(100),
   recipient_user_email: z.string().email().nullable().optional(),
@@ -177,6 +184,14 @@ export const configPackageDataSourceSchema = z.object({
   upsert_key: nullableStringSchema,
 });
 
+export const configPackageWorkflowDefinitionSchema = z.object({
+  name: z.string().min(1).max(255),
+  workflow_type: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9_.-]*$/),
+  description: nullableStringSchema,
+  /** Published as-is; call.workflow resolves the latest active definition by workflow_type. */
+  definition: z.record(z.string(), z.unknown()),
+});
+
 export const configPackageBundleSchema = z.object({
   format: z.literal('nova.config-package'),
   version: z.literal(1),
@@ -198,15 +213,42 @@ export const configPackageBundleSchema = z.object({
     data_sources: z.object({
       sources: z.array(configPackageDataSourceSchema).default([]),
     }).default({ sources: [] }),
+    workflows: z.object({
+      definitions: z.array(configPackageWorkflowDefinitionSchema).default([]),
+    }).default({ definitions: [] }),
   }).default({
     catalog: { categories: [], service_items: [] },
     notifications: { rules: [] },
     data_sources: { sources: [] },
+    workflows: { definitions: [] },
   }),
 });
 
 export const configPackageApplySchema = z.object({
   package: configPackageBundleSchema,
+});
+
+// ─── ServiceNow catalog migrator ───
+export const serviceNowConnectionSchema = z.object({
+  instance_url: z.string().trim().min(1).max(255),
+  credential_slug: z.string().trim().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/),
+});
+
+export const serviceNowCreateRunSchema = serviceNowConnectionSchema.extend({
+  options: serviceNowExtractOptionsSchema.default({
+    catalogIds: [],
+    categoryIds: [],
+    itemIds: [],
+    includeRecordProducers: false,
+    includeInactive: false,
+    maxItems: 500,
+  }),
+});
+
+export const serviceNowApplySchema = z.object({
+  item_keys: z.array(z.string().min(1).max(160)).min(1).max(2000),
+  /** Create assignment groups referenced by tasks that do not exist yet; otherwise tasks are left unassigned. */
+  create_missing_groups: z.boolean().default(false),
 });
 
 // ─── Requests (User Portal) ───
@@ -515,6 +557,7 @@ export const postmortemActionItemSchema = z.object({
   due_at: z.string().optional().nullable(),
   problem_id: uuidSchema.optional().nullable(),
   change_id: uuidSchema.optional().nullable(),
+  improvement_id: uuidSchema.optional().nullable(),
 });
 
 export const postmortemActionItemCreateSchema = z.object({
@@ -641,25 +684,41 @@ export const createReleaseSchema = z.object({
 export const updateReleaseSchema = createReleaseSchema.partial();
 export const RELEASE_UPDATE_COLUMNS = Object.keys(updateReleaseSchema.shape);
 
-// ─── Type Exports ───
-export type LoginInput = z.infer<typeof loginSchema>;
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type CreateRequestInput = z.infer<typeof createRequestSchema>;
-export type ApproveRequestInput = z.infer<typeof approveRequestSchema>;
-export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
-export type UpdateIncidentInput = z.infer<typeof updateIncidentSchema>;
-export type AddJournalEntryInput = z.infer<typeof addJournalEntrySchema>;
-export type IncidentLinkMajorIncidentInput = z.infer<typeof incidentLinkMajorIncidentSchema>;
-export type CreateProblemInput = z.infer<typeof createProblemSchema>;
-export type UpdateProblemInput = z.infer<typeof updateProblemSchema>;
-export type CreateChangeInput = z.infer<typeof createChangeSchema>;
-export type UpdateChangeInput = z.infer<typeof updateChangeSchema>;
+// ─── Continual improvement ───
+const improvementStatusSchema = z.enum(['registered', 'in_progress', 'done', 'cancelled']);
+
+export const createImprovementSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(10000).nullable().optional(),
+});
+
+export const updateImprovementSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  description: z.string().max(10000).nullable().optional(),
+  status: improvementStatusSchema.optional(),
+  owner_user_id: uuidSchema.nullable().optional(),
+});
+export const IMPROVEMENT_UPDATE_COLUMNS = Object.keys(updateImprovementSchema.shape);
+
+export const improvementFromPostmortemSchema = z.object({
+  major_incident_id: uuidSchema,
+  action_item_id: uuidSchema,
+});
+
+export const improvementFromChangeSchema = z.object({
+  change_id: uuidSchema,
+});
+
+export const improvementFromProblemSchema = z.object({
+  problem_id: uuidSchema,
+});
+
+export const addImprovementJournalSchema = z.object({
+  entry_type: z.enum(['comment', 'work_note']).default('comment'),
+  content: z.string().min(1).max(10000),
+});
+
 export const updateCIClassSchema = createCIClassSchema.partial();
 
-export type CreateCIClassInput = z.infer<typeof createCIClassSchema>;
-export type CreateCIInput = z.infer<typeof createCISchema>;
-export type UpdateCIInput = z.infer<typeof updateCISchema>;
-export type CreateCIRelationshipInput = z.infer<typeof createCIRelationshipSchema>;
+export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
 export type CreateMajorIncidentInput = z.infer<typeof createMajorIncidentSchema>;
-export type UpdateMajorIncidentInput = z.infer<typeof updateMajorIncidentSchema>;
-export type MajorIncidentResolveInput = z.infer<typeof majorIncidentResolveSchema>;

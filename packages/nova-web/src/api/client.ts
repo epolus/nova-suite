@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 
-export { BASE, getToken, setToken, clearToken, request, uploadFile } from './http';
+export { setToken, clearToken } from './http';
 export * from './types';
 
 export { settings } from './domains/settings';
@@ -13,8 +13,12 @@ export { problems } from './domains/problems';
 export { changes } from './domains/changes';
 export { assets } from './domains/assets';
 export { releases } from './domains/releases';
+export { improvements } from './domains/improvements';
+export { alerts } from './domains/alerts';
+export type { ImprovementSource } from './domains/improvements';
 export { reports } from './domains/reports';
 export { admin } from './domains/admin';
+export { migrations } from './domains/migrations';
 export { cmdb } from './domains/cmdb';
 export { knowledge } from './domains/knowledge';
 export { notifications } from './domains/notifications';

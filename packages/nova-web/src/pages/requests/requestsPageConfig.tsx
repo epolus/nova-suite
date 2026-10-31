@@ -9,15 +9,6 @@ import { useFieldLabel } from '@/i18n/hooks';
 export const DEFAULT_COLS = ['number', 'service_item_name', 'requester_name', 'priority', 'status', 'created_at'];
 export const PRESETS_KEY = 'nova_filter_presets_requests';
 
-export interface FilterPreset {
-  id: string;
-  name: string;
-  search: string;
-  status: string;
-  active: string;
-  columnFilters: Record<string, string>;
-}
-
 export type RequestListLabels = {
   field: ReturnType<typeof useFieldLabel>;
   emDash: string;
@@ -116,22 +107,7 @@ export function buildColumns(listParams: Record<string, string>, labels: Request
   ];
 }
 
-export const REQUEST_CSV_HEADERS = [
+export const REQUEST_CSV_HEADERS: (keyof ServiceRequest & string)[] = [
   'number', 'service_item_name', 'requester_name', 'priority', 'status',
   'approved_by_name', 'approved_at', 'created_at', 'updated_at',
 ];
-
-export function getRequestCsvField(row: ServiceRequest, header: string): unknown {
-  switch (header) {
-    case 'number': return row.number;
-    case 'service_item_name': return row.service_item_name;
-    case 'requester_name': return row.requester_name;
-    case 'priority': return row.priority;
-    case 'status': return row.status;
-    case 'approved_by_name': return row.approved_by_name;
-    case 'approved_at': return row.approved_at;
-    case 'created_at': return row.created_at;
-    case 'updated_at': return row.updated_at;
-    default: return '';
-  }
-}

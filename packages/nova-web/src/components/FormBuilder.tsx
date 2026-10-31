@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import type { FormField } from '../api/client';
-import { FIELD_TYPE_VALUES, TYPE_COLORS, slugify, EMPTY_FIELD } from './formBuilderConfig';
+import { FIELD_TYPE_VALUES, TYPE_COLORS, fieldTypeMessageKey, slugify, EMPTY_FIELD } from './formBuilderConfig';
 import FormFieldPreview from './FormFieldPreview';
 
 interface Props {
@@ -17,7 +17,7 @@ export default function FormBuilder({ fields, onChange, ciClasses = [] }: Props)
   const tFields = useTranslations('common.fields');
   const tStates = useTranslations('common.states');
   const fieldTypes = useMemo(
-    () => FIELD_TYPE_VALUES.map((value) => ({ value, label: t(`fieldTypes.${value === 'cmdb_ref' ? 'cmdbRef' : value === 'user_ref' ? 'userRef' : value === 'multiselect' ? 'multiselect' : value}` as never) })),
+    () => FIELD_TYPE_VALUES.map((value) => ({ value, label: t(`fieldTypes.${fieldTypeMessageKey(value)}` as never) })),
     [t],
   );
   const [editIdx, setEditIdx] = useState<number | null>(null);

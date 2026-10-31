@@ -25,7 +25,7 @@ export default function OpenChangesStatWidget(_props: DashboardWidgetProps) {
       label={t('openChanges')}
       value={data.open_total}
       accent="violet"
-      icon={DashboardIcons.change('w-5 h-5')}
+      icon={<DashboardIcons.change className="size-5" />}
       link="/changes"
     />
   );

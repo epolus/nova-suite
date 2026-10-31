@@ -1,6 +1,6 @@
 {
   "name": "@nova-suite/shared",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Shared workflow/automation schema for Nova Suite",
   "license": "AGPL-3.0",
   "main": "dist/cjs/index.js",
@@ -11,14 +11,35 @@
       "types": "./dist/esm/index.d.ts",
       "import": "./dist/esm/index.js",
       "require": "./dist/cjs/index.js"
+    },
+    "./node": {
+      "types": "./dist/esm/node/index.d.ts",
+      "import": "./dist/esm/node/index.js",
+      "require": "./dist/cjs/node/index.js"
+    },
+    "./migrators/servicenow": {
+      "types": "./dist/esm/migrators/servicenow/index.d.ts",
+      "import": "./dist/esm/migrators/servicenow/index.js",
+      "require": "./dist/cjs/migrators/servicenow/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "node": ["dist/esm/node/index.d.ts"],
+      "migrators/servicenow": ["dist/esm/migrators/servicenow/index.d.ts"]
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json"
+    "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json",
+    "test": "vitest run src"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=24.0.0"

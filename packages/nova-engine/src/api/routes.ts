@@ -26,12 +26,15 @@ import dashboardsRoutes from './dashboards/routes';
 import credentialsRoutes from './credentials/routes';
 import assetRoutes from './assets/routes';
 import releaseRoutes from './releases/routes';
+import improvementRoutes from './improvements/routes';
 import reportRoutes from './reports/routes';
 import configPackageRoutes from './config-packages/routes';
+import serviceNowMigrationRoutes from './migrations/servicenow/routes';
 import majorIncidentRoutes from './major-incidents/routes';
 import aiRoutes from './ai/routes';
 import analyticsRoutes from './analytics/routes';
 import inboundWebhookRoutes from './webhooks/inbound';
+import alertRoutes from './alerts/routes';
 
 const router = Router();
 
@@ -41,6 +44,7 @@ router.use('/settings', settingsRoutes);
 router.use('/auth/sso', ssoRoutes);
 router.use('/auth', authRoutes);
 router.use('/admin/config-packages', configPackageRoutes);
+router.use('/admin/migrations/servicenow', serviceNowMigrationRoutes);
 router.use('/admin', adminRoutes);
 router.use('/catalog', catalogRoutes);
 router.use('/requests', requestRoutes);
@@ -62,9 +66,11 @@ router.use('/approvals', approvalRoutes);
 router.use('/credentials', credentialsRoutes);
 router.use('/assets', assetRoutes);
 router.use('/releases', releaseRoutes);
+router.use('/improvements', improvementRoutes);
 router.use('/reports', reportRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/ai', aiRoutes);
 router.use('/webhooks', inboundWebhookRoutes);
+router.use('/alerts', alertRoutes);
 
 export default router;

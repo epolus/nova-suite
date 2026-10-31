@@ -1,6 +1,6 @@
 {
   "name": "nova-suite",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "private": true,
   "description": "Open-source Service Management System",
   "license": "AGPL-3.0",
@@ -30,7 +30,7 @@
     "picomatch": "4.0.4",
     "protobufjs": "8.8.0",
     "serialize-javascript": "7.0.5",
-    "fast-uri": "3.1.8",
+    "fast-uri": "3.1.9",
     "qs": "6.16.0"
   }
 }

@@ -10,10 +10,13 @@ Nova Suite follows a monolithic-but-modular architecture. A single Express serve
 │ (reverse    │     │ (Express +  │     │(RLS enabled) │
 │  proxy)     │     │  TypeScript)│     └──────────────┘
 └─────────────┘     │             │
-                    │             │────▶┌──────────────┐
-                    └─────────────┘     │  Temporal    │
-                                        │ (workflows)  │
-                                        └──────────────┘
+       │            │             │────▶┌──────────────┐
+       │            └─────────────┘     │  Temporal    │
+       ▼                                │ (workflows)  │
+┌─────────────┐     ┌─────────────┐     └──────▲───────┘
+│  Nova Web   │     │ Nova Worker │────────────┘
+│ (React SPA) │     │ (activities)│
+└─────────────┘     └─────────────┘
 ```
 
 ## Multi-Tenancy Strategy
@@ -65,16 +68,24 @@ CREATE POLICY tenant_isolation_requests ON requests
 | Table                  | Purpose                                    |
 |------------------------|--------------------------------------------|
 | `tenants`              | Tenant organizations                       |
-| `users`                | Authenticated users with roles             |
+| `users` / `roles`      | Authenticated users and role membership    |
 | `service_categories`   | Catalog organization                       |
 | `service_items`        | Requestable services with dynamic forms    |
 | `requests`             | User submissions through the portal        |
 | `incidents`            | Fulfiller work items with SLA tracking     |
 | `incident_journal`     | Activity log (comments, state changes)     |
+| `major_incidents`      | Declared major incidents and war-room data |
+| `changes` / `standard_changes` | Change records and reusable templates |
+| `problems` / `known_errors` | Problem records and the known-error store |
+| `assets`               | IT asset records, often linked to a CI     |
+| `improvements`         | Continual improvement register             |
+| `events` / `alerts` / `alert_definitions` | Monitoring ingest and alert episodes |
 | `ci_classes`           | Extensible CI type definitions             |
 | `configuration_items`  | Actual infrastructure items                |
 | `ci_relationships`     | Dependency graph between CIs               |
 | `ci_history`           | Audit trail for CI changes                 |
+| `sla_definitions` / `business_calendars` | Customer SLA and business hours |
+| `assignment_groups`    | Groups, including optional OLA targets     |
 | `priority_matrix`      | Impact × Urgency → Priority mapping        |
 
 ### Indexes
@@ -110,11 +121,12 @@ This supports Google and Microsoft Entra ID without code-path changes.
 
 ### Role Hierarchy
 
-| Role      | Capabilities                                            |
-|-----------|---------------------------------------------------------|
-| `admin`   | Everything: user management, catalog admin, CMDB, all   |
-| `fulfiller`| Incidents, CMDB, request approval, journal entries     |
-| `user`    | Browse catalog, submit requests, view own requests      |
+| Role | Capabilities |
+|------|--------------|
+| `admin` | Everything: users, catalog, CMDB, all practice queues |
+| `fulfiller` | Incidents, CMDB, request approval, journal entries |
+| `user` | Browse catalog, submit requests, view own requests |
+| Practice roles | Examples: `change_manager`, `problem`, `major_incident_manager`, `configuration_manager`, `event_operator` (alert queue), `event_manager` (alert definitions). Assign under Admin → Roles. |
 
 ## API Design Principles
 

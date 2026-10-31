@@ -58,7 +58,7 @@ export default function DashboardWidgetShell({
           }`}
         >
           <div className="flex items-center gap-2 min-w-0">
-            {editMode && DashboardIcons.grip('w-4 h-4 shrink-0 text-gray-400')}
+            {editMode && <DashboardIcons.grip className="size-4 shrink-0 text-gray-400" />}
             {!isStat && (
               <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{title}</span>
             )}

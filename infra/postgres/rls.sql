@@ -67,6 +67,8 @@ ALTER TABLE system_metrics_db_size_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metric_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE improvements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE improvement_journal ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_exports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events ENABLE ROW LEVEL SECURITY;
@@ -87,6 +89,11 @@ ALTER TABLE notification_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_rule_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_email_deliveries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_notification_webhooks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_inbound_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alert_definitions ENABLE ROW LEVEL SECURITY;
 
 -- ─── Departments ───
 CREATE POLICY tenant_isolation_departments ON departments
@@ -501,6 +508,13 @@ CREATE POLICY tenant_isolation_assets ON assets
 CREATE POLICY tenant_isolation_releases ON releases
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Continual improvement ───
+CREATE POLICY tenant_isolation_improvements ON improvements
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+CREATE POLICY tenant_isolation_improvement_journal ON improvement_journal
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Report Exports ───
 CREATE POLICY tenant_isolation_report_exports ON report_exports
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -629,6 +643,58 @@ CREATE POLICY tenant_isolation_notification_email_deliveries ON notification_ema
     AND current_user_has_role('admin', 'fulfiller', 'system')
   );
 
+-- ─── Events and alerts ───
+CREATE POLICY tenant_isolation_events ON events
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+  );
+
+CREATE POLICY tenant_isolation_alerts ON alerts
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+  );
+
+CREATE POLICY tenant_isolation_alert_definitions ON alert_definitions
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_manager', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'event_manager', 'system')
+  );
+
+-- ─── Chat threads (Slack / Teams replies on an incident) ───
+CREATE POLICY tenant_isolation_chat_threads ON chat_threads
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  );
+
+CREATE POLICY tenant_isolation_chat_inbound_receipts ON chat_inbound_receipts
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'fulfiller', 'system')
+  );
+
 -- ─── Tenant Notification Webhooks (Slack / Teams) ───
 CREATE POLICY tenant_isolation_tenant_notification_webhooks ON tenant_notification_webhooks
   FOR ALL USING (
@@ -708,6 +774,8 @@ ALTER TABLE system_metrics_db_size_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE metric_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE assets FORCE ROW LEVEL SECURITY;
 ALTER TABLE releases FORCE ROW LEVEL SECURITY;
+ALTER TABLE improvements FORCE ROW LEVEL SECURITY;
+ALTER TABLE improvement_journal FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_exports FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events FORCE ROW LEVEL SECURITY;
@@ -728,6 +796,11 @@ ALTER TABLE notification_rules FORCE ROW LEVEL SECURITY;
 ALTER TABLE notification_rule_templates FORCE ROW LEVEL SECURITY;
 ALTER TABLE notification_email_deliveries FORCE ROW LEVEL SECURITY;
 ALTER TABLE tenant_notification_webhooks FORCE ROW LEVEL SECURITY;
+ALTER TABLE chat_threads FORCE ROW LEVEL SECURITY;
+ALTER TABLE chat_inbound_receipts FORCE ROW LEVEL SECURITY;
+ALTER TABLE events FORCE ROW LEVEL SECURITY;
+ALTER TABLE alerts FORCE ROW LEVEL SECURITY;
+ALTER TABLE alert_definitions FORCE ROW LEVEL SECURITY;
 
 -- Import staging tables
 ALTER TABLE import_jobs ENABLE ROW LEVEL SECURITY;
@@ -745,6 +818,19 @@ CREATE POLICY tenant_isolation_config_deployment_runs ON config_deployment_runs
   FOR ALL
   USING (tenant_id = current_tenant_id())
   WITH CHECK (tenant_id = current_tenant_id());
+
+-- ServiceNow migrator runs
+ALTER TABLE migration_runs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_migration_runs ON migration_runs
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'system')
+  );
+ALTER TABLE migration_runs FORCE ROW LEVEL SECURITY;
 
 -- Catalog tasks
 ALTER TABLE catalog_tasks ENABLE ROW LEVEL SECURITY;

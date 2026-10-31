@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
-import type { SimilarIncident, KnowledgeSuggestion, KnownErrorSuggestion } from '../api/client';
+import type { CorrelationHint, SimilarIncident, KnowledgeSuggestion, KnownErrorSuggestion } from '../api/client';
 import Badge from './Badge';
 
 export function SimilarIncidentsSection({
@@ -125,6 +125,42 @@ export function KbSuggestionsSection({
             >
               {inner}
             </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function CorrelationHintsSection({
+  hints,
+  loading = false,
+}: {
+  hints: CorrelationHint[];
+  loading?: boolean;
+}) {
+  const t = useTranslations('components.incidentSidebar');
+  return (
+    <section>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{t('correlations')}</h4>
+      <div className="space-y-2">
+        {!loading && hints.length === 0 && <p className="text-sm text-gray-400">{t('noCorrelations')}</p>}
+        {hints.map((hint) => {
+          const href = hint.relatedEntityType === 'change' && hint.relatedEntityId
+            ? `/changes/${hint.relatedEntityId}`
+            : hint.relatedEntityType === 'alert' && hint.relatedEntityId
+              ? `/alerts/${hint.relatedEntityId}`
+              : null;
+          const body = (
+            <>
+              <p className="text-xs uppercase text-gray-400">{hint.source}</p>
+              <p className="text-sm text-gray-900">{hint.summary}</p>
+            </>
+          );
+          return href ? (
+            <Link key={`${hint.source}-${hint.relatedEntityId}`} to={href} className="block rounded-md border border-gray-200 p-3 hover:bg-gray-50">{body}</Link>
+          ) : (
+            <div key={`${hint.source}-${hint.summary}`} className="rounded-md border border-gray-200 p-3">{body}</div>
           );
         })}
       </div>

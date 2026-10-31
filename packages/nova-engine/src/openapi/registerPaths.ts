@@ -9,6 +9,7 @@ import {
   approveRequestSchema,
   configPackageApplySchema,
   createCategorySchema,
+  updateCategorySchema,
   createCIClassSchema,
   createCIRelationshipSchema,
   createCISchema,
@@ -18,6 +19,9 @@ import {
   loginSchema,
   paginationSchema,
   registerSchema,
+  serviceNowApplySchema,
+  serviceNowConnectionSchema,
+  serviceNowCreateRunSchema,
   updateCIClassSchema,
   updateCISchema,
   updateIncidentSchema,
@@ -143,6 +147,21 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
       },
     },
     responses: { 201: { description: 'Category created' } },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/catalog/categories/{id}',
+    tags: ['Catalog'],
+    summary: 'Update category (admin)',
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: {
+        content: { 'application/json': { schema: updateCategorySchema } },
+        required: true,
+      },
+    },
+    responses: { 200: { description: 'Category updated' } },
   });
 
   registry.registerPath({
@@ -539,4 +558,48 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
     request: { query: configPackageRunsQuerySchema },
     responses: { 200: { description: 'Run history' } },
   });
+
+  const snBase = '/admin/migrations/servicenow';
+  const jsonBody = (schema: z.ZodType) => ({
+    body: { content: { 'application/json': { schema } }, required: true },
+  });
+  const snPath = (
+    method: 'get' | 'post',
+    subpath: string,
+    summary: string,
+    responses: Record<number, { description: string }>,
+    request?: { params?: typeof uuidParam; body?: ReturnType<typeof jsonBody>['body'] },
+  ) => {
+    registry.registerPath({
+      method,
+      path: `${snBase}${subpath}`,
+      tags: ['ServiceNow migration'],
+      summary,
+      ...(request ? { request } : {}),
+      responses,
+    });
+  };
+  snPath('post', '/test-connection', 'Probe a ServiceNow instance with a vault credential (read-only)', {
+    200: { description: 'Table access, flow storage and value encoding' },
+  }, jsonBody(serviceNowConnectionSchema));
+  snPath('post', '/catalogs/browse', 'List catalogs, categories and catalog items for selection (credential in body, not query)', {
+    200: { description: 'Catalog structure' },
+  }, jsonBody(serviceNowConnectionSchema));
+  snPath('post', '/runs', 'Start an extract + transform run (preview only, nothing is applied)', {
+    202: { description: 'Run queued' },
+    409: { description: 'Another run is in progress' },
+  }, jsonBody(serviceNowCreateRunSchema));
+  snPath('get', '/runs', 'List recent migration runs', { 200: { description: 'Run summaries' } });
+  snPath('get', '/runs/{id}', 'Get run status, progress and migration report', {
+    200: { description: 'Run' },
+    404: { description: 'Not found' },
+  }, { params: uuidParam });
+  snPath('get', '/runs/{id}/package', 'Get the generated configuration package', {
+    200: { description: 'nova.config-package' },
+    409: { description: 'Not ready' },
+  }, { params: uuidParam });
+  snPath('post', '/runs/{id}/apply', 'Apply selected items from the generated package', {
+    200: { description: 'Apply result' },
+    400: { description: 'Validation failed' },
+  }, { params: uuidParam, ...jsonBody(serviceNowApplySchema) });
 }

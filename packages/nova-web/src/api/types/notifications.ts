@@ -4,7 +4,7 @@ export interface NotificationRule {
   external_key?: string | null;
   name: string;
   description: string | null;
-  entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
+  entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident' | 'alert';
   trigger_key: string;
   recipient_type:
     | 'caller'
@@ -77,6 +77,11 @@ export interface NotificationWebhook {
   channel: NotificationWebhookChannel;
   name: string;
   webhook_url: string;
+  reply_channel_id?: string | null;
+  has_api_token?: boolean;
+  has_signing_secret?: boolean;
+  api_token?: string | null;
+  signing_secret?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

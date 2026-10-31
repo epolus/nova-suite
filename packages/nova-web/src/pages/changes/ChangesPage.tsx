@@ -13,7 +13,8 @@ import DataTable, { type DataColumnDef } from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
 import { useResettingState } from '../../hooks/useSyncedState';
-import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
+import { useCsvExport } from '@/hooks/useCsvExport';
+import FilterPresetsBar from '@/components/FilterPresetsBar';
 import { formatDate } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
@@ -22,15 +23,10 @@ import { CHANGE_BULK_ACTIONS, CHANGE_RISK_OPTIONS, CHANGE_STATUS_OPTIONS } from 
 
 const DEFAULT_COLS = ['number', 'title', 'status', 'stage', 'risk_level', 'priority', 'scheduled_start', 'updated_at'];
 const PRESETS_KEY = 'nova_filter_presets_changes';
-
-interface FilterPreset {
-  id: string;
-  name: string;
-  search: string;
-  status: string;
-  risk_level: string;
-  columnFilters: Record<string, string>;
-}
+const CHANGE_CSV_HEADERS: (keyof Change & string)[] = [
+  'number', 'title', 'status', 'stage', 'risk_level', 'priority', 'change_type_name', 'assignment_group_name',
+  'pending_approvals', 'conflict_count', 'scheduled_start', 'updated_at',
+];
 
 type ChangeListLabels = {
   field: ReturnType<typeof useFieldLabel>;
@@ -72,7 +68,6 @@ function buildColumns(listParams: Record<string, string>, labels: ChangeListLabe
 export default function ChangesPage() {
   const tChanges = useTranslations('pages.changes');
   const tList = useTranslations('common.list');
-  const tFilters = useTranslations('common.filters');
   const tActions = useTranslations('common.actions');
   const tMaster = useTranslations('common.masterData');
   const tTable = useTranslations('common.table');
@@ -90,17 +85,10 @@ export default function ChangesPage() {
     filterKeys: ['status', 'risk_level'],
     storageKey: 'changes',
   });
-  const [exporting, setExporting] = useState(false);
+  const { exporting, exportCsv } = useCsvExport('changes');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const invalidateChanges = useInvalidateChanges();
-  const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
-    `presets:${PRESETS_KEY}`,
-    [],
-    PRESETS_KEY,
-  );
-  const [showSaveInput, setShowSaveInput] = useState(false);
-  const [savePresetName, setSavePresetName] = useState('');
   const navigate = useNavigate();
   const status = params.filters.status || 'all';
   const risk = params.filters.risk_level || 'all';
@@ -128,33 +116,6 @@ export default function ChangesPage() {
 
   const columns = useMemo(() => buildColumns(apiParams, listLabels), [apiParams, listLabels]);
   const hasActiveFilter = !!params.search || status !== 'all' || risk !== 'all' || Object.values(params.columnFilters).some(Boolean);
-  const applyPreset = (preset: FilterPreset) => {
-    update({
-      search: preset.search,
-      filters: { status: preset.status, risk_level: preset.risk_level },
-      columnFilters: preset.columnFilters,
-      page: 1,
-    });
-  };
-  const savePreset = () => {
-    if (!savePresetName.trim()) return;
-    const next: FilterPreset[] = [...presets, {
-      id: crypto.randomUUID(),
-      name: savePresetName.trim(),
-      search: params.search,
-      status,
-      risk_level: risk,
-      columnFilters: { ...params.columnFilters },
-    }];
-    setPresets(next);
-    setSavePresetName('');
-    setShowSaveInput(false);
-  };
-  const deletePreset = (id: string) => {
-    const next = presets.filter((p) => p.id !== id);
-    setPresets(next);
-  };
-
   const handleBulkClose = async () => {
     if (selectedIds.length === 0) return;
     setBulkLoading(true);
@@ -165,69 +126,6 @@ export default function ChangesPage() {
       invalidateChanges();
     } finally {
       setBulkLoading(false);
-    }
-  };
-
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      const allRows = selectedIds.length > 0
-        ? data.filter((row) => selectedIds.includes(row.id))
-        : await (async () => {
-            const apiParams: Record<string, string> = {};
-            if (status !== 'all') apiParams.status = status;
-            if (risk !== 'all') apiParams.risk_level = risk;
-            if (params.search) apiParams.search = params.search;
-            if (params.sort) {
-              apiParams.sort_by = params.sort;
-              apiParams.sort_dir = params.dir;
-            }
-            for (const [col, val] of Object.entries(params.columnFilters)) {
-              if (val) apiParams[`cf.${col}`] = val;
-            }
-            const firstPage = await changes.list(apiParams, 1, 100);
-            const rows = [...firstPage.changes];
-            for (let page = 2; page <= firstPage.pagination.pages; page += 1) {
-              const nextPage = await changes.list(apiParams, page, 100);
-              rows.push(...nextPage.changes);
-            }
-            return rows;
-          })();
-      const headers = ['number', 'title', 'status', 'stage', 'risk_level', 'priority', 'change_type_name', 'assignment_group_name', 'pending_approvals', 'conflict_count', 'scheduled_start', 'updated_at'];
-      const getField = (row: Change, header: string): unknown => {
-        switch (header) {
-          case 'number': return row.number;
-          case 'title': return row.title;
-          case 'status': return row.status;
-          case 'stage': return row.stage;
-          case 'risk_level': return row.risk_level;
-          case 'priority': return row.priority;
-          case 'change_type_name': return row.change_type_name;
-          case 'assignment_group_name': return row.assignment_group_name;
-          case 'pending_approvals': return row.pending_approvals;
-          case 'conflict_count': return row.conflict_count;
-          case 'scheduled_start': return row.scheduled_start;
-          case 'updated_at': return row.updated_at;
-          default: return '';
-        }
-      };
-      const csvEscape = (value: unknown) => {
-        const str = String(value ?? '');
-        return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-      };
-      const lines = [headers.join(','), ...allRows.map((row) => headers.map((h) => csvEscape(getField(row, h))).join(','))];
-      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = selectedIds.length > 0 ? `changes-selected-${ts}.csv` : `changes-${ts}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } finally {
-      setExporting(false);
     }
   };
 
@@ -243,37 +141,18 @@ export default function ChangesPage() {
           </div>
         }
       />
-      {isAgent && (presets.length > 0 || hasActiveFilter) && (
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-xs font-medium text-gray-400">{tFilters('saved')}</span>
-          {presets.map((preset) => (
-            <div key={preset.id} className="flex items-center gap-0.5 pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700">
-              <button onClick={() => applyPreset(preset)} className="hover:text-indigo-600 transition-colors">{preset.name}</button>
-              <button onClick={() => deletePreset(preset.id)} className="ml-1 text-gray-300 hover:text-red-500 transition-colors leading-none">&#10005;</button>
-            </div>
-          ))}
-          {showSaveInput ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                autoFocus
-                value={savePresetName}
-                onChange={(e) => setSavePresetName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') { setShowSaveInput(false); setSavePresetName(''); } }}
-                placeholder={tFilters('filterNamePlaceholder')}
-                className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-hidden focus:ring-1 focus:ring-indigo-400 w-36"
-              />
-              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">{tActions('save')}</button>
-              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">{tActions('cancel')}</button>
-            </div>
-          ) : hasActiveFilter && (
-            <button
-              onClick={() => setShowSaveInput(true)}
-              className="px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
-            >
-              + {tFilters('saveCurrent')}
-            </button>
-          )}
-        </div>
+      {isAgent && (
+        <FilterPresetsBar
+          storageKey={PRESETS_KEY}
+          current={{ search: params.search, status, risk_level: risk, columnFilters: params.columnFilters }}
+          hasActiveFilter={hasActiveFilter}
+          onApply={(preset) => update({
+            search: preset.search,
+            filters: { status: preset.status, risk_level: preset.risk_level },
+            columnFilters: preset.columnFilters,
+            page: 1,
+          })}
+        />
       )}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
@@ -301,7 +180,14 @@ export default function ChangesPage() {
             </button>
           ))}
           {isAgent && (
-            <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exporting}
+              onClick={() => exportCsv(CHANGE_CSV_HEADERS, selectedIds, data, (page) =>
+                changes.list(apiParams, page, 100).then((r) => ({ rows: r.changes, pages: r.pagination.pages })),
+              )}
+            >
               {exporting ? tList('exporting') : tList('exportCsv')}
             </Button>
           )}

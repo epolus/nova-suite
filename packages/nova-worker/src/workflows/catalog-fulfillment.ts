@@ -90,15 +90,39 @@ export async function catalogFulfillment(input: FulfillmentInput): Promise<strin
 
     const automatedInGroup = group.filter((t) => !t.requiresUserCompletion && t.taskType === 'automated');
     if (automatedInGroup.length > 0) {
-      const autoResults = await Promise.all(
-        automatedInGroup.map((t) =>
-          executeAutomatedCatalogTask({
-            requestTaskId: t.id,
+      const runAutomated = async (requestTaskId: string) => {
+        let result = await executeAutomatedCatalogTask({
+          requestTaskId,
+          requestId: input.requestId,
+          tenantId: input.tenantId,
+        });
+        // In-flow approvals and manual tasks pause the automation until the child task is completed.
+        while (result.suspended) {
+          const childTaskId = result.suspended.approvalTaskId;
+          const isManual = result.suspended.taskKind === 'manual';
+          if (!isManual) await updateRequestStatus(input.requestId, input.tenantId, 'pending_approval');
+          await condition(() => completedTasks.has(childTaskId));
+          const signal = completedTasks.get(childTaskId)!;
+          const outcome = isManual ? 'completed' : signal.outcome === 'rejected' ? 'rejected' : 'approved';
+          await completeRequestTask(
+            childTaskId,
+            input.tenantId,
+            outcome === 'rejected' ? 'rejected' : 'completed',
+            isManual ? null : outcome,
+            signal.userId,
+            signal.notes,
+          );
+          await updateRequestStatus(input.requestId, input.tenantId, 'in_progress');
+          result = await executeAutomatedCatalogTask({
+            requestTaskId,
             requestId: input.requestId,
             tenantId: input.tenantId,
-          }),
-        ),
-      );
+            resumeOutcome: outcome,
+          });
+        }
+        return result;
+      };
+      const autoResults = await Promise.all(automatedInGroup.map((t) => runAutomated(t.id)));
       if (autoResults.some((r) => !r.ok && r.rejectRequest)) {
         await skipRemainingTasks(input.requestId, input.tenantId);
         await updateRequestStatus(input.requestId, input.tenantId, 'rejected');

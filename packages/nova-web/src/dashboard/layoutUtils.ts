@@ -1,14 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { Layout, LayoutItem } from 'react-grid-layout';
 import { hasAnyRole } from '@/utils/roles';
-import { createStableId } from '@/utils/id';
 import { DASHBOARD_COLS_BY_BREAKPOINT, MAX_DASHBOARD_WIDGETS } from './constants';
 import { getWidgetDefinition, isKnownWidgetType } from './registry';
 import type { DashboardLayout, DashboardWidgetInstance, DashboardWidgetType } from './types';
-
-export function createWidgetId(): string {
-  return createStableId('widget');
-}
 
 export function defaultWidgetId(type: DashboardWidgetType): string {
   return `def-${type.replace(/\./g, '-')}`;
@@ -194,7 +189,7 @@ export function createWidgetInstance(
   const { x, y } = findNextPlacement(existing, def.defaultSize.w, def.defaultSize.h);
   const config = initialConfig ?? (def.defaultConfig ? { ...def.defaultConfig } : undefined);
   return {
-    id: createWidgetId(),
+    id: crypto.randomUUID(),
     type,
     x,
     y,

@@ -40,6 +40,13 @@ router.get('/pending-count', async (req: Request, res: Response, next: NextFunct
          WHERE kaa.tenant_id = current_tenant_id()
            AND kaa.status = 'pending')
         +
+        -- Request approval tasks assigned to the user (e.g. group_manager mode)
+        (SELECT COUNT(*) FROM request_tasks rt
+         WHERE rt.tenant_id = current_tenant_id()
+           AND rt.task_type = 'approval'
+           AND rt.status = 'in_progress'
+           AND rt.assigned_to = current_user_id())
+        +
         -- Request approval tasks (manager approval; subject = COALESCE(requested_for, requester_id))
         (SELECT COUNT(*) FROM request_tasks rt
          JOIN requests r ON r.id = rt.request_id
@@ -48,6 +55,7 @@ router.get('/pending-count', async (req: Request, res: Response, next: NextFunct
          WHERE rt.tenant_id = current_tenant_id()
            AND rt.task_type = 'approval'
            AND rt.status = 'in_progress'
+           AND rt.assigned_to IS NULL
            AND rt.assigned_group_id IS NULL
            AND subject_u.manager_id = current_user_id()
            AND COALESCE(r.requested_for, r.requester_id) <> current_user_id())
@@ -61,7 +69,8 @@ router.get('/pending-count', async (req: Request, res: Response, next: NextFunct
          WHERE rt.tenant_id = current_tenant_id()
            AND rt.task_type = 'approval'
            AND rt.status = 'in_progress'
-           AND rt.assigned_group_id IS NOT NULL)
+           AND rt.assigned_group_id IS NOT NULL
+           AND (rt.assigned_to IS NULL OR rt.assigned_to = current_user_id()))
       )::int AS count
     `);
     res.json({ count: Number(result.rows[0]?.count ?? 0) });
@@ -136,6 +145,26 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
       UNION ALL
 
+      -- Request approval tasks assigned to the user (e.g. group_manager mode)
+      SELECT
+        'request'::text,
+        rt.id::text AS approval_id,
+        'assignee'::text AS approval_type,
+        r.id::text AS entity_id,
+        r.number AS entity_number,
+        COALESCE(si.name, rt.name, 'Request approval') AS entity_title,
+        rt.created_at
+      FROM request_tasks rt
+      JOIN requests r ON r.id = rt.request_id
+                    AND r.tenant_id = current_tenant_id()
+      LEFT JOIN service_items si ON si.id = r.service_item_id
+      WHERE rt.tenant_id = current_tenant_id()
+        AND rt.task_type = 'approval'
+        AND rt.status = 'in_progress'
+        AND rt.assigned_to = current_user_id()
+
+      UNION ALL
+
       -- Request approval tasks (manager approval)
       SELECT
         'request'::text,
@@ -153,6 +182,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       WHERE rt.tenant_id = current_tenant_id()
         AND rt.task_type = 'approval'
         AND rt.status = 'in_progress'
+        AND rt.assigned_to IS NULL
         AND rt.assigned_group_id IS NULL
         AND subject_u.manager_id = current_user_id()
         AND COALESCE(r.requested_for, r.requester_id) <> current_user_id()
@@ -180,6 +210,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         AND rt.task_type = 'approval'
         AND rt.status = 'in_progress'
         AND rt.assigned_group_id IS NOT NULL
+        AND (rt.assigned_to IS NULL OR rt.assigned_to = current_user_id())
 
       ORDER BY created_at ASC
     `);

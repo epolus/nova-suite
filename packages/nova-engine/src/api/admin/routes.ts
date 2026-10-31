@@ -22,11 +22,14 @@ import {
   resolveCredentialTemplateValues,
   validateAutomationConfig,
 } from '@nova-suite/shared';
-import { loadCredentialSecretsBySlugs } from '../../credentials/vault';
 import { logger } from '../../logger';
 import { sendAutomationEmail } from './automation-send-email';
-import { postNotificationWebhook } from '../../notifications/webhook-dispatcher';
-import { assertPublicHttpUrl, UnsafeHttpUrlError } from '../../data/public-http-url';
+import {
+  assertPublicHttpUrl,
+  loadCredentialSecretsBySlugs,
+  postChatWebhook,
+  UnsafeHttpUrlError,
+} from '@nova-suite/shared/node';
 
 const router = Router();
 const processStartedAtMs = Date.now();
@@ -99,6 +102,7 @@ async function listAssignmentGroupsForTenant(tenantId: string) {
   return db.getMany(
     `SELECT ag.id, ag.name, ag.description, ag.is_active,
             ag.manager_id, ag.cost_center_id, ag.parent_group_id,
+            ag.ola_response_hours, ag.ola_resolution_hours,
             ag.created_at, ag.updated_at,
             m.display_name AS manager_name,
             cc.name AS cost_center_name,
@@ -216,7 +220,7 @@ router.get('/runtime-health', async (_req: Request, res: Response) => {
   // operational probes should continue using /health which returns 503 when degraded.
   res.json({
     status,
-    version: '0.1.2',
+    version: '0.1.4',
     timestamp: new Date().toISOString(),
     checks: {
       database: dbOk ? 'connected' : 'disconnected',
@@ -447,7 +451,7 @@ router.get('/system-metrics', async (req: Request, res: Response) => {
     },
     runtime: {
       uptimeSec: Math.floor((Date.now() - processStartedAtMs) / 1000),
-      version: '0.1.2',
+      version: '0.1.4',
       appStatus,
       dbStatus: dbOk ? 'connected' : 'disconnected',
       redisStatus: redis.enabled ? (redis.connected ? 'connected' : 'disconnected') : 'disabled',
@@ -1099,16 +1103,30 @@ router.patch('/processes/:id', async (req: Request, res: Response, next: NextFun
 // ASSIGNMENT GROUPS
 // ════════════════════════════════════════════
 
+function parseOlaHours(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 8760) {
+    throw new AppError(400, 'OLA hours must be a whole number from 1 to 8760');
+  }
+  return n;
+}
+
 router.post('/assignment-groups', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
     const { name, description, manager_id, cost_center_id, parent_group_id, member_ids, process_ids, role_ids } = req.body;
     if (!name) throw new AppError(400, 'name is required');
+    const olaResponseHours = parseOlaHours(req.body.ola_response_hours);
+    const olaResolutionHours = parseOlaHours(req.body.ola_resolution_hours);
 
     const row = await db.getOne<{ id: string }>(
-      `INSERT INTO assignment_groups (tenant_id, name, description, manager_id, cost_center_id, parent_group_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [tenantId, name, description || null, manager_id || null, cost_center_id || null, parent_group_id || null],
+      `INSERT INTO assignment_groups (
+         tenant_id, name, description, manager_id, cost_center_id, parent_group_id,
+         ola_response_hours, ola_resolution_hours
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [tenantId, name, description || null, manager_id || null, cost_center_id || null, parent_group_id || null, olaResponseHours, olaResolutionHours],
     );
 
     const groupId = row!.id;
@@ -1167,6 +1185,14 @@ router.patch('/assignment-groups/:id', async (req: Request, res: Response, next:
     if (cost_center_id !== undefined) { sets.push(`cost_center_id = $${i++}`); vals.push(cost_center_id || null); }
     if (parent_group_id !== undefined) { sets.push(`parent_group_id = $${i++}`); vals.push(parent_group_id || null); }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'ola_response_hours')) {
+      sets.push(`ola_response_hours = $${i++}`);
+      vals.push(parseOlaHours(req.body.ola_response_hours));
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'ola_resolution_hours')) {
+      sets.push(`ola_resolution_hours = $${i++}`);
+      vals.push(parseOlaHours(req.body.ola_resolution_hours));
+    }
 
     if (sets.length > 0) {
       vals.push(groupId);
@@ -1547,6 +1573,17 @@ function normalizeWebhookChannel(raw: unknown): NotificationWebhookChannel {
   return value;
 }
 
+function blankToNull(raw: unknown): string | null {
+  if (raw == null) return null;
+  const value = String(raw).trim();
+  return value || null;
+}
+
+const WEBHOOK_PUBLIC_COLUMNS = `id, channel, name, webhook_url, reply_channel_id,
+  (api_token IS NOT NULL) AS has_api_token,
+  (signing_secret IS NOT NULL) AS has_signing_secret,
+  is_active, created_at, updated_at`;
+
 function normalizeNotificationTemplates(raw: unknown, legacyTitle?: unknown, legacyBody?: unknown): NotificationRuleTemplateInput[] {
   if (!Array.isArray(raw)) {
     const fallbackTitle = String(legacyTitle || '').trim();
@@ -1810,7 +1847,7 @@ router.post('/notification-rules/:id/test', async (req: Request, res: Response, 
     const tenantId = req.user!.tenant_id;
     const rule = await db.getOne<{
       id: string;
-      entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident';
+      entity_type: 'incident' | 'request' | 'change' | 'problem' | 'knowledge' | 'major_incident' | 'alert';
       trigger_key: string;
     }>(
       `SELECT id, entity_type, trigger_key
@@ -1829,6 +1866,7 @@ router.post('/notification-rules/:id/test', async (req: Request, res: Response, 
         problem: 'SELECT id FROM problems WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1',
         knowledge: 'SELECT id FROM knowledge_articles WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1',
         major_incident: 'SELECT id FROM major_incidents WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1',
+        alert: 'SELECT id FROM alerts WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1',
       };
       const entityQuery = latestEntityByType[rule.entity_type];
       if (!entityQuery) throw new AppError(400, 'Unsupported entity type for test');
@@ -1859,7 +1897,7 @@ router.get('/notification-webhooks', async (req: Request, res: Response, next: N
   try {
     const tenantId = req.user!.tenant_id;
     const rows = await db.getMany(
-      `SELECT id, channel, name, webhook_url, is_active, created_at, updated_at
+      `SELECT ${WEBHOOK_PUBLIC_COLUMNS}
        FROM tenant_notification_webhooks
        WHERE tenant_id = $1
        ORDER BY channel, name`,
@@ -1884,12 +1922,22 @@ router.post('/notification-webhooks', async (req: Request, res: Response, next: 
       throw err;
     }
 
+    const slack = channel === 'slack';
     const row = await db.getOne(
       `INSERT INTO tenant_notification_webhooks (
-        tenant_id, channel, name, webhook_url, is_active
-      ) VALUES ($1, $2::notification_webhook_channel, $3, $4, $5)
-      RETURNING id, channel, name, webhook_url, is_active, created_at, updated_at`,
-      [tenantId, channel, name, webhookUrl, req.body?.is_active !== false],
+        tenant_id, channel, name, webhook_url, reply_channel_id, api_token, signing_secret, is_active
+      ) VALUES ($1, $2::notification_webhook_channel, $3, $4, $5, $6, $7, $8)
+      RETURNING ${WEBHOOK_PUBLIC_COLUMNS}`,
+      [
+        tenantId,
+        channel,
+        name,
+        webhookUrl,
+        slack ? blankToNull(req.body?.reply_channel_id) : null,
+        slack ? blankToNull(req.body?.api_token) : null,
+        slack ? blankToNull(req.body?.signing_secret) : null,
+        req.body?.is_active !== false,
+      ],
     );
     res.status(201).json(row);
   } catch (err) { next(err); }
@@ -1903,9 +1951,12 @@ router.patch('/notification-webhooks/:id', async (req: Request, res: Response, n
     const vals: unknown[] = [];
     let i = 1;
 
-    if (req.body?.channel !== undefined) {
+    const nextChannel = req.body?.channel !== undefined
+      ? normalizeWebhookChannel(req.body.channel)
+      : undefined;
+    if (nextChannel !== undefined) {
       sets.push(`channel = $${i++}::notification_webhook_channel`);
-      vals.push(normalizeWebhookChannel(req.body.channel));
+      vals.push(nextChannel);
     }
     if (req.body?.name !== undefined) {
       const name = String(req.body.name || '').trim();
@@ -1928,6 +1979,22 @@ router.patch('/notification-webhooks/:id', async (req: Request, res: Response, n
     if (req.body?.is_active !== undefined) {
       sets.push(`is_active = $${i++}`);
       vals.push(Boolean(req.body.is_active));
+    }
+    if (nextChannel === 'teams') {
+      sets.push('reply_channel_id = NULL', 'api_token = NULL', 'signing_secret = NULL');
+    } else {
+      if (req.body?.reply_channel_id !== undefined) {
+        sets.push(`reply_channel_id = $${i++}`);
+        vals.push(blankToNull(req.body.reply_channel_id));
+      }
+      if (req.body?.api_token !== undefined) {
+        sets.push(`api_token = $${i++}`);
+        vals.push(blankToNull(req.body.api_token));
+      }
+      if (req.body?.signing_secret !== undefined) {
+        sets.push(`signing_secret = $${i++}`);
+        vals.push(blankToNull(req.body.signing_secret));
+      }
     }
     if (sets.length === 0) { res.json({ success: true }); return; }
 
@@ -1964,15 +2031,22 @@ router.post('/notification-webhooks/:id/test', async (req: Request, res: Respons
       channel: NotificationWebhookChannel;
       webhook_url: string;
       name: string;
+      api_token: string | null;
+      reply_channel_id: string | null;
     }>(
-      `SELECT id, channel, webhook_url, name
+      `SELECT id, channel, webhook_url, name, api_token, reply_channel_id
        FROM tenant_notification_webhooks
        WHERE id = $1 AND tenant_id = $2`,
       [req.params.id, tenantId],
     );
     if (!webhook) throw new AppError(404, 'Notification webhook not found');
 
-    const result = await postNotificationWebhook(webhook.channel, webhook.webhook_url, {
+    const result = await postChatWebhook({
+      channel: webhook.channel,
+      webhookUrl: webhook.webhook_url,
+      apiToken: webhook.api_token,
+      replyChannelId: webhook.reply_channel_id,
+    }, {
       title: 'Nova Suite connection test',
       text: `Test message from webhook "${webhook.name}".`,
     });
@@ -2286,7 +2360,7 @@ router.post('/automation/dry-run', async (req: Request, res: Response, next: Nex
     const client = await db.getClient();
     try {
       await db.setTenantContext(client, tenantId, userId, userRoles);
-      const rawCredMap = await loadCredentialSecretsBySlugs(client, tenantId, slugList);
+      const rawCredMap = await loadCredentialSecretsBySlugs(client, config.credentials.masterKey, tenantId, slugList);
       const credMap = await resolveCredentialTemplateValues(tenantId, rawCredMap);
 
       const runPromise = executeAutomationGraph({

@@ -9,7 +9,7 @@ For the complete baseline list, see `.env.example`.
 |----------|-------------|--------|
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Postgres image init, Temporal auto-setup, `nova-migrate`, backups | Bootstrap **superuser**. Never point the API or worker at this role. |
 | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | `nova-engine`, `nova-worker` | Default `nova_runtime`. Must be `NOSUPERUSER NOBYPASSRLS`. Created by `infra/postgres/00-runtime-role.sh`. |
-| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.17`). Mismatch puts the API in degraded mode and stops the worker. |
+| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.23`). Mismatch puts the API in degraded mode and stops the worker. |
 | `NOVA_MIGRATIONS_DIR` | `nova-migrate` | Directory of `vNN.NN.NN__slug.sql` files. Defaults to `/app/infra/postgres/migrations` in the engine image. |
 
 ## Core Variables
@@ -29,6 +29,10 @@ CATALOG_AUTOMATION_SHARED_KEY=
 
 # API uploads
 UPLOAD_MAX_FILE_SIZE_MB=20
+
+# Slack / Teams inbound on nova-engine. Slack Events use the webhook signing secret.
+# See docs/SLACK_TEAMS.md.
+NOVA_INBOUND_WEBHOOK_SECRET=
 
 # Redis (optional cache backend)
 REDIS_ENABLED=false
@@ -69,7 +73,7 @@ See `.env.deploy.example` for the annotated baseline.
 | Variable | Default | Notes |
 |----------|---------|--------|
 | `NOVA_IMAGE` | `epolus/nova-suite` | Docker Hub repository holding all five components. |
-| `NOVA_TAG` | `latest` | Version applied to every component. Tags are prefixed per component (`engine-0.1.2`, `web-0.1.2`, …), so this value is the part after the prefix. Pin a release in production. |
+| `NOVA_TAG` | `latest` | Version applied to every component. Tags are prefixed per component (`engine-0.1.4`, `web-0.1.4`, …), so this value is the part after the prefix. Pin a release in production. |
 | `NOVA_LOAD_DEMO_DATA` | `false` | Loads the bulk demo dataset (~500 incidents, ~200 requests, ~80 CIs) during **database initialization only**. Ignored on an existing volume. |
 | `HTTP_PORT` / `HTTPS_PORT` | `80` / `443` | Host ports published by the edge proxy. |
 
@@ -86,7 +90,7 @@ required in that file, so Compose fails with a named error rather than starting 
   Inline `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` take precedence and skip generation entirely.
 
 - **`CREDENTIALS_MASTER_KEY`** — symmetric passphrase for PostgreSQL `pgp_sym_encrypt` / `pgp_sym_decrypt` on the `tenant_credentials` table. Must be identical on **nova-engine** (create/list credentials, data source **Test connection**) and **nova-worker** (catalog `{{cred.slug}}`, scheduled imports using `credential_slug`). Use a long random string (≥16 characters). If unset or too short, vault writes and runtime decryption fail.
-- **`CATALOG_AUTOMATION_SHARED_KEY`** — shared secret used by internal catalog automation endpoints under `/api/catalog/automation/*` (for example the demo add-support-group-member endpoint). Must be identical on **nova-engine** and **nova-worker**. If missing/mismatched, automated tasks can fail with HTTP `401 Invalid automation key` or `503 Catalog automation key is not configured`.
+- **`CATALOG_AUTOMATION_SHARED_KEY`** — shared secret used by internal catalog automation endpoints under `/api/catalog/automation/*` (for example the demo add-support-group-member endpoint) and by in-flow HTTP steps created by catalog automation. Must be identical on **nova-engine** and **nova-worker**. If missing/mismatched, automated tasks can fail with HTTP `401 Invalid automation key` or `503 Catalog automation key is not configured`. Deploy schema `v00.01.23` before engine/worker builds that use `migration_runs` or `request_tasks.parent_task_id` / `automation_checkpoint`.
 
 - **`TEMPORAL_RETENTION_DAYS`** is the app’s configured retention (shown in Admin → Workflows as “App setting”). It does **not** change an already-created Temporal namespace by itself.
 - **`DEFAULT_NAMESPACE_RETENTION`** is read by `temporalio/auto-setup` when it **first registers** the default namespace (Go duration, e.g. `720h` for 30 days). Defaults to **720h** in `docker-compose.yml` so it matches `TEMPORAL_RETENTION_DAYS=30`. If you changed retention days, set this to `(days)×24` hours (e.g. `14d` → `336h`).
@@ -103,3 +107,5 @@ required in that file, so Compose fails with a named error rather than starting 
 - `VITE_*` values are injected at frontend build time; rebuild `nova-web` after changing them.
 - **`VITE_HIDE_DEMO_LOGIN_CREDENTIALS`** — when `true`, hides the demo quick-login buttons (Admin / Fulfiller / User) on the login page. Default is `false` (shown). Set to `true` in production deployments.
 - **AI assistant** — see [AI_ASSISTANT.md](./AI_ASSISTANT.md). Set `AI_ENABLED=true` and configure `OPENAI_*`, Azure OpenAI, or `OLLAMA_*`. ESS/agent toggles: `AI_ESS_ENABLED`, `AI_AGENT_ENABLED`.
+- **Slack and Teams** — see [SLACK_TEAMS.md](./SLACK_TEAMS.md). `NOVA_INBOUND_WEBHOOK_SECRET` authenticates non-Slack callers of `POST /api/webhooks/inbound/chat` and alert ingest at `POST /api/webhooks/inbound/events`. Leave it empty until you connect a channel. Do not store that secret in tenant settings.
+- **Event management** — see [EVENT_MANAGEMENT.md](./EVENT_MANAGEMENT.md).

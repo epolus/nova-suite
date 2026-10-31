@@ -11,26 +11,23 @@ import DataTable, { type DataColumnDef } from '../../components/DataTable';
 import { Button } from '../../components/ui/button';
 import { useListParams } from '../../hooks/useListParams';
 import { useResettingState } from '../../hooks/useSyncedState';
-import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
+import { useCsvExport } from '@/hooks/useCsvExport';
+import FilterPresetsBar from '@/components/FilterPresetsBar';
 import { useAuth } from '../../context/AuthContext';
 import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import {
   STATUS_OPTIONS,
   DEFAULT_COLS,
   PRESETS_KEY,
-  type FilterPreset,
   type RequestTaskListLabels,
   createRequestTaskListParams,
   buildRequestTaskColumns,
   REQUEST_TASK_CSV_HEADERS,
-  getRequestTaskCsvField,
 } from './requestTasksConfig';
 
 export default function RequestTasksPage() {
   const tTasks = useTranslations('pages.requests.tasksPage');
   const tList = useTranslations('common.list');
-  const tFilters = useTranslations('common.filters');
-  const tActions = useTranslations('common.actions');
   const tMaster = useTranslations('common.masterData');
   const tTable = useTranslations('common.table');
   const fieldLabel = useFieldLabel();
@@ -56,15 +53,8 @@ export default function RequestTasksPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const { exporting, exportCsv } = useCsvExport('request-tasks');
   const [refreshKey, setRefreshKey] = useState(0);
-  const [presets, setPresets] = useUserPreferenceState<FilterPreset[]>(
-    `presets:${PRESETS_KEY}`,
-    [],
-    PRESETS_KEY,
-  );
-  const [showSaveInput, setShowSaveInput] = useState(false);
-  const [savePresetName, setSavePresetName] = useState('');
 
   const rawStatusFilter = params.filters.status || '';
   const statusFilter = rawStatusFilter;
@@ -123,7 +113,11 @@ export default function RequestTasksPage() {
     const isActive = task.status === 'in_progress';
     const isLoading = actionLoadingId === task.id;
     const approvalSubjectId = task.requested_for ?? task.requester_id;
-    const isSelfApprovalBlocked = task.task_type === 'approval' && approvalSubjectId === user?.id;
+    // Block only classic manager-of-subject self-approval; explicit assignees may decide.
+    const isSelfApprovalBlocked =
+      task.task_type === 'approval'
+      && approvalSubjectId === user?.id
+      && !task.assigned_to;
     const canAssign = task.task_type !== 'approval' && !task.assigned_to && task.status !== 'completed';
     const canApprove = isActive && task.task_type === 'approval' && !isSelfApprovalBlocked;
     const canComplete = isActive && task.task_type !== 'approval';
@@ -174,72 +168,6 @@ export default function RequestTasksPage() {
   }, [actionLoadingId, user?.id, tTasks]);
 
   const hasActiveFilter = !!params.search || statusFilter !== '' || Object.values(params.columnFilters).some(Boolean);
-  const applyPreset = (preset: FilterPreset) => {
-    update({ search: preset.search, filters: { status: preset.status }, columnFilters: preset.columnFilters, page: 1 });
-  };
-  const savePreset = () => {
-    if (!savePresetName.trim()) return;
-    const next: FilterPreset[] = [...presets, {
-      id: crypto.randomUUID(),
-      name: savePresetName.trim(),
-      search: params.search,
-      status: rawStatusFilter,
-      columnFilters: { ...params.columnFilters },
-    }];
-    setPresets(next);
-    setSavePresetName('');
-    setShowSaveInput(false);
-  };
-  const deletePreset = (id: string) => {
-    const next = presets.filter((p) => p.id !== id);
-    setPresets(next);
-  };
-
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      const rows = selectedIds.length > 0
-        ? data.filter((row) => selectedIds.includes(row.id))
-        : await (async () => {
-            const apiParams = createRequestTaskListParams({
-              statusFilter,
-              search: params.search,
-              sort: params.sort,
-              dir: params.dir,
-              columnFilters: params.columnFilters,
-            });
-            const first = await requestsApi.taskQueue(apiParams, 1, 100);
-            const all = [...first.tasks];
-            for (let page = 2; page <= first.pagination.pages; page += 1) {
-              const next = await requestsApi.taskQueue(apiParams, page, 100);
-              all.push(...next.tasks);
-            }
-            return all;
-          })();
-      const headers = REQUEST_TASK_CSV_HEADERS;
-      const csvEscape = (value: unknown) => {
-        const str = String(value ?? '');
-        return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-      };
-      const lines = [
-        headers.join(','),
-        ...rows.map((row) => headers.map((h) => csvEscape(getRequestTaskCsvField(row, h))).join(',')),
-      ];
-      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = selectedIds.length > 0 ? `request-tasks-selected-${ts}.csv` : `request-tasks-${ts}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } finally {
-      setExporting(false);
-    }
-  };
-
   const getListParams = useCallback((): Record<string, string> => {
     const lp = createRequestTaskListParams({
       statusFilter,
@@ -259,38 +187,12 @@ export default function RequestTasksPage() {
         description={tTasks('description')}
       />
 
-      {(presets.length > 0 || hasActiveFilter) && (
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-xs font-medium text-gray-400">{tFilters('saved')}</span>
-          {presets.map((preset) => (
-            <div key={preset.id} className="flex items-center gap-0.5 pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700">
-              <button onClick={() => applyPreset(preset)} className="hover:text-indigo-600 transition-colors">{preset.name}</button>
-              <button onClick={() => deletePreset(preset.id)} className="ml-1 text-gray-300 hover:text-red-500 transition-colors leading-none">&#10005;</button>
-            </div>
-          ))}
-          {showSaveInput ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                autoFocus
-                value={savePresetName}
-                onChange={(e) => setSavePresetName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') { setShowSaveInput(false); setSavePresetName(''); } }}
-                placeholder={tFilters('filterNamePlaceholder')}
-                className="px-2 py-1 text-xs border border-indigo-300 rounded-full outline-hidden focus:ring-1 focus:ring-indigo-400 w-36"
-              />
-              <button onClick={savePreset} disabled={!savePresetName.trim()} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-40">{tActions('save')}</button>
-              <button onClick={() => { setShowSaveInput(false); setSavePresetName(''); }} className="text-xs text-gray-400 hover:text-gray-600">{tActions('cancel')}</button>
-            </div>
-          ) : hasActiveFilter && (
-            <button
-              onClick={() => setShowSaveInput(true)}
-              className="px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-xs text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
-            >
-              + {tFilters('saveCurrent')}
-            </button>
-          )}
-        </div>
-      )}
+      <FilterPresetsBar
+        storageKey={PRESETS_KEY}
+        current={{ search: params.search, status: rawStatusFilter, columnFilters: params.columnFilters }}
+        hasActiveFilter={hasActiveFilter}
+        onApply={(preset) => update({ search: preset.search, filters: { status: preset.status }, columnFilters: preset.columnFilters, page: 1 })}
+      />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="w-full sm:w-80">
@@ -314,7 +216,15 @@ export default function RequestTasksPage() {
               {s === '' ? tTasks('filters.active') : statusLabel(s)}
             </button>
           ))}
-          <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={exporting}
+            onClick={() => exportCsv(REQUEST_TASK_CSV_HEADERS, selectedIds, data, (page) =>
+              requestsApi.taskQueue(createRequestTaskListParams({ statusFilter, search: params.search, sort: params.sort, dir: params.dir, columnFilters: params.columnFilters }), page, 100)
+              .then((r) => ({ rows: r.tasks, pages: r.pagination.pages })),
+            )}
+          >
             {exporting ? tList('exporting') : tList('exportCsv')}
           </Button>
         </div>

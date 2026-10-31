@@ -8,80 +8,25 @@ import {
   UNIFIED_BUILDER_DEFAULT_AUTOMATION_CONFIG,
   UNIFIED_BUILDER_PARSE_FALLBACK_EXPRESSION,
 } from '@nova-suite/shared';
-import type { AutomationStateType, UnifiedBuilderNodeType } from '@nova-suite/shared';
+import type { AutomationStateType, UnifiedBuilderNodeDefaults, UnifiedBuilderNodeType } from '@nova-suite/shared';
+import {
+  extractExtraJson,
+  parseExtraJson,
+  parseOptionalJsonObject,
+  serializeExtensionState,
+  validateExtensionNode,
+} from './unifiedAutomationDesigner.extensions';
 
 export type BuilderError = {
   code: string;
   params?: Record<string, string | number>;
 };
 
-export const UNIFIED_PALETTE_TYPES: UnifiedBuilderNodeType[] = [
-  'start',
-  'activity',
-  'decision',
-  'delay',
-  'end',
-  'action.rest',
-  'action.ci.lookup',
-  'action.ci.create',
-  'decision.advanced',
-  'action.notification',
-  'action.ticket',
-  'action.assign',
-  'action.script',
-  'call.workflow',
-];
-
-/** i18n keys under `components.unifiedAutomationDesigner.nodeTypes` (dots in type ids are not valid message paths). */
-export const UNIFIED_NODE_TYPE_MESSAGE_KEYS: Record<UnifiedBuilderNodeType, string> = {
-  start: 'start',
-  activity: 'activity',
-  decision: 'decision',
-  delay: 'delay',
-  end: 'end',
-  'action.rest': 'actionRest',
-  'action.ci.lookup': 'actionCiLookup',
-  'action.ci.create': 'actionCiCreate',
-  'decision.advanced': 'decisionAdvanced',
-  'action.notification': 'actionNotification',
-  'action.ticket': 'actionTicket',
-  'action.assign': 'actionAssign',
-  'action.script': 'actionScript',
-  'call.workflow': 'callWorkflow',
-};
-
-export type UnifiedBuilderNodeData = {
-  label: string;
+export type UnifiedBuilderNodeData = Omit<UnifiedBuilderNodeDefaults, 'nodeType'> & {
   nodeType?: UnifiedBuilderNodeType;
-  method?: string;
-  url?: string;
-  condition?: string;
-  delaySeconds?: number;
-  retryAttempts?: number;
-  retryBackoffSec?: number;
-  onError?: 'fail' | 'continue' | 'fallback';
   fallbackNodeId?: string;
-  endResult?: 'success' | 'failure';
-  className?: string;
-  ciName?: string;
-  displayName?: string;
-  attributesJson?: string;
-  expressionJson?: string;
-  channel?: string;
-  recipientType?: string;
-  titleTemplate?: string;
-  bodyTemplate?: string;
-  entity?: string;
-  operation?: string;
-  fieldsJson?: string;
-  target?: string;
-  assigneeTemplate?: string;
-  groupIdTemplate?: string;
-  runtime?: string;
-  code?: string;
-  workflowType?: string;
-  definitionId?: string;
-  inputJson?: string;
+  /** JSON of state keys the designer has no editor for (e.g. headers, body, onSuccess); round-tripped on save. */
+  extraJson?: string;
 };
 
 function stringifyJsonField(raw: unknown): string | undefined {
@@ -92,25 +37,6 @@ function stringifyJsonField(raw: unknown): string | undefined {
   return undefined;
 }
 
-function parseOptionalJsonObject(
-  raw: string | undefined,
-  errors: BuilderError[],
-  label: string,
-): Record<string, unknown> | undefined {
-  const text = (raw || '').trim();
-  if (!text) return undefined;
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      errors.push({ code: 'actionInvalidAttributes', params: { label } });
-      return undefined;
-    }
-    return parsed as Record<string, unknown>;
-  } catch {
-    errors.push({ code: 'actionInvalidAttributes', params: { label } });
-    return undefined;
-  }
-}
 
 export function resolveBuilderNodeType(node: Node<UnifiedBuilderNodeData>): UnifiedBuilderNodeType {
   if (node.data.nodeType) return node.data.nodeType;
@@ -123,11 +49,6 @@ export function resolveBuilderNodeType(node: Node<UnifiedBuilderNodeData>): Unif
     return label;
   }
   return 'activity';
-}
-
-export function nextBuilderId(prefix: UnifiedBuilderNodeType): string {
-  const safePrefix = prefix.replace(/[^a-zA-Z0-9]+/g, '_');
-  return `${safePrefix}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function parseBuilderFromConfig(raw: Record<string, unknown>): {
@@ -187,7 +108,7 @@ export function parseBuilderFromConfig(raw: Record<string, unknown>): {
         fallbackNodeId: typeof s.fallbackNodeId === 'string' ? s.fallbackNodeId : undefined,
         endResult: s.result === 'failure' ? 'failure' : 'success',
         className: typeof s.className === 'string' ? s.className : '',
-        ciName: typeof s.name === 'string' ? s.name : '',
+        ciName: t !== 'action.approval' && t !== 'action.task' && typeof s.name === 'string' ? s.name : '',
         displayName: typeof s.displayName === 'string' ? s.displayName : '',
         attributesJson: JSON.stringify(
           s.attributes && typeof s.attributes === 'object' && !Array.isArray(s.attributes) ? s.attributes : {},
@@ -216,6 +137,18 @@ export function parseBuilderFromConfig(raw: Record<string, unknown>): {
         workflowType: typeof s.workflowType === 'string' ? s.workflowType : undefined,
         definitionId: typeof s.definitionId === 'string' ? s.definitionId : undefined,
         inputJson: stringifyJsonField(s.input),
+        itemsExpr: typeof s.itemsExpr === 'string' ? s.itemsExpr : undefined,
+        maxIterations: typeof s.maxIterations === 'number' ? s.maxIterations : undefined,
+        joinId: typeof s.joinId === 'string' ? s.joinId : undefined,
+        approverType: typeof s.approverType === 'string' ? s.approverType : undefined,
+        approverTemplate: typeof s.approverTemplate === 'string' ? s.approverTemplate : undefined,
+        approvalName: t === 'action.approval' && typeof s.name === 'string' ? s.name : undefined,
+        taskName: t === 'action.task' && typeof s.name === 'string' ? s.name : undefined,
+        groupTemplate: typeof s.groupTemplate === 'string' ? s.groupTemplate : undefined,
+        waitForCompletion: t === 'action.task' ? s.wait !== false : undefined,
+        instructions: typeof s.instructions === 'string' ? s.instructions : undefined,
+        assignmentsJson: stringifyJsonField(s.assignments),
+        extraJson: extractExtraJson(s),
       },
     });
     idx += 1;
@@ -273,10 +206,13 @@ export function serializeBuilderToConfig(
     for (const tr of transitions) {
       if (!byId.has(tr.to)) errors.push({ code: 'transitionMissingTarget', params: { fromId: n.id, toId: tr.to } });
     }
+    validateExtensionNode(t, n.data, transitions, byId, errors);
+    const extras = parseExtraJson(n.data.extraJson);
+    const pushState = (state: Record<string, unknown>) => states.push({ ...extras, ...state });
 
     if (t === 'activity' || t === 'action.rest') {
       if (!n.data.url || !n.data.url.trim()) errors.push({ code: 'activityRequiresUrl', params: { label: n.data.label } });
-      states.push({
+      pushState({
         id: n.id,
         type: t,
         method: n.data.method || 'GET',
@@ -288,7 +224,7 @@ export function serializeBuilderToConfig(
         transitions,
       });
     } else if (t === 'decision') {
-      states.push({
+      pushState({
         id: n.id,
         type: 'decision',
         condition: n.data.condition || '{{response.status}}',
@@ -301,21 +237,21 @@ export function serializeBuilderToConfig(
       } catch {
         errors.push({ code: 'decisionInvalidExpression', params: { label: n.data.label } });
       }
-      states.push({
+      pushState({
         id: n.id,
         type: 'decision.advanced',
         expression,
         transitions,
       });
     } else if (t === 'delay') {
-      states.push({
+      pushState({
         id: n.id,
         type: 'delay',
         delaySeconds: n.data.delaySeconds ?? 5,
         transitions,
       });
     } else if (t === 'end') {
-      states.push({
+      pushState({
         id: n.id,
         type: 'end',
         result: n.data.endResult || 'success',
@@ -327,7 +263,7 @@ export function serializeBuilderToConfig(
       } catch {
         errors.push({ code: 'actionInvalidAttributes', params: { label: n.data.label } });
       }
-      states.push({
+      pushState({
         id: n.id,
         type: 'action.ci.lookup',
         url: n.data.url || '',
@@ -342,7 +278,7 @@ export function serializeBuilderToConfig(
       } catch {
         errors.push({ code: 'actionInvalidAttributes', params: { label: n.data.label } });
       }
-      states.push({
+      pushState({
         id: n.id,
         type: 'action.ci.create',
         url: n.data.url || '',
@@ -353,7 +289,7 @@ export function serializeBuilderToConfig(
         transitions,
       });
     } else if (t === 'action.notification') {
-      states.push({
+      pushState({
         id: n.id,
         type: 'action.notification',
         channel: n.data.channel || 'in_app',
@@ -364,7 +300,7 @@ export function serializeBuilderToConfig(
       });
     } else if (t === 'action.ticket') {
       const fields = parseOptionalJsonObject(n.data.fieldsJson, errors, n.data.label);
-      states.push({
+      pushState({
         id: n.id,
         type: 'action.ticket',
         entity: n.data.entity || 'incident',
@@ -373,7 +309,7 @@ export function serializeBuilderToConfig(
         transitions,
       });
     } else if (t === 'action.assign') {
-      states.push({
+      pushState({
         id: n.id,
         type: 'action.assign',
         target: n.data.target || 'group',
@@ -382,7 +318,7 @@ export function serializeBuilderToConfig(
         transitions,
       });
     } else if (t === 'action.script') {
-      states.push({
+      pushState({
         id: n.id,
         type: 'action.script',
         runtime: n.data.runtime || 'js',
@@ -391,7 +327,7 @@ export function serializeBuilderToConfig(
       });
     } else if (t === 'call.workflow') {
       const input = parseOptionalJsonObject(n.data.inputJson, errors, n.data.label);
-      states.push({
+      pushState({
         id: n.id,
         type: 'call.workflow',
         ...(n.data.workflowType ? { workflowType: n.data.workflowType } : {}),
@@ -399,6 +335,9 @@ export function serializeBuilderToConfig(
         ...(input ? { input } : {}),
         transitions,
       });
+    } else {
+      const extension = serializeExtensionState(t, n.id, n.data, transitions, errors);
+      if (extension) pushState(extension);
     }
   }
 

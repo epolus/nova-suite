@@ -6,7 +6,7 @@
 
 **Open-source IT Service Management (ITSM) platform.**
 
-Nova Suite provides a complete service management solution — service catalog, incident management, CMDB, workflow automation, SSO, AI assistant, and a modern admin dashboard — all with built-in multi-tenancy and row-level security.
+Nova Suite provides a complete service management solution — service catalog, incidents, major incidents, change and problem management, assets, CMDB, event management, Slack and Teams, continual improvement, workflow automation, SSO, AI assistant, and a modern admin dashboard — all with built-in multi-tenancy and row-level security.
 
 ## Screenshots
 
@@ -43,30 +43,40 @@ Nova Suite provides a complete service management solution — service catalog, 
 
 ### Incident Management
 - Full incident lifecycle (new → in progress → resolved → closed)
-- SLA tracking with configurable breach actions
+- Response and resolution SLA clocks with pause/resume, bound definitions, and breach actions
 - Priority matrix with impact/urgency calculation
-- Assignment to users and groups
+- Assignment to users and groups, plus OLA handoff clocks on assignment groups
 - Journal / activity log with comments and work notes
+- Known-error suggestions from the same CI or service
 - Default "active" filter (excludes closed) for efficient triage
 - **AI assistant (Agent)** — incident context, KB suggestions, draft work notes, and catalog automation proposals (with confirmation before write)
 
-### CMDB (Configuration Management Database)
+### Major Incidents, Change, and Problem
+- Major incident promote/accept, war room roles, stakeholder cadence, and postmortem actions
+- Standard, normal, and emergency changes with risk questionnaire, CAB, conflict checks, and structured post-implementation review
+- Standard-change templates whose success rate updates when a change closes
+- Problems with RCA fields, recurrence scan, known-error control, and linked incidents
+
+### CMDB and Assets
 - Extensible CI classes with parent/child inheritance (child classes inherit parent attributes)
 - Class-specific attributes (string, integer, number, boolean)
-- CI creation wizard with dynamic attribute forms
 - Relationship management (depends_on, used_by, runs_on, connected_to, part_of, manages)
-- Recursive impact analysis (blast radius)
-- Full audit trail with relationship change history
-- Supported By group field for support ownership
-- Record navigation (prev/next) on CI detail pages
+- Recursive impact analysis (blast radius) and CI history
+- Microsoft Intune discovery with optional full-sync retire-missing
+- IT assets linked to CIs, including purchase, warranty, and contract reference
+
+### Events, Chat, and Improvement
+- Alertmanager and generic event ingest into alert episodes (`docs/EVENT_MANAGEMENT.md`)
+- Slack and Teams incident threads with journal replies (`docs/SLACK_TEAMS.md`)
+- Continual improvement register with an activity journal
 
 ### Administration
 - **User Management** — Create, edit, delete users with record navigation; auto-calculated display names (Lastname, Firstname (ID))
 - **Organization** — Departments, Cost Centers, Assignment Groups
 - **Service Catalog** — Services, Catalog Items with custom fields, Catalog Tasks
-- **Process & Automation** — Processes, Workflows (Temporal), SLA Configuration
+- **Process & Automation** — Processes, Workflows (Temporal), SLA Configuration, Alert Definitions, Change Management
 - **CMDB** — CI Classes with attribute builder and inheritance
-- **Data & Integration** — Data Sources (REST/CSV/DB with scheduled imports via Temporal), Import History
+- **Data & Integration** — Data Sources (REST/CSV/DB/Intune with scheduled imports via Temporal), Import History
 - **System** — Roles, Theming (colors, logo, app name)
 - Organized sub-menu navigation with auto-expand
 
@@ -81,13 +91,13 @@ Nova Suite provides a complete service management solution — service catalog, 
 - Multi-tenant architecture with PostgreSQL Row-Level Security
 - JWT-based authentication
 - SSO via OpenID Connect providers (Google-first) with auto-provisioning
-- Role-based access control (admin, fulfiller, user, configuration_manager)
+- Role-based access control (admin, fulfiller, user, plus practice roles such as change_manager, event_operator, and event_manager)
 
 ## Tech Stack
 
 | Layer          | Technology                              |
 |----------------|-----------------------------------------|
-| Frontend       | React 18 + TypeScript + Tailwind CSS    |
+| Frontend       | React 19 + TypeScript + Tailwind CSS    |
 | Backend        | Node.js 24+ / Express / TypeScript      |
 | Validation     | Zod                                     |
 | Database       | PostgreSQL 18 with Row-Level Security   |
@@ -221,6 +231,7 @@ In Entra app registration, add a Web redirect URI that exactly matches `OIDC_RED
 | Caddy          | 80    | Reverse proxy — main entry point     |
 | Nova Web       | 3000  | React SPA (served via Caddy)         |
 | Nova Engine    | 4000  | Backend REST API                     |
+| Nova Worker    | —     | Temporal worker (fulfillment, sync, notifications) |
 | PostgreSQL     | 5432  | Database                             |
 | Temporal       | 7233  | Workflow engine (gRPC)               |
 | Temporal UI    | 8080  | Workflow monitoring dashboard        |
@@ -251,7 +262,9 @@ nova-suite/
 │   │       │   ├── config-packages/
 │   │       │   ├── credentials/
 │   │       │   ├── datasources/
+│   │       │   ├── alerts/       # Alert episodes and definitions
 │   │       │   ├── import/
+│   │       │   ├── improvements/
 │   │       │   ├── incidents/
 │   │       │   ├── knowledge/
 │   │       │   ├── major-incidents/
@@ -262,7 +275,8 @@ nova-suite/
 │   │       │   ├── requests/
 │   │       │   ├── search/
 │   │       │   ├── settings/     # Theme and app settings
-│   │       │   └── temporal/     # Enqueue / inspect workflows
+│   │       │   ├── temporal/     # Enqueue / inspect workflows
+│   │       │   └── webhooks/     # Slack/Teams chat and event ingest
 │   │       ├── audit/
 │   │       ├── cache/            # Redis + cache metrics
 │   │       ├── data/
@@ -288,14 +302,18 @@ nova-suite/
 │   │       ├── pages/
 │   │       │   ├── Dashboard.tsx, Login.tsx, profile, search, My Todo / My Groups
 │   │       │   ├── admin/        # Admin console + workflow editor
+│   │       │   ├── alerts/
+│   │       │   ├── assets/
 │   │       │   ├── catalog/      # Catalog + cart
 │   │       │   ├── changes/
 │   │       │   ├── cmdb/
 │   │       │   ├── ess/          # Employee self-service home + approvals
+│   │       │   ├── improvements/
 │   │       │   ├── incidents/
 │   │       │   ├── knowledge/
 │   │       │   ├── major-incidents/
 │   │       │   ├── problems/
+│   │       │   ├── releases/
 │   │       │   ├── reports/
 │   │       │   ├── requests/
 │   │       │   └── todo/
@@ -306,13 +324,13 @@ nova-suite/
 │   │       ├── automation-config.ts
 │   │       ├── catalog-links.ts  # Shared catalog link normalization
 │   │       ├── automation-builder-defaults.ts
-│   │       └── automation-fixtures.ts
+│   │       ├── automation-fixtures.ts
+│   │       └── node/             # Node-only helpers (`@nova-suite/shared/node`): safe HTTP, vault, chat webhooks, DB checks
 │   └── nova-worker/              # Temporal worker (activities + workflows)
 │       └── src/
 │           ├── worker.ts
 │           ├── config.ts
 │           ├── db.ts
-│           ├── credentials/      # Secret provider helpers
 │           ├── activities/       # Catalog, datasource, email, incidents, ...
 │           └── workflows/        # Fulfillment, sync, notifications, major incidents, ...
 ├── infra/
@@ -328,10 +346,14 @@ nova-suite/
 │   ├── AI_ASSISTANT.md
 │   ├── CATALOG_TASK_AUTOMATION.md
 │   ├── ENVIRONMENT.md
+│   ├── EVENT_MANAGEMENT.md
 │   ├── HIGH_AVAILABILITY.md
+│   ├── ITAM_DISCOVERY.md
 │   ├── OBSERVABILITY.md
 │   ├── OPERATIONS_RUNBOOK.md
-│   └── UPGRADE_STRATEGY.md
+│   ├── SLACK_TEAMS.md
+│   ├── UPGRADE_STRATEGY.md
+│   └── dockerhub/                # Docker Hub product page copy
 ├── scripts/                      # Backup / maintenance helpers
 ├── .github/                      # CI workflows
 ├── docker-compose.yml
@@ -384,7 +406,7 @@ All endpoints are prefixed with `/api`. Full interactive documentation is availa
 | `/api/settings/theme`               | GET             | None              | Public theming (e.g. login page)       |
 | `/api/settings`                     | GET/PUT         | Admin             | List / bulk-update tenant settings     |
 
-**Roles:** Admin = full access, Fulfiller (FF) = incident/request management, Configuration Manager (CM) = CMDB editing, User = self-service only. The table is a **sample**; use `/docs` for every route (changes, problems, knowledge, major incidents, cart, search, …).
+**Roles:** Admin = full access, Fulfiller (FF) = incident/request management, Configuration Manager (CM) = CMDB editing, User = self-service only. Practice roles such as `change_manager`, `event_operator`, and `event_manager` gate those queues. The table is a **sample**; use `/docs` for every route (changes, problems, knowledge, major incidents, alerts, assets, improvements, cart, search, …).
 
 ## Documentation
 
@@ -392,6 +414,9 @@ All endpoints are prefixed with `/api`. Full interactive documentation is availa
 - [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) — Feature summary
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System design & decisions
 - [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md) — AI assistant (ESS + Agent personas, providers, API)
+- [docs/EVENT_MANAGEMENT.md](docs/EVENT_MANAGEMENT.md) — Alert ingest and definitions
+- [docs/SLACK_TEAMS.md](docs/SLACK_TEAMS.md) — Slack and Teams incident threads
+- [docs/ITAM_DISCOVERY.md](docs/ITAM_DISCOVERY.md) — Intune discovery and full sync
 - [docs/HIGH_AVAILABILITY.md](docs/HIGH_AVAILABILITY.md) — HA deployment
 - [docs/UPGRADE_STRATEGY.md](docs/UPGRADE_STRATEGY.md) — Zero-downtime upgrades
 - [docs/CATALOG_TASK_AUTOMATION.md](docs/CATALOG_TASK_AUTOMATION.md) — Catalog task HTTP automation (`automation_config`)

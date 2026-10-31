@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://github.com/epolus/nova-suite/discussions/new?category=q-a
+    about: Setup, configuration, and "how do I…" questions belong in Q&A, not as issues.
+  - name: Share an idea
+    url: https://github.com/epolus/nova-suite/discussions/new?category=ideas
+    about: Early product ideas for internal IT, MSPs, and small enterprises can start as a discussion.
+  - name: Report a vulnerability
+    url: https://github.com/epolus/nova-suite/security/advisories/new
+    about: Security issues go through a private advisory. Do not file them as public issues.

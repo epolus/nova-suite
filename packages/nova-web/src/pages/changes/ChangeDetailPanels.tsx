@@ -5,7 +5,8 @@ import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import { Button } from '../../components/ui/button';
 import { useTranslations } from 'use-intl';
-import type { ChangeFormState } from './useChangeDetail';
+import type { ChangeFormState } from './changeFormState';
+import { ImprovementSourceLink } from '../../components/ImprovementSourceLink';
 
 export function ChangeApprovalsPanel({
   approvals,
@@ -120,12 +121,16 @@ export function ChangeReviewPanel({
   inputCls,
   selectCls,
   textareaCls,
+  changeId,
+  savedUnsuccessful,
 }: {
   form: ChangeFormState;
   setForm: Dispatch<SetStateAction<ChangeFormState>>;
   inputCls: string;
   selectCls: string;
   textareaCls: string;
+  changeId?: string;
+  savedUnsuccessful?: boolean;
 }) {
   const tChanges = useTranslations('pages.changes');
   const failureLabel = (key: (typeof FAILURE_CATEGORIES)[number]) => {
@@ -199,6 +204,11 @@ export function ChangeReviewPanel({
         <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('reviewNotesPir')}</label>
         <textarea rows={6} value={form.review_notes} onChange={(e) => setForm((p) => ({ ...p, review_notes: e.target.value }))} className={textareaCls} placeholder={tChanges('reviewNotesPlaceholder')} />
       </div>
+      {changeId && savedUnsuccessful && (
+        <div className="mt-4">
+          <ImprovementSourceLink sourceType="change" sourceId={changeId} canRegister />
+        </div>
+      )}
     </Card>
   );
 }

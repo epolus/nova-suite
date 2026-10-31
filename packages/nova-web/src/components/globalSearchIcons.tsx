@@ -75,9 +75,8 @@ export function AppIcon({ name, className }: { name: IconName; className?: strin
     case 'problem':
       return (
         <Icon className={className}>
-          <circle cx="12" cy="12" r="9" />
-          <path {...path} d="M9.09 9a3 3 0 015.82 1c0 2-3 2-3 4" />
-          <path {...path} d="M12 17h.01" />
+          <path {...path} d="M9 9.5c0-1.8 1.3-3 3-3s3 1.2 3 3v6c0 1.8-1.3 3-3 3s-3-1.2-3-3v-6z" />
+          <path {...path} d="M12 9v7M9 11H6M15 11h3M9 14H6M15 14h3M9 17H6M15 17h3M10.2 6.8L8 4.5M13.8 6.8L16 4.5" />
         </Icon>
       );
     case 'knowledge':

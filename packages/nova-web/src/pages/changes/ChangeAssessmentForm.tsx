@@ -13,7 +13,7 @@ import { SearchableDropdown } from '../../components/SearchableDropdown';
 import UserDateTimeInput from '../../components/UserDateTimeInput';
 import { useFieldLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
-import type { ChangeFormState } from './useChangeDetail';
+import type { ChangeFormState } from './changeFormState';
 
 export function ChangeAssessmentForm({
   form,

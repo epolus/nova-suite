@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router';
+import { Routes, Route, Navigate, Outlet } from 'react-router';
 import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/Layout';
 import ESSLayout from '@/components/ESSLayout';
 import Spinner from '@/components/Spinner';
 import Login from '@/pages/Login';
 import AdminAccessGuard from '@/components/AdminAccessGuard';
-import { isAgentRole } from '@/utils/roles';
+import { canAccessImprovements, isAgentRole } from '@/utils/roles';
 import * as Pages from './lazyPages';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -25,6 +25,12 @@ function SmartLayout() {
 function SmartHome() {
   const { user } = useAuth();
   return isAgentRole(user?.roles) ? <Pages.Dashboard /> : <Navigate to="/ess" replace />;
+}
+
+function ImprovementAccess() {
+  const { user } = useAuth();
+  if (!canAccessImprovements(user?.roles)) return <Navigate to="/" replace />;
+  return <Outlet />;
 }
 
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -74,6 +80,13 @@ export default function AppRoutes() {
         <Route path="/assets" element={<Lazy><Pages.AssetsPage /></Lazy>} />
         <Route path="/assets/new" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
         <Route path="/assets/:id" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
+        <Route path="/alerts" element={<Lazy><Pages.AlertsPage /></Lazy>} />
+        <Route path="/alerts/:id" element={<Lazy><Pages.AlertDetailPage /></Lazy>} />
+        <Route path="/improvements" element={<ImprovementAccess />}>
+          <Route index element={<Lazy><Pages.ImprovementsPage /></Lazy>} />
+          <Route path="new" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />
+          <Route path=":id" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />
+        </Route>
         <Route path="/releases" element={<Lazy><Pages.ReleasesPage /></Lazy>} />
         <Route path="/releases/new" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />
         <Route path="/releases/:id" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />
@@ -113,6 +126,7 @@ export default function AppRoutes() {
           <Route path="workflows/editor" element={<Lazy><Pages.WorkflowEditorPage /></Lazy>} />
           <Route path="workflows/designer" element={<Navigate to="/admin/workflows/editor" replace />} />
           <Route path="workflows/:workflowId/:runId" element={<Lazy><Pages.WorkflowDetailPage /></Lazy>} />
+          <Route path="categories" element={<Lazy><Pages.CategoriesPage /></Lazy>} />
           <Route path="service-items" element={<Lazy><Pages.ServiceItemsPage /></Lazy>} />
           <Route path="catalog-tasks" element={<Lazy><Pages.CatalogTasksPage /></Lazy>} />
           <Route path="catalog-tasks/:serviceItemId/new" element={<Lazy><Pages.CatalogTaskDetailPage /></Lazy>} />
@@ -121,6 +135,7 @@ export default function AppRoutes() {
           <Route path="sla-config" element={<Lazy><Pages.SlaConfigPage /></Lazy>} />
           <Route path="business-calendars" element={<Lazy><Pages.BusinessCalendarsPage /></Lazy>} />
           <Route path="notification-config" element={<Lazy><Pages.NotificationConfigPage /></Lazy>} />
+          <Route path="alert-definitions" element={<Lazy><Pages.AlertDefinitionsPage /></Lazy>} />
           <Route path="notification-deliveries" element={<Lazy><Pages.NotificationEmailDeliveriesPage /></Lazy>} />
           <Route path="change-management" element={<Lazy><Pages.ChangeAdminPage /></Lazy>} />
           <Route path="knowledge-workflows" element={<Lazy><Pages.KnowledgeWorkflowsPage /></Lazy>} />
@@ -130,6 +145,7 @@ export default function AppRoutes() {
           <Route path="data-sources" element={<Lazy><Pages.DataSourcesPage /></Lazy>} />
           <Route path="credentials" element={<Lazy><Pages.CredentialsPage /></Lazy>} />
           <Route path="config-packages" element={<Lazy><Pages.ConfigPackagesPage /></Lazy>} />
+          <Route path="migrations/servicenow" element={<Lazy><Pages.ServiceNowMigrationPage /></Lazy>} />
           <Route path="import" element={<Lazy><Pages.ImportPage /></Lazy>} />
           <Route path="import/history" element={<Lazy><Pages.ImportHistoryPage /></Lazy>} />
         </Route>

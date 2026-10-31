@@ -1,8 +1,8 @@
 # Nova Suite
 
-**Open-source IT Service Management (ITSM) platform — service catalog, incident, change and problem management, knowledge base, CMDB, and workflow automation.**
+**Open-source IT Service Management (ITSM) platform — service catalog, incidents, major incidents, change and problem management, assets, CMDB, event management, Slack and Teams, knowledge base, and workflow automation.**
 
-Nova Suite is a complete service management solution: a self-service portal with a dynamic request catalog and approvals, an agent console for the full incident and change lifecycle with SLA tracking, a configuration management database with relationship mapping and impact analysis, and an admin platform covering users, roles, organizations, theming, and integrations. It is multi-tenant at the database level using PostgreSQL Row-Level Security, authenticates with JWT and OpenID Connect SSO, and runs workflows on Temporal.
+Nova Suite is a complete service management solution: a self-service portal with a dynamic request catalog and approvals; an agent console for incidents, changes, problems, assets, and improvements with SLA and OLA tracking; event ingest into alert episodes; Slack and Teams incident threads; a configuration management database with relationship mapping, impact analysis, and Intune discovery; and an admin platform covering users, roles, organizations, theming, and integrations. It is multi-tenant at the database level using PostgreSQL Row-Level Security, authenticates with JWT and OpenID Connect SSO, and runs workflows on Temporal.
 
 Source: **[github.com/epolus/nova-suite](https://github.com/epolus/nova-suite)**
 
@@ -59,14 +59,14 @@ For each component you get:
 | Tag | Meaning |
 | --- | --- |
 | `engine-latest` | Latest commit on `main`. Moves often — pin a version for production. |
-| `engine-0.1.2` | Exact release. Immutable. |
+| `engine-0.1.4` | Exact release. Immutable. |
 | `engine-0.1`, `engine-0` | Moving tags following the newest patch / minor in that line. |
 | `engine-sha-a1b2c3d` | Exact commit, for traceability. |
 
 There is deliberately **no bare `latest`**, since five different components share the repository. Pin a release by setting a single variable:
 
 ```bash
-NOVA_TAG=0.1.2
+NOVA_TAG=0.1.4
 ```
 
 Always run every component on the same version. Platform: `linux/amd64`.
@@ -88,7 +88,7 @@ Everything else has a working default. The most commonly changed settings:
 | `NOVA_TAG` | `latest` | Pin to a release for production. |
 | `HTTP_PORT` / `HTTPS_PORT` | `80` / `443` | Edge proxy ports. |
 | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | `nova_runtime` | Restricted runtime role used by the API and worker. Must stay `NOSUPERUSER NOBYPASSRLS` — Row-Level Security is the tenant boundary, and a superuser would bypass it. |
-| `DB_SCHEMA_VERSION` | `v00.01.17` | Must match the highest applied migration. A mismatch puts the API in degraded mode and stops the worker. |
+| `DB_SCHEMA_VERSION` | `v00.01.23` | Must match the highest applied migration. A mismatch puts the API in degraded mode and stops the worker. |
 | `AUTH_LOCAL_LOGIN_ENABLED` | `true` | Set `false` for SSO-only mode. |
 | `OIDC_ISSUER` and related | — | OpenID Connect SSO with auto-provisioning. Tested with Google and Microsoft Entra ID. |
 | `MAIL_NOTIFICATIONS_ENABLED`, `SMTP_*` | `false` | Email notifications. In-app notifications work without SMTP. |

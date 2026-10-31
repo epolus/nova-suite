@@ -39,9 +39,11 @@ docker compose up -d
 This starts:
 - **PostgreSQL 18** — database with schema auto-initialized
 - **Nova Engine** — the API server on port 4000
+- **Nova Worker** — Temporal worker for fulfillment, imports, and notifications
 - **Temporal** — workflow engine on port 7233
 - **Temporal UI** — workflow dashboard on port 8080
 - **Caddy** — reverse proxy on ports 80/443
+- **Nova Web** — React SPA served through Caddy on port 80
 
 ## Step 3: Verify
 
@@ -55,7 +57,7 @@ Expected response:
 ```json
 {
   "status": "healthy",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "checks": { "database": "connected" }
 }
 ```
@@ -205,7 +207,9 @@ The interactive Swagger UI lets you try every endpoint.
 
 ## Next Steps
 
+- Open the UI at `http://localhost` (demo logins are on the login page)
+- Read [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) for the full module list
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for system design
 - Customize the service catalog for your organization
-- Build a frontend (Backstage.io recommended)
+- Optionally connect [Slack/Teams](docs/SLACK_TEAMS.md) or [event ingest](docs/EVENT_MANAGEMENT.md)
 - Set up [High Availability](docs/HIGH_AVAILABILITY.md) for production

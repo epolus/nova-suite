@@ -4,7 +4,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { UnsafeUploadPathError } from '../data/upload-path';
-import { UnsafeHttpUrlError } from '../data/public-http-url';
+import { UnsafeHttpUrlError } from '@nova-suite/shared/node';
 import { logger } from '../logger';
 
 /** Application-level error with HTTP status. */

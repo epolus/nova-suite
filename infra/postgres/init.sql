@@ -322,6 +322,8 @@ CREATE TABLE assignment_groups (
   cost_center_id  uuid REFERENCES cost_centers(id) ON DELETE SET NULL,
   parent_group_id uuid REFERENCES assignment_groups(id) ON DELETE SET NULL,
   is_active       boolean NOT NULL DEFAULT true,
+  ola_response_hours   integer CHECK (ola_response_hours IS NULL OR ola_response_hours BETWEEN 1 AND 8760),
+  ola_resolution_hours integer CHECK (ola_resolution_hours IS NULL OR ola_resolution_hours BETWEEN 1 AND 8760),
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, name)
@@ -551,6 +553,12 @@ CREATE TABLE incidents (
   responded_at    timestamptz,
   sla_paused_at   timestamptz,
   sla_paused_ms   bigint NOT NULL DEFAULT 0,
+  ola_group_id    uuid REFERENCES assignment_groups(id) ON DELETE SET NULL,
+  ola_response_due_at timestamptz,
+  ola_resolution_due_at timestamptz,
+  ola_responded_at timestamptz,
+  ola_paused_at   timestamptz,
+  ola_paused_ms   bigint NOT NULL DEFAULT 0,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, number)
@@ -1039,7 +1047,13 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.14', 'itam_discovery_external_ids_and_intune'),
   ('v00.01.15', 'incident_sla_controls_and_change_conflict_gate'),
   ('v00.01.16', 'change_post_implementation_review'),
-  ('v00.01.17', 'problem_recurrence_scan');
+  ('v00.01.17', 'problem_recurrence_scan'),
+  ('v00.01.18', 'continual_improvement'),
+  ('v00.01.19', 'improvement_journal'),
+  ('v00.01.20', 'assignment_group_ola'),
+  ('v00.01.21', 'chat_threads'),
+  ('v00.01.22', 'event_management'),
+  ('v00.01.23', 'servicenow_migrator');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1252,7 +1266,13 @@ INSERT INTO roles (id, tenant_id, name, description) VALUES
    'report_admin', 'Can manage all tenant reports and sharing'),
   ('a3000000-0000-0000-0000-000000000015',
    'a0000000-0000-0000-0000-000000000001',
-   'major_incident_manager', 'Owns major incident response: accept, war room actions, postmortem');
+   'major_incident_manager', 'Owns major incident response: accept, war room actions, postmortem'),
+  ('a3000000-0000-0000-0000-000000000016',
+   'a0000000-0000-0000-0000-000000000001',
+   'event_operator', 'Can view and work monitoring alerts'),
+  ('a3000000-0000-0000-0000-000000000017',
+   'a0000000-0000-0000-0000-000000000001',
+   'event_manager', 'Can manage alert definitions and work monitoring alerts');
 
 -- Demo company
 INSERT INTO companies (
@@ -1863,6 +1883,8 @@ CREATE TABLE request_tasks (
   completed_by      uuid REFERENCES users(id),
   outcome           text CHECK (outcome IN ('approved', 'rejected')),
   notes             text,
+  automation_checkpoint jsonb,
+  parent_task_id    uuid REFERENCES request_tasks(id) ON DELETE CASCADE,
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_request_tasks_request ON request_tasks(request_id, task_order);
@@ -2909,6 +2931,59 @@ CREATE TRIGGER trg_releases_updated_at
   BEFORE UPDATE ON releases
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+-- ============================================================
+-- CONTINUAL IMPROVEMENT
+-- ============================================================
+
+CREATE SEQUENCE improvement_number_seq START 1;
+
+CREATE TABLE improvements (
+  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id           uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  number              text NOT NULL,
+  title               text NOT NULL,
+  description         text,
+  status              text NOT NULL DEFAULT 'registered'
+                      CHECK (status IN ('registered', 'in_progress', 'done', 'cancelled')),
+  source_type         text NOT NULL DEFAULT 'manual'
+                      CHECK (source_type IN ('manual', 'postmortem', 'change', 'problem')),
+  major_incident_id   uuid REFERENCES major_incidents(id) ON DELETE SET NULL,
+  action_item_id      uuid,
+  change_id           uuid REFERENCES changes(id) ON DELETE SET NULL,
+  problem_id          uuid REFERENCES problems(id) ON DELETE SET NULL,
+  owner_user_id       uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_by          uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, number)
+);
+CREATE INDEX idx_improvements_tenant_status ON improvements(tenant_id, status, updated_at DESC);
+CREATE UNIQUE INDEX uq_improvements_postmortem_action
+  ON improvements(tenant_id, major_incident_id, action_item_id)
+  WHERE source_type = 'postmortem' AND action_item_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_improvements_change
+  ON improvements(tenant_id, change_id)
+  WHERE source_type = 'change' AND change_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_improvements_problem
+  ON improvements(tenant_id, problem_id)
+  WHERE source_type = 'problem' AND problem_id IS NOT NULL;
+CREATE TRIGGER trg_improvements_updated_at
+  BEFORE UPDATE ON improvements
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE improvement_journal (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  improvement_id  uuid NOT NULL REFERENCES improvements(id) ON DELETE CASCADE,
+  author_id       uuid NOT NULL REFERENCES users(id),
+  entry_type      text NOT NULL DEFAULT 'comment'
+                  CHECK (entry_type IN ('comment', 'work_note', 'state_change')),
+  content         text NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_improvement_journal_improvement
+  ON improvement_journal(improvement_id, created_at DESC);
+
 -- Seed change types
 INSERT INTO change_types (
   id, tenant_id, name, description,
@@ -3152,14 +3227,17 @@ CREATE TRIGGER trg_notification_email_deliveries_updated_at
 CREATE TYPE notification_webhook_channel AS ENUM ('slack', 'teams');
 
 CREATE TABLE tenant_notification_webhooks (
-  id           uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  tenant_id    uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  channel      notification_webhook_channel NOT NULL,
-  name         text        NOT NULL,
-  webhook_url  text        NOT NULL,
-  is_active    boolean     NOT NULL DEFAULT true,
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  updated_at   timestamptz NOT NULL DEFAULT now(),
+  id               uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id        uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  channel          notification_webhook_channel NOT NULL,
+  name             text        NOT NULL,
+  webhook_url      text        NOT NULL,
+  reply_channel_id text,
+  api_token        text,
+  signing_secret   text,
+  is_active        boolean     NOT NULL DEFAULT true,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT tenant_notification_webhooks_name_nonempty CHECK (char_length(trim(name)) > 0),
   CONSTRAINT tenant_notification_webhooks_url_nonempty CHECK (char_length(trim(webhook_url)) > 0)
 );
@@ -3168,6 +3246,157 @@ CREATE INDEX idx_tenant_notification_webhooks_tenant_channel
 CREATE TRIGGER trg_tenant_notification_webhooks_updated_at
   BEFORE UPDATE ON tenant_notification_webhooks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE chat_threads (
+  id                 uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id          uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  webhook_id         uuid        NOT NULL REFERENCES tenant_notification_webhooks(id) ON DELETE CASCADE,
+  channel            notification_webhook_channel NOT NULL,
+  entity_type        text        NOT NULL CHECK (entity_type = 'incident'),
+  entity_id          uuid        NOT NULL,
+  entity_number      text        NOT NULL,
+  external_thread_id text,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, webhook_id, entity_type, entity_id)
+);
+CREATE UNIQUE INDEX chat_threads_external_thread
+  ON chat_threads (tenant_id, channel, external_thread_id)
+  WHERE external_thread_id IS NOT NULL;
+CREATE TRIGGER trg_chat_threads_updated_at
+  BEFORE UPDATE ON chat_threads
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE chat_inbound_receipts (
+  tenant_id         uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  channel           notification_webhook_channel NOT NULL,
+  external_event_id text        NOT NULL,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, channel, external_event_id)
+);
+
+CREATE TABLE migration_runs (
+  id                     uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id              uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  source                 text        NOT NULL CHECK (source IN ('servicenow')),
+  instance_url           text        NOT NULL,
+  credential_slug        text        NOT NULL,
+  options                jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  status                 text        NOT NULL DEFAULT 'queued'
+                         CHECK (status IN ('queued', 'extracting', 'transforming', 'ready', 'applying', 'applied', 'failed')),
+  progress               jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  snapshot               jsonb,
+  package                jsonb,
+  report                 jsonb,
+  error                  text,
+  config_package_run_id  uuid        REFERENCES config_deployment_runs(id) ON DELETE SET NULL,
+  created_by             uuid        REFERENCES users(id) ON DELETE SET NULL,
+  created_at             timestamptz NOT NULL DEFAULT now(),
+  updated_at             timestamptz NOT NULL DEFAULT now(),
+  completed_at           timestamptz
+);
+CREATE INDEX idx_migration_runs_tenant_created ON migration_runs (tenant_id, created_at DESC);
+CREATE UNIQUE INDEX uq_migration_runs_one_active
+  ON migration_runs (tenant_id)
+  WHERE status IN ('queued', 'extracting', 'transforming', 'applying');
+CREATE TRIGGER trg_migration_runs_updated_at
+  BEFORE UPDATE ON migration_runs
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE SEQUENCE alert_number_seq START 1000;
+
+CREATE TABLE events (
+  id                     uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id              uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  source                 text        NOT NULL,
+  external_event_id      text,
+  fingerprint            text        NOT NULL,
+  status                 text        NOT NULL CHECK (status IN ('firing', 'resolved')),
+  severity               text        NOT NULL,
+  title                  text        NOT NULL,
+  labels                 jsonb       NOT NULL DEFAULT '{}',
+  payload                jsonb       NOT NULL DEFAULT '{}',
+  source_url             text,
+  configuration_item_id  uuid        REFERENCES configuration_items(id) ON DELETE SET NULL,
+  alert_id               uuid,
+  occurred_at            timestamptz,
+  received_at            timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX events_external_id
+  ON events (tenant_id, source, external_event_id)
+  WHERE external_event_id IS NOT NULL;
+CREATE INDEX idx_events_received ON events (tenant_id, received_at DESC);
+
+CREATE TABLE alerts (
+  id                     uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id              uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  number                 text        NOT NULL,
+  source                 text        NOT NULL,
+  fingerprint            text        NOT NULL,
+  status                 text        NOT NULL CHECK (status IN ('firing', 'resolved')),
+  severity               text        NOT NULL,
+  title                  text        NOT NULL,
+  labels                 jsonb       NOT NULL DEFAULT '{}',
+  source_url             text,
+  configuration_item_id  uuid        REFERENCES configuration_items(id) ON DELETE SET NULL,
+  event_count            integer     NOT NULL DEFAULT 1,
+  first_seen_at          timestamptz NOT NULL DEFAULT now(),
+  last_seen_at           timestamptz NOT NULL DEFAULT now(),
+  resolved_at            timestamptz,
+  definition_id          uuid,
+  incident_id            uuid        REFERENCES incidents(id) ON DELETE SET NULL,
+  workflow_id            text,
+  suppressed_reason      text,
+  created_at             timestamptz NOT NULL DEFAULT now(),
+  updated_at             timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, number)
+);
+CREATE UNIQUE INDEX alerts_one_firing_episode
+  ON alerts (tenant_id, source, fingerprint)
+  WHERE status = 'firing';
+CREATE INDEX idx_alerts_ci ON alerts (tenant_id, configuration_item_id, first_seen_at DESC);
+CREATE INDEX idx_alerts_status ON alerts (tenant_id, status, last_seen_at DESC);
+CREATE TRIGGER trg_alerts_updated_at
+  BEFORE UPDATE ON alerts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE alert_definitions (
+  id                   uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id            uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name                 text        NOT NULL,
+  description          text,
+  is_active            boolean     NOT NULL DEFAULT true,
+  sort_order           integer     NOT NULL DEFAULT 100,
+  source               text,
+  severity             text,
+  match_labels         jsonb       NOT NULL DEFAULT '{}',
+  severity_map         jsonb,
+  action               text        NOT NULL DEFAULT 'none'
+                       CHECK (action IN ('none', 'incident', 'workflow')),
+  assignment_group_id  uuid        REFERENCES assignment_groups(id) ON DELETE SET NULL,
+  impact               text        CHECK (impact IS NULL OR impact IN ('low', 'medium', 'high')),
+  urgency              text        CHECK (urgency IS NULL OR urgency IN ('low', 'medium', 'high')),
+  workflow_key         text,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_at           timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_alert_definitions_active
+  ON alert_definitions (tenant_id, is_active, sort_order);
+CREATE TRIGGER trg_alert_definitions_updated_at
+  BEFORE UPDATE ON alert_definitions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE events
+  ADD CONSTRAINT events_alert_id_fkey
+  FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE SET NULL;
+CREATE INDEX idx_events_alert ON events (alert_id);
+ALTER TABLE alerts
+  ADD CONSTRAINT alerts_definition_id_fkey
+  FOREIGN KEY (definition_id) REFERENCES alert_definitions(id) ON DELETE SET NULL;
+
+INSERT INTO alert_definitions (tenant_id, name, severity, action, impact, urgency, sort_order)
+SELECT t.id, 'Critical alert opens an incident', 'critical', 'incident', 'high', 'high', 10
+FROM tenants t;
 
 INSERT INTO notification_rules (
   tenant_id, name, description, entity_type, trigger_key, recipient_type, title_template, body_template, sort_order

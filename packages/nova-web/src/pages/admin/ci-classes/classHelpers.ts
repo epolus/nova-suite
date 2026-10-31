@@ -2,7 +2,7 @@
 import type { useTranslations } from 'use-intl';
 import type { CIClass } from '../../../api/client';
 
-export { CI_CLASS_ICON_VALUES as ICON_VALUES } from '../../../components/CiClassIcon';
+export { CI_CLASS_ICON_VALUES as ICON_VALUES } from '../../../components/ciClassIcons';
 
 export const ATTR_TYPES = ['string', 'integer', 'number', 'boolean', 'reference'];
 
