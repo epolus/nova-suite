@@ -80,6 +80,8 @@ CREATE TABLE departments (
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   parent_department_id uuid REFERENCES departments(id) ON DELETE SET NULL,
   cost_center_id uuid,
+  manager_id  uuid,
+  external_id text,
   name        text NOT NULL,
   description text,
   is_active   boolean NOT NULL DEFAULT true,
@@ -90,6 +92,10 @@ CREATE TABLE departments (
 
 CREATE INDEX idx_departments_tenant ON departments(tenant_id);
 CREATE INDEX idx_departments_cost_center ON departments(cost_center_id);
+CREATE INDEX idx_departments_manager ON departments(manager_id);
+CREATE UNIQUE INDEX uq_departments_tenant_external_id
+  ON departments(tenant_id, external_id)
+  WHERE external_id IS NOT NULL;
 
 -- ============================================================
 -- COST CENTERS
@@ -195,6 +201,10 @@ CREATE INDEX idx_users_company ON users(company);
 ALTER TABLE cost_centers
   ADD CONSTRAINT fk_cost_centers_responsible
   FOREIGN KEY (responsible_user_id) REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE departments
+  ADD CONSTRAINT fk_departments_manager
+  FOREIGN KEY (manager_id) REFERENCES users(id) ON DELETE SET NULL;
 
 -- ============================================================
 -- COMPANIES
@@ -1060,7 +1070,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.21', 'chat_threads'),
   ('v00.01.22', 'event_management'),
   ('v00.01.23', 'servicenow_migrator'),
-  ('v00.01.24', 'cost_center_responsible');
+  ('v00.01.24', 'cost_center_responsible'),
+  ('v00.01.25', 'department_manager');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT

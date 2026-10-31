@@ -75,6 +75,8 @@
       "createdAt": "Erstellt am",
       "updatedAt": "Aktualisiert am",
       "search": "Suchen",
+      "manager": "Manager",
+      "externalId": "Externe ID",
       "responsiblePerson": "Verantwortliche Person",
       "departments": "Abteilungen"
     },

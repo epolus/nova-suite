@@ -92,6 +92,7 @@
       "displayName": "Display Name",
       "parentCompany": "Parent Company",
       "manager": "Manager",
+      "externalId": "External ID",
       "responsiblePerson": "Responsible Person",
       "department": "Department",
       "departments": "Departments",
