@@ -81,6 +81,7 @@ CREATE TABLE departments (
   parent_department_id uuid REFERENCES departments(id) ON DELETE SET NULL,
   cost_center_id uuid,
   manager_id  uuid,
+  external_id text,
   name        text NOT NULL,
   description text,
   is_active   boolean NOT NULL DEFAULT true,
@@ -92,6 +93,9 @@ CREATE TABLE departments (
 CREATE INDEX idx_departments_tenant ON departments(tenant_id);
 CREATE INDEX idx_departments_cost_center ON departments(cost_center_id);
 CREATE INDEX idx_departments_manager ON departments(manager_id);
+CREATE UNIQUE INDEX uq_departments_tenant_external_id
+  ON departments(tenant_id, external_id)
+  WHERE external_id IS NOT NULL;
 
 -- ============================================================
 -- COST CENTERS

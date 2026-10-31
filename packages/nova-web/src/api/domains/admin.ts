@@ -26,6 +26,7 @@ export const admin = {
     parent_department_id?: string;
     cost_center_id?: string;
     manager_id?: string | null;
+    external_id?: string | null;
   }) =>
     request<{ id: string }>('/admin/departments', { method: 'POST', body: JSON.stringify(data) }),
   updateDepartment: (id: string, data: {
@@ -34,6 +35,7 @@ export const admin = {
     parent_department_id?: string;
     cost_center_id?: string;
     manager_id?: string | null;
+    external_id?: string | null;
     is_active?: boolean;
   }) =>
     request<{ success: boolean }>(`/admin/departments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

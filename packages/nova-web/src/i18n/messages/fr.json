@@ -76,6 +76,7 @@
       "updatedAt": "Mis à jour à",
       "search": "Recherche",
       "manager": "Manager",
+      "externalId": "ID externe",
       "responsiblePerson": "Personne responsable",
       "departments": "Départements"
     },

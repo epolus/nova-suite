@@ -55,6 +55,14 @@ export default function DepartmentsPage() {
         ),
     },
     {
+      key: 'external_id',
+      label: tFields('externalId'),
+      sortable: true,
+      render: (d) => (
+        <span className="font-mono text-xs text-gray-500">{d.external_id || tTable('emDash')}</span>
+      ),
+    },
+    {
       key: 'user_count',
       label: tFields('users'),
       sortable: true,
@@ -132,6 +140,7 @@ export default function DepartmentsPage() {
           .map((u) => ({ value: u.id, label: u.display_name })),
       ],
     },
+    { key: 'external_id', label: tFields('externalId'), type: 'text' },
   ], [allCostCentersForOptions, allDepartmentsForOptions, allUsersForOptions, noneOption, t, tFields]);
 
   return (
@@ -149,6 +158,7 @@ export default function DepartmentsPage() {
         parent_department_id?: string;
         cost_center_id?: string;
         manager_id?: string | null;
+        external_id?: string | null;
       })}
       updateItem={(id, data) => admin.updateDepartment(id, data)}
       getDefaults={(item) => ({
@@ -157,6 +167,7 @@ export default function DepartmentsPage() {
         parent_department_id: item?.parent_department_id ?? '',
         cost_center_id: item?.cost_center_id ?? '',
         manager_id: item?.manager_id ?? '',
+        external_id: item?.external_id ?? '',
       })}
       searchFilter={(item, q) =>
         item.name.toLowerCase().includes(q) ||
@@ -164,7 +175,8 @@ export default function DepartmentsPage() {
         (item.parent_department_name?.toLowerCase().includes(q) ?? false) ||
         (item.cost_center_name?.toLowerCase().includes(q) ?? false) ||
         (item.cost_center_code?.toLowerCase().includes(q) ?? false) ||
-        (item.manager_name?.toLowerCase().includes(q) ?? false)
+        (item.manager_name?.toLowerCase().includes(q) ?? false) ||
+        (item.external_id?.toLowerCase().includes(q) ?? false)
       }
     />
   );

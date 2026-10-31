@@ -74,6 +74,7 @@ export interface DepartmentItem {
   cost_center_code: string | null;
   manager_id: string | null;
   manager_name: string | null;
+  external_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

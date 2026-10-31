@@ -520,7 +520,7 @@ router.get('/departments', async (req: Request, res: Response, next: NextFunctio
   try {
     const tenantId = req.user!.tenant_id;
     const rows = await db.getMany(
-      `SELECT d.id, d.name, d.description, d.parent_department_id, d.cost_center_id, d.manager_id, d.is_active, d.created_at, d.updated_at,
+      `SELECT d.id, d.name, d.description, d.parent_department_id, d.cost_center_id, d.manager_id, d.external_id, d.is_active, d.created_at, d.updated_at,
               pd.name AS parent_department_name,
               cc.name AS cost_center_name,
               cc.code AS cost_center_code,
@@ -541,11 +541,12 @@ router.get('/departments', async (req: Request, res: Response, next: NextFunctio
 router.post('/departments', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { name, description, parent_department_id, cost_center_id, manager_id } = req.body;
+    const { name, description, parent_department_id, cost_center_id, manager_id, external_id } = req.body;
     if (!name) throw new AppError(400, 'name is required');
     const parentDepartmentId = parent_department_id || null;
     const costCenterId = cost_center_id || null;
     const managerId = manager_id || null;
+    const externalId = external_id || null;
     if (parentDepartmentId) {
       const parent = await db.getOne<{ id: string }>(
         'SELECT id FROM departments WHERE id = $1 AND tenant_id = $2',
@@ -568,8 +569,8 @@ router.post('/departments', async (req: Request, res: Response, next: NextFuncti
       if (!manager) throw new AppError(400, 'manager_id must reference an existing user in this tenant');
     }
     const row = await db.getOne<{ id: string }>(
-      'INSERT INTO departments (tenant_id, name, description, parent_department_id, cost_center_id, manager_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-      [tenantId, name, description || null, parentDepartmentId, costCenterId, managerId],
+      'INSERT INTO departments (tenant_id, name, description, parent_department_id, cost_center_id, manager_id, external_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      [tenantId, name, description || null, parentDepartmentId, costCenterId, managerId, externalId],
     );
     res.status(201).json(row);
   } catch (err) { next(err); }
@@ -578,7 +579,7 @@ router.post('/departments', async (req: Request, res: Response, next: NextFuncti
 router.patch('/departments/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { name, description, is_active, parent_department_id, cost_center_id, manager_id } = req.body;
+    const { name, description, is_active, parent_department_id, cost_center_id, manager_id, external_id } = req.body;
     if (parent_department_id !== undefined) {
       const parentDepartmentId = parent_department_id || null;
       if (parentDepartmentId === req.params.id) {
@@ -620,6 +621,7 @@ router.patch('/departments/:id', async (req: Request, res: Response, next: NextF
     if (parent_department_id !== undefined) { sets.push(`parent_department_id = $${i++}`); vals.push(parent_department_id || null); }
     if (cost_center_id !== undefined) { sets.push(`cost_center_id = $${i++}`); vals.push(cost_center_id || null); }
     if (manager_id !== undefined) { sets.push(`manager_id = $${i++}`); vals.push(manager_id || null); }
+    if (external_id !== undefined) { sets.push(`external_id = $${i++}`); vals.push(external_id || null); }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
     if (sets.length === 0) { res.json({ success: true }); return; }
     vals.push(req.params.id, tenantId);

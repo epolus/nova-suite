@@ -157,9 +157,9 @@ Also keep `CATALOG_AUTOMATION_SHARED_KEY` identical on engine and worker — in-
 
 Apply `infra/postgres/migrations/v00.01.24__cost_center_responsible.sql` before rolling out builds that read or write `cost_centers.responsible_user_id`. The column is nullable; existing rows stay valid with a null responsible person.
 
-## Department manager (`v00.01.25`)
+## Department manager and external_id (`v00.01.25`)
 
-Apply `infra/postgres/migrations/v00.01.25__department_manager.sql` before rolling out builds that read or write `departments.manager_id`. The column is nullable; existing rows stay valid with a null manager.
+Apply `infra/postgres/migrations/v00.01.25__department_manager.sql` before rolling out builds that read or write `departments.manager_id` or `departments.external_id`. Both columns are nullable; existing rows stay valid with null values. `external_id` is unique per tenant when set.
 
 ## Pre-Deploy Checklist
 
