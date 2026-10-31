@@ -90,6 +90,21 @@ async function resolveApprovalAssignee(
     };
   }
   const subjectId = (request.requested_for as string | null) ?? (request.requester_id as string | null);
+  if (approval.approverType === 'department_manager') {
+    const r = await client.query(
+      `SELECT d.manager_id
+       FROM users u
+       LEFT JOIN departments d ON d.id = u.department_id
+       WHERE u.id = $1 AND u.tenant_id = $2`,
+      [subjectId, tenantId],
+    );
+    const managerId = (r.rows[0]?.manager_id as string | null | undefined) ?? null;
+    return {
+      assignedTo: managerId,
+      assignedGroupId: null,
+      note: managerId ? null : 'Request subject has no department manager.',
+    };
+  }
   const r = await client.query(`SELECT manager_id FROM users WHERE id = $1`, [subjectId]);
   const managerId = (r.rows[0]?.manager_id as string | null | undefined) ?? null;
   return { assignedTo: managerId, assignedGroupId: null, note: managerId ? null : 'Request subject has no manager.' };
@@ -423,6 +438,7 @@ export async function executeAutomatedCatalogTask(
 
 export const __test__ = {
   createInFlowManualTask,
+  resolveApprovalAssignee,
   evaluateAdvancedCondition,
   toHttpActivityState,
 };

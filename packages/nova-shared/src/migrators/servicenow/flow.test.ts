@@ -121,6 +121,31 @@ describe('convertFlow compile branches', () => {
     expect(notes.notes.some((n) => n.code === 'manager_approval')).toBe(true);
   });
 
+  it('maps a dept-head approval to the department manager', () => {
+    const lookups = emptyLookups({
+      actionTypes: new Map([
+        ['def_appr', { sys_id: 'def_appr', name: 'Requested Item Dept Head Approval', internal_name: 'ask_for_approval' }],
+      ]),
+    });
+    const notes = new NoteCollector();
+    const result = convertFlow(
+      flow([
+        step({
+          uiId: 'a1',
+          order: 4,
+          definitionId: 'def_appr',
+          comment: 'Requested Item Dept Head Approval',
+          values: { rules: '' },
+        }),
+      ]),
+      { lookups, fields: new Map(), notes, isSubflow: false, extractPreApproval: true },
+    );
+    const approval = result.config?.states.find((s) => s.type === 'action.approval') as { approverType?: string } | undefined;
+    expect(approval?.approverType).toBe('department_manager');
+    expect(notes.notes.some((n) => n.code === 'approval_rules_unparsed')).toBe(false);
+    expect(notes.notes.some((n) => n.code === 'department_manager')).toBe(true);
+  });
+
   it('compiles wait duration and skips wait-until datetimes', () => {
     const lookups = emptyLookups({
       logicDefinitions: new Map([
