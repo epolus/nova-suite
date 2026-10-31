@@ -86,7 +86,10 @@ export interface CostCenterItem {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  responsible_user_id: string | null;
+  responsible_user_name: string | null;
   user_count: number;
+  department_count: number;
 }
 
 export interface CompanyItem {

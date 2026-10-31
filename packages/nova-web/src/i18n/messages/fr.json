@@ -74,7 +74,9 @@
       "assignedTo": "Attribué à",
       "createdAt": "Créé à",
       "updatedAt": "Mis à jour à",
-      "search": "Recherche"
+      "search": "Recherche",
+      "responsiblePerson": "Personne responsable",
+      "departments": "Départements"
     },
     "table": {
       "number": "Nombre",

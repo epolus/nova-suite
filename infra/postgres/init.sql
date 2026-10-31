@@ -100,6 +100,7 @@ CREATE TABLE cost_centers (
   code        text NOT NULL,
   name        text NOT NULL,
   description text,
+  responsible_user_id uuid,
   is_active   boolean NOT NULL DEFAULT true,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
@@ -107,6 +108,7 @@ CREATE TABLE cost_centers (
 );
 
 CREATE INDEX idx_cost_centers_tenant ON cost_centers(tenant_id);
+CREATE INDEX idx_cost_centers_responsible ON cost_centers(responsible_user_id);
 
 ALTER TABLE departments
   ADD CONSTRAINT fk_departments_cost_center
@@ -189,6 +191,10 @@ CREATE INDEX idx_users_department ON users(department_id);
 CREATE INDEX idx_users_sso ON users(tenant_id, sso_provider_id) WHERE sso_provider_id IS NOT NULL;
 CREATE INDEX idx_users_cost_center ON users(cost_center_id);
 CREATE INDEX idx_users_company ON users(company);
+
+ALTER TABLE cost_centers
+  ADD CONSTRAINT fk_cost_centers_responsible
+  FOREIGN KEY (responsible_user_id) REFERENCES users(id) ON DELETE SET NULL;
 
 -- ============================================================
 -- COMPANIES
@@ -1053,7 +1059,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.20', 'assignment_group_ola'),
   ('v00.01.21', 'chat_threads'),
   ('v00.01.22', 'event_management'),
-  ('v00.01.23', 'servicenow_migrator');
+  ('v00.01.23', 'servicenow_migrator'),
+  ('v00.01.24', 'cost_center_responsible');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT

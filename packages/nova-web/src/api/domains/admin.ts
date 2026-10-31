@@ -26,9 +26,20 @@ export const admin = {
     request<{ success: boolean }>(`/admin/departments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   // Cost Centers
   costCenters: () => request<{ cost_centers: CostCenterItem[] }>('/admin/cost-centers'),
-  createCostCenter: (data: { code: string; name: string; description?: string }) =>
+  createCostCenter: (data: {
+    code: string;
+    name: string;
+    description?: string;
+    responsible_user_id?: string | null;
+  }) =>
     request<{ id: string }>('/admin/cost-centers', { method: 'POST', body: JSON.stringify(data) }),
-  updateCostCenter: (id: string, data: { code?: string; name?: string; description?: string; is_active?: boolean }) =>
+  updateCostCenter: (id: string, data: {
+    code?: string;
+    name?: string;
+    description?: string;
+    is_active?: boolean;
+    responsible_user_id?: string | null;
+  }) =>
     request<{ success: boolean }>(`/admin/cost-centers/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   // Companies
   companies: () => request<{ companies: CompanyItem[] }>('/admin/companies'),

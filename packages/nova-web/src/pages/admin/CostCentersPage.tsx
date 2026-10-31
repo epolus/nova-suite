@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useMemo } from 'react';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { admin, type CostCenterItem } from '../../api/client';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
@@ -28,6 +29,33 @@ export default function CostCentersPage() {
       sortable: true,
       render: (cc) => <span className="text-gray-500">{cc.description || tTable('emDash')}</span>,
       className: 'max-w-xs truncate',
+    },
+    {
+      key: 'responsible_user_name',
+      label: tFields('responsiblePerson'),
+      sortable: true,
+      render: (cc) =>
+        cc.responsible_user_id && cc.responsible_user_name ? (
+          <Link
+            to={`/admin/users/${cc.responsible_user_id}`}
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {cc.responsible_user_name}
+          </Link>
+        ) : (
+          <span className="text-gray-400">{tTable('emDash')}</span>
+        ),
+    },
+    {
+      key: 'department_count',
+      label: tFields('departments'),
+      sortable: true,
+      render: (cc) => (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          {cc.department_count}
+        </span>
+      ),
     },
     {
       key: 'user_count',
@@ -71,7 +99,8 @@ export default function CostCentersPage() {
       searchFilter={(item, q) =>
         item.code.toLowerCase().includes(q) ||
         item.name.toLowerCase().includes(q) ||
-        (item.description?.toLowerCase().includes(q) ?? false)
+        (item.description?.toLowerCase().includes(q) ?? false) ||
+        (item.responsible_user_name?.toLowerCase().includes(q) ?? false)
       }
     />
   );
