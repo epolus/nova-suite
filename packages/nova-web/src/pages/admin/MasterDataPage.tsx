@@ -16,6 +16,8 @@ export type { ColumnDef, FieldDef } from './master-data/types';
 interface MasterDataPageProps<T extends { id: string; is_active: boolean }> {
   title: string;
   description: string;
+  /** Singular label used in the editor. Defaults to the title with a trailing "s" removed. */
+  entityLabel?: string;
   storageKey?: string;
   detailBasePath?: string;
   columns: ColumnDef<T>[];
@@ -31,6 +33,7 @@ interface MasterDataPageProps<T extends { id: string; is_active: boolean }> {
 export default function MasterDataPage<T extends { id: string; is_active: boolean }>({
   title,
   description,
+  entityLabel: entityLabelProp,
   storageKey,
   detailBasePath,
   columns,
@@ -46,7 +49,7 @@ export default function MasterDataPage<T extends { id: string; is_active: boolea
   const tMaster = useTranslations('common.masterData');
   const tFields = useTranslations('common.fields');
   const tStates = useTranslations('common.states');
-  const entityLabel = title.replace(/s$/, '');
+  const entityLabel = entityLabelProp ?? title.replace(/s$/, '');
   // Build the full column list: user-defined columns + the always-present "Status" column
   const allColumns: DataColumnDef<T>[] = useMemo(() => {
     const mapped: DataColumnDef<T>[] = columns.map((col) => ({

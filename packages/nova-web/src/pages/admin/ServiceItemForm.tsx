@@ -1,52 +1,62 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'use-intl';
 import { catalog, cmdb } from '../../api/client';
 import type { ServiceItem, Category, FormField, CIClass } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
-import Card from '../../components/Card';
-import FormBuilder from '../../components/FormBuilder';
-import { formatCurrency, normalizeCurrencyCode } from '../../utils/currency';
+import { normalizeCurrencyCode } from '../../utils/currency';
 import { formatCustomAttribute, parseCustomAttribute } from './customAttributes';
-
-const EMPTY_ITEM: Partial<ServiceItem> = {
-  name: '',
-  short_description: '',
-  description: '',
-  icon: 'box',
-  price: null,
-  custom_attributes: {},
-  form_schema: { fields: [] },
-  approval_required: false,
-  sla_hours: 72,
-  is_active: false,
-};
+import {
+  EMPTY_SERVICE_ITEM,
+  optionalText,
+  serviceItemIssues,
+  softSaveFailure,
+  type ServiceItemField,
+  type ServiceItemFieldErrors,
+  type ServiceItemIssue,
+} from './serviceItemFormModel';
+import {
+  ServiceItemAttributesCard,
+  ServiceItemBasicCard,
+  ServiceItemPictureCard,
+  ServiceItemPreviewCard,
+  ServiceItemRequestFormCard,
+  ServiceItemSettingsCard,
+} from './ServiceItemFormSections';
 
 export default function ServiceItemForm({
   item,
   categories,
   currencyCode,
+  prevItemId,
+  nextItemId,
+  onNavigate,
   onSave,
   onCancel,
 }: {
   item?: ServiceItem;
   categories: Category[];
   currencyCode: string;
+  prevItemId?: string | null;
+  nextItemId?: string | null;
+  onNavigate?: (id: string) => void;
   onSave: (item: ServiceItem) => void;
   onCancel: () => void;
 }) {
   const t = useTranslations('pages.admin.serviceItems');
   const tForm = useTranslations('pages.admin.serviceItems.form');
   const tActions = useTranslations('common.actions');
-  const tFields = useTranslations('common.fields');
-  const tStates = useTranslations('common.states');
   const tMaster = useTranslations('common.masterData');
+  const tMessages = useTranslations('common.messages');
+  const dirtyRef = useRef(false);
   const isNew = !item;
   const [form, setForm] = useState<Record<string, unknown>>(() => {
     if (item) return { ...item };
-    return { ...EMPTY_ITEM, category_id: categories[0]?.id || '' };
+    return { ...EMPTY_SERVICE_ITEM, category_id: categories[0]?.id || '' };
   });
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<ServiceItemFieldErrors>({});
   const [pictureFile, setPictureFile] = useState<File | null>(null);
   const [picturePreview, setPicturePreview] = useState<string>('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -73,22 +83,53 @@ export default function ServiceItemForm({
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
         .then((res) => { if (res.ok) return res.blob(); throw new Error(); })
-        .then((blob) => { objectUrl = URL.createObjectURL(blob); setPicturePreview(objectUrl); })
+        .then((blob) => {
+          objectUrl = URL.createObjectURL(blob);
+          if (objectUrl.startsWith('blob:')) setPicturePreview(objectUrl);
+        })
         .catch(() => {});
     }
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [item?.id, item?.picture_storage_key]);
 
+  const markDirty = () => { dirtyRef.current = true; };
+
+  const navigateTo = useCallback((id: string) => {
+    if (!onNavigate) return;
+    if (dirtyRef.current && !window.confirm(tMessages('unsavedChanges'))) return;
+    onNavigate(id);
+  }, [onNavigate, tMessages]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isNew) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
+      if (e.key === 'ArrowLeft' && prevItemId) navigateTo(prevItemId);
+      if (e.key === 'ArrowRight' && nextItemId) navigateTo(nextItemId);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isNew, prevItemId, nextItemId, navigateTo]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (!f.type.startsWith('image/')) return;
+    const previewUrl = URL.createObjectURL(f);
+    if (!previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+      return;
+    }
+    markDirty();
     setPictureFile(f);
-    setPicturePreview(URL.createObjectURL(f));
+    setPicturePreview(previewUrl);
   };
 
-  const addAttr = () => setCustomAttrs([...customAttrs, ['', '']]);
-  const removeAttr = (idx: number) => setCustomAttrs(customAttrs.filter((_, i) => i !== idx));
+  const addAttr = () => { markDirty(); setCustomAttrs([...customAttrs, ['', '']]); };
+  const removeAttr = (idx: number) => { markDirty(); setCustomAttrs(customAttrs.filter((_, i) => i !== idx)); };
   const updateAttr = (idx: number, field: 0 | 1, value: string) => {
+    markDirty();
     const updated = [...customAttrs];
     const entry = updated[idx];
     if (!entry) return;
@@ -97,6 +138,19 @@ export default function ServiceItemForm({
   };
 
   const handleSubmit = async () => {
+    const issues = serviceItemIssues(form, { isNew, taskCount: item?.task_count ?? 0 });
+    if (Object.keys(issues).length > 0) {
+      const messages: ServiceItemFieldErrors = {};
+      for (const [field, key] of Object.entries(issues) as [ServiceItemField, ServiceItemIssue][]) {
+        messages[field] = tForm(key);
+      }
+      setFieldErrors(messages);
+      setFormError(tForm('validationFailed'));
+      return;
+    }
+
+    setFieldErrors({});
+    setFormError(null);
     setSaving(true);
     try {
       // Build custom_attributes from editor
@@ -105,25 +159,34 @@ export default function ServiceItemForm({
         if (k.trim()) attrs[k.trim()] = parseCustomAttribute(v);
       }
 
+      const name = typeof form.name === 'string' ? form.name.trim() : '';
       const payload: Record<string, unknown> = {
         category_id: form.category_id,
-        name: form.name,
-        short_description: form.short_description || null,
-        description: form.description || null,
+        name,
         icon: form.icon || 'box',
         price: form.price != null && form.price !== '' ? Number(form.price) : null,
         custom_attributes: attrs,
         form_schema: form.form_schema || { fields: [] },
         approval_required: form.approval_required ?? false,
-        sla_hours: Number(form.sla_hours) || 72,
+        sla_hours: Number(form.sla_hours),
         is_active: form.is_active ?? true,
       };
+      const shortDescription = optionalText(form.short_description);
+      const description = optionalText(form.description);
+      if (shortDescription) payload.short_description = shortDescription;
+      if (description) payload.description = description;
 
       let saved: ServiceItem;
       if (isNew) {
         saved = await catalog.createItem(payload as Partial<ServiceItem>);
       } else {
         saved = await catalog.updateItem(item!.id, payload as Partial<ServiceItem>);
+      }
+
+      const rejected = softSaveFailure(saved);
+      if (rejected) {
+        setFormError(rejected);
+        return;
       }
 
       // Upload picture if changed
@@ -133,275 +196,142 @@ export default function ServiceItemForm({
 
       onSave(saved);
     } catch (err) {
-      console.error(err);
-      alert(String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setFormError(message);
+      const expectedValidation = message.startsWith('Validation failed')
+        || message.includes('Cannot activate a service item');
+      if (!expectedValidation) console.error(err);
     } finally {
       setSaving(false);
     }
   };
 
-  const set = (key: string, value: unknown) => setForm({ ...form, [key]: value });
+  const set = (key: string, value: unknown) => {
+    markDirty();
+    setForm({ ...form, [key]: value });
+    setFieldErrors((prev) => {
+      if (!(key in prev)) return prev;
+      const next = { ...prev };
+      delete next[key as ServiceItemField];
+      return next;
+    });
+  };
 
   return (
     <>
       <PageHeader
         title={isNew ? t('newServiceItem') : t('editServiceItem', { name: item!.name })}
+        description={!isNew && (prevItemId || nextItemId) ? tMaster('navigateRecords') : undefined}
         action={
-          <button onClick={onCancel} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-            &larr; {tActions('cancel')}
-          </button>
+          <div className="flex items-center gap-2">
+            {!isNew && (
+              <>
+                <button
+                  type="button"
+                  disabled={!prevItemId}
+                  onClick={() => prevItemId && navigateTo(prevItemId)}
+                  className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={tMaster('previousEntity', { entity: t('entity') })}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  disabled={!nextItemId}
+                  onClick={() => nextItemId && navigateTo(nextItemId)}
+                  className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={tMaster('nextEntity', { entity: t('entity') })}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {tActions('cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={saving}
+              className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? tActions('saving') : isNew ? tForm('createServiceItem') : tMaster('saveChanges')}
+            </button>
+          </div>
         }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main form */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">{tForm('basicInformation')}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('name')} *</label>
-                <input
-                  value={(form.name as string) || ''}
-                  onChange={(e) => set('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                  placeholder={tForm('namePlaceholder')}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('category')} *</label>
-                <select
-                  value={(form.category_id as string) || ''}
-                  onChange={(e) => set('category_id', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">{tForm('selectCategory')}</option>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('icon')}</label>
-                <input
-                  value={(form.icon as string) || ''}
-                  onChange={(e) => set('icon', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                  placeholder={tForm('iconPlaceholder')}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('shortDescription')}</label>
-                <input
-                  value={(form.short_description as string) || ''}
-                  onChange={(e) => set('short_description', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                  placeholder={tForm('shortDescriptionPlaceholder')}
-                  maxLength={500}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('description')}</label>
-                <textarea
-                  value={(form.description as string) || ''}
-                  onChange={(e) => set('description', e.target.value)}
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none"
-                  placeholder={tForm('descriptionPlaceholder')}
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* Picture */}
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">{tForm('picture')}</h3>
-            {picturePreview ? (
-              <div className="mb-4 relative inline-block">
-                <img src={picturePreview} className="max-h-48 rounded-lg object-cover" alt={tForm('picturePreviewAlt')} />
-                <button
-                  onClick={() => { setPictureFile(null); setPicturePreview(''); if (fileRef.current) fileRef.current.value = ''; }}
-                  className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600"
-                >
-                  &times;
-                </button>
-              </div>
-            ) : (
-              <div
-                onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-300 transition-colors"
-              >
-                <p className="text-sm text-gray-400">{tForm('uploadHint')}</p>
-                <p className="text-xs text-gray-300 mt-1">{tForm('uploadFormats')}</p>
-              </div>
+      {formError && (
+        <div
+          role="alert"
+          className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start justify-between gap-3"
+        >
+          <div>
+            <p>{formError}</p>
+            {Object.keys(fieldErrors).length > 0 && (
+              <ul className="mt-1 list-disc pl-5">
+                {Object.entries(fieldErrors).map(([field, message]) => (
+                  <li key={field}>{message}</li>
+                ))}
+              </ul>
             )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            {!picturePreview && (
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="mt-3 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
-              >
-                {tForm('chooseFile')}
-              </button>
-            )}
-          </Card>
-
-          {/* Custom Attributes */}
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">{tForm('customAttributes')}</h3>
-              <button onClick={addAttr} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">{tForm('addAttribute')}</button>
-            </div>
-            <div className="space-y-2">
-              {customAttrs.map(([key, val], idx) => (
-                <div key={idx} className="flex gap-2 items-center">
-                  <input
-                    value={key}
-                    onChange={(e) => updateAttr(idx, 0, e.target.value)}
-                    placeholder={tForm('attributeNamePlaceholder')}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                  />
-                  {val.includes('\n') ? (
-                    <textarea
-                      value={val}
-                      onChange={(e) => updateAttr(idx, 1, e.target.value)}
-                      rows={Math.min(8, val.split('\n').length)}
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono outline-hidden focus:ring-2 focus:ring-indigo-500 resize-y"
-                    />
-                  ) : (
-                    <input
-                      value={val}
-                      onChange={(e) => updateAttr(idx, 1, e.target.value)}
-                      placeholder={tFields('value')}
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                    />
-                  )}
-                  <button onClick={() => removeAttr(idx)} className="text-red-400 hover:text-red-600 text-sm shrink-0 px-1">&times;</button>
-                </div>
-              ))}
-              {customAttrs.length === 0 && (
-                <p className="text-xs text-gray-400">{tForm('noCustomAttributes')}</p>
-              )}
-            </div>
-          </Card>
-
-          {/* Request Form Builder */}
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">
-                {tForm('requestForm')}
-                {((form.form_schema as { fields: FormField[] })?.fields || []).length > 0 && (
-                  <span className="ml-2 text-xs font-normal bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-                    {tForm('fieldCount', { count: (form.form_schema as { fields: FormField[] }).fields.length })}
-                  </span>
-                )}
-              </h3>
-            </div>
-            <p className="text-xs text-gray-400 mb-3">{tForm('requestFormHint')}</p>
-            <FormBuilder
-              fields={(form.form_schema as { fields: FormField[] })?.fields || []}
-              onChange={(fields) => set('form_schema', { fields })}
-              ciClasses={ciClasses}
-            />
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">{tForm('settings')}</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('price')}</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs uppercase">
-                    {normalizedCurrency}
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.price != null && form.price !== '' ? String(form.price) : ''}
-                    onChange={(e) => set('price', e.target.value === '' ? null : e.target.value)}
-                    className="w-full pl-16 pr-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                    placeholder={tForm('pricePlaceholder')}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{tForm('slaHoursLabel')}</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.sla_hours ? String(form.sla_hours) : ''}
-                  onChange={(e) => set('sla_hours', parseInt(e.target.value, 10) || 72)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={!!form.approval_required}
-                    onChange={(e) => set('approval_required', e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 rounded-sm border-gray-300 focus:ring-indigo-500"
-                    id="approval_required"
-                  />
-                  <label htmlFor="approval_required" className="text-sm text-gray-700">{t('managerApproval')}</label>
-                </div>
-                <p className="text-xs text-gray-500 pl-7">
-                  {tForm('approvalHint')}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={form.is_active !== false}
-                  onChange={(e) => set('is_active', e.target.checked)}
-                  className="w-4 h-4 text-indigo-600 rounded-sm border-gray-300 focus:ring-indigo-500"
-                  id="is_active"
-                />
-                <label htmlFor="is_active" className="text-sm text-gray-700">{tStates('active')}</label>
-              </div>
-            </div>
-          </Card>
-
-          {/* Live preview */}
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-3">{tForm('preview')}</h3>
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
-              {picturePreview && (
-                <img src={picturePreview} className="w-full h-32 object-cover" alt="" />
-              )}
-              <div className="p-3">
-                <h4 className="font-semibold text-gray-900 text-sm">{(form.name as string) || tForm('previewNamePlaceholder')}</h4>
-                <p className="text-xs text-gray-500 mt-1">{(form.short_description as string) || tForm('previewShortDescriptionPlaceholder')}</p>
-                <div className="flex items-center justify-between mt-2">
-                  {form.price != null && form.price !== '' ? (
-                    <span className="text-sm font-semibold text-green-700">
-                      {formatCurrency(Number(form.price), normalizedCurrency)}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-400">{tForm('free')}</span>
-                  )}
-                  <span className="text-xs text-gray-400">{t('slaHours', { hours: String(form.sla_hours || 72) })}</span>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Save */}
+          </div>
           <button
-            onClick={handleSubmit}
-            disabled={saving || !(form.name as string)?.trim() || !(form.category_id as string)}
-            className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            type="button"
+            onClick={() => setFormError(null)}
+            className="shrink-0 text-red-500 hover:text-red-800 leading-none"
+            aria-label={tActions('dismiss')}
           >
-            {saving ? tActions('saving') : isNew ? tForm('createServiceItem') : tMaster('saveChanges')}
+            &times;
           </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <ServiceItemBasicCard form={form} categories={categories} fieldErrors={fieldErrors} set={set} />
+          <ServiceItemPictureCard
+            picturePreview={picturePreview}
+            fileRef={fileRef}
+            onFileChange={handleFileChange}
+            onClear={() => {
+              setPictureFile(null);
+              setPicturePreview('');
+              if (fileRef.current) fileRef.current.value = '';
+            }}
+          />
+          <ServiceItemAttributesCard
+            customAttrs={customAttrs}
+            onAdd={addAttr}
+            onRemove={removeAttr}
+            onUpdate={updateAttr}
+          />
+          <ServiceItemRequestFormCard
+            fields={(form.form_schema as { fields: FormField[] })?.fields || []}
+            ciClasses={ciClasses}
+            onChange={(fields) => set('form_schema', { fields })}
+          />
+        </div>
+        <div className="space-y-6">
+          <ServiceItemSettingsCard
+            form={form}
+            fieldErrors={fieldErrors}
+            currencyCode={normalizedCurrency}
+            set={set}
+          />
+          <ServiceItemPreviewCard
+            form={form}
+            picturePreview={picturePreview}
+            currencyCode={normalizedCurrency}
+          />
         </div>
       </div>
     </>

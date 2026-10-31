@@ -67,6 +67,7 @@ export const ImportHistoryPage = lazy(() => import('@/pages/admin/ImportHistoryP
 export const CatalogTasksPage = lazy(() => import('@/pages/admin/CatalogTasksPage'));
 export const CatalogTaskDetailPage = lazy(() => import('@/pages/admin/CatalogTaskDetailPage'));
 export const ServiceItemsPage = lazy(() => import('@/pages/admin/ServiceItemsPage'));
+export const CategoriesPage = lazy(() => import('@/pages/admin/CategoriesPage'));
 export const ServicesPage = lazy(() => import('@/pages/admin/ServicesPage'));
 export const SlaConfigPage = lazy(() => import('@/pages/admin/SlaConfigPage'));
 export const BusinessCalendarsPage = lazy(() => import('@/pages/admin/BusinessCalendarsPage'));

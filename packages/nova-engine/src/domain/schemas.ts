@@ -67,11 +67,19 @@ export const createCategorySchema = z.object({
   sort_order: z.number().int().min(0).optional(),
 });
 
+export const updateCategorySchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  icon: z.string().max(50).optional(),
+  sort_order: z.number().int().min(0).optional(),
+  is_active: z.boolean().optional(),
+});
+
 export const createServiceItemSchema = z.object({
   category_id: uuidSchema,
   name: z.string().min(1).max(255),
-  short_description: z.string().max(500).optional(),
-  description: z.string().max(5000).optional(),
+  short_description: z.string().max(500).nullable().optional(),
+  description: z.string().max(5000).nullable().optional(),
   icon: z.string().max(50).optional(),
   price: z.number().min(0).optional().nullable(),
   custom_attributes: z.record(z.string(), z.unknown()).default({}),

@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { db } from '../../data/db';
 import { authenticate, requireRole, getRequestClient, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
-import { createCategorySchema, createServiceItemSchema } from '../../domain/schemas';
+import { createCategorySchema, createServiceItemSchema, updateCategorySchema } from '../../domain/schemas';
 import { NotFound, BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
 import {
@@ -356,12 +356,22 @@ function ensureDir(dir: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+function canManageCatalog(req: Request): boolean {
+  const roles = req.user?.roles ?? [];
+  return roles.includes('admin') || roles.includes('catalog_designer');
+}
+
 // ─── GET /api/catalog/categories ───
 router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
+    const includeInactive = req.query.include_inactive === 'true' && canManageCatalog(req);
     const result = await client.query(
-      'SELECT * FROM service_categories WHERE is_active = true ORDER BY sort_order, name',
+      `SELECT sc.*,
+              (SELECT count(*)::int FROM service_items si WHERE si.category_id = sc.id) AS item_count
+       FROM service_categories sc
+       ${includeInactive ? '' : 'WHERE sc.is_active = true'}
+       ORDER BY sc.sort_order, sc.name`,
     );
     res.json({ categories: result.rows });
   } catch (err) {
@@ -403,6 +413,45 @@ router.post(
   },
 );
 
+// ─── PATCH /api/catalog/categories/:id ───
+router.patch(
+  '/categories/:id',
+  requireRole('admin', 'catalog_designer'),
+  validateBody(updateCategorySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const { name, description, icon, sort_order, is_active } = req.body;
+      const sets: string[] = [];
+      const vals: unknown[] = [];
+      let i = 1;
+      if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(name); }
+      if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description || null); }
+      if (icon !== undefined) { sets.push(`icon = $${i++}`); vals.push(icon || 'folder'); }
+      if (sort_order !== undefined) { sets.push(`sort_order = $${i++}`); vals.push(sort_order); }
+      if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
+      if (sets.length === 0) {
+        const current = await client.query(
+          'SELECT * FROM service_categories WHERE id = $1',
+          [req.params.id],
+        );
+        if (!current.rows[0]) throw NotFound('Category not found');
+        res.json(current.rows[0]);
+        return;
+      }
+      vals.push(req.params.id);
+      const result = await client.query(
+        `UPDATE service_categories SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
+        vals,
+      );
+      if (!result.rows[0]) throw NotFound('Category not found');
+      res.json(result.rows[0]);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── GET /api/catalog/items ───
 router.get('/items', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -411,7 +460,8 @@ router.get('/items', async (req: Request, res: Response, next: NextFunction) => 
     const includeInactive = req.query.include_inactive === 'true';
 
     let sql = `
-      SELECT si.*, sc.name AS category_name
+      SELECT si.*, sc.name AS category_name,
+             (SELECT count(*)::int FROM catalog_tasks ct WHERE ct.service_item_id = si.id) AS task_count
       FROM service_items si
       JOIN service_categories sc ON sc.id = si.category_id
     `;
@@ -506,7 +556,11 @@ router.put(
           [req.params.id],
         );
         if (parseInt(taskCount.rows[0].count, 10) === 0) {
-          throw BadRequest('Cannot activate a service item without at least one active Catalog Workflow Task');
+          res.json({
+            success: false,
+            error: 'Cannot activate a service item without at least one active Catalog Workflow Task',
+          });
+          return;
         }
       }
 
@@ -634,13 +688,82 @@ router.delete('/items/:id/picture', requireRole('admin', 'catalog_designer'),
   },
 );
 
+function unlinkCatalogPicture(storageKey: string | null): void {
+  if (!storageKey) return;
+  try {
+    fs.unlinkSync(resolveUploadPath(config.uploads.dir, storageKey));
+  } catch {
+    /* file may already be gone */
+  }
+}
+
 // ─── DELETE /api/catalog/items/:id ───
+// Without ?permanent=true this deactivates the item. Permanent delete is only
+// allowed for an inactive item, and it removes that item's catalog tasks.
+// Submitted requests keep a required reference to the item, so those items stay.
 router.delete('/items/:id', requireRole('admin', 'catalog_designer'),
   async (req: Request, res: Response, next: NextFunction) => {
+    const permanent = req.query.permanent === 'true';
+    const client = getRequestClient(req);
     try {
-      const client = getRequestClient(req);
-      await client.query('UPDATE service_items SET is_active = false, updated_at = now() WHERE id = $1', [req.params.id]);
-      res.json({ success: true });
+      if (!permanent) {
+        await client.query(
+          'UPDATE service_items SET is_active = false, updated_at = now() WHERE id = $1',
+          [req.params.id],
+        );
+        res.json({ success: true });
+        return;
+      }
+
+      await client.query('BEGIN');
+      try {
+        const item = await client.query(
+          'SELECT id, is_active, picture_storage_key FROM service_items WHERE id = $1 FOR UPDATE',
+          [req.params.id],
+        );
+        if (item.rows.length === 0) throw NotFound('Service item not found');
+        if (item.rows[0].is_active) {
+          throw BadRequest('Deactivate the service item before deleting it');
+        }
+
+        const used = await client.query(
+          'SELECT count(*)::int AS count FROM requests WHERE service_item_id = $1',
+          [req.params.id],
+        );
+        const requestCount = Number(used.rows[0]?.count ?? 0);
+        if (requestCount > 0) {
+          await client.query('ROLLBACK');
+          res.json({
+            success: false,
+            error: `This service item is used by ${requestCount} existing request${requestCount === 1 ? '' : 's'} and cannot be deleted`,
+          });
+          return;
+        }
+
+        await client.query('DELETE FROM cart_items WHERE service_item_id = $1', [req.params.id]);
+        await client.query(
+          `UPDATE request_tasks
+             SET catalog_task_id = NULL
+           WHERE catalog_task_id IN (SELECT id FROM catalog_tasks WHERE service_item_id = $1)`,
+          [req.params.id],
+        );
+        const tasks = await client.query(
+          'DELETE FROM catalog_tasks WHERE service_item_id = $1',
+          [req.params.id],
+        );
+        const deleted = await client.query(
+          'DELETE FROM service_items WHERE id = $1 AND is_active = false',
+          [req.params.id],
+        );
+        if ((deleted.rowCount ?? 0) === 0) throw NotFound('Service item not found');
+
+        await client.query('COMMIT');
+        unlinkCatalogPicture(item.rows[0].picture_storage_key as string | null);
+        res.json({ success: true, deleted_tasks: tasks.rowCount ?? 0 });
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
     } catch (err) {
       next(err);
     }

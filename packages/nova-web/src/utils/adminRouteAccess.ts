@@ -17,7 +17,11 @@ export function canAccessAdminRoute(pathname: string, roles: string[] | undefine
   const r = roles ?? [];
   if (!pathname.startsWith('/admin')) return true;
 
-  if (pathname.startsWith('/admin/service-items') || pathname.startsWith('/admin/catalog-tasks')) {
+  if (
+    pathname.startsWith('/admin/categories')
+    || pathname.startsWith('/admin/service-items')
+    || pathname.startsWith('/admin/catalog-tasks')
+  ) {
     return isAdminRole(r) || isCatalogDesignerRole(r);
   }
   if (pathname.startsWith('/admin/ci-classes')) {
