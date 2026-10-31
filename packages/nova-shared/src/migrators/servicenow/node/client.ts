@@ -30,9 +30,15 @@ export class ServiceNowApiError extends Error {
   }
 }
 
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
 /** Accepts "acme", "acme.service-now.com", or a full https URL. */
 export function normalizeServiceNowInstanceUrl(raw: string): string {
-  const trimmed = raw.trim().replace(/\/+$/, '');
+  const trimmed = stripTrailingSlashes(raw.trim());
   if (!trimmed) throw new Error('Instance URL is required');
   if (/^[a-z0-9-]+$/i.test(trimmed)) return `https://${trimmed.toLowerCase()}.service-now.com`;
   const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;

@@ -34,6 +34,18 @@ import { aliasKind, buildTree, type FlowNode, walk } from './tree';
 
 export type { FlowLookups } from './flow-types';
 
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
+function stripLeadingSlashes(value: string): string {
+  let start = 0;
+  while (start < value.length && value.charCodeAt(start) === 47) start++;
+  return value.slice(start);
+}
+
 function subflowOutputVar(prefix: string, output: string): string {
   return `${prefix}_${output.replace(/[^A-Za-z0-9_]/g, '_')}`;
 }
@@ -393,7 +405,7 @@ export function convertFlow(
       case 'rest': {
         const base = pick(values, 'base_url', 'rest_endpoint', 'endpoint', 'url');
         const path = pick(values, 'resource_path', 'path');
-        const url = translateTemplate(`${base.replace(/\/+$/, '')}${path ? `/${path.replace(/^\/+/, '')}` : ''}`, ctx);
+        const url = translateTemplate(`${stripTrailingSlashes(base)}${path ? `/${stripLeadingSlashes(path)}` : ''}`, ctx);
         if (!url) {
           return placeholder(n, 'REST step without a resolvable endpoint (likely a connection alias).', next);
         }

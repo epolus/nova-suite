@@ -35,6 +35,7 @@ describe('instance URL and credential parsing', () => {
   it('normalizes instance names and rejects http', () => {
     expect(normalizeServiceNowInstanceUrl('Acme')).toBe('https://acme.service-now.com');
     expect(normalizeServiceNowInstanceUrl('acme.service-now.com/')).toBe('https://acme.service-now.com');
+    expect(normalizeServiceNowInstanceUrl('https://acme.service-now.com///')).toBe('https://acme.service-now.com');
     expect(() => normalizeServiceNowInstanceUrl('http://acme.service-now.com')).toThrow(/https/);
   });
 
