@@ -75,6 +75,7 @@
       "createdAt": "Creato a",
       "updatedAt": "Aggiornato a",
       "search": "Ricerca",
+      "manager": "Manager",
       "responsiblePerson": "Persona responsabile",
       "departments": "Dipartimenti"
     },

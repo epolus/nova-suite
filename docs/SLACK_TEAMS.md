@@ -2,7 +2,7 @@
 
 Nova Suite posts incident notifications into Slack or Microsoft Teams, keeps later messages on the same incident, and writes a reply back to the incident journal.
 
-Schema `v00.01.21` or later is required (current is `v00.01.24`). On an older database, apply `infra/postgres/migrations/v00.01.21__chat_threads.sql` and set `DB_SCHEMA_VERSION` to the highest applied migration before using this. A mismatch puts the API in degraded mode and stops the worker.
+Schema `v00.01.21` or later is required (current is `v00.01.25`). On an older database, apply `infra/postgres/migrations/v00.01.21__chat_threads.sql` and set `DB_SCHEMA_VERSION` to the highest applied migration before using this. A mismatch puts the API in degraded mode and stops the worker.
 
 Configuration is admin-only: **Admin → Notification Workflows** (`/admin/notification-config`).
 
