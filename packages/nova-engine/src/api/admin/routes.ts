@@ -616,8 +616,14 @@ router.get('/cost-centers', async (req: Request, res: Response, next: NextFuncti
     const tenantId = req.user!.tenant_id;
     const rows = await db.getMany(
       `SELECT cc.id, cc.code, cc.name, cc.description, cc.is_active, cc.created_at, cc.updated_at,
-              (SELECT count(*) FROM users u WHERE u.cost_center_id = cc.id AND u.is_active)::int AS user_count
-       FROM cost_centers cc WHERE cc.tenant_id = $1 ORDER BY cc.code`,
+              cc.responsible_user_id,
+              ru.display_name AS responsible_user_name,
+              (SELECT count(*) FROM users u WHERE u.cost_center_id = cc.id AND u.is_active)::int AS user_count,
+              (SELECT count(*) FROM departments d WHERE d.cost_center_id = cc.id AND d.is_active)::int AS department_count
+       FROM cost_centers cc
+       LEFT JOIN users ru ON ru.id = cc.responsible_user_id
+       WHERE cc.tenant_id = $1
+       ORDER BY cc.code`,
       [tenantId],
     );
     res.json({ cost_centers: rows });
@@ -627,11 +633,19 @@ router.get('/cost-centers', async (req: Request, res: Response, next: NextFuncti
 router.post('/cost-centers', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { code, name, description } = req.body;
+    const { code, name, description, responsible_user_id } = req.body;
     if (!code || !name) throw new AppError(400, 'code and name are required');
+    const responsibleUserId = responsible_user_id || null;
+    if (responsibleUserId) {
+      const user = await db.getOne<{ id: string }>(
+        'SELECT id FROM users WHERE id = $1 AND tenant_id = $2',
+        [responsibleUserId, tenantId],
+      );
+      if (!user) throw new AppError(400, 'responsible_user_id must reference an existing user in this tenant');
+    }
     const row = await db.getOne<{ id: string }>(
-      'INSERT INTO cost_centers (tenant_id, code, name, description) VALUES ($1, $2, $3, $4) RETURNING id',
-      [tenantId, code, name, description || null],
+      'INSERT INTO cost_centers (tenant_id, code, name, description, responsible_user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [tenantId, code, name, description || null, responsibleUserId],
     );
     res.status(201).json(row);
   } catch (err) { next(err); }
@@ -640,13 +654,24 @@ router.post('/cost-centers', async (req: Request, res: Response, next: NextFunct
 router.patch('/cost-centers/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { code, name, description, is_active } = req.body;
+    const { code, name, description, is_active, responsible_user_id } = req.body;
+    if (responsible_user_id !== undefined) {
+      const responsibleUserId = responsible_user_id || null;
+      if (responsibleUserId) {
+        const user = await db.getOne<{ id: string }>(
+          'SELECT id FROM users WHERE id = $1 AND tenant_id = $2',
+          [responsibleUserId, tenantId],
+        );
+        if (!user) throw new AppError(400, 'responsible_user_id must reference an existing user in this tenant');
+      }
+    }
     const sets: string[] = [];
     const vals: unknown[] = [];
     let i = 1;
     if (code !== undefined) { sets.push(`code = $${i++}`); vals.push(code); }
     if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(name); }
     if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description || null); }
+    if (responsible_user_id !== undefined) { sets.push(`responsible_user_id = $${i++}`); vals.push(responsible_user_id || null); }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
     if (sets.length === 0) { res.json({ success: true }); return; }
     vals.push(req.params.id, tenantId);

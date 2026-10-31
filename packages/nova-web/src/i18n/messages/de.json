@@ -74,7 +74,9 @@
       "assignedTo": "Zugewiesen an",
       "createdAt": "Erstellt am",
       "updatedAt": "Aktualisiert am",
-      "search": "Suchen"
+      "search": "Suchen",
+      "responsiblePerson": "Verantwortliche Person",
+      "departments": "Abteilungen"
     },
     "table": {
       "number": "Nummer",
