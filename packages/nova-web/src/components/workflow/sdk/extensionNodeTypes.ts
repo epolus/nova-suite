@@ -3,6 +3,7 @@ import { defineNode, scope } from './defineNode';
 
 const approverTypeOptions = [
   { label: 'Requester manager', value: 'requester_manager' },
+  { label: 'Department manager', value: 'department_manager' },
   { label: 'User', value: 'user' },
   { label: 'Group', value: 'group' },
   { label: 'Group manager', value: 'group_manager' },

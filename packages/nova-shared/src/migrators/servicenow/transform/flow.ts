@@ -171,6 +171,11 @@ export function convertFlow(
     if (groups.length + users.length > 1) {
       notes.warn('approval_multiple', 'Multiple approvers/rules found; only the first is migrated.', n.label);
     }
+    const described = `${n.defName} ${n.step.comment} ${rules}`;
+    if (/dept(?:artment)?[\s_-]*head|department[\s_-]*manager/i.test(described)) {
+      notes.info('department_manager', 'Department head approval uses the manager of the request subject\'s department.', n.label);
+      return { type: 'department_manager', template: '' };
+    }
     if (/manager/i.test(rules) && groups.length === 0 && users.length === 0) {
       return { type: 'requester_manager', template: '' };
     }

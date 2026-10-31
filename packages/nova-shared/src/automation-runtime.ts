@@ -630,7 +630,9 @@ type SuspensionWithoutCheckpoint = AutomationSuspension extends infer S
   : never;
 
 function normalizeApproverType(raw: unknown): AutomationApproverType {
-  return raw === 'user' || raw === 'group' || raw === 'group_manager' ? raw : 'requester_manager';
+  return raw === 'user' || raw === 'group' || raw === 'group_manager' || raw === 'department_manager'
+    ? raw
+    : 'requester_manager';
 }
 
 export async function executeAutomationGraph(
