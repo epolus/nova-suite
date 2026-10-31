@@ -587,6 +587,12 @@ router.get(
         conditions.push(
           `(rt.assigned_to = $${assignedParam}
             OR (
+              rt.assigned_to IS NULL
+              AND rt.assigned_group_id IN (
+                SELECT group_id FROM assignment_group_members WHERE user_id = $${assignedParam}
+              )
+            )
+            OR (
               rt.task_type = 'approval'
               AND rt.assigned_group_id IS NULL
               AND rt.assigned_to IS NULL

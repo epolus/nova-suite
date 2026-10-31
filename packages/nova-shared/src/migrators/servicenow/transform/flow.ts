@@ -366,8 +366,8 @@ export function convertFlow(
         const to = pick(values, 'ah_to', 'to', 'recipients', 'users', 'recipient');
         let recipientType = 'requester';
         const toPath = singlePillPath(to, ctx);
-        if (toPath === 'request.requested_for') recipientType = 'requested_for';
-        else if (toPath === 'request.requester_id') recipientType = 'requester';
+        if (toPath === 'request.requested_for' || toPath === 'request.requested_for_email') recipientType = 'requested_for';
+        else if (toPath === 'request.requester_id' || toPath === 'request.requester_email') recipientType = 'requester';
         else if (toPath) recipientType = `{{${toPath}}}`;
         else if (/^[^@\s]+@[^@\s]+$/.test(to)) {
           recipientType = to;

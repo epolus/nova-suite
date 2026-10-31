@@ -41,7 +41,31 @@ const REQUEST_FIELD_MAP: Record<string, string> = {
   request: 'request.id',
   assigned_to: 'request.assigned_to',
   cat_item: 'request.service_item_name',
+  opened_at: 'request.created_at',
+  quantity: 'request.quantity',
+  comments: 'request.notes',
 };
+
+/** User-record walks that Nova can resolve from the request subject / requester. */
+const USER_FIELD_WALK: Record<string, Record<string, string>> = {
+  requested_for: { email: 'request.requested_for_email' },
+  opened_by: { email: 'request.requester_email' },
+};
+
+function mapRequestField(field: string, rest: string[], path: string, ctx: PillContext): string | null {
+  const base = REQUEST_FIELD_MAP[field];
+  if (!base) return null;
+  const itemName = field === 'cat_item' && rest.length === 1 && rest[0].toLowerCase() === 'name';
+  if (rest.length === 0 || itemName) return base;
+  const walked = USER_FIELD_WALK[field]?.[rest[0].toLowerCase()];
+  if (walked && rest.length === 1) return walked;
+  if (walked) {
+    ctx.notes.warn('pill_dot_walk', `Dot-walked pill "${path}" is only supported through .${rest[0]}; using ${walked}.`, path);
+    return walked;
+  }
+  ctx.notes.warn('pill_dot_walk', `Dot-walked pill "${path}" is not supported; using ${base}.`, path);
+  return base;
+}
 
 /** Translates the inside of a `{{...}}` data pill to a Nova template path, or null when unknown. */
 export function translatePillPath(raw: string, ctx: PillContext): string | null {
@@ -55,7 +79,7 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
       rest = rest.slice(1);
     }
     if ((rest[0] ?? '').toLowerCase() === 'variables' && (rest[1] ?? '').toLowerCase() === 'requested_for') {
-      return ['request.requested_for', ...rest.slice(2)].join('.');
+      return mapRequestField('requested_for', rest.slice(2), path, ctx);
     }
     if ((rest[0] ?? '').toLowerCase() === 'variables' && rest[1]) {
       const mapping = ctx.fields.get(rest[1]);
@@ -65,13 +89,8 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
     }
     if ((rest[0] ?? '').toLowerCase() === 'request' && rest[1]) rest = rest.slice(1);
     const field = (rest[0] ?? 'sys_id').toLowerCase();
-    if (REQUEST_FIELD_MAP[field]) {
-      const itemName = field === 'cat_item' && rest.length === 2 && rest[1].toLowerCase() === 'name';
-      if (rest.length > 1 && !itemName) {
-        ctx.notes.warn('pill_dot_walk', `Dot-walked pill "${path}" is not supported; using ${REQUEST_FIELD_MAP[field]}.`, path);
-      }
-      return REQUEST_FIELD_MAP[field];
-    }
+    const mapped = mapRequestField(field, rest.slice(1), path, ctx);
+    if (mapped) return mapped;
     ctx.notes.warn('pill_request_field', `Request field "${field}" has no Nova equivalent; it will resolve to an empty value.`, path);
     return `request.${field}`;
   }
