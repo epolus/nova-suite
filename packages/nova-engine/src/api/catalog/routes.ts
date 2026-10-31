@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { db } from '../../data/db';
 import { authenticate, requireRole, getRequestClient, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
-import { createCategorySchema, createServiceItemSchema } from '../../domain/schemas';
+import { createCategorySchema, createServiceItemSchema, updateCategorySchema } from '../../domain/schemas';
 import { NotFound, BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
 import {
@@ -356,12 +356,22 @@ function ensureDir(dir: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+function canManageCatalog(req: Request): boolean {
+  const roles = req.user?.roles ?? [];
+  return roles.includes('admin') || roles.includes('catalog_designer');
+}
+
 // ─── GET /api/catalog/categories ───
 router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
+    const includeInactive = req.query.include_inactive === 'true' && canManageCatalog(req);
     const result = await client.query(
-      'SELECT * FROM service_categories WHERE is_active = true ORDER BY sort_order, name',
+      `SELECT sc.*,
+              (SELECT count(*)::int FROM service_items si WHERE si.category_id = sc.id) AS item_count
+       FROM service_categories sc
+       ${includeInactive ? '' : 'WHERE sc.is_active = true'}
+       ORDER BY sc.sort_order, sc.name`,
     );
     res.json({ categories: result.rows });
   } catch (err) {
@@ -397,6 +407,45 @@ router.post(
         [name, description || null, icon || 'folder', sort_order || 0],
       );
       res.status(201).json(result.rows[0]);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── PATCH /api/catalog/categories/:id ───
+router.patch(
+  '/categories/:id',
+  requireRole('admin', 'catalog_designer'),
+  validateBody(updateCategorySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const { name, description, icon, sort_order, is_active } = req.body;
+      const sets: string[] = [];
+      const vals: unknown[] = [];
+      let i = 1;
+      if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(name); }
+      if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description || null); }
+      if (icon !== undefined) { sets.push(`icon = $${i++}`); vals.push(icon || 'folder'); }
+      if (sort_order !== undefined) { sets.push(`sort_order = $${i++}`); vals.push(sort_order); }
+      if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
+      if (sets.length === 0) {
+        const current = await client.query(
+          'SELECT * FROM service_categories WHERE id = $1',
+          [req.params.id],
+        );
+        if (!current.rows[0]) throw NotFound('Category not found');
+        res.json(current.rows[0]);
+        return;
+      }
+      vals.push(req.params.id);
+      const result = await client.query(
+        `UPDATE service_categories SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
+        vals,
+      );
+      if (!result.rows[0]) throw NotFound('Category not found');
+      res.json(result.rows[0]);
     } catch (err) {
       next(err);
     }

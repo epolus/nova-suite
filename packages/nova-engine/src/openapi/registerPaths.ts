@@ -9,6 +9,7 @@ import {
   approveRequestSchema,
   configPackageApplySchema,
   createCategorySchema,
+  updateCategorySchema,
   createCIClassSchema,
   createCIRelationshipSchema,
   createCISchema,
@@ -146,6 +147,21 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
       },
     },
     responses: { 201: { description: 'Category created' } },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/catalog/categories/{id}',
+    tags: ['Catalog'],
+    summary: 'Update category (admin)',
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: {
+        content: { 'application/json': { schema: updateCategorySchema } },
+        required: true,
+      },
+    },
+    responses: { 200: { description: 'Category updated' } },
   });
 
   registry.registerPath({

@@ -346,6 +346,7 @@
       "roles": "Roles",
       "assignmentGroups": "Assignment Groups",
       "services": "Services",
+      "categories": "Categories",
       "serviceItems": "Service Items",
       "catalogTasks": "Catalog Tasks",
       "processes": "Processes",
@@ -1514,6 +1515,17 @@
         "description": "Manage service offerings in the catalog.",
         "placeholderName": "e.g. Email Service",
         "placeholderDescription": "Brief description of the service"
+      },
+      "categories": {
+        "title": "Categories",
+        "entity": "category",
+        "description": "Group service catalog items.",
+        "placeholderName": "e.g. Hardware",
+        "placeholderDescription": "What belongs in this category",
+        "placeholderIcon": "folder",
+        "sortOrder": "Sort order",
+        "sortOrderInvalid": "Sort order must be a whole number.",
+        "items": "Items"
       },
       "serviceItems": {
         "title": "Service Item Designer",
@@ -3686,6 +3698,7 @@
         "adminTheming": { "title": "Theming & Branding", "subtitle": "Admin · System" },
         "adminAiSettings": { "title": "AI Settings", "subtitle": "Admin · System" },
         "adminImport": { "title": "Import Data", "subtitle": "Admin · Data & Integration" },
+        "adminCategories": { "title": "Categories", "subtitle": "Admin · Service Catalog" },
         "adminServiceItems": { "title": "Service Items", "subtitle": "Admin · Service Catalog" }
       }
     }

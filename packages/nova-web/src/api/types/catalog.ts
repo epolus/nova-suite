@@ -6,6 +6,8 @@ export interface Category {
   description: string | null;
   icon: string;
   sort_order: number;
+  is_active: boolean;
+  item_count?: number;
 }
 
 export interface FormField {
