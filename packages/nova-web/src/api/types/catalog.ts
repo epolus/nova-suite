@@ -40,6 +40,7 @@ export interface ServiceItem {
   sla_hours: number;
   is_active: boolean;
   category_name?: string;
+  task_count?: number;
 }
 
 export interface ServiceRequest {

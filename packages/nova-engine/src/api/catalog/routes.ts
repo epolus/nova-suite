@@ -411,7 +411,8 @@ router.get('/items', async (req: Request, res: Response, next: NextFunction) => 
     const includeInactive = req.query.include_inactive === 'true';
 
     let sql = `
-      SELECT si.*, sc.name AS category_name
+      SELECT si.*, sc.name AS category_name,
+             (SELECT count(*)::int FROM catalog_tasks ct WHERE ct.service_item_id = si.id) AS task_count
       FROM service_items si
       JOIN service_categories sc ON sc.id = si.category_id
     `;
@@ -634,13 +635,82 @@ router.delete('/items/:id/picture', requireRole('admin', 'catalog_designer'),
   },
 );
 
+function unlinkCatalogPicture(storageKey: string | null): void {
+  if (!storageKey) return;
+  try {
+    fs.unlinkSync(resolveUploadPath(config.uploads.dir, storageKey));
+  } catch {
+    /* file may already be gone */
+  }
+}
+
 // ─── DELETE /api/catalog/items/:id ───
+// Without ?permanent=true this deactivates the item. Permanent delete is only
+// allowed for an inactive item, and it removes that item's catalog tasks.
+// Submitted requests keep a required reference to the item, so those items stay.
 router.delete('/items/:id', requireRole('admin', 'catalog_designer'),
   async (req: Request, res: Response, next: NextFunction) => {
+    const permanent = req.query.permanent === 'true';
+    const client = getRequestClient(req);
     try {
-      const client = getRequestClient(req);
-      await client.query('UPDATE service_items SET is_active = false, updated_at = now() WHERE id = $1', [req.params.id]);
-      res.json({ success: true });
+      if (!permanent) {
+        await client.query(
+          'UPDATE service_items SET is_active = false, updated_at = now() WHERE id = $1',
+          [req.params.id],
+        );
+        res.json({ success: true });
+        return;
+      }
+
+      await client.query('BEGIN');
+      try {
+        const item = await client.query(
+          'SELECT id, is_active, picture_storage_key FROM service_items WHERE id = $1 FOR UPDATE',
+          [req.params.id],
+        );
+        if (item.rows.length === 0) throw NotFound('Service item not found');
+        if (item.rows[0].is_active) {
+          throw BadRequest('Deactivate the service item before deleting it');
+        }
+
+        const used = await client.query(
+          'SELECT count(*)::int AS count FROM requests WHERE service_item_id = $1',
+          [req.params.id],
+        );
+        const requestCount = Number(used.rows[0]?.count ?? 0);
+        if (requestCount > 0) {
+          await client.query('ROLLBACK');
+          res.json({
+            success: false,
+            error: `This service item is used by ${requestCount} existing request${requestCount === 1 ? '' : 's'} and cannot be deleted`,
+          });
+          return;
+        }
+
+        await client.query('DELETE FROM cart_items WHERE service_item_id = $1', [req.params.id]);
+        await client.query(
+          `UPDATE request_tasks
+             SET catalog_task_id = NULL
+           WHERE catalog_task_id IN (SELECT id FROM catalog_tasks WHERE service_item_id = $1)`,
+          [req.params.id],
+        );
+        const tasks = await client.query(
+          'DELETE FROM catalog_tasks WHERE service_item_id = $1',
+          [req.params.id],
+        );
+        const deleted = await client.query(
+          'DELETE FROM service_items WHERE id = $1 AND is_active = false',
+          [req.params.id],
+        );
+        if ((deleted.rowCount ?? 0) === 0) throw NotFound('Service item not found');
+
+        await client.query('COMMIT');
+        unlinkCatalogPicture(item.rows[0].picture_storage_key as string | null);
+        res.json({ success: true, deleted_tasks: tasks.rowCount ?? 0 });
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
     } catch (err) {
       next(err);
     }

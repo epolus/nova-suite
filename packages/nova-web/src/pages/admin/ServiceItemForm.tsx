@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'use-intl';
 import { catalog, cmdb } from '../../api/client';
 import type { ServiceItem, Category, FormField, CIClass } from '../../api/client';
@@ -8,6 +8,7 @@ import Card from '../../components/Card';
 import FormBuilder from '../../components/FormBuilder';
 import { formatCurrency, normalizeCurrencyCode } from '../../utils/currency';
 import { formatCustomAttribute, parseCustomAttribute } from './customAttributes';
+import { CATALOG_ITEM_ICONS, CatalogItemIcon, isCatalogItemIcon } from './catalogItemIcons';
 
 const EMPTY_ITEM: Partial<ServiceItem> = {
   name: '',
@@ -26,21 +27,30 @@ export default function ServiceItemForm({
   item,
   categories,
   currencyCode,
+  prevItemId,
+  nextItemId,
+  onNavigate,
   onSave,
   onCancel,
 }: {
   item?: ServiceItem;
   categories: Category[];
   currencyCode: string;
+  prevItemId?: string | null;
+  nextItemId?: string | null;
+  onNavigate?: (id: string) => void;
   onSave: (item: ServiceItem) => void;
   onCancel: () => void;
 }) {
   const t = useTranslations('pages.admin.serviceItems');
   const tForm = useTranslations('pages.admin.serviceItems.form');
+  const tIcons = useTranslations('pages.admin.serviceItems.form.icons');
   const tActions = useTranslations('common.actions');
   const tFields = useTranslations('common.fields');
   const tStates = useTranslations('common.states');
   const tMaster = useTranslations('common.masterData');
+  const tMessages = useTranslations('common.messages');
+  const dirtyRef = useRef(false);
   const isNew = !item;
   const [form, setForm] = useState<Record<string, unknown>>(() => {
     if (item) return { ...item };
@@ -79,16 +89,38 @@ export default function ServiceItemForm({
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [item?.id, item?.picture_storage_key]);
 
+  const markDirty = () => { dirtyRef.current = true; };
+
+  const navigateTo = useCallback((id: string) => {
+    if (!onNavigate) return;
+    if (dirtyRef.current && !window.confirm(tMessages('unsavedChanges'))) return;
+    onNavigate(id);
+  }, [onNavigate, tMessages]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isNew) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
+      if (e.key === 'ArrowLeft' && prevItemId) navigateTo(prevItemId);
+      if (e.key === 'ArrowRight' && nextItemId) navigateTo(nextItemId);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isNew, prevItemId, nextItemId, navigateTo]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    markDirty();
     setPictureFile(f);
     setPicturePreview(URL.createObjectURL(f));
   };
 
-  const addAttr = () => setCustomAttrs([...customAttrs, ['', '']]);
-  const removeAttr = (idx: number) => setCustomAttrs(customAttrs.filter((_, i) => i !== idx));
+  const addAttr = () => { markDirty(); setCustomAttrs([...customAttrs, ['', '']]); };
+  const removeAttr = (idx: number) => { markDirty(); setCustomAttrs(customAttrs.filter((_, i) => i !== idx)); };
   const updateAttr = (idx: number, field: 0 | 1, value: string) => {
+    markDirty();
     const updated = [...customAttrs];
     const entry = updated[idx];
     if (!entry) return;
@@ -140,16 +172,61 @@ export default function ServiceItemForm({
     }
   };
 
-  const set = (key: string, value: unknown) => setForm({ ...form, [key]: value });
+  const set = (key: string, value: unknown) => {
+    markDirty();
+    setForm({ ...form, [key]: value });
+  };
+  const canSave = !saving && !!(form.name as string)?.trim() && !!(form.category_id as string);
 
   return (
     <>
       <PageHeader
         title={isNew ? t('newServiceItem') : t('editServiceItem', { name: item!.name })}
+        description={!isNew && (prevItemId || nextItemId) ? tMaster('navigateRecords') : undefined}
         action={
-          <button onClick={onCancel} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-            &larr; {tActions('cancel')}
-          </button>
+          <div className="flex items-center gap-2">
+            {!isNew && (
+              <>
+                <button
+                  type="button"
+                  disabled={!prevItemId}
+                  onClick={() => prevItemId && navigateTo(prevItemId)}
+                  className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={tMaster('previousEntity', { entity: t('entity') })}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  disabled={!nextItemId}
+                  onClick={() => nextItemId && navigateTo(nextItemId)}
+                  className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={tMaster('nextEntity', { entity: t('entity') })}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {tActions('cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSave}
+              className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? tActions('saving') : isNew ? tForm('createServiceItem') : tMaster('saveChanges')}
+            </button>
+          </div>
         }
       />
 
@@ -179,14 +256,33 @@ export default function ServiceItemForm({
                   {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('icon')}</label>
-                <input
-                  value={(form.icon as string) || ''}
-                  onChange={(e) => set('icon', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                  placeholder={tForm('iconPlaceholder')}
-                />
+                <div className="flex flex-wrap gap-2" role="group" aria-label={tFields('icon')}>
+                  {CATALOG_ITEM_ICONS.map(({ value }) => {
+                    const selected = ((form.icon as string) || 'box') === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        title={tIcons(value)}
+                        aria-label={tIcons(value)}
+                        aria-pressed={selected}
+                        onClick={() => set('icon', value)}
+                        className={`p-2 rounded-lg border-2 transition-all text-gray-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                          selected
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                            : 'border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
+                        <CatalogItemIcon name={value} />
+                      </button>
+                    );
+                  })}
+                </div>
+                {(form.icon as string) && !isCatalogItemIcon(form.icon as string) && (
+                  <p className="text-xs text-gray-400 mt-1">{tForm('currentIcon', { icon: form.icon as string })}</p>
+                )}
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('shortDescription')}</label>
@@ -378,7 +474,10 @@ export default function ServiceItemForm({
                 <img src={picturePreview} className="w-full h-32 object-cover" alt="" />
               )}
               <div className="p-3">
-                <h4 className="font-semibold text-gray-900 text-sm">{(form.name as string) || tForm('previewNamePlaceholder')}</h4>
+                <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                  <CatalogItemIcon name={(form.icon as string) || 'box'} className="size-4 shrink-0 text-gray-500" />
+                  <span>{(form.name as string) || tForm('previewNamePlaceholder')}</span>
+                </h4>
                 <p className="text-xs text-gray-500 mt-1">{(form.short_description as string) || tForm('previewShortDescriptionPlaceholder')}</p>
                 <div className="flex items-center justify-between mt-2">
                   {form.price != null && form.price !== '' ? (
@@ -393,15 +492,6 @@ export default function ServiceItemForm({
               </div>
             </div>
           </Card>
-
-          {/* Save */}
-          <button
-            onClick={handleSubmit}
-            disabled={saving || !(form.name as string)?.trim() || !(form.category_id as string)}
-            className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-          >
-            {saving ? tActions('saving') : isNew ? tForm('createServiceItem') : tMaster('saveChanges')}
-          </button>
         </div>
       </div>
     </>
