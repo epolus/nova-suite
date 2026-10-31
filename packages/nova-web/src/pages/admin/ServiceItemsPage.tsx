@@ -10,7 +10,8 @@ import SearchBar from '../../components/SearchBar';
 import { useTheme } from '../../context/ThemeContext';
 import { formatCurrency } from '../../utils/currency';
 import AuthImage from './AuthImage';
-import ServiceItemForm, { formatCustomAttribute } from './ServiceItemForm';
+import { formatCustomAttribute } from './customAttributes';
+import ServiceItemForm from './ServiceItemForm';
 
 export default function ServiceItemsPage() {
   const t = useTranslations('pages.admin.serviceItems');
