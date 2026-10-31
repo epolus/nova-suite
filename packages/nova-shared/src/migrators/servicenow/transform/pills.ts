@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { replacePlaceholders, singlePlaceholder } from '../../../placeholders';
 import type { NoteCollector } from './report';
 import type { FieldMapping } from './variables';
 
@@ -20,8 +21,6 @@ export type PillContext = {
   /** Inlined subflow: prefix of the flow variables that hold its outputs. */
   outputPrefix?: string;
 };
-
-const SINGLE_PILL_RE = /^\{\{([^}]+)\}\}$/;
 
 /** The caller's value for an inlined subflow input pill such as `subflow.requested_item.number`. */
 function subflowInput(parts: string[], ctx: PillContext): { raw: string; rest: string[] } | null {
@@ -85,8 +84,8 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
   if (head === 'subflow' || head === 'subflow_inputs' || head === 'inputs') {
     const input = subflowInput(parts, ctx);
     if (input) {
-      const pill = SINGLE_PILL_RE.exec(input.raw.trim());
-      if (pill) return translatePillPath([pill[1], ...input.rest].join('.'), ctx.subflowInputs!.parent);
+      const pill = singlePlaceholder(input.raw);
+      if (pill !== null) return translatePillPath([pill, ...input.rest].join('.'), ctx.subflowInputs!.parent);
       return null;
     }
     if (ctx.subflowInputs) {
@@ -124,14 +123,12 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
   return null;
 }
 
-const PILL_RE = /\{\{([^}]+)\}\}/g;
-
 /** Rewrites every data pill in a string; unknown pills are left as-is and reported. */
 export function translateTemplate(value: string, ctx: PillContext): string {
-  return value.replace(PILL_RE, (whole, inner: string) => {
+  return replacePlaceholders(value, (inner, whole) => {
     const parts = inner.trim().replace(/\s+/g, '').split('.');
     const input = ['subflow', 'subflow_inputs', 'inputs'].includes((parts[0] ?? '').toLowerCase()) ? subflowInput(parts, ctx) : null;
-    if (input && input.rest.length === 0 && !SINGLE_PILL_RE.test(input.raw.trim())) {
+    if (input && input.rest.length === 0 && singlePlaceholder(input.raw) === null) {
       return translateTemplate(input.raw, ctx.subflowInputs!.parent);
     }
     const mapped = translatePillPath(inner, ctx);
@@ -145,9 +142,9 @@ export function translateTemplate(value: string, ctx: PillContext): string {
 
 /** Returns the Nova path when the whole value is exactly one pill. */
 export function singlePillPath(value: string, ctx: PillContext): string | null {
-  const m = SINGLE_PILL_RE.exec(value.trim());
-  if (!m) return null;
-  return translatePillPath(m[1], ctx);
+  const inner = singlePlaceholder(value);
+  if (inner === null) return null;
+  return translatePillPath(inner, ctx);
 }
 
 export function translateUnknown(value: unknown, ctx: PillContext): unknown {
@@ -163,8 +160,8 @@ export function translateUnknown(value: unknown, ctx: PillContext): unknown {
 
 /** The ServiceNow variable referenced by a pill, used to map literal values in conditions. */
 export function pillFieldMapping(raw: string, ctx: PillContext): FieldMapping | null {
-  const m = SINGLE_PILL_RE.exec(raw.trim());
-  const path = (m ? m[1] : raw).replace(/\s+/g, '');
+  const inner = singlePlaceholder(raw);
+  const path = (inner ?? raw).replace(/\s+/g, '');
   const vm = /(?:^|\.)variables\.([^.]+)/.exec(path);
   return vm ? ctx.fields.get(vm[1]) ?? null : null;
 }

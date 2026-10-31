@@ -17,6 +17,7 @@ import {
   executeNativeLibraryState,
   type AutomationSendEmail,
 } from './automation-native';
+import { replacePlaceholders, singlePlaceholder } from './placeholders';
 
 const MAX_EXECUTION_STEPS = 120;
 const OAUTH_TOKEN_SAFETY_MS = 60_000;
@@ -178,13 +179,11 @@ function buildTemplateContext(params: {
   };
 }
 
-const SINGLE_PLACEHOLDER = /^\{\{([^}]+)\}\}$/;
-
 /** Like interpolateString, but a template that is exactly one placeholder keeps the raw (non-string) value. */
 export function resolveTemplateValue(template: string, ctx: Record<string, unknown>): unknown {
-  const m = SINGLE_PLACEHOLDER.exec(template.trim());
-  if (m && !m[1].trim().startsWith('env.')) {
-    return getByPath(ctx, m[1].trim().replace(/\[(\w+)\]/g, '.$1'));
+  const inner = singlePlaceholder(template);
+  if (inner !== null && !inner.trim().startsWith('env.')) {
+    return getByPath(ctx, inner.trim().replace(/\[(\w+)\]/g, '.$1'));
   }
   return interpolateString(template, ctx);
 }
@@ -210,7 +209,7 @@ export function resolveLoopItems(itemsExpr: string, ctx: Record<string, unknown>
 }
 
 function interpolateString(template: string, ctx: Record<string, unknown>): string {
-  return template.replace(/\{\{([^}]+)\}\}/g, (_, rawKey: string) => {
+  return replacePlaceholders(template, (rawKey) => {
     const key = rawKey.trim();
     const envMatch = /^env\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(key);
     if (envMatch) {

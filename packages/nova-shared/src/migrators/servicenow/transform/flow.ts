@@ -7,6 +7,7 @@ import {
   type AutomationState,
 } from '../../../automation-config';
 import { UNIFIED_BUILDER_NODE_DEFAULTS } from '../../../automation-builder-defaults';
+import { firstPlaceholder } from '../../../placeholders';
 import type { ServiceNowFlow } from '../snapshot';
 import { encodedQueryToCondition, parseEncodedQuery, parseFieldAssignments } from './encoded-query';
 import { singlePillPath, translateTemplate, translateUnknown, type PillContext, type StepAlias } from './pills';
@@ -171,9 +172,9 @@ export function convertFlow(
       if (!u) notes.warn('approval_user_unresolved', `Approval user ${users[0]} not found; set the approver after import.`, n.label);
       return { type: 'user', template: u?.email || u?.user_name || users[0] };
     }
-    const pill = /\{\{[^}]+\}\}/.exec(rules);
+    const pill = firstPlaceholder(rules);
     if (pill) {
-      const path = singlePillPath(pill[0], ctx);
+      const path = singlePillPath(pill, ctx);
       if (path) return { type: 'user', template: `{{${path}}}` };
     }
     notes.warn('approval_rules_unparsed', 'Approval rules could not be parsed; defaulting to the requester\'s manager.', n.label);

@@ -10,6 +10,7 @@ import {
   type AutomationState,
   type AutomationTicketActionState,
 } from './automation-config';
+import { replacePlaceholders } from './placeholders';
 
 export type AutomationDbClient = {
   query: (sql: string, values?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>> }>;
@@ -41,7 +42,7 @@ function asString(value: unknown): string {
 }
 
 function interpolateString(template: string, ctx: Record<string, unknown>): string {
-  return template.replace(/\{\{([^}]+)\}\}/g, (_, rawKey: string) => {
+  return replacePlaceholders(template, (rawKey) => {
     const key = rawKey.trim();
     const envMatch = /^env\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(key);
     if (envMatch) {
