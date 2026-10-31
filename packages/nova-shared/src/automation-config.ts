@@ -292,7 +292,7 @@ type AutomationValidationState = {
 };
 
 function collectCredentialSlugsFromString(raw: string, out: Set<string>): void {
-  const re = /\{\{\s*cred\.([A-Za-z0-9_]+)(?:\.[^}\s]+)?\s*\}\}/g;
+  const re = /\{\{\s*cred\.([A-Za-z0-9_]+)(?:\.[^}\s.{]+)*\s*\}\}/g;
   let m: RegExpExecArray | null = null;
   while ((m = re.exec(raw)) !== null) out.add(m[1]);
 }

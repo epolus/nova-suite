@@ -41,7 +41,7 @@ function asString(value: unknown): string {
 }
 
 function interpolateString(template: string, ctx: Record<string, unknown>): string {
-  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, rawKey: string) => {
+  return template.replace(/\{\{([^}]+)\}\}/g, (_, rawKey: string) => {
     const key = rawKey.trim();
     const envMatch = /^env\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(key);
     if (envMatch) {

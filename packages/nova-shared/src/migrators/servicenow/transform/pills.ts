@@ -21,7 +21,7 @@ export type PillContext = {
   outputPrefix?: string;
 };
 
-const SINGLE_PILL_RE = /^\{\{\s*([^}]+?)\s*\}\}$/;
+const SINGLE_PILL_RE = /^\{\{([^}]+)\}\}$/;
 
 /** The caller's value for an inlined subflow input pill such as `subflow.requested_item.number`. */
 function subflowInput(parts: string[], ctx: PillContext): { raw: string; rest: string[] } | null {
@@ -124,7 +124,7 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
   return null;
 }
 
-const PILL_RE = /\{\{\s*([^}]+?)\s*\}\}/g;
+const PILL_RE = /\{\{([^}]+)\}\}/g;
 
 /** Rewrites every data pill in a string; unknown pills are left as-is and reported. */
 export function translateTemplate(value: string, ctx: PillContext): string {
@@ -145,7 +145,7 @@ export function translateTemplate(value: string, ctx: PillContext): string {
 
 /** Returns the Nova path when the whole value is exactly one pill. */
 export function singlePillPath(value: string, ctx: PillContext): string | null {
-  const m = /^\{\{\s*([^}]+?)\s*\}\}$/.exec(value.trim());
+  const m = SINGLE_PILL_RE.exec(value.trim());
   if (!m) return null;
   return translatePillPath(m[1], ctx);
 }
@@ -163,7 +163,7 @@ export function translateUnknown(value: unknown, ctx: PillContext): unknown {
 
 /** The ServiceNow variable referenced by a pill, used to map literal values in conditions. */
 export function pillFieldMapping(raw: string, ctx: PillContext): FieldMapping | null {
-  const m = /^\{\{\s*([^}]+?)\s*\}\}$/.exec(raw.trim());
+  const m = SINGLE_PILL_RE.exec(raw.trim());
   const path = (m ? m[1] : raw).replace(/\s+/g, '');
   const vm = /(?:^|\.)variables\.([^.]+)/.exec(path);
   return vm ? ctx.fields.get(vm[1]) ?? null : null;

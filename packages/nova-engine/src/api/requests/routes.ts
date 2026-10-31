@@ -42,6 +42,16 @@ interface FormFieldDef {
   ci_class?: string;
 }
 
+function isEmailAddress(val: string): boolean {
+  const at = val.indexOf('@');
+  if (at <= 0 || val.indexOf('@', at + 1) !== -1 || /\s/.test(val)) return false;
+  const domain = val.slice(at + 1);
+  for (let i = 1; i < domain.length - 1; i++) {
+    if (domain[i] === '.') return true;
+  }
+  return false;
+}
+
 function validateFormData(
   fields: FormFieldDef[],
   data: Record<string, unknown>,
@@ -66,7 +76,7 @@ function validateFormData(
     }
 
     if (field.type === 'email' && val) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+      if (!isEmailAddress(val)) {
         errors[field.name] = 'Invalid email address';
         continue;
       }

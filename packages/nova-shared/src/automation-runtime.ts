@@ -178,7 +178,7 @@ function buildTemplateContext(params: {
   };
 }
 
-const SINGLE_PLACEHOLDER = /^\{\{\s*([^}]+?)\s*\}\}$/;
+const SINGLE_PLACEHOLDER = /^\{\{([^}]+)\}\}$/;
 
 /** Like interpolateString, but a template that is exactly one placeholder keeps the raw (non-string) value. */
 export function resolveTemplateValue(template: string, ctx: Record<string, unknown>): unknown {
@@ -210,7 +210,7 @@ export function resolveLoopItems(itemsExpr: string, ctx: Record<string, unknown>
 }
 
 function interpolateString(template: string, ctx: Record<string, unknown>): string {
-  return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, rawKey: string) => {
+  return template.replace(/\{\{([^}]+)\}\}/g, (_, rawKey: string) => {
     const key = rawKey.trim();
     const envMatch = /^env\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(key);
     if (envMatch) {
@@ -237,7 +237,7 @@ function interpolateRecord(
 }
 
 function collectCredSlugsFromText(raw: string, out: Set<string>): void {
-  const re = /\{\{\s*cred\.([A-Za-z0-9_]+)(?:\.[^}\s]+)?\s*\}\}/g;
+  const re = /\{\{\s*cred\.([A-Za-z0-9_]+)(?:\.[^}\s.{]+)*\s*\}\}/g;
   let m;
   while ((m = re.exec(raw)) !== null) out.add(m[1]);
 }
