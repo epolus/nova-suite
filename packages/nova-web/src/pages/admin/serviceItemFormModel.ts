@@ -85,6 +85,16 @@ export function serviceItemIssues(
   return issues;
 }
 
+/** Parsed blob: URL, or empty. encodeURI is the barrier CodeQL accepts for img src. */
+export function blobPreviewUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'blob:' ? encodeURI(url.href) : '';
+  } catch {
+    return '';
+  }
+}
+
 export function controlClass(invalid: boolean, extra = ''): string {
   const padding = extra.includes('pl-') || extra.includes('pr-') || extra.includes('px-') ? '' : 'px-3 ';
   return `w-full ${padding}py-2 border rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 ${

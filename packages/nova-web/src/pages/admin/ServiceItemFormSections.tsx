@@ -7,7 +7,7 @@ import FormBuilder from '../../components/FormBuilder';
 import { formatCurrency } from '../../utils/currency';
 import { CatalogItemIcon } from './catalogItemIcons';
 import { CATALOG_ITEM_ICONS, isCatalogItemIcon } from './catalogItemIconSet';
-import { controlClass, type ServiceItemFieldErrors } from './serviceItemFormModel';
+import { blobPreviewUrl, controlClass, type ServiceItemFieldErrors } from './serviceItemFormModel';
 
 type SetField = (key: string, value: unknown) => void;
 
@@ -128,13 +128,13 @@ export function ServiceItemPictureCard({
   onClear: () => void;
 }) {
   const tForm = useTranslations('pages.admin.serviceItems.form');
-  const safePicturePreview = picturePreview.startsWith('blob:') ? picturePreview : '';
+  const safePicturePreview = blobPreviewUrl(picturePreview);
   return (
     <Card>
       <h3 className="font-semibold text-gray-900 mb-4">{tForm('picture')}</h3>
       {safePicturePreview ? (
         <div className="mb-4 relative inline-block">
-          <img src={safePicturePreview} className="max-h-48 rounded-lg object-cover" alt={tForm('picturePreviewAlt')} />
+          <img src={encodeURI(safePicturePreview)} className="max-h-48 rounded-lg object-cover" alt={tForm('picturePreviewAlt')} />
           <button
             onClick={onClear}
             className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600"
@@ -336,13 +336,13 @@ export function ServiceItemPreviewCard({
 }) {
   const t = useTranslations('pages.admin.serviceItems');
   const tForm = useTranslations('pages.admin.serviceItems.form');
-  const safePicturePreview = picturePreview.startsWith('blob:') ? picturePreview : '';
+  const safePicturePreview = blobPreviewUrl(picturePreview);
   return (
     <Card>
       <h3 className="font-semibold text-gray-900 mb-3">{tForm('preview')}</h3>
       <div className="border border-gray-200 rounded-xl overflow-hidden">
         {safePicturePreview && (
-          <img src={safePicturePreview} className="w-full h-32 object-cover" alt="" />
+          <img src={encodeURI(safePicturePreview)} className="w-full h-32 object-cover" alt="" />
         )}
         <div className="p-3">
           <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
