@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { SnQuestionChoice, SnVariable } from '../raw-schemas';
 import type { NoteCollector } from './report';
-import { htmlToText, truncate } from './text';
+import { htmlToText, stripEdgeUnderscores, truncate } from './text';
 
 export type NovaFormFieldType =
   | 'text'
@@ -76,7 +76,7 @@ export const SN_VARIABLE_TYPES: Record<number, string> = {
 const DROPPED_TYPES = new Set([11, 12, 14, 15, 17, 19, 20, 24, 32, 33]);
 
 function sanitizeFieldName(raw: string, used: Set<string>): string {
-  let base = raw.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'field';
+  let base = stripEdgeUnderscores(raw.toLowerCase().replace(/[^a-z0-9_]+/g, '_')) || 'field';
   if (/^[0-9]/.test(base)) base = `f_${base}`;
   base = base.slice(0, 60);
   let name = base;
