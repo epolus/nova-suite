@@ -128,12 +128,13 @@ export function ServiceItemPictureCard({
   onClear: () => void;
 }) {
   const tForm = useTranslations('pages.admin.serviceItems.form');
+  const safePicturePreview = picturePreview.startsWith('blob:') ? picturePreview : '';
   return (
     <Card>
       <h3 className="font-semibold text-gray-900 mb-4">{tForm('picture')}</h3>
-      {picturePreview ? (
+      {safePicturePreview ? (
         <div className="mb-4 relative inline-block">
-          <img src={picturePreview} className="max-h-48 rounded-lg object-cover" alt={tForm('picturePreviewAlt')} />
+          <img src={safePicturePreview} className="max-h-48 rounded-lg object-cover" alt={tForm('picturePreviewAlt')} />
           <button
             onClick={onClear}
             className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600"
@@ -151,7 +152,7 @@ export function ServiceItemPictureCard({
         </div>
       )}
       <input ref={fileRef} type="file" accept="image/*" onChange={onFileChange} className="hidden" />
-      {!picturePreview && (
+      {!safePicturePreview && (
         <button
           onClick={() => fileRef.current?.click()}
           className="mt-3 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
@@ -335,12 +336,13 @@ export function ServiceItemPreviewCard({
 }) {
   const t = useTranslations('pages.admin.serviceItems');
   const tForm = useTranslations('pages.admin.serviceItems.form');
+  const safePicturePreview = picturePreview.startsWith('blob:') ? picturePreview : '';
   return (
     <Card>
       <h3 className="font-semibold text-gray-900 mb-3">{tForm('preview')}</h3>
       <div className="border border-gray-200 rounded-xl overflow-hidden">
-        {picturePreview && (
-          <img src={picturePreview} className="w-full h-32 object-cover" alt="" />
+        {safePicturePreview && (
+          <img src={safePicturePreview} className="w-full h-32 object-cover" alt="" />
         )}
         <div className="p-3">
           <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">

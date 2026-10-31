@@ -83,7 +83,10 @@ export default function ServiceItemForm({
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
         .then((res) => { if (res.ok) return res.blob(); throw new Error(); })
-        .then((blob) => { objectUrl = URL.createObjectURL(blob); setPicturePreview(objectUrl); })
+        .then((blob) => {
+          objectUrl = URL.createObjectURL(blob);
+          if (objectUrl.startsWith('blob:')) setPicturePreview(objectUrl);
+        })
         .catch(() => {});
     }
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
@@ -112,9 +115,15 @@ export default function ServiceItemForm({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (!f.type.startsWith('image/')) return;
+    const previewUrl = URL.createObjectURL(f);
+    if (!previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+      return;
+    }
     markDirty();
     setPictureFile(f);
-    setPicturePreview(URL.createObjectURL(f));
+    setPicturePreview(previewUrl);
   };
 
   const addAttr = () => { markDirty(); setCustomAttrs([...customAttrs, ['', '']]); };
