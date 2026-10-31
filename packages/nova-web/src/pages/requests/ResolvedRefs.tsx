@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
+import { useTranslations } from 'use-intl';
 import { cmdb, auth, catalog } from '../../api/client';
 
 export function ResolvedCmdbRef({ ciId }: { ciId: string }) {
@@ -37,4 +38,13 @@ export function ResolvedLocationRef({ locationId }: { locationId: string }) {
     }).catch(() => {});
   }, [locationId]);
   return <span>{label}</span>;
+}
+
+export function FormFieldValue({ type, value }: { type?: string; value: unknown }) {
+  const tStates = useTranslations('common.states');
+  if (type === 'cmdb_ref' && value) return <ResolvedCmdbRef ciId={String(value)} />;
+  if (type === 'user_ref' && value) return <ResolvedUserRef userId={String(value)} />;
+  if (type === 'location_ref' && value) return <ResolvedLocationRef locationId={String(value)} />;
+  if (type === 'checkbox') return <>{String(value) === 'true' ? tStates('yes') : tStates('no')}</>;
+  return <>{String(value)}</>;
 }
