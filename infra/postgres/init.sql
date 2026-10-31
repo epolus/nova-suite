@@ -1059,7 +1059,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.20', 'assignment_group_ola'),
   ('v00.01.21', 'chat_threads'),
   ('v00.01.22', 'event_management'),
-  ('v00.01.23', 'servicenow_migrator');
+  ('v00.01.23', 'servicenow_migrator'),
+  ('v00.01.24', 'cost_center_responsible');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
