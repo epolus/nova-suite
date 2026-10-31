@@ -26,6 +26,7 @@ export const catalog = {
   allItems: () =>
     request<{ items: ServiceItem[] }>('/catalog/items?include_inactive=true'),
   allTasks: () => request<{ tasks: AllCatalogTask[] }>('/catalog/tasks'),
+  locations: () => request<{ locations: { id: string; name: string; city: string | null; is_active: boolean }[] }>('/catalog/locations'),
   itemTasks: (itemId: string) => request<{ tasks: CatalogTask[] }>(`/catalog/items/${itemId}/tasks`),
   createItemTask: (itemId: string, data: Partial<CatalogTask>) =>
     request<CatalogTask>(`/catalog/items/${itemId}/tasks`, { method: 'POST', body: JSON.stringify(data) }),

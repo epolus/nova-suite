@@ -37,6 +37,10 @@ Supported state types:
 - **`action.assign`** — assign the **current catalog request task** to a user or group (`target`, `assigneeTemplate`, `groupIdTemplate`). Play has no request task id, so this step fails there unless a live fulfillment run provides one.
 - **`action.script`** — JavaScript (`runtime: js`, `code`) with a 250ms timeout and no `require`/`process`. Not a security sandbox; prefer `action.rest` for anything sensitive.
 - **`call.workflow`** — runs a published `workflow_definitions` state machine (`definitionId` or `workflow_type`), depth-limited. Does not start a second Temporal `catalogFulfillment`.
+- **`loop.foreach`** — iterates `itemsExpr` (an array, a JSON array string, or a comma-separated string such as a list collector value). Transitions: `item` enters the body, `done` exits. The last body step must transition back to the loop state. `maxIterations` defaults to 100 (max 1000). The current item is `{{loop.<stateId>.item}}` and its position `{{loop.<stateId>.index}}`.
+- **`parallel.fork`** / **`parallel.join`** — every fork transition starts a branch; branches run concurrently until they reach the join named by `joinId`, then the join's transition continues. An `end` reached inside a branch ends the whole run. Approvals inside branches are not supported.
+- **`action.approval`** — pauses the automation and creates an approval request task (`approverType`: `requester_manager` (default), `user`, `group`, `group_manager`; `approverTemplate` resolves to an id, email, or name). Transitions: `approved`, `rejected`. In a live fulfillment the run resumes from a checkpoint after the decision; Play auto-approves; inside `call.workflow` it fails.
+- **`variables.set`** — `assignments` map of name to template. A template that is exactly one placeholder keeps the raw value (arrays, objects). Read back as `{{vars.<name>}}`.
 
 Play uses the same executors as the worker (real HTTP and real DB/email side effects). Form data is still not persisted.
 

@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
-import { cmdb, auth } from '../../api/client';
+import { useTranslations } from 'use-intl';
+import { cmdb, auth, catalog } from '../../api/client';
 
 export function ResolvedCmdbRef({ ciId }: { ciId: string }) {
   const [label, setLabel] = useState<string>(ciId);
@@ -26,4 +27,24 @@ export function ResolvedUserRef({ userId }: { userId: string }) {
     }).catch(() => {});
   }, [userId]);
   return <span>{label}</span>;
+}
+
+export function ResolvedLocationRef({ locationId }: { locationId: string }) {
+  const [label, setLabel] = useState<string>(locationId);
+  useEffect(() => {
+    catalog.locations().then((res) => {
+      const loc = res.locations.find((row) => row.id === locationId);
+      if (loc) setLabel(loc.name);
+    }).catch(() => {});
+  }, [locationId]);
+  return <span>{label}</span>;
+}
+
+export function FormFieldValue({ type, value }: { type?: string; value: unknown }) {
+  const tStates = useTranslations('common.states');
+  if (type === 'cmdb_ref' && value) return <ResolvedCmdbRef ciId={String(value)} />;
+  if (type === 'user_ref' && value) return <ResolvedUserRef userId={String(value)} />;
+  if (type === 'location_ref' && value) return <ResolvedLocationRef locationId={String(value)} />;
+  if (type === 'checkbox') return <>{String(value) === 'true' ? tStates('yes') : tStates('no')}</>;
+  return <>{String(value)}</>;
 }

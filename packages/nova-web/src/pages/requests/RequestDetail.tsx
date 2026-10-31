@@ -15,7 +15,7 @@ import { isFulfillerRole } from '../../utils/roles';
 import { useFieldLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
 import { TaskCard } from './RequestTaskCard';
-import { ResolvedCmdbRef, ResolvedUserRef } from './ResolvedRefs';
+import { FormFieldValue } from './ResolvedRefs';
 import { RequestDetailSidebar } from './RequestDetailSidebar';
 
 export default function RequestDetail() {
@@ -25,7 +25,6 @@ export default function RequestDetail() {
   const tRequests = useTranslations('pages.requests');
   const tActions = useTranslations('common.actions');
   const tMaster = useTranslations('common.masterData');
-  const tStates = useTranslations('common.states');
   const fieldLabel = useFieldLabel();
   const [req, setReq] = useState<ServiceRequest | null>(null);
   const [tasks, setTasks] = useState<RequestTask[]>([]);
@@ -306,15 +305,7 @@ export default function RequestDetail() {
                   <div key={key}>
                     <dt className="text-gray-500 capitalize">{label}</dt>
                     <dd className="font-medium text-gray-900 mt-0.5">
-                      {fieldDef?.type === 'cmdb_ref' && value ? (
-                        <ResolvedCmdbRef ciId={String(value)} />
-                      ) : fieldDef?.type === 'user_ref' && value ? (
-                        <ResolvedUserRef userId={String(value)} />
-                      ) : fieldDef?.type === 'checkbox' ? (
-                        value === 'true' ? tStates('yes') : tStates('no')
-                      ) : (
-                        String(value)
-                      )}
+                      <FormFieldValue type={fieldDef?.type} value={value} />
                     </dd>
                   </div>
                 );

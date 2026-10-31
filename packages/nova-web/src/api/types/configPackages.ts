@@ -17,6 +17,9 @@ export interface ConfigPackageBundle {
     data_sources?: {
       sources: Array<Record<string, unknown>>;
     };
+    workflows?: {
+      definitions: Array<Record<string, unknown>>;
+    };
   };
 }
 
@@ -27,7 +30,7 @@ export interface ConfigPackageValidationIssue {
 }
 
 export interface ConfigPackageChange {
-  type: 'category' | 'service_item' | 'catalog_task' | 'notification_rule' | 'data_source';
+  type: 'category' | 'service_item' | 'catalog_task' | 'notification_rule' | 'data_source' | 'workflow_definition';
   external_key: string;
   name: string;
   action: 'create' | 'update' | 'skip';
@@ -67,6 +70,7 @@ export interface ConfigPackageApplyResponse {
     catalog_tasks: number;
     notification_rules: number;
     data_sources: number;
+    workflow_definitions?: number;
   };
 }
 

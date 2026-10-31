@@ -33,6 +33,17 @@ export type UnifiedBuilderNodeDefaults = {
   workflowType?: string;
   definitionId?: string;
   inputJson?: string;
+  itemsExpr?: string;
+  maxIterations?: number;
+  joinId?: string;
+  approverType?: string;
+  approverTemplate?: string;
+  approvalName?: string;
+  taskName?: string;
+  groupTemplate?: string;
+  waitForCompletion?: boolean;
+  instructions?: string;
+  assignmentsJson?: string;
 };
 
 export const UNIFIED_BUILDER_EMPTY_ATTRIBUTES_JSON = '{\n  \n}';
@@ -127,5 +138,35 @@ export const UNIFIED_BUILDER_NODE_DEFAULTS: Record<UnifiedBuilderNodeType, Unifi
     workflowType: 'catalog-fulfillment',
     definitionId: '',
     inputJson: '{\n  "requestId": "{{request.id}}"\n}',
+  },
+  'loop.foreach': {
+    label: 'for-each',
+    nodeType: 'loop.foreach',
+    itemsExpr: '{{request.form_data.items}}',
+    maxIterations: 100,
+  },
+  'parallel.fork': { label: 'parallel-fork', nodeType: 'parallel.fork', joinId: '' },
+  'parallel.join': { label: 'parallel-join', nodeType: 'parallel.join' },
+  'action.approval': {
+    label: 'approval',
+    nodeType: 'action.approval',
+    approverType: 'requester_manager',
+    approverTemplate: '',
+    approvalName: 'Approval for {{request.number}}',
+    instructions: 'Please review and approve or reject this request.',
+  },
+  'action.task': {
+    label: 'manual-task',
+    nodeType: 'action.task',
+    taskName: 'Fulfill {{request.number}}',
+    instructions: '',
+    groupTemplate: '',
+    assigneeTemplate: '',
+    waitForCompletion: true,
+  },
+  'variables.set': {
+    label: 'set-variables',
+    nodeType: 'variables.set',
+    assignmentsJson: '{\n  "example": "{{request.form_data.example}}"\n}',
   },
 };

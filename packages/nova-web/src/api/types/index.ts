@@ -13,6 +13,7 @@ export * from './importer';
 export * from './sla';
 export * from './notifications';
 export * from './configPackages';
+export * from './migrations';
 export * from './knowledge';
 export * from './requests';
 export * from './credentials';

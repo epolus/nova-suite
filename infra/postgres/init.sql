@@ -1052,7 +1052,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.19', 'improvement_journal'),
   ('v00.01.20', 'assignment_group_ola'),
   ('v00.01.21', 'chat_threads'),
-  ('v00.01.22', 'event_management');
+  ('v00.01.22', 'event_management'),
+  ('v00.01.23', 'servicenow_migrator');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1882,6 +1883,8 @@ CREATE TABLE request_tasks (
   completed_by      uuid REFERENCES users(id),
   outcome           text CHECK (outcome IN ('approved', 'rejected')),
   notes             text,
+  automation_checkpoint jsonb,
+  parent_task_id    uuid REFERENCES request_tasks(id) ON DELETE CASCADE,
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_request_tasks_request ON request_tasks(request_id, task_order);
@@ -3271,6 +3274,34 @@ CREATE TABLE chat_inbound_receipts (
   created_at        timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, channel, external_event_id)
 );
+
+CREATE TABLE migration_runs (
+  id                     uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id              uuid        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  source                 text        NOT NULL CHECK (source IN ('servicenow')),
+  instance_url           text        NOT NULL,
+  credential_slug        text        NOT NULL,
+  options                jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  status                 text        NOT NULL DEFAULT 'queued'
+                         CHECK (status IN ('queued', 'extracting', 'transforming', 'ready', 'applying', 'applied', 'failed')),
+  progress               jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  snapshot               jsonb,
+  package                jsonb,
+  report                 jsonb,
+  error                  text,
+  config_package_run_id  uuid        REFERENCES config_deployment_runs(id) ON DELETE SET NULL,
+  created_by             uuid        REFERENCES users(id) ON DELETE SET NULL,
+  created_at             timestamptz NOT NULL DEFAULT now(),
+  updated_at             timestamptz NOT NULL DEFAULT now(),
+  completed_at           timestamptz
+);
+CREATE INDEX idx_migration_runs_tenant_created ON migration_runs (tenant_id, created_at DESC);
+CREATE UNIQUE INDEX uq_migration_runs_one_active
+  ON migration_runs (tenant_id)
+  WHERE status IN ('queued', 'extracting', 'transforming', 'applying');
+CREATE TRIGGER trg_migration_runs_updated_at
+  BEFORE UPDATE ON migration_runs
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE SEQUENCE alert_number_seq START 1000;
 

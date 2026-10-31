@@ -7,6 +7,7 @@ import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import FormBuilder from '../../components/FormBuilder';
 import { formatCurrency, normalizeCurrencyCode } from '../../utils/currency';
+import { formatCustomAttribute, parseCustomAttribute } from './customAttributes';
 
 const EMPTY_ITEM: Partial<ServiceItem> = {
   name: '',
@@ -59,7 +60,7 @@ export default function ServiceItemForm({
   // Custom attributes editor
   const [customAttrs, setCustomAttrs] = useState<[string, string][]>(() => {
     const attrs = (item?.custom_attributes || {}) as Record<string, unknown>;
-    const entries = Object.entries(attrs).map(([k, v]) => [k, String(v)] as [string, string]);
+    const entries = Object.entries(attrs).map(([k, v]) => [k, formatCustomAttribute(v, true)] as [string, string]);
     return entries.length > 0 ? entries : [['', '']];
   });
 
@@ -99,9 +100,9 @@ export default function ServiceItemForm({
     setSaving(true);
     try {
       // Build custom_attributes from editor
-      const attrs: Record<string, string> = {};
+      const attrs: Record<string, unknown> = {};
       for (const [k, v] of customAttrs) {
-        if (k.trim()) attrs[k.trim()] = v;
+        if (k.trim()) attrs[k.trim()] = parseCustomAttribute(v);
       }
 
       const payload: Record<string, unknown> = {
@@ -264,12 +265,21 @@ export default function ServiceItemForm({
                     placeholder={tForm('attributeNamePlaceholder')}
                     className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
-                  <input
-                    value={val}
-                    onChange={(e) => updateAttr(idx, 1, e.target.value)}
-                    placeholder={tFields('value')}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
-                  />
+                  {val.includes('\n') ? (
+                    <textarea
+                      value={val}
+                      onChange={(e) => updateAttr(idx, 1, e.target.value)}
+                      rows={Math.min(8, val.split('\n').length)}
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono outline-hidden focus:ring-2 focus:ring-indigo-500 resize-y"
+                    />
+                  ) : (
+                    <input
+                      value={val}
+                      onChange={(e) => updateAttr(idx, 1, e.target.value)}
+                      placeholder={tFields('value')}
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
+                    />
+                  )}
                   <button onClick={() => removeAttr(idx)} className="text-red-400 hover:text-red-600 text-sm shrink-0 px-1">&times;</button>
                 </div>
               ))}

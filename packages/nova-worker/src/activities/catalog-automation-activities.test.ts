@@ -49,4 +49,57 @@ describe('catalog automation v2 helpers', () => {
     expect(state.body).toContain('"name":"LAP-42"');
     expect(state.body).toContain('"serial_number":"S42"');
   });
+
+  it('creates an in-flow manual task under the automated task', async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const client = {
+      query: async (sql: string, params: unknown[] = []) => {
+        calls.push({ sql, params });
+        if (sql.includes('FROM assignment_groups')) return { rows: [{ id: 'g-1' }] };
+        if (sql.includes('FROM users')) return { rows: [] };
+        if (sql.includes('nextval')) return { rows: [{ nextval: 42 }] };
+        return { rows: [{ id: 'task-9' }] };
+      },
+    };
+    const id = await __test__.createInFlowManualTask(
+      client as unknown as Parameters<typeof __test__.createInFlowManualTask>[0],
+      'tenant-1',
+      'req-1',
+      'parent-1',
+      3,
+      { name: 'Order REQ1', instructions: 'Place the order', group: 'Procurement', assignee: 'nobody@example.com', wait: true },
+    );
+    expect(id).toBe('task-9');
+    expect(calls[0].params).toEqual(['tenant-1', null, 'Procurement']);
+    const insert = calls.find((c) => c.sql.includes('INSERT INTO request_tasks'))!;
+    expect(insert.params).toEqual([
+      'tenant-1', 'TASK0000042', 'req-1', 'parent-1', 3, 'Order REQ1', 'Place the order', null, 'g-1',
+      'in_progress', null, 'Assignee "nobody@example.com" not found.',
+    ]);
+  });
+
+  it('marks non-waiting in-flow manual tasks completed immediately', async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const client = {
+      query: async (sql: string, params: unknown[] = []) => {
+        calls.push({ sql, params });
+        if (sql.includes('FROM assignment_groups')) return { rows: [] };
+        if (sql.includes('FROM users')) return { rows: [] };
+        if (sql.includes('nextval')) return { rows: [{ nextval: 7 }] };
+        return { rows: [{ id: 'task-nofollow' }] };
+      },
+    };
+    await __test__.createInFlowManualTask(
+      client as unknown as Parameters<typeof __test__.createInFlowManualTask>[0],
+      'tenant-1',
+      'req-1',
+      'parent-1',
+      2,
+      { name: 'Notify only', instructions: '', group: '', assignee: '', wait: false },
+    );
+    const insert = calls.find((c) => c.sql.includes('INSERT INTO request_tasks'))!;
+    expect(insert.params[9]).toBe('completed');
+    expect(insert.params[10]).toBeInstanceOf(Date);
+    expect(String(insert.params[11])).toContain('without waiting');
+  });
 });

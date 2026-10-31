@@ -79,4 +79,5 @@ export const ChangeAdminPage = lazy(() => import('@/pages/admin/ChangeAdminPage'
 export const NotificationConfigPage = lazy(() => import('@/pages/admin/NotificationConfigPage'));
 export const NotificationEmailDeliveriesPage = lazy(() => import('@/pages/admin/NotificationEmailDeliveriesPage'));
 export const ConfigPackagesPage = lazy(() => import('@/pages/admin/ConfigPackagesPage'));
+export const ServiceNowMigrationPage = lazy(() => import('@/pages/admin/ServiceNowMigrationPage'));
 export const SystemStatusPage = lazy(() => import('@/pages/admin/SystemStatusPage'));

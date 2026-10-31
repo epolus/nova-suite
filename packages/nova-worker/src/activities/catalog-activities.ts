@@ -331,14 +331,16 @@ export async function getPendingTaskCount(
 ): Promise<number> {
   return withTenantContext(tenantId, async (client) => {
     const result = await client.query(
-      `SELECT count(*) FROM request_tasks WHERE request_id = $1 AND task_order = $2 AND status IN ('pending', 'in_progress')`,
+      `SELECT count(*) FROM request_tasks
+       WHERE request_id = $1 AND task_order = $2 AND status IN ('pending', 'in_progress')
+         AND parent_task_id IS NULL`,
       [requestId, taskOrder],
     );
     return parseInt(result.rows[0].count as string, 10);
   });
 }
 
-/** Task IDs that still need a taskCompleted signal (matches pending/in_progress after automation/skip). */
+/** Top-level task IDs that still need a taskCompleted signal (in-flow children are owned by automation). */
 export async function getAwaitingHumanTaskIds(
   requestId: string,
   tenantId: string,
@@ -348,6 +350,7 @@ export async function getAwaitingHumanTaskIds(
     const result = await client.query(
       `SELECT id FROM request_tasks
        WHERE request_id = $1 AND task_order = $2 AND status IN ('pending', 'in_progress')
+         AND parent_task_id IS NULL
        ORDER BY created_at ASC`,
       [requestId, taskOrder],
     );

@@ -11,7 +11,7 @@ export interface Category {
 export interface FormField {
   name: string;
   label?: string;
-  type: 'text' | 'textarea' | 'date' | 'number' | 'email' | 'checkbox' | 'select' | 'multiselect' | 'cmdb_ref' | 'user_ref';
+  type: 'text' | 'textarea' | 'date' | 'number' | 'email' | 'checkbox' | 'select' | 'multiselect' | 'cmdb_ref' | 'user_ref' | 'location_ref';
   required?: boolean;
   options?: string[];
   placeholder?: string;

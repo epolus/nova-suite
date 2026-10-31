@@ -362,6 +362,7 @@
       "dataSources": "Data Sources",
       "credentials": "Credentials",
       "configPackages": "Config Packages",
+      "serviceNowMigration": "ServiceNow Migration (experimental)",
       "importData": "Import Data",
       "theming": "Theming",
       "aiSettings": "AI Settings",
@@ -2371,6 +2372,101 @@
         },
         "refresh": "Refresh"
       },
+      "serviceNowMigration": {
+        "title": "ServiceNow Catalog Migration (experimental)",
+        "description": "Import catalog items, variables and Flow Designer flows from a ServiceNow instance. Runs are read-only until you apply a reviewed package.",
+        "steps": {
+          "connect": "Connect",
+          "select": "Select",
+          "run": "Extract",
+          "review": "Review & apply"
+        },
+        "connect": {
+          "instanceUrl": "Instance",
+          "instancePlaceholder": "acme or https://acme.service-now.com",
+          "credential": "Vault credential",
+          "credentialPlaceholder": "Select a credential",
+          "credentialHint": "Store \"user:password\" or a JSON OAuth / API-key secret under Admin > Credentials. Only read access is needed.",
+          "noCredentials": "No credentials found. Create one under Admin > Credentials first.",
+          "test": "Test connection",
+          "testing": "Testing…",
+          "ok": "Connected to {instance} ({release}).",
+          "failed": "The connection works but required tables are not readable.",
+          "flowStorage": "Flow storage: {storage}; value encoding: {encoding}",
+          "table": "Table",
+          "access": "Access",
+          "rows": "Rows",
+          "continue": "Continue"
+        },
+        "select": {
+          "loading": "Loading catalog…",
+          "search": "Search items",
+          "allCategories": "All categories",
+          "includeInactive": "Include inactive items",
+          "includeProducers": "Include record producers",
+          "selectAllVisible": "Select all visible",
+          "clear": "Clear",
+          "selected": "{count} selected",
+          "truncated": "Only the first 2000 items are listed; use search or a category to narrow the scope.",
+          "flow": "Flow",
+          "legacy": "Legacy workflow",
+          "none": "No flow",
+          "inactive": "inactive",
+          "start": "Extract {count} items",
+          "starting": "Starting…"
+        },
+        "run": {
+          "stage": "Stage: {stage}",
+          "requests": "{count} Table API requests",
+          "waiting": "Waiting for the worker…"
+        },
+        "review": {
+          "full": "Full",
+          "partial": "Partial",
+          "unsupported": "Unsupported",
+          "fields": "Fields",
+          "subflows": "Sub-workflows",
+          "scriptSteps": "Script steps to port",
+          "item": "Item",
+          "category": "Category",
+          "status": "Status",
+          "tasks": "Tasks",
+          "notes": "Notes",
+          "showNotes": "{count} notes",
+          "preview": "Preview flow",
+          "previewTitle": "{name} — automation preview",
+          "previewHint": "Preview only. Edits here are not saved; adjust the task after applying.",
+          "close": "Close",
+          "createGroups": "Create missing assignment groups (otherwise affected tasks are left unassigned)",
+          "apply": "Apply {count} items",
+          "applying": "Applying…",
+          "applied": "Applied {items} items, {tasks} tasks and {workflows} sub-workflows.",
+          "groupsCreated": "Created groups: {names}",
+          "groupsUnassigned": "Left unassigned (group not found): {names}",
+          "validationFailed": "The package did not pass validation. Nothing was applied.",
+          "subflowList": "Sub-workflows",
+          "warnings": "Extraction warnings"
+        },
+        "runs": {
+          "title": "Previous runs",
+          "empty": "No migration runs yet.",
+          "open": "Open",
+          "instance": "Instance",
+          "created": "Created",
+          "status": "Status",
+          "items": "Items"
+        },
+        "status": {
+          "queued": "Queued",
+          "extracting": "Extracting",
+          "transforming": "Transforming",
+          "ready": "Ready for review",
+          "applying": "Applying",
+          "applied": "Applied",
+          "failed": "Failed"
+        },
+        "newRun": "New migration"
+      },
       "configPackages": {
         "title": "Configuration Packages",
         "description": "Export, validate, and apply portable catalog, notification, and data source configuration between Nova instances.",
@@ -3271,12 +3367,16 @@
       "searchCi": "Search CMDB{suffix}...",
       "searchCiSuffix": " ({class})",
       "searchUser": "Search users...",
+      "searchLocation": "Search locations...",
       "noCiFound": "No CIs found",
       "noCiMatching": "No CIs matching \"{query}\"",
       "noUserFound": "No users found",
       "noUserMatching": "No users matching \"{query}\"",
+      "noLocationFound": "No locations found",
+      "noLocationMatching": "No locations matching \"{query}\"",
       "searching": "Searching...",
       "loadingUsers": "Loading users...",
+      "loadingLocations": "Loading locations...",
       "selected": "Selected: {name}"
     },
     "formBuilder": {
@@ -3290,7 +3390,8 @@
         "select": "Dropdown",
         "multiselect": "Multi-select",
         "cmdbRef": "CMDB Reference",
-        "userRef": "User Reference"
+        "userRef": "User Reference",
+        "locationRef": "Location Reference"
       },
       "addField": "Add Field",
       "editField": "Edit Field",
@@ -3434,7 +3535,12 @@
         "actionTicket": "Ticket",
         "actionAssign": "Assignment",
         "actionScript": "Script",
-        "callWorkflow": "Sub-workflow"
+        "callWorkflow": "Sub-workflow",
+        "loopForeach": "For Each",
+        "parallelFork": "Parallel Fork",
+        "parallelJoin": "Parallel Join",
+        "actionApproval": "Approval",
+        "variablesSet": "Set Variables"
       },
       "errors": {
         "kindMustBeStateMachine": "kind must be \"state_machine\".",
@@ -3452,7 +3558,11 @@
         "transitionMissingTarget": "Transition from \"{fromId}\" points to missing \"{toId}\"",
         "activityRequiresUrl": "Activity \"{label}\" requires url.",
         "decisionInvalidExpression": "Decision \"{label}\" has invalid expression JSON.",
-        "actionInvalidAttributes": "Action \"{label}\" has invalid attributes JSON."
+        "actionInvalidAttributes": "Action \"{label}\" has invalid attributes JSON.",
+        "loopNeedsItemDone": "For Each \"{label}\" needs item/done labeled transitions.",
+        "approvalNeedsApprovedRejected": "Approval \"{label}\" needs approved/rejected labeled transitions.",
+        "taskRequiresName": "Manual task \"{label}\" requires a task name.",
+        "forkNeedsJoin": "Parallel fork \"{label}\" must reference an existing Parallel Join node id."
       }
     },
     "majorIncidentBanner": {

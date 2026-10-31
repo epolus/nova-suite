@@ -144,6 +144,7 @@ export default function AppRoutes() {
           <Route path="data-sources" element={<Lazy><Pages.DataSourcesPage /></Lazy>} />
           <Route path="credentials" element={<Lazy><Pages.CredentialsPage /></Lazy>} />
           <Route path="config-packages" element={<Lazy><Pages.ConfigPackagesPage /></Lazy>} />
+          <Route path="migrations/servicenow" element={<Lazy><Pages.ServiceNowMigrationPage /></Lazy>} />
           <Route path="import" element={<Lazy><Pages.ImportPage /></Lazy>} />
           <Route path="import/history" element={<Lazy><Pages.ImportHistoryPage /></Lazy>} />
         </Route>

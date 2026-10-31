@@ -17,4 +17,10 @@ export const NODE_TYPE_ICONS: Record<UnifiedBuilderNodeType, IconType> = {
   'action.assign': 'UserPlus',
   'action.script': 'Code',
   'call.workflow': 'ShareNetwork',
+  'loop.foreach': 'Repeat',
+  'parallel.fork': 'ArrowsSplit',
+  'parallel.join': 'ArrowsMerge',
+  'action.approval': 'SealCheck',
+  'action.task': 'ClipboardText',
+  'variables.set': 'BracketsCurly',
 };

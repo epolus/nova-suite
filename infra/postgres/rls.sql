@@ -819,6 +819,19 @@ CREATE POLICY tenant_isolation_config_deployment_runs ON config_deployment_runs
   USING (tenant_id = current_tenant_id())
   WITH CHECK (tenant_id = current_tenant_id());
 
+-- ServiceNow migrator runs
+ALTER TABLE migration_runs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_migration_runs ON migration_runs
+  FOR ALL USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'system')
+  );
+ALTER TABLE migration_runs FORCE ROW LEVEL SECURITY;
+
 -- Catalog tasks
 ALTER TABLE catalog_tasks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON catalog_tasks

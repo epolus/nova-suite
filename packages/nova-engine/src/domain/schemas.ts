@@ -4,6 +4,7 @@
 
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import { serviceNowExtractOptionsSchema } from '@nova-suite/shared/migrators/servicenow';
 
 extendZodWithOpenApi(z);
 
@@ -175,6 +176,14 @@ export const configPackageDataSourceSchema = z.object({
   upsert_key: nullableStringSchema,
 });
 
+export const configPackageWorkflowDefinitionSchema = z.object({
+  name: z.string().min(1).max(255),
+  workflow_type: z.string().min(1).max(100).regex(/^[a-z0-9][a-z0-9_.-]*$/),
+  description: nullableStringSchema,
+  /** Published as-is; call.workflow resolves the latest active definition by workflow_type. */
+  definition: z.record(z.string(), z.unknown()),
+});
+
 export const configPackageBundleSchema = z.object({
   format: z.literal('nova.config-package'),
   version: z.literal(1),
@@ -196,15 +205,42 @@ export const configPackageBundleSchema = z.object({
     data_sources: z.object({
       sources: z.array(configPackageDataSourceSchema).default([]),
     }).default({ sources: [] }),
+    workflows: z.object({
+      definitions: z.array(configPackageWorkflowDefinitionSchema).default([]),
+    }).default({ definitions: [] }),
   }).default({
     catalog: { categories: [], service_items: [] },
     notifications: { rules: [] },
     data_sources: { sources: [] },
+    workflows: { definitions: [] },
   }),
 });
 
 export const configPackageApplySchema = z.object({
   package: configPackageBundleSchema,
+});
+
+// ─── ServiceNow catalog migrator ───
+export const serviceNowConnectionSchema = z.object({
+  instance_url: z.string().trim().min(1).max(255),
+  credential_slug: z.string().trim().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/),
+});
+
+export const serviceNowCreateRunSchema = serviceNowConnectionSchema.extend({
+  options: serviceNowExtractOptionsSchema.default({
+    catalogIds: [],
+    categoryIds: [],
+    itemIds: [],
+    includeRecordProducers: false,
+    includeInactive: false,
+    maxItems: 500,
+  }),
+});
+
+export const serviceNowApplySchema = z.object({
+  item_keys: z.array(z.string().min(1).max(160)).min(1).max(2000),
+  /** Create assignment groups referenced by tasks that do not exist yet; otherwise tasks are left unassigned. */
+  create_missing_groups: z.boolean().default(false),
 });
 
 // ─── Requests (User Portal) ───
