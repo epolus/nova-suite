@@ -11,6 +11,7 @@ import { useListParams } from '../../hooks/useListParams';
 import { useTheme } from '../../context/ThemeContext';
 import { formatCurrency } from '../../utils/currency';
 import ServiceItemForm from './ServiceItemForm';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const DEFAULT_COLS = ['name', 'category_name', 'short_description', 'price', 'task_count', '_status'];
 const PAGE_SIZE = 25;
@@ -149,6 +150,7 @@ export default function ServiceItemsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<ServiceItem | null>(null);
   const [creating, setCreating] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ServiceItem | null>(null);
 
   useEffect(() => {
     if (!creating && !editing) return;
@@ -269,9 +271,9 @@ export default function ServiceItemsPage() {
     }
   }, [t]);
 
-  const handlePermanentDelete = useCallback(async (item: ServiceItem) => {
-    const count = item.task_count ?? 0;
-    if (!confirm(t('confirmDelete', { name: item.name, count }))) return;
+  const handlePermanentDelete = useCallback(async () => {
+    const item = pendingDelete;
+    if (!item) return;
     setActionError(null);
     setBusyId(item.id);
     try {
@@ -285,8 +287,9 @@ export default function ServiceItemsPage() {
       setActionError(err instanceof Error ? err.message : t('deleteFailed'));
     } finally {
       setBusyId(null);
+      setPendingDelete(null);
     }
-  }, [t]);
+  }, [pendingDelete, t]);
 
   const rowActions = useCallback((item: ServiceItem) => {
     const busy = busyId === item.id;
@@ -312,7 +315,7 @@ export default function ServiceItemsPage() {
           <button
             type="button"
             disabled={busy}
-            onClick={() => handlePermanentDelete(item)}
+            onClick={() => setPendingDelete(item)}
             className="text-xs text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
           >
             {tActions('delete')}
@@ -320,7 +323,7 @@ export default function ServiceItemsPage() {
         )}
       </div>
     );
-  }, [busyId, handleDeactivate, handlePermanentDelete, tActions, tMaster]);
+  }, [busyId, handleDeactivate, tActions, tMaster]);
 
   const editingIndex = editing ? sorted.findIndex((item) => item.id === editing.id) : -1;
   const prevItemId = editingIndex > 0 ? sorted[editingIndex - 1]?.id ?? null : null;
@@ -427,6 +430,19 @@ export default function ServiceItemsPage() {
           }
         />
       )}
+
+      <ConfirmDialog
+        open={pendingDelete != null}
+        title={t('deleteTitle')}
+        message={pendingDelete
+          ? t('confirmDelete', { name: pendingDelete.name, count: pendingDelete.task_count ?? 0 })
+          : ''}
+        confirmLabel={tActions('delete')}
+        variant="danger"
+        loading={pendingDelete != null && busyId === pendingDelete.id}
+        onConfirm={() => { void handlePermanentDelete(); }}
+        onCancel={() => { if (busyId == null) setPendingDelete(null); }}
+      />
     </>
   );
 }

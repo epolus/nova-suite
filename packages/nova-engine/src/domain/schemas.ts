@@ -70,8 +70,8 @@ export const createCategorySchema = z.object({
 export const createServiceItemSchema = z.object({
   category_id: uuidSchema,
   name: z.string().min(1).max(255),
-  short_description: z.string().max(500).optional(),
-  description: z.string().max(5000).optional(),
+  short_description: z.string().max(500).nullable().optional(),
+  description: z.string().max(5000).nullable().optional(),
   icon: z.string().max(50).optional(),
   price: z.number().min(0).optional().nullable(),
   custom_attributes: z.record(z.string(), z.unknown()).default({}),

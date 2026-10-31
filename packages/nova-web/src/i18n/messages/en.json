@@ -1522,6 +1522,7 @@
         "newItem": "+ New Item",
         "searchPlaceholder": "Search items...",
         "confirmDeactivate": "Deactivate this service item?",
+        "deleteTitle": "Delete service item",
         "confirmDelete": "{count, plural, =0 {Permanently delete \"{name}\"? This cannot be undone.} one {Permanently delete \"{name}\" and its catalog task? This cannot be undone.} other {Permanently delete \"{name}\" and its # catalog tasks? This cannot be undone.}}",
         "deleteFailed": "Could not delete this service item.",
         "loadFailed": "Could not load service items.",
@@ -1589,7 +1590,17 @@
           "previewNamePlaceholder": "Item Name",
           "previewShortDescriptionPlaceholder": "Short description...",
           "free": "Free",
-          "createServiceItem": "Create Service Item"
+          "createServiceItem": "Create Service Item",
+          "validationFailed": "This item was not saved.",
+          "nameRequired": "Name is required.",
+          "categoryRequired": "Category is required.",
+          "nameTooLong": "Name must be 255 characters or fewer.",
+          "shortDescriptionTooLong": "Short description must be 500 characters or fewer.",
+          "descriptionTooLong": "Description must be 5,000 characters or fewer.",
+          "priceInvalid": "Price must be zero or greater.",
+          "slaInvalid": "SLA must be a whole number of at least 1 hour.",
+          "iconTooLong": "Icon must be 50 characters or fewer.",
+          "activateRequiresTask": "Add at least one active catalog task before activating this item."
         }
       },
       "credentials": {

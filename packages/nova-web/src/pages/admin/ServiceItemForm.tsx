@@ -23,6 +23,82 @@ const EMPTY_ITEM: Partial<ServiceItem> = {
   is_active: false,
 };
 
+type ServiceItemField =
+  | 'name'
+  | 'category_id'
+  | 'short_description'
+  | 'description'
+  | 'icon'
+  | 'price'
+  | 'sla_hours'
+  | 'is_active';
+
+type ServiceItemIssue =
+  | 'nameRequired'
+  | 'nameTooLong'
+  | 'categoryRequired'
+  | 'shortDescriptionTooLong'
+  | 'descriptionTooLong'
+  | 'priceInvalid'
+  | 'slaInvalid'
+  | 'iconTooLong'
+  | 'activateRequiresTask';
+
+function optionalText(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function softSaveFailure(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const body = value as { success?: boolean; error?: string; id?: string };
+  if (body.success === false && !body.id) return body.error || 'This item was not saved.';
+  return null;
+}
+
+/** Mirrors createServiceItemSchema: only name and category are required. */
+function serviceItemIssues(
+  form: Record<string, unknown>,
+  options: { isNew: boolean; taskCount: number },
+): Partial<Record<ServiceItemField, ServiceItemIssue>> {
+  const issues: Partial<Record<ServiceItemField, ServiceItemIssue>> = {};
+  const name = typeof form.name === 'string' ? form.name.trim() : '';
+  if (!name) issues.name = 'nameRequired';
+  else if (name.length > 255) issues.name = 'nameTooLong';
+
+  const categoryId = typeof form.category_id === 'string' ? form.category_id.trim() : '';
+  if (!categoryId) issues.category_id = 'categoryRequired';
+
+  const shortDescription = typeof form.short_description === 'string' ? form.short_description : '';
+  if (shortDescription.length > 500) issues.short_description = 'shortDescriptionTooLong';
+
+  const description = typeof form.description === 'string' ? form.description : '';
+  if (description.length > 5000) issues.description = 'descriptionTooLong';
+
+  const icon = typeof form.icon === 'string' && form.icon ? form.icon : 'box';
+  if (icon.length > 50) issues.icon = 'iconTooLong';
+
+  if (form.price != null && form.price !== '') {
+    const price = Number(form.price);
+    if (!Number.isFinite(price) || price < 0) issues.price = 'priceInvalid';
+  }
+
+  const sla = Number(form.sla_hours);
+  if (!Number.isInteger(sla) || sla < 1) issues.sla_hours = 'slaInvalid';
+
+  if (!options.isNew && form.is_active !== false && options.taskCount === 0) {
+    issues.is_active = 'activateRequiresTask';
+  }
+
+  return issues;
+}
+
+function controlClass(invalid: boolean, extra = ''): string {
+  const padding = extra.includes('pl-') || extra.includes('pr-') || extra.includes('px-') ? '' : 'px-3 ';
+  return `w-full ${padding}py-2 border rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 ${
+    invalid ? 'border-red-400' : 'border-gray-200'
+  }${extra ? ` ${extra}` : ''}`;
+}
+
 export default function ServiceItemForm({
   item,
   categories,
@@ -57,6 +133,8 @@ export default function ServiceItemForm({
     return { ...EMPTY_ITEM, category_id: categories[0]?.id || '' };
   });
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ServiceItemField, string>>>({});
   const [pictureFile, setPictureFile] = useState<File | null>(null);
   const [picturePreview, setPicturePreview] = useState<string>('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -129,6 +207,19 @@ export default function ServiceItemForm({
   };
 
   const handleSubmit = async () => {
+    const issues = serviceItemIssues(form, { isNew, taskCount: item?.task_count ?? 0 });
+    if (Object.keys(issues).length > 0) {
+      const messages: Partial<Record<ServiceItemField, string>> = {};
+      for (const [field, key] of Object.entries(issues) as [ServiceItemField, ServiceItemIssue][]) {
+        messages[field] = tForm(key);
+      }
+      setFieldErrors(messages);
+      setFormError(tForm('validationFailed'));
+      return;
+    }
+
+    setFieldErrors({});
+    setFormError(null);
     setSaving(true);
     try {
       // Build custom_attributes from editor
@@ -137,25 +228,34 @@ export default function ServiceItemForm({
         if (k.trim()) attrs[k.trim()] = parseCustomAttribute(v);
       }
 
+      const name = typeof form.name === 'string' ? form.name.trim() : '';
       const payload: Record<string, unknown> = {
         category_id: form.category_id,
-        name: form.name,
-        short_description: form.short_description || null,
-        description: form.description || null,
+        name,
         icon: form.icon || 'box',
         price: form.price != null && form.price !== '' ? Number(form.price) : null,
         custom_attributes: attrs,
         form_schema: form.form_schema || { fields: [] },
         approval_required: form.approval_required ?? false,
-        sla_hours: Number(form.sla_hours) || 72,
+        sla_hours: Number(form.sla_hours),
         is_active: form.is_active ?? true,
       };
+      const shortDescription = optionalText(form.short_description);
+      const description = optionalText(form.description);
+      if (shortDescription) payload.short_description = shortDescription;
+      if (description) payload.description = description;
 
       let saved: ServiceItem;
       if (isNew) {
         saved = await catalog.createItem(payload as Partial<ServiceItem>);
       } else {
         saved = await catalog.updateItem(item!.id, payload as Partial<ServiceItem>);
+      }
+
+      const rejected = softSaveFailure(saved);
+      if (rejected) {
+        setFormError(rejected);
+        return;
       }
 
       // Upload picture if changed
@@ -165,8 +265,11 @@ export default function ServiceItemForm({
 
       onSave(saved);
     } catch (err) {
-      console.error(err);
-      alert(String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setFormError(message);
+      const expectedValidation = message.startsWith('Validation failed')
+        || message.includes('Cannot activate a service item');
+      if (!expectedValidation) console.error(err);
     } finally {
       setSaving(false);
     }
@@ -175,8 +278,13 @@ export default function ServiceItemForm({
   const set = (key: string, value: unknown) => {
     markDirty();
     setForm({ ...form, [key]: value });
+    setFieldErrors((prev) => {
+      if (!(key in prev)) return prev;
+      const next = { ...prev };
+      delete next[key as ServiceItemField];
+      return next;
+    });
   };
-  const canSave = !saving && !!(form.name as string)?.trim() && !!(form.category_id as string);
 
   return (
     <>
@@ -221,7 +329,7 @@ export default function ServiceItemForm({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={!canSave}
+              disabled={saving}
               className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
               {saving ? tActions('saving') : isNew ? tForm('createServiceItem') : tMaster('saveChanges')}
@@ -229,6 +337,32 @@ export default function ServiceItemForm({
           </div>
         }
       />
+
+      {formError && (
+        <div
+          role="alert"
+          className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start justify-between gap-3"
+        >
+          <div>
+            <p>{formError}</p>
+            {Object.keys(fieldErrors).length > 0 && (
+              <ul className="mt-1 list-disc pl-5">
+                {Object.entries(fieldErrors).map(([field, message]) => (
+                  <li key={field}>{message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setFormError(null)}
+            className="shrink-0 text-red-500 hover:text-red-800 leading-none"
+            aria-label={tActions('dismiss')}
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main form */}
@@ -241,20 +375,27 @@ export default function ServiceItemForm({
                 <input
                   value={(form.name as string) || ''}
                   onChange={(e) => set('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
+                  aria-required="true"
+                  aria-invalid={fieldErrors.name ? true : undefined}
+                  className={controlClass(!!fieldErrors.name)}
                   placeholder={tForm('namePlaceholder')}
+                  maxLength={255}
                 />
+                {fieldErrors.name && <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('category')} *</label>
                 <select
                   value={(form.category_id as string) || ''}
                   onChange={(e) => set('category_id', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
+                  aria-required="true"
+                  aria-invalid={fieldErrors.category_id ? true : undefined}
+                  className={controlClass(!!fieldErrors.category_id)}
                 >
                   <option value="">{tForm('selectCategory')}</option>
                   {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+                {fieldErrors.category_id && <p className="text-xs text-red-600 mt-1">{fieldErrors.category_id}</p>}
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('icon')}</label>
@@ -283,16 +424,19 @@ export default function ServiceItemForm({
                 {(form.icon as string) && !isCatalogItemIcon(form.icon as string) && (
                   <p className="text-xs text-gray-400 mt-1">{tForm('currentIcon', { icon: form.icon as string })}</p>
                 )}
+                {fieldErrors.icon && <p className="text-xs text-red-600 mt-1">{fieldErrors.icon}</p>}
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('shortDescription')}</label>
                 <input
                   value={(form.short_description as string) || ''}
                   onChange={(e) => set('short_description', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
+                  aria-invalid={fieldErrors.short_description ? true : undefined}
+                  className={controlClass(!!fieldErrors.short_description)}
                   placeholder={tForm('shortDescriptionPlaceholder')}
                   maxLength={500}
                 />
+                {fieldErrors.short_description && <p className="text-xs text-red-600 mt-1">{fieldErrors.short_description}</p>}
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">{tFields('description')}</label>
@@ -300,9 +444,12 @@ export default function ServiceItemForm({
                   value={(form.description as string) || ''}
                   onChange={(e) => set('description', e.target.value)}
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500 resize-none"
+                  aria-invalid={fieldErrors.description ? true : undefined}
+                  className={controlClass(!!fieldErrors.description, 'resize-none')}
                   placeholder={tForm('descriptionPlaceholder')}
+                  maxLength={5000}
                 />
+                {fieldErrors.description && <p className="text-xs text-red-600 mt-1">{fieldErrors.description}</p>}
               </div>
             </div>
           </Card>
@@ -423,10 +570,12 @@ export default function ServiceItemForm({
                     min="0"
                     value={form.price != null && form.price !== '' ? String(form.price) : ''}
                     onChange={(e) => set('price', e.target.value === '' ? null : e.target.value)}
-                    className="w-full pl-16 pr-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
+                    aria-invalid={fieldErrors.price ? true : undefined}
+                    className={controlClass(!!fieldErrors.price, 'pl-16 pr-3')}
                     placeholder={tForm('pricePlaceholder')}
                   />
                 </div>
+                {fieldErrors.price && <p className="text-xs text-red-600 mt-1">{fieldErrors.price}</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">{tForm('slaHoursLabel')}</label>
@@ -435,8 +584,10 @@ export default function ServiceItemForm({
                   min="1"
                   value={form.sla_hours ? String(form.sla_hours) : ''}
                   onChange={(e) => set('sla_hours', parseInt(e.target.value, 10) || 72)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
+                  aria-invalid={fieldErrors.sla_hours ? true : undefined}
+                  className={controlClass(!!fieldErrors.sla_hours)}
                 />
+                {fieldErrors.sla_hours && <p className="text-xs text-red-600 mt-1">{fieldErrors.sla_hours}</p>}
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
@@ -463,6 +614,7 @@ export default function ServiceItemForm({
                 />
                 <label htmlFor="is_active" className="text-sm text-gray-700">{tStates('active')}</label>
               </div>
+              {fieldErrors.is_active && <p className="text-xs text-red-600">{fieldErrors.is_active}</p>}
             </div>
           </Card>
 

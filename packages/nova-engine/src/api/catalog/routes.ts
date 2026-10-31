@@ -507,7 +507,11 @@ router.put(
           [req.params.id],
         );
         if (parseInt(taskCount.rows[0].count, 10) === 0) {
-          throw BadRequest('Cannot activate a service item without at least one active Catalog Workflow Task');
+          res.json({
+            success: false,
+            error: 'Cannot activate a service item without at least one active Catalog Workflow Task',
+          });
+          return;
         }
       }
 
