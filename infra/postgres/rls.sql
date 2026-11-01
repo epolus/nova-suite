@@ -21,6 +21,7 @@ ALTER TABLE assignment_group_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_processes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fulfillment_models ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE carts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cart_items ENABLE ROW LEVEL SECURITY;
@@ -163,6 +164,10 @@ CREATE POLICY tenant_isolation_services ON services
 
 -- ─── Service Categories ───
 CREATE POLICY tenant_isolation_service_categories ON service_categories
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Fulfillment Models ───
+CREATE POLICY tenant_isolation_fulfillment_models ON fulfillment_models
   FOR ALL USING (tenant_id = current_tenant_id());
 
 -- ─── Service Items ───
@@ -728,6 +733,7 @@ ALTER TABLE assignment_group_roles FORCE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_processes FORCE ROW LEVEL SECURITY;
 ALTER TABLE services FORCE ROW LEVEL SECURITY;
 ALTER TABLE service_categories FORCE ROW LEVEL SECURITY;
+ALTER TABLE fulfillment_models FORCE ROW LEVEL SECURITY;
 ALTER TABLE service_items FORCE ROW LEVEL SECURITY;
 ALTER TABLE carts FORCE ROW LEVEL SECURITY;
 ALTER TABLE cart_items FORCE ROW LEVEL SECURITY;

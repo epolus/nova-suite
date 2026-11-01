@@ -144,7 +144,7 @@ async function listAssignmentGroupsForTenant(tenantId: string) {
 router.get(
   '/assignment-groups',
   authenticate,
-  requireRole('admin', 'fulfiller'),
+  requireRole('admin', 'fulfiller', 'catalog_designer'),
   setTenantRLS,
   releaseTenantClient,
   async (req: Request, res: Response, next: NextFunction) => {

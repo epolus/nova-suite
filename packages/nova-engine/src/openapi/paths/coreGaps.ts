@@ -4,6 +4,8 @@ import { z } from 'zod';
 import {
   batchRequestSchema,
   createServiceItemSchema,
+  fulfillmentModelUpdateSchema,
+  fulfillmentModelWriteSchema,
   incidentLinkMajorIncidentSchema,
   paginationSchema,
   rankedSuggestionsQuerySchema,
@@ -33,6 +35,8 @@ const assignTaskSchema = z.object({
 });
 
 const completeTaskSchema = z.object({
+  outcome: z.enum(['approved', 'rejected', 'completed', 'skipped', 'cancelled']).optional(),
+  notes: z.string().max(4000).optional(),
   work_notes: z.string().max(10000).optional(),
 }).loose();
 
@@ -49,6 +53,26 @@ export function registerCoreGaps(registry: OpenAPIRegistry): void {
   registerOp(registry, 'get', '/catalog/locations', 'Catalog', 'List catalog locations', {
     200: { description: 'Locations' },
   });
+
+  registerOp(registry, 'get', '/catalog/fulfillment-models', 'Catalog', 'List fulfillment models', {
+    200: { description: 'Fulfillment models' },
+  });
+  registerOp(registry, 'get', '/catalog/fulfillment-models/{id}', 'Catalog', 'Get fulfillment model', {
+    200: { description: 'Fulfillment model' },
+    404: { description: 'Not found' },
+  }, { params: uuidParam });
+  registerOp(registry, 'post', '/catalog/fulfillment-models', 'Catalog', 'Create fulfillment model', {
+    201: { description: 'Fulfillment model created' },
+  }, jsonBody(fulfillmentModelWriteSchema));
+  registerOp(registry, 'put', '/catalog/fulfillment-models/{id}', 'Catalog', 'Update fulfillment model', {
+    200: { description: 'Fulfillment model updated' },
+    404: { description: 'Not found' },
+  }, { params: uuidParam, ...jsonBody(fulfillmentModelUpdateSchema) });
+  registerOp(registry, 'delete', '/catalog/fulfillment-models/{id}', 'Catalog', 'Delete an unused fulfillment model', {
+    200: { description: 'Deleted' },
+    404: { description: 'Not found' },
+    409: { description: 'Still used by a service item' },
+  }, { params: uuidParam });
 
   registerOp(registry, 'put', '/catalog/items/{id}', 'Catalog', 'Update service item (admin)', {
     200: { description: 'Item updated' },

@@ -5,6 +5,7 @@ export * from './automation-builder-defaults';
 export * from './automation-runtime';
 export * from './automation-native';
 export * from './catalog-links';
+export * from './fulfillment-model';
 export * from './analytics-snapshot-metrics';
 export * from './notification-webhooks';
 export * from './chat-inbound';

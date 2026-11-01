@@ -40,6 +40,7 @@ export interface ServiceItem {
   form_schema: { fields: FormField[] };
   approval_required: boolean;
   sla_hours: number;
+  fulfillment_model_id?: string | null;
   is_active: boolean;
   category_name?: string;
   task_count?: number;
@@ -60,6 +61,11 @@ export interface ServiceRequest {
   approved_by: string | null;
   approved_at: string | null;
   notes: string | null;
+  provisioned_ci_id?: string | null;
+  provisioned_ci_name?: string | null;
+  provisioned_asset_id?: string | null;
+  provisioned_asset_name?: string | null;
+  provisioned_asset_tag?: string | null;
   created_at: string;
   updated_at: string;
   service_item_name?: string;
@@ -67,6 +73,45 @@ export interface ServiceRequest {
   approved_by_name?: string;
   requested_for_name?: string;
   batch_count?: number;
+}
+
+export interface FulfillmentModelTask {
+  name: string;
+  instructions?: string | null;
+  assigned_group_id?: string | null;
+  sla_hours?: number | null;
+}
+
+export interface FulfillmentModelConfig {
+  tasks: FulfillmentModelTask[];
+  ci: {
+    enabled: boolean;
+    class_id?: string | null;
+    name_template: string;
+    display_name_template: string;
+    status: 'installed' | 'in_stock' | 'maintenance' | 'retired' | 'planned';
+  };
+  asset: {
+    enabled: boolean;
+    category: string;
+    name_template: string;
+    asset_tag_template: string;
+  };
+}
+
+export function fulfillmentGroupTasks(config: FulfillmentModelConfig | null | undefined): FulfillmentModelTask[] {
+  return config?.tasks ?? [];
+}
+
+export interface FulfillmentModel {
+  id: string;
+  name: string;
+  description: string | null;
+  config: FulfillmentModelConfig;
+  is_active: boolean;
+  task_group_names?: Array<string | null> | null;
+  ci_class_name?: string | null;
+  item_count?: number;
 }
 
 export interface CatalogTask {

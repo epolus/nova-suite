@@ -27,6 +27,7 @@ import {
   enqueueCatalogFulfillmentStartJob,
   enqueueNotificationDispatchStartJob,
 } from '../../temporal/workflow-start-queue';
+import { catalogWorkflowForItem } from '../catalog/item-fulfillment';
 import { isAdminRole, isFulfillerRole } from '../roles';
 import { getRequestApprovalTrigger } from '../../notifications/triggers';
 
@@ -371,11 +372,8 @@ router.post(
         }
       }
 
-      const taskCheck = await client.query(
-        'SELECT count(*) FROM catalog_tasks WHERE service_item_id = $1 AND is_active = true',
-        [service_item_id],
-      );
-      const hasWorkflowTasks = parseInt(taskCheck.rows[0].count, 10) > 0;
+      const workflow = await catalogWorkflowForItem(client, service_item_id);
+      const hasWorkflowTasks = workflow === 'start';
 
       const seqResult = await client.query("SELECT nextval('request_number_seq')");
       const number = `REQ${seqResult.rows[0].nextval.toString().padStart(7, '0')}`;
@@ -499,11 +497,8 @@ router.post(
             }
           }
 
-          const taskCheck = await client.query(
-            'SELECT count(*) FROM catalog_tasks WHERE service_item_id = $1 AND is_active = true',
-            [item.service_item_id],
-          );
-          const hasWorkflowTasks = parseInt(taskCheck.rows[0].count, 10) > 0;
+          const workflow = await catalogWorkflowForItem(client, item.service_item_id);
+          const hasWorkflowTasks = workflow === 'start';
 
           const seqResult = await client.query("SELECT nextval('request_number_seq')");
           const number = `REQ${seqResult.rows[0].nextval.toString().padStart(7, '0')}`;
@@ -754,12 +749,17 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       `SELECT r.*, si.name AS service_item_name, si.form_schema,
               u.display_name AS requester_name,
               a.display_name AS approved_by_name,
-              rf.display_name AS requested_for_name
+              rf.display_name AS requested_for_name,
+              COALESCE(pci.display_name, pci.name) AS provisioned_ci_name,
+              pa.name AS provisioned_asset_name,
+              pa.asset_tag AS provisioned_asset_tag
        FROM requests r
        JOIN service_items si ON si.id = r.service_item_id
        JOIN users u ON u.id = r.requester_id
        LEFT JOIN users a ON a.id = r.approved_by
        LEFT JOIN users rf ON rf.id = r.requested_for
+       LEFT JOIN configuration_items pci ON pci.id = r.provisioned_ci_id
+       LEFT JOIN assets pa ON pa.id = r.provisioned_asset_id
        WHERE r.id = $1`,
       [req.params.id],
     );
@@ -903,7 +903,8 @@ router.post('/:id/tasks/:taskId/complete',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const client = getRequestClient(req);
-      const { outcome, notes } = req.body;
+      const { outcome } = req.body;
+      let notes = typeof req.body.notes === 'string' ? req.body.notes : null;
       const requestId = req.params.id as string;
       const taskId = req.params.taskId as string;
       const userId = req.user!.id;
@@ -945,6 +946,14 @@ router.post('/:id/tasks/:taskId/complete',
       if (task.task_type === 'approval' && !['approved', 'rejected'].includes(outcome)) {
         throw BadRequest('Approval tasks require outcome: approved or rejected');
       }
+      if (task.task_type !== 'approval' && outcome && !['completed', 'skipped', 'cancelled'].includes(outcome)) {
+        throw BadRequest('Task outcome must be completed, skipped, or cancelled');
+      }
+      if (task.task_type !== 'approval' && outcome === 'cancelled') {
+        const reason = notes?.trim() ?? '';
+        if (!reason) throw BadRequest('A reason is required to cancel the request');
+        notes = reason;
+      }
 
       // Prevent classic manager-of-subject self-approval. Explicit assignees
       // (group_manager) may still decide even when they are the request subject.
@@ -981,16 +990,27 @@ router.post('/:id/tasks/:taskId/complete',
         throw BadRequest('You are not authorized to complete this task');
       }
 
-      const finalOutcome = task.task_type === 'approval' ? outcome : 'completed';
+      const signalOutcome = task.task_type === 'approval'
+        ? outcome
+        : outcome === 'skipped' || outcome === 'cancelled'
+          ? outcome
+          : 'completed';
+      const taskStatus = signalOutcome === 'rejected'
+        ? 'rejected'
+        : signalOutcome === 'skipped'
+          ? 'skipped'
+          : signalOutcome === 'cancelled'
+            ? 'cancelled'
+            : 'completed';
 
       // Signal the Temporal workflow
-      await signalTaskCompleted(requestId, taskId, finalOutcome, notes || null, userId);
+      await signalTaskCompleted(requestId, taskId, signalOutcome, notes || null, userId);
 
-      if (task.task_type === 'approval' && (finalOutcome === 'approved' || finalOutcome === 'rejected')) {
+      if (task.task_type === 'approval' && (signalOutcome === 'approved' || signalOutcome === 'rejected')) {
         enqueueNotificationDispatchStartJob({
           tenantId: req.user!.tenant_id,
           entityType: 'request',
-          triggerKey: getRequestApprovalTrigger(finalOutcome),
+          triggerKey: getRequestApprovalTrigger(signalOutcome),
           entityId: String(requestId),
           actorUserId: req.user!.id,
         }).catch(() => {});
@@ -1002,8 +1022,8 @@ router.post('/:id/tasks/:taskId/complete',
           status = $1, outcome = $2, completed_by = $3, completed_at = now(), notes = $4
          WHERE id = $5`,
         [
-          finalOutcome === 'rejected' ? 'rejected' : 'completed',
-          task.task_type === 'approval' ? finalOutcome : null,
+          taskStatus,
+          task.task_type === 'approval' ? signalOutcome : null,
           userId, notes || null, taskId,
         ],
       );

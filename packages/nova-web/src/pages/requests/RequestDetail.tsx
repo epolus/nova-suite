@@ -129,13 +129,13 @@ export default function RequestDetail() {
     }
   };
 
-  const handleTaskComplete = async (taskId: string, outcome: string) => {
+  const handleTaskComplete = async (taskId: string, outcome: string, notes?: string) => {
     if (!id) return;
     setActionLoading(true);
     try {
       const updated = await requestsApi.completeTask(id, taskId, {
         outcome,
-        notes: taskNotes[taskId] || undefined,
+        notes: notes ?? (taskNotes[taskId] || undefined),
       });
       setTasks(tasks.map((t) => (t.id === updated.id ? updated : t)));
       setTaskNotes((prev) => ({ ...prev, [taskId]: '' }));
@@ -274,6 +274,26 @@ export default function RequestDetail() {
                 <div>
                   <dt className="text-gray-500">{tRequests('approvedBy')}</dt>
                   <dd className="font-medium text-gray-900 mt-0.5">{req.approved_by_name} &middot; {formatDateTime(req.approved_at)}</dd>
+                </div>
+              )}
+              {req.provisioned_ci_id && (
+                <div>
+                  <dt className="text-gray-500">{tRequests('provisionedCi')}</dt>
+                  <dd className="font-medium text-gray-900 mt-0.5">
+                    <Link to={`/cmdb/${req.provisioned_ci_id}`} className="text-indigo-700 hover:underline">
+                      {req.provisioned_ci_name || req.provisioned_ci_id}
+                    </Link>
+                  </dd>
+                </div>
+              )}
+              {req.provisioned_asset_id && (
+                <div>
+                  <dt className="text-gray-500">{tRequests('provisionedAsset')}</dt>
+                  <dd className="font-medium text-gray-900 mt-0.5">
+                    <Link to={`/assets/${req.provisioned_asset_id}`} className="text-indigo-700 hover:underline">
+                      {req.provisioned_asset_name || req.provisioned_asset_tag || req.provisioned_asset_id}
+                    </Link>
+                  </dd>
                 </div>
               )}
               {req.requested_for_name && req.requested_for !== req.requester_id && (

@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'use-intl';
 import { catalog, cmdb } from '../../api/client';
-import type { ServiceItem, Category, FormField, CIClass } from '../../api/client';
+import type { ServiceItem, Category, FormField, CIClass, FulfillmentModel } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import { normalizeCurrencyCode } from '../../utils/currency';
 import { formatCustomAttribute, parseCustomAttribute } from './customAttributes';
@@ -61,10 +61,12 @@ export default function ServiceItemForm({
   const [picturePreview, setPicturePreview] = useState<string>('');
   const fileRef = useRef<HTMLInputElement>(null);
   const [ciClasses, setCiClasses] = useState<CIClass[]>([]);
+  const [fulfillmentModels, setFulfillmentModels] = useState<FulfillmentModel[]>([]);
   const normalizedCurrency = normalizeCurrencyCode(currencyCode);
 
   useEffect(() => {
     cmdb.classes().then((res) => setCiClasses(res.classes)).catch(() => {});
+    catalog.fulfillmentModels().then((res) => setFulfillmentModels(res.fulfillment_models)).catch(() => {});
   }, []);
 
   // Custom attributes editor
@@ -149,6 +151,12 @@ export default function ServiceItemForm({
       return;
     }
 
+    const modelId = typeof form.fulfillment_model_id === 'string' ? form.fulfillment_model_id.trim() : '';
+    if (modelId && (item?.task_count ?? 0) > 0) {
+      setFormError(tForm('modelAndTasks'));
+      return;
+    }
+
     setFieldErrors({});
     setFormError(null);
     setSaving(true);
@@ -169,6 +177,9 @@ export default function ServiceItemForm({
         form_schema: form.form_schema || { fields: [] },
         approval_required: form.approval_required ?? false,
         sla_hours: Number(form.sla_hours),
+        fulfillment_model_id: typeof form.fulfillment_model_id === 'string' && form.fulfillment_model_id
+          ? form.fulfillment_model_id
+          : null,
         is_active: form.is_active ?? true,
       };
       const shortDescription = optionalText(form.short_description);
@@ -325,6 +336,7 @@ export default function ServiceItemForm({
             form={form}
             fieldErrors={fieldErrors}
             currencyCode={normalizedCurrency}
+            fulfillmentModels={fulfillmentModels}
             set={set}
           />
           <ServiceItemPreviewCard

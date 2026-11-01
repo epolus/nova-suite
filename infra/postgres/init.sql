@@ -412,6 +412,26 @@ CREATE INDEX idx_service_categories_tenant ON service_categories(tenant_id);
 CREATE UNIQUE INDEX uq_service_categories_tenant_external_key ON service_categories(tenant_id, external_key);
 
 -- ============================================================
+-- FULFILLMENT MODELS
+-- Reusable simple fulfillment for service items (group task, CI, asset).
+-- Distinct from ITSM business services.
+-- ============================================================
+CREATE TABLE fulfillment_models (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  external_key text,
+  name         text NOT NULL,
+  description  text,
+  config       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  is_active    boolean NOT NULL DEFAULT true,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_fulfillment_models_tenant ON fulfillment_models(tenant_id);
+CREATE UNIQUE INDEX uq_fulfillment_models_tenant_external_key ON fulfillment_models(tenant_id, external_key);
+
+-- ============================================================
 -- SERVICE CATALOG ITEMS
 -- ============================================================
 CREATE TABLE service_items (
@@ -419,6 +439,7 @@ CREATE TABLE service_items (
   tenant_id           uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   external_key         text,
   category_id         uuid NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
+  fulfillment_model_id uuid REFERENCES fulfillment_models(id) ON DELETE RESTRICT,
   name                text NOT NULL,
   short_description   text,
   description         text,
@@ -436,6 +457,7 @@ CREATE TABLE service_items (
 
 CREATE INDEX idx_service_items_tenant ON service_items(tenant_id);
 CREATE INDEX idx_service_items_category ON service_items(category_id);
+CREATE INDEX idx_service_items_fulfillment_model ON service_items(fulfillment_model_id);
 CREATE UNIQUE INDEX uq_service_items_tenant_external_key ON service_items(tenant_id, external_key);
 CREATE INDEX idx_service_items_custom_attributes_gin ON service_items USING gin (custom_attributes);
 CREATE INDEX idx_service_items_form_schema_gin ON service_items USING gin (form_schema);
@@ -1071,7 +1093,9 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.22', 'event_management'),
   ('v00.01.23', 'servicenow_migrator'),
   ('v00.01.24', 'cost_center_responsible'),
-  ('v00.01.25', 'department_manager');
+  ('v00.01.25', 'department_manager'),
+  ('v00.01.26', 'fulfillment_models'),
+  ('v00.01.27', 'request_task_cancelled');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1092,7 +1116,7 @@ BEGIN
     SELECT unnest(ARRAY[
       'tenants', 'departments', 'cost_centers', 'roles', 'processes',
       'users', 'companies', 'locations', 'user_preferences', 'user_dashboards', 'assignment_groups', 'services',
-      'service_categories', 'service_items',
+      'service_categories', 'service_items', 'fulfillment_models',
       'requests', 'workflow_start_jobs', 'ai_conversations', 'incidents', 'major_incidents', 'postmortems', 'ci_classes', 'configuration_items'
     ])
   LOOP
@@ -1144,6 +1168,13 @@ CREATE UNIQUE INDEX uq_assets_tenant_external_id_2
 CREATE TRIGGER trg_assets_updated_at
   BEFORE UPDATE ON assets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE requests
+  ADD COLUMN provisioned_ci_id uuid REFERENCES configuration_items(id) ON DELETE SET NULL,
+  ADD COLUMN provisioned_asset_id uuid REFERENCES assets(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_requests_provisioned_ci ON requests(provisioned_ci_id);
+CREATE INDEX idx_requests_provisioned_asset ON requests(provisioned_asset_id);
 
 -- ============================================================
 -- FUNCTION CALCULATE PRIORITY
@@ -1893,7 +1924,7 @@ CREATE TABLE request_tasks (
                     CHECK (task_type IN ('approval', 'manual', 'automated')),
   is_active         boolean NOT NULL DEFAULT true,
   status            text NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending', 'in_progress', 'completed', 'skipped', 'rejected', 'failed')),
+                    CHECK (status IN ('pending', 'in_progress', 'completed', 'skipped', 'rejected', 'failed', 'cancelled')),
   assigned_to       uuid REFERENCES users(id),
   assigned_group_id uuid REFERENCES assignment_groups(id),
   started_at        timestamptz,
@@ -3489,7 +3520,7 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'problems' THEN
     NEW.is_active := (NEW.status::text NOT IN ('resolved', 'closed'));
   ELSIF TG_TABLE_NAME = 'request_tasks' THEN
-    NEW.is_active := (NEW.status::text NOT IN ('completed', 'skipped', 'rejected'));
+    NEW.is_active := (NEW.status::text NOT IN ('completed', 'skipped', 'rejected', 'cancelled'));
   ELSIF TG_TABLE_NAME = 'requests' THEN
     NEW.is_active := (NEW.status::text NOT IN ('fulfilled', 'cancelled'));
   END IF;

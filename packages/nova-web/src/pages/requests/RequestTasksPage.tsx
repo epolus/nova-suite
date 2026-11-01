@@ -13,6 +13,7 @@ import { useListParams } from '../../hooks/useListParams';
 import { useResettingState } from '../../hooks/useSyncedState';
 import { useCsvExport } from '@/hooks/useCsvExport';
 import FilterPresetsBar from '@/components/FilterPresetsBar';
+import RequestTaskCancelDialog from '@/components/RequestTaskCancelDialog';
 import { useAuth } from '../../context/AuthContext';
 import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import {
@@ -27,6 +28,7 @@ import {
 
 export default function RequestTasksPage() {
   const tTasks = useTranslations('pages.requests.tasksPage');
+  const tRequests = useTranslations('pages.requests');
   const tList = useTranslations('common.list');
   const tMaster = useTranslations('common.masterData');
   const tTable = useTranslations('common.table');
@@ -53,6 +55,9 @@ export default function RequestTasksPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [cancelTask, setCancelTask] = useState<RequestTaskListItem | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState('');
   const { exporting, exportCsv } = useCsvExport('request-tasks');
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -84,11 +89,16 @@ export default function RequestTasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.page, statusFilter, params.search, params.sort, params.dir, cfKey, refreshKey]);
 
-  const handleComplete = async (task: RequestTaskListItem, outcome: string) => {
+  const handleComplete = async (task: RequestTaskListItem, outcome: string, notes?: string) => {
     setActionLoadingId(task.id);
+    setCancelError('');
     try {
-      await requestsApi.completeTask(task.request_id, task.id, { outcome });
+      await requestsApi.completeTask(task.request_id, task.id, { outcome, notes });
+      setCancelTask(null);
+      setCancelReason('');
       setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : tRequests('loadTaskFailed'));
     } finally {
       setActionLoadingId(null);
     }
@@ -155,13 +165,34 @@ export default function RequestTasksPage() {
           </>
         )}
         {canComplete && (
-          <button
-            onClick={(e) => { e.stopPropagation(); handleComplete(task, 'completed'); }}
-            disabled={isLoading}
-            className="px-2.5 py-1 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
-          >
-            {tTasks('actions.complete')}
-          </button>
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleComplete(task, 'skipped'); }}
+              disabled={isLoading}
+              className="px-2.5 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
+            >
+              {tTasks('actions.skip')}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setCancelTask(task);
+                setCancelReason('');
+                setCancelError('');
+              }}
+              disabled={isLoading}
+              className="px-2.5 py-1 text-xs font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 whitespace-nowrap"
+            >
+              {tTasks('actions.cancel')}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleComplete(task, 'completed'); }}
+              disabled={isLoading}
+              className="px-2.5 py-1 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
+            >
+              {tTasks('actions.complete')}
+            </button>
+          </>
         )}
       </div>
     );
@@ -269,6 +300,23 @@ export default function RequestTasksPage() {
           }
         />
       )}
+      <RequestTaskCancelDialog
+        open={cancelTask !== null}
+        reason={cancelReason}
+        error={cancelError}
+        loading={actionLoadingId === cancelTask?.id}
+        onReason={(value) => { setCancelReason(value); setCancelError(''); }}
+        onClose={() => { setCancelTask(null); setCancelError(''); }}
+        onConfirm={() => {
+          if (!cancelTask) return;
+          const reason = cancelReason.trim();
+          if (!reason) {
+            setCancelError(tRequests('cancelReasonRequired'));
+            return;
+          }
+          handleComplete(cancelTask, 'cancelled', reason);
+        }}
+      />
     </>
   );
 }

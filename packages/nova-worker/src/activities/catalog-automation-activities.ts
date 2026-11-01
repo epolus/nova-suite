@@ -6,12 +6,17 @@ import {
   evaluateAdvancedCondition,
   executeAutomationGraph,
   parseAutomationConfig,
+  parseFulfillmentModelConfig,
+  renderFulfillmentTemplate,
   resolveCredentialTemplateValues,
   toHttpActivityState,
   type AutomationCheckpoint,
   type AutomationResumeOutcome,
   type AutomationSuspension,
+  type FulfillmentModelConfig,
+  type FulfillmentTemplateContext,
 } from '@nova-suite/shared';
+import type { PoolClient } from 'pg';
 import { config } from '../config';
 import { withTenantContext } from '../db';
 import { loadCredentialSecretsBySlugs } from '@nova-suite/shared/node';
@@ -264,6 +269,182 @@ export async function skipRequestTasksByOrders(
   });
 }
 
+function pgErrorCode(err: unknown): string | undefined {
+  if (typeof err === 'object' && err !== null && 'code' in err) return String((err as { code: unknown }).code);
+  return undefined;
+}
+
+async function provisionFulfillmentModel(
+  client: PoolClient,
+  tenantId: string,
+  requestId: string,
+  requestTaskId: string,
+): Promise<ExecuteAutomatedCatalogTaskResult> {
+  let committed = false;
+  try {
+    await client.query('BEGIN');
+    const reqRes = await client.query(
+      `SELECT r.number, r.form_data, r.requester_id, r.requested_for,
+              r.provisioned_ci_id, r.provisioned_asset_id,
+              si.name AS service_item_name, si.fulfillment_model_id
+       FROM requests r
+       JOIN service_items si ON si.id = r.service_item_id
+       WHERE r.id = $1
+       FOR UPDATE OF r`,
+      [requestId],
+    );
+    if (reqRes.rows.length === 0) throw new Error('Request not found');
+    const request = reqRes.rows[0] as Record<string, unknown>;
+    const modelId = request.fulfillment_model_id ? String(request.fulfillment_model_id) : '';
+    if (!modelId) throw new Error('Service item has no fulfillment model');
+
+    const modelRes = await client.query(
+      `SELECT config FROM fulfillment_models WHERE id = $1`,
+      [modelId],
+    );
+    const model = parseFulfillmentModelConfig(modelRes.rows[0]?.config);
+    if (!model) throw new Error('Fulfillment model config is invalid');
+
+    if (!model.ci.enabled && !model.asset.enabled) {
+      await client.query(
+        `UPDATE request_tasks SET status = 'completed', completed_at = now(), notes = $1 WHERE id = $2`,
+        ['Fulfillment model no longer creates a CI or asset.', requestTaskId],
+      );
+      await client.query('COMMIT');
+      committed = true;
+      return { ok: true, message: 'Nothing to provision' };
+    }
+
+    const subject = String(request.requested_for || request.requester_id);
+    const formData = request.form_data && typeof request.form_data === 'object' && !Array.isArray(request.form_data)
+      ? request.form_data as Record<string, unknown>
+      : {};
+    const templateContext: FulfillmentTemplateContext = {
+      requestNumber: String(request.number),
+      itemName: String(request.service_item_name || ''),
+      formData,
+    };
+    const created = await createProvisionedRecords(client, tenantId, subject, model, templateContext, {
+      ciId: request.provisioned_ci_id ? String(request.provisioned_ci_id) : null,
+      assetId: request.provisioned_asset_id ? String(request.provisioned_asset_id) : null,
+    });
+
+    await client.query(
+      `UPDATE requests
+       SET provisioned_ci_id = $1, provisioned_asset_id = $2, updated_at = now()
+       WHERE id = $3`,
+      [created.ciId, created.assetId, requestId],
+    );
+    await client.query(
+      `UPDATE request_tasks
+       SET status = 'completed', completed_at = now(), notes = $1, automation_checkpoint = NULL
+       WHERE id = $2`,
+      [created.notes.join('. ').slice(0, 2000), requestTaskId],
+    );
+    await client.query('COMMIT');
+    committed = true;
+    return { ok: true, message: created.notes.join('. ') };
+  } catch (err) {
+    if (!committed) {
+      try { await client.query('ROLLBACK'); } catch { /* connection may already be closed */ }
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    const friendly = pgErrorCode(err) === '23505' ? 'Asset tag already exists' : message;
+    await client.query(
+      `UPDATE request_tasks SET status = 'failed', completed_at = now(), notes = $1 WHERE id = $2`,
+      [friendly.slice(0, 2000), requestTaskId],
+    );
+    return { ok: false, message: friendly, rejectRequest: true };
+  }
+}
+
+async function createProvisionedRecords(
+  client: PoolClient,
+  tenantId: string,
+  subjectUserId: string,
+  model: FulfillmentModelConfig,
+  templateContext: FulfillmentTemplateContext,
+  existing: { ciId: string | null; assetId: string | null },
+): Promise<{ ciId: string | null; assetId: string | null; notes: string[] }> {
+  let ciId = existing.ciId;
+  let assetId = existing.assetId;
+  const notes: string[] = [];
+
+  if (model.ci.enabled && !ciId) {
+    if (!model.ci.class_id) throw new Error('CI class is required');
+    const classRes = await client.query(
+      `SELECT id FROM ci_classes WHERE id = $1 AND tenant_id = $2`,
+      [model.ci.class_id, tenantId],
+    );
+    if (classRes.rows.length === 0) throw new Error('CI class not found');
+    const name = renderFulfillmentTemplate(model.ci.name_template, templateContext);
+    const displayName = renderFulfillmentTemplate(model.ci.display_name_template, templateContext) || name;
+    if (!name) throw new Error('CI name template produced an empty name');
+    if (name.length > 200 || displayName.length > 200) throw new Error('CI name template is too long');
+    const ciResult = await client.query(
+      `INSERT INTO configuration_items (
+         tenant_id, class_id, name, display_name, status, environment,
+         attributes, managed_by, assigned_to, notes
+       ) VALUES (
+         $1, $2, $3, $4, $5, 'production', $6::jsonb, $7, $7, $8
+       ) RETURNING id, name, display_name, assigned_to`,
+      [
+        tenantId,
+        model.ci.class_id,
+        name,
+        displayName,
+        model.ci.status,
+        JSON.stringify({
+          request_number: templateContext.requestNumber,
+          service_item: templateContext.itemName,
+        }),
+        subjectUserId,
+        'Created by fulfillment model.',
+      ],
+    );
+    const createdCi = ciResult.rows[0] as { id: string; name: string; display_name: string; assigned_to: string };
+    ciId = String(createdCi.id);
+    await client.query(
+      `INSERT INTO ci_history (tenant_id, ci_id, changed_by, change_type, new_value)
+       VALUES ($1, $2, $3, 'create', $4)`,
+      [tenantId, ciId, subjectUserId, JSON.stringify(createdCi)],
+    );
+    notes.push(`Created CI ${displayName}`);
+  } else if (ciId && model.ci.enabled) {
+    notes.push('CI already provisioned');
+  }
+
+  if (model.asset.enabled && !assetId) {
+    const name = renderFulfillmentTemplate(model.asset.name_template, templateContext);
+    const assetTag = renderFulfillmentTemplate(model.asset.asset_tag_template, templateContext);
+    if (!name) throw new Error('Asset name template produced an empty name');
+    if (!assetTag) throw new Error('Asset tag template produced an empty tag');
+    if (name.length > 200 || assetTag.length > 100) throw new Error('Asset template is too long');
+    const assetResult = await client.query(
+      `INSERT INTO assets (
+         tenant_id, asset_tag, name, category, status, owner_user_id, linked_ci_id, notes
+       ) VALUES (
+         $1, $2, $3, $4, 'in_use', $5, $6, $7
+       ) RETURNING id, asset_tag`,
+      [
+        tenantId,
+        assetTag,
+        name,
+        model.asset.category || 'hardware',
+        subjectUserId,
+        ciId,
+        'Created by fulfillment model.',
+      ],
+    );
+    assetId = String(assetResult.rows[0].id);
+    notes.push(`Created asset ${String(assetResult.rows[0].asset_tag)}`);
+  } else if (assetId && model.asset.enabled) {
+    notes.push('Asset already provisioned');
+  }
+
+  return { ciId, assetId, notes };
+}
+
 export async function executeAutomatedCatalogTask(
   input: ExecuteAutomatedCatalogTaskInput,
 ): Promise<ExecuteAutomatedCatalogTaskResult> {
@@ -272,7 +453,7 @@ export async function executeAutomatedCatalogTask(
 
   return withTenantContext(tenantId, async (client) => {
     const taskRow = await client.query(
-      `SELECT rt.id, rt.task_order, rt.task_type, rt.status, rt.name, rt.automation_checkpoint,
+      `SELECT rt.id, rt.catalog_task_id, rt.task_order, rt.task_type, rt.status, rt.name, rt.automation_checkpoint,
               ct.automation_config
        FROM request_tasks rt
        LEFT JOIN catalog_tasks ct ON ct.id = rt.catalog_task_id
@@ -286,6 +467,10 @@ export async function executeAutomatedCatalogTask(
     const row = taskRow.rows[0] as Record<string, unknown>;
     if (row.task_type !== 'automated') return { ok: false, message: 'Not an automated task', rejectRequest: true };
     if (row.status !== 'in_progress' && row.status !== 'pending') return { ok: true, message: 'Task already finalized' };
+
+    if (row.catalog_task_id == null) {
+      return provisionFulfillmentModel(client, tenantId, requestId, requestTaskId);
+    }
 
     const cfg = parseAutomationConfig(row.automation_config);
     if (!cfg) {

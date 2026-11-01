@@ -4,6 +4,7 @@
 
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
+import { fulfillmentModelConfigErrors } from '@nova-suite/shared';
 import { serviceNowExtractOptionsSchema } from '@nova-suite/shared/migrators/servicenow';
 
 extendZodWithOpenApi(z);
@@ -88,6 +89,32 @@ export const createServiceItemSchema = z.object({
     .default({ fields: [] }),
   approval_required: z.boolean().default(false),
   sla_hours: z.number().int().min(1).optional(),
+  fulfillment_model_id: uuidSchema.nullable().optional(),
+});
+
+export const fulfillmentModelWriteSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(2000).nullable().optional(),
+  is_active: z.boolean().optional(),
+  config: z.unknown(),
+}).superRefine((body, ctx) => {
+  const errors = fulfillmentModelConfigErrors(body.config);
+  if (errors.length > 0) {
+    ctx.addIssue({ code: 'custom', message: errors.join('; '), path: ['config'] });
+  }
+});
+
+export const fulfillmentModelUpdateSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  is_active: z.boolean().optional(),
+  config: z.unknown().optional(),
+}).superRefine((body, ctx) => {
+  if (body.config === undefined) return;
+  const errors = fulfillmentModelConfigErrors(body.config);
+  if (errors.length > 0) {
+    ctx.addIssue({ code: 'custom', message: errors.join('; '), path: ['config'] });
+  }
 });
 
 // ─── Configuration Packages ───
@@ -128,9 +155,38 @@ export const configPackageCatalogTaskSchema = z.object({
   is_active: z.boolean().default(true),
 });
 
+const configPackageFulfillmentTaskSchema = z.object({
+  name: z.string().min(1).max(200),
+  instructions: nullableStringSchema,
+  assigned_group_name: nullableStringSchema,
+  sla_hours: z.number().int().min(1).nullable().optional(),
+});
+
+export const configPackageFulfillmentModelSchema = z.object({
+  external_key: configExternalKeySchema,
+  name: z.string().min(1).max(255),
+  description: nullableStringSchema,
+  is_active: z.boolean().default(true),
+  tasks: z.array(configPackageFulfillmentTaskSchema).max(20).default([]),
+  ci: z.object({
+    enabled: z.boolean(),
+    class_name: nullableStringSchema,
+    name_template: z.string().max(200).default('{{item.name}} {{request.number}}'),
+    display_name_template: z.string().max(200).default('{{item.name}} {{request.number}}'),
+    status: z.enum(['installed', 'in_stock', 'maintenance', 'retired', 'planned']).default('installed'),
+  }),
+  asset: z.object({
+    enabled: z.boolean(),
+    category: z.string().max(100).default('hardware'),
+    name_template: z.string().max(200).default('{{item.name}} {{request.number}}'),
+    asset_tag_template: z.string().max(100).default('{{request.number}}'),
+  }),
+});
+
 export const configPackageServiceItemSchema = z.object({
   external_key: configExternalKeySchema,
   category_external_key: configExternalKeySchema,
+  fulfillment_model_external_key: configExternalKeySchema.nullable().optional(),
   name: z.string().min(1).max(255),
   short_description: nullableStringSchema,
   description: nullableStringSchema,
@@ -205,8 +261,9 @@ export const configPackageBundleSchema = z.object({
   contents: z.object({
     catalog: z.object({
       categories: z.array(configPackageCategorySchema).default([]),
+      fulfillment_models: z.array(configPackageFulfillmentModelSchema).default([]),
       service_items: z.array(configPackageServiceItemSchema).default([]),
-    }).default({ categories: [], service_items: [] }),
+    }).default({ categories: [], fulfillment_models: [], service_items: [] }),
     notifications: z.object({
       rules: z.array(configPackageNotificationRuleSchema).default([]),
     }).default({ rules: [] }),
@@ -217,7 +274,7 @@ export const configPackageBundleSchema = z.object({
       definitions: z.array(configPackageWorkflowDefinitionSchema).default([]),
     }).default({ definitions: [] }),
   }).default({
-    catalog: { categories: [], service_items: [] },
+    catalog: { categories: [], fulfillment_models: [], service_items: [] },
     notifications: { rules: [] },
     data_sources: { sources: [] },
     workflows: { definitions: [] },
