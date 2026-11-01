@@ -19,7 +19,9 @@ function resolveInternalHref(href: string): string | null {
     href.startsWith('#') ||
     href.startsWith('mailto:') ||
     href.startsWith('tel:') ||
-    href.startsWith('javascript:')
+    href.startsWith('javascript:') || 
+    href.startsWith('data:') || 
+    href.startsWith('vbscript:')
   ) {
     return null;
   }
