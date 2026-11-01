@@ -31,6 +31,12 @@ import { catalogWorkflowForItem } from '../catalog/item-fulfillment';
 import { isAdminRole, isFulfillerRole } from '../roles';
 import { getRequestApprovalTrigger } from '../../notifications/triggers';
 
+const SORT_DIRECTIONS: Record<string, 'ASC' | 'DESC'> = { asc: 'ASC', desc: 'DESC' };
+
+function sqlSortDirection(value: unknown): 'ASC' | 'DESC' {
+  return typeof value === 'string' ? SORT_DIRECTIONS[value] ?? 'DESC' : 'DESC';
+}
+
 interface FormFieldDef {
   name: string;
   label?: string;
@@ -173,7 +179,7 @@ router.get(
       const sortBy = typeof req.query.sort_by === 'string' && allowedSortCols[req.query.sort_by]
         ? allowedSortCols[req.query.sort_by]
         : 'r.created_at';
-      const sortDir = req.query.sort_dir === 'asc' ? 'ASC' : 'DESC';
+      const sortDir = sqlSortDirection(req.query.sort_dir);
       const orderBy = `${sortBy} ${sortDir}, r.id ASC`;
 
       const countResult = await client.query(
@@ -279,7 +285,7 @@ router.get('/nav', async (req: Request, res: Response, next: NextFunction) => {
     const sortBy = typeof req.query.sort_by === 'string' && allowedSortCols[req.query.sort_by]
       ? allowedSortCols[req.query.sort_by]
       : 'r.created_at';
-    const sortDir = req.query.sort_dir === 'asc' ? 'ASC' : 'DESC';
+    const sortDir = sqlSortDirection(req.query.sort_dir);
     const orderBy = `${sortBy} ${sortDir}, r.id ASC`;
 
     const result = await client.query(
@@ -632,12 +638,23 @@ router.get(
       paramIdx++;
       params.push(offset);
 
-      const sortCol = req.query.sort_by === 'request_number' ? 'r.number'
-        : req.query.sort_by === 'service_item_name' ? 'si.name'
-        : req.query.sort_by === 'assigned_group_name' ? 'ag.name'
-        : req.query.sort_by ? `rt.${req.query.sort_by}`
+      const taskSortColumns: Record<string, string> = {
+        number: 'rt.number',
+        name: 'rt.name',
+        task_type: 'rt.task_type',
+        status: 'rt.status',
+        request_number: 'r.number',
+        service_item_name: 'si.name',
+        requester_name: 'req_user.display_name',
+        assigned_group_name: 'ag.name',
+        assigned_to_name: 'u.display_name',
+        created_at: 'rt.created_at',
+        completed_at: 'rt.completed_at',
+      };
+      const sortCol = typeof req.query.sort_by === 'string' && taskSortColumns[req.query.sort_by]
+        ? taskSortColumns[req.query.sort_by]
         : 'rt.created_at';
-      const sortDir = req.query.sort_dir === 'asc' ? 'ASC' : 'DESC';
+      const sortDir = sqlSortDirection(req.query.sort_dir);
 
       const result = await client.query(
         `SELECT rt.*,

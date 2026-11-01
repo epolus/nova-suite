@@ -18,7 +18,10 @@ describe('report query compiler', () => {
     });
 
     expect(query.text).toContain('FROM incidents t');
+    expect(query.text).toContain('t.number AS "c0"');
     expect(query.text).toContain('ORDER BY t.created_at DESC');
+    expect(query.text).not.toContain('AS "number"');
+    expect(query.columns).toEqual(['number', 'status', 'created_at']);
     expect(query.values).toEqual(['new', 'vpn', 20]);
   });
 
