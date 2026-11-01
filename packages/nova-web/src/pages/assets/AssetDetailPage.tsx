@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { assets } from '@/api/client';
 import PageHeader from '@/components/PageHeader';
@@ -60,6 +60,7 @@ export default function AssetDetailPage() {
   const navigate = useNavigate();
   const t = useTranslations('pages.assets');
   const tActions = useTranslations('common.actions');
+  const tTable = useTranslations('common.table');
   const statusLabel = useStatusLabel();
 
   const [loading, setLoading] = useState(!isNew);
@@ -67,6 +68,7 @@ export default function AssetDetailPage() {
   const [error, setError] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
   const [baseline, setBaseline] = useState(EMPTY_FORM);
+  const [linkedCi, setLinkedCi] = useState<{ id: string; name: string } | null>(null);
   const [prevId, setPrevId] = useState(id);
 
   if (id !== prevId) {
@@ -76,6 +78,7 @@ export default function AssetDetailPage() {
     if (isNew) {
       setForm(EMPTY_FORM);
       setBaseline(EMPTY_FORM);
+      setLinkedCi(null);
     }
   }
 
@@ -101,6 +104,9 @@ export default function AssetDetailPage() {
         };
         setForm(next);
         setBaseline(next);
+        setLinkedCi(asset.linked_ci_id
+          ? { id: asset.linked_ci_id, name: asset.linked_ci_name || asset.linked_ci_id }
+          : null);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
@@ -217,6 +223,16 @@ export default function AssetDetailPage() {
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">{t('name')} *</label>
             <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{t('configurationItem')}</label>
+            {linkedCi ? (
+              <Link to={`/cmdb/${linkedCi.id}`} className="text-sm text-indigo-700 hover:underline">
+                {linkedCi.name}
+              </Link>
+            ) : (
+              <p className="text-sm text-gray-400">{tTable('emDash')}</p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
