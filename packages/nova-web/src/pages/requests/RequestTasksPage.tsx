@@ -89,7 +89,7 @@ export default function RequestTasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.page, statusFilter, params.search, params.sort, params.dir, cfKey, refreshKey]);
 
-  const handleComplete = async (task: RequestTaskListItem, outcome: string, notes?: string) => {
+  const handleComplete = useCallback(async (task: RequestTaskListItem, outcome: string, notes?: string) => {
     setActionLoadingId(task.id);
     setCancelError('');
     try {
@@ -102,9 +102,9 @@ export default function RequestTasksPage() {
     } finally {
       setActionLoadingId(null);
     }
-  };
+  }, [tRequests]);
 
-  const handleAssign = async (task: RequestTaskListItem) => {
+  const handleAssign = useCallback(async (task: RequestTaskListItem) => {
     setActionLoadingId(task.id);
     try {
       await requestsApi.assignTask(task.request_id, task.id);
@@ -112,7 +112,7 @@ export default function RequestTasksPage() {
     } finally {
       setActionLoadingId(null);
     }
-  };
+  }, []);
 
   const columns = useMemo<DataColumnDef<RequestTaskListItem>[]>(
     () => buildRequestTaskColumns(listLabels),
@@ -196,7 +196,7 @@ export default function RequestTasksPage() {
         )}
       </div>
     );
-  }, [actionLoadingId, user?.id, tTasks]);
+  }, [actionLoadingId, user?.id, tTasks, handleComplete, handleAssign]);
 
   const hasActiveFilter = !!params.search || statusFilter !== '' || Object.values(params.columnFilters).some(Boolean);
   const getListParams = useCallback((): Record<string, string> => {
