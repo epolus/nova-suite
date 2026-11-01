@@ -63,6 +63,14 @@ type CompiledQuery = {
   values: unknown[];
 };
 
+const SORT_SQL: Record<string, 'ASC' | 'DESC'> = { asc: 'ASC', desc: 'DESC' };
+const TABLE_COLUMN_ALIASES = ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10', 'c11'] as const;
+
+function sortSql(direction: unknown): 'ASC' | 'DESC' {
+  const key = String(direction || 'desc').trim().toLowerCase();
+  return SORT_SQL[key] ?? 'DESC';
+}
+
 function isScalar(value: unknown): value is Scalar {
   return ['string', 'number', 'boolean'].includes(typeof value);
 }
@@ -145,20 +153,21 @@ function normalizeLimit(rawLimit: unknown, maxAllowed: number): number {
   return Math.max(1, Math.min(Math.trunc(limit), maxAllowed));
 }
 
-export function compileTableQuery(config: TableComponentConfig, maxAllowedRows = 500): CompiledQuery {
+export function compileTableQuery(config: TableComponentConfig, maxAllowedRows = 500): CompiledQuery & { columns: string[] } {
   const dataset = ensureDataset(config.dataset);
   if (!Array.isArray(config.columns) || config.columns.length === 0) {
     throw new AppError(400, 'Table component requires at least one column');
   }
-  if (config.columns.length > 12) {
+  if (config.columns.length > TABLE_COLUMN_ALIASES.length) {
     throw new AppError(400, 'A table component can have at most 12 columns');
   }
 
-  const selected = config.columns.map((column) => {
-    const key = String(column).trim();
+  const columns = config.columns.map((column) => String(column).trim());
+  const selected = columns.map((key, index) => {
     const field = dataset.fields[key];
-    if (!field) throw new AppError(400, `Unsupported table column "${key}"`);
-    return `${field.sql} AS "${key}"`;
+    const alias = TABLE_COLUMN_ALIASES[index];
+    if (!field || !alias) throw new AppError(400, `Unsupported table column "${key}"`);
+    return `${field.sql} AS "${alias}"`;
   });
 
   const values: unknown[] = [];
@@ -171,8 +180,7 @@ export function compileTableQuery(config: TableComponentConfig, maxAllowedRows =
     if (!sortField || !sortField.sortable) {
       throw new AppError(400, `Unsupported sort field "${config.sort.field}"`);
     }
-    const direction = String(config.sort.direction || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-    orderBy = `ORDER BY ${sortField.sql} ${direction}`;
+    orderBy = `ORDER BY ${sortField.sql} ${sortSql(config.sort.direction)}`;
   }
 
   const limit = normalizeLimit(config.limit, maxAllowedRows);
@@ -185,6 +193,7 @@ export function compileTableQuery(config: TableComponentConfig, maxAllowedRows =
            ${orderBy}
            LIMIT $${values.length}`,
     values,
+    columns,
   };
 }
 
