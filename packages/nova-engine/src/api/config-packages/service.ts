@@ -9,6 +9,7 @@ import { BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
 import { assertUuidParam, resolveUploadPath, safeImageExtension } from '../../data/upload-path';
 import { configPackageBundleSchema } from '../../domain/schemas';
+import { parseFulfillmentModelConfig } from '@nova-suite/shared';
 import {
   collectCredentialSlugsFromAutomationConfig,
   validateAndParseAutomationConfig,
@@ -21,6 +22,7 @@ export type ConfigPackageBundle = z.infer<typeof configPackageBundleSchema>;
 export type ConfigPackageCategory = ConfigPackageBundle['contents']['catalog']['categories'][number];
 export type ConfigPackageServiceItem = ConfigPackageBundle['contents']['catalog']['service_items'][number];
 export type ConfigPackageCatalogTask = ConfigPackageServiceItem['tasks'][number];
+export type ConfigPackageFulfillmentModel = ConfigPackageBundle['contents']['catalog']['fulfillment_models'][number];
 export type ConfigPackageNotificationRule = ConfigPackageBundle['contents']['notifications']['rules'][number];
 export type ConfigPackageDataSource = ConfigPackageBundle['contents']['data_sources']['sources'][number];
 
@@ -31,7 +33,7 @@ export type ValidationIssue = {
 };
 
 export type PackageChange = {
-  type: 'category' | 'service_item' | 'catalog_task' | 'notification_rule' | 'data_source' | 'workflow_definition';
+  type: 'category' | 'fulfillment_model' | 'service_item' | 'catalog_task' | 'notification_rule' | 'data_source' | 'workflow_definition';
   external_key: string;
   name: string;
   action: 'create' | 'update' | 'skip';
@@ -56,6 +58,7 @@ export type ApplyResult = {
   dry_run: ValidationReport;
   applied: {
     categories: number;
+    fulfillment_models: number;
     service_items: number;
     catalog_tasks: number;
     notification_rules: number;
@@ -113,6 +116,7 @@ export async function ensureConfigPackageSchema(): Promise<void> {
       await db.query('ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS external_key text');
       await db.query('ALTER TABLE service_items ADD COLUMN IF NOT EXISTS external_key text');
       await db.query('ALTER TABLE catalog_tasks ADD COLUMN IF NOT EXISTS external_key text');
+      await db.query('ALTER TABLE fulfillment_models ADD COLUMN IF NOT EXISTS external_key text');
       await db.query('ALTER TABLE notification_rules ADD COLUMN IF NOT EXISTS external_key text');
       await db.query('ALTER TABLE data_sources ADD COLUMN IF NOT EXISTS external_key text');
       await db.query(
@@ -123,6 +127,9 @@ export async function ensureConfigPackageSchema(): Promise<void> {
       );
       await db.query(
         'CREATE UNIQUE INDEX IF NOT EXISTS uq_catalog_tasks_tenant_external_key ON catalog_tasks(tenant_id, external_key)',
+      );
+      await db.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS uq_fulfillment_models_tenant_external_key ON fulfillment_models(tenant_id, external_key)',
       );
       await db.query(
         'CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_rules_tenant_external_key ON notification_rules(tenant_id, external_key)',
@@ -217,6 +224,20 @@ export async function backfillExternalKeys(client: PoolClient, tenantId: string)
        SET external_key = $1
        WHERE tenant_id = $2 AND id = $3 AND external_key IS NULL`,
       [makeExternalKey('catalog-task', row.name, row.id), tenantId, row.id],
+    );
+  }
+
+  const models = await client.query<{ id: string; name: string }>(
+    `SELECT id, name FROM fulfillment_models
+     WHERE tenant_id = $1 AND external_key IS NULL`,
+    [tenantId],
+  );
+  for (const row of models.rows) {
+    await client.query(
+      `UPDATE fulfillment_models
+       SET external_key = $1
+       WHERE tenant_id = $2 AND id = $3 AND external_key IS NULL`,
+      [makeExternalKey('fulfillment-model', row.name, row.id), tenantId, row.id],
     );
   }
 
@@ -341,6 +362,16 @@ export async function findAssignmentGroupId(client: PoolClient, tenantId: string
   return row.rows[0]?.id || null;
 }
 
+async function findCiClassId(client: PoolClient, tenantId: string, name: string): Promise<string | null> {
+  const row = await client.query<{ id: string }>(
+    `SELECT id FROM ci_classes
+     WHERE tenant_id = $1 AND lower(name) = lower($2)
+     LIMIT 1`,
+    [tenantId, name],
+  );
+  return row.rows[0]?.id || null;
+}
+
 async function findUserIdByEmail(client: PoolClient, tenantId: string, email: string): Promise<string | null> {
   const row = await client.query<{ id: string }>(
     `SELECT id FROM users
@@ -434,6 +465,12 @@ export async function validateBundle(
   );
   addDuplicateKeyIssues(
     issues,
+    bundle.contents.catalog.fulfillment_models,
+    'fulfillment model',
+    'contents.catalog.fulfillment_models',
+  );
+  addDuplicateKeyIssues(
+    issues,
     bundle.contents.catalog.service_items,
     'service item',
     'contents.catalog.service_items',
@@ -476,9 +513,42 @@ export async function validateBundle(
   }
 
   const packagedCategoryKeys = new Set(bundle.contents.catalog.categories.map((category) => category.external_key));
+  const packagedModelKeys = new Set(bundle.contents.catalog.fulfillment_models.map((model) => model.external_key));
 
   for (const category of bundle.contents.catalog.categories) {
     await recordExternalKeyChange('category', 'service_categories', category.external_key, category.name);
+  }
+
+  for (const [modelIndex, model] of bundle.contents.catalog.fulfillment_models.entries()) {
+    const path = `contents.catalog.fulfillment_models.${modelIndex}`;
+    for (const [taskIndex, task] of model.tasks.entries()) {
+      const taskPath = `${path}.tasks.${taskIndex}.assigned_group_name`;
+      if (!task.assigned_group_name) {
+        issues.push({ severity: 'error', path: taskPath, message: 'Assignment group is required' });
+      } else if (!await findAssignmentGroupId(client, tenantId, task.assigned_group_name)) {
+        issues.push({
+          severity: 'error',
+          path: taskPath,
+          message: `Missing assignment group "${task.assigned_group_name}" on target`,
+        });
+      }
+    }
+    if (model.ci.enabled) {
+      if (!model.ci.class_name) {
+        issues.push({ severity: 'error', path: `${path}.ci.class_name`, message: 'CI class is required' });
+      } else if (!await findCiClassId(client, tenantId, model.ci.class_name)) {
+        issues.push({
+          severity: 'error',
+          path: `${path}.ci.class_name`,
+          message: `Missing CI class "${model.ci.class_name}" on target`,
+        });
+      }
+    }
+    const runtime = await runtimeConfigFromPackage(client, tenantId, model);
+    if (!runtime) {
+      issues.push({ severity: 'error', path, message: 'Fulfillment model config is invalid' });
+    }
+    await recordExternalKeyChange('fulfillment_model', 'fulfillment_models', model.external_key, model.name);
   }
 
   for (const [itemIndex, item] of bundle.contents.catalog.service_items.entries()) {
@@ -506,6 +576,48 @@ export async function validateBundle(
           path: `contents.catalog.service_items.${itemIndex}.picture.sha256`,
           message: `Picture checksum mismatch for "${item.name}"`,
         });
+      }
+    }
+
+    if (item.fulfillment_model_external_key && item.tasks.length > 0) {
+      issues.push({
+        severity: 'error',
+        path: `contents.catalog.service_items.${itemIndex}.fulfillment_model_external_key`,
+        message: 'A service item cannot use a fulfillment model and catalog tasks',
+      });
+    }
+    if (item.fulfillment_model_external_key && !packagedModelKeys.has(item.fulfillment_model_external_key)) {
+      const modelExists = await existsByExternalKey(
+        client,
+        'fulfillment_models',
+        tenantId,
+        item.fulfillment_model_external_key,
+      );
+      if (!modelExists) {
+        issues.push({
+          severity: 'error',
+          path: `contents.catalog.service_items.${itemIndex}.fulfillment_model_external_key`,
+          message: `Missing fulfillment model "${item.fulfillment_model_external_key}" on target`,
+        });
+      }
+    }
+    if (item.fulfillment_model_external_key) {
+      const existingItem = await client.query<{ id: string }>(
+        `SELECT id FROM service_items WHERE tenant_id = $1 AND external_key = $2 LIMIT 1`,
+        [tenantId, item.external_key],
+      );
+      if (existingItem.rows[0]) {
+        const taskCount = await client.query<{ count: string }>(
+          `SELECT count(*) FROM catalog_tasks WHERE service_item_id = $1`,
+          [existingItem.rows[0].id],
+        );
+        if (parseInt(taskCount.rows[0]?.count || '0', 10) > 0) {
+          issues.push({
+            severity: 'error',
+            path: `contents.catalog.service_items.${itemIndex}.fulfillment_model_external_key`,
+            message: 'Service item already has catalog tasks. Remove them before linking a fulfillment model.',
+          });
+        }
       }
     }
 
@@ -785,21 +897,92 @@ async function writePicture(
   );
 }
 
+async function runtimeConfigFromPackage(
+  client: PoolClient,
+  tenantId: string,
+  model: ConfigPackageFulfillmentModel,
+) {
+  const tasks = [];
+  for (const task of model.tasks) {
+    tasks.push({
+      name: task.name,
+      instructions: task.instructions,
+      assigned_group_id: task.assigned_group_name
+        ? await findAssignmentGroupId(client, tenantId, task.assigned_group_name)
+        : null,
+      sla_hours: task.sla_hours ?? null,
+    });
+  }
+  const classId = model.ci.enabled && model.ci.class_name
+    ? await findCiClassId(client, tenantId, model.ci.class_name)
+    : null;
+  return parseFulfillmentModelConfig({
+    tasks,
+    ci: {
+      enabled: model.ci.enabled,
+      class_id: classId,
+      name_template: model.ci.name_template,
+      display_name_template: model.ci.display_name_template,
+      status: model.ci.status,
+    },
+    asset: {
+      enabled: model.asset.enabled,
+      category: model.asset.category,
+      name_template: model.asset.name_template,
+      asset_tag_template: model.asset.asset_tag_template,
+    },
+  });
+}
+
+async function upsertFulfillmentModel(
+  client: PoolClient,
+  tenantId: string,
+  model: ConfigPackageFulfillmentModel,
+): Promise<string> {
+  const config = await runtimeConfigFromPackage(client, tenantId, model);
+  if (!config) throw BadRequest(`Fulfillment model "${model.name}" is invalid`);
+  const row = await client.query<{ id: string }>(
+    `INSERT INTO fulfillment_models (
+       tenant_id, external_key, name, description, config, is_active
+     ) VALUES (
+       $1, $2, $3, $4, $5::jsonb, $6
+     )
+     ON CONFLICT (tenant_id, external_key) DO UPDATE SET
+       name = EXCLUDED.name,
+       description = EXCLUDED.description,
+       config = EXCLUDED.config,
+       is_active = EXCLUDED.is_active,
+       updated_at = now()
+     RETURNING id`,
+    [
+      tenantId,
+      model.external_key,
+      model.name,
+      model.description || null,
+      JSON.stringify(config),
+      model.is_active,
+    ],
+  );
+  return row.rows[0].id;
+}
+
 async function upsertServiceItem(
   client: PoolClient,
   tenantId: string,
   item: ConfigPackageServiceItem,
   categoryId: string,
+  fulfillmentModelId: string | null,
 ): Promise<string> {
   const row = await client.query<{ id: string }>(
     `INSERT INTO service_items (
-       tenant_id, external_key, category_id, name, short_description, description,
+       tenant_id, external_key, category_id, fulfillment_model_id, name, short_description, description,
        icon, price, custom_attributes, form_schema, approval_required, sla_hours, is_active
      ) VALUES (
-       $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12, $13
+       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13, $14
      )
      ON CONFLICT (tenant_id, external_key) DO UPDATE SET
        category_id = EXCLUDED.category_id,
+       fulfillment_model_id = EXCLUDED.fulfillment_model_id,
        name = EXCLUDED.name,
        short_description = EXCLUDED.short_description,
        description = EXCLUDED.description,
@@ -816,6 +999,7 @@ async function upsertServiceItem(
       tenantId,
       item.external_key,
       categoryId,
+      fulfillmentModelId,
       item.name,
       item.short_description || null,
       item.description || null,
@@ -1052,8 +1236,15 @@ export async function applyBundle(
       categoryIds.set(category.external_key, id);
     }
 
+    const modelIds = new Map<string, string>();
+    for (const model of bundle.contents.catalog.fulfillment_models) {
+      const id = await upsertFulfillmentModel(client, tenantId, model);
+      modelIds.set(model.external_key, id);
+    }
+
     const applied = {
       categories: bundle.contents.catalog.categories.length,
+      fulfillment_models: bundle.contents.catalog.fulfillment_models.length,
       service_items: 0,
       catalog_tasks: 0,
       notification_rules: 0,
@@ -1073,9 +1264,22 @@ export async function applyBundle(
         categoryId = existing.rows[0]?.id;
       }
       if (!categoryId) throw BadRequest(`Missing category "${item.category_external_key}"`);
-      const itemId = await upsertServiceItem(client, tenantId, item, categoryId);
+      let fulfillmentModelId: string | null = null;
+      if (item.fulfillment_model_external_key) {
+        fulfillmentModelId = modelIds.get(item.fulfillment_model_external_key) || null;
+        if (!fulfillmentModelId) {
+          const existingModel = await client.query<{ id: string }>(
+            `SELECT id FROM fulfillment_models WHERE tenant_id = $1 AND external_key = $2 LIMIT 1`,
+            [tenantId, item.fulfillment_model_external_key],
+          );
+          fulfillmentModelId = existingModel.rows[0]?.id || null;
+        }
+        if (!fulfillmentModelId) throw BadRequest(`Missing fulfillment model "${item.fulfillment_model_external_key}"`);
+      }
+      const itemId = await upsertServiceItem(client, tenantId, item, categoryId, fulfillmentModelId);
       applied.service_items += 1;
       if (item.picture) await writePicture(client, itemId, item.picture);
+      if (fulfillmentModelId) continue;
       for (const task of item.tasks) {
         await upsertCatalogTask(client, tenantId, itemId, task);
         applied.catalog_tasks += 1;

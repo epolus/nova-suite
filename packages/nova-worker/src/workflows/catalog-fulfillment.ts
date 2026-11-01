@@ -29,7 +29,7 @@ export interface FulfillmentInput {
 
 export interface TaskCompletionSignal {
   taskId: string;
-  outcome: 'approved' | 'rejected' | 'completed';
+  outcome: 'approved' | 'rejected' | 'completed' | 'skipped' | 'cancelled';
   notes: string | null;
   userId: string;
 }
@@ -41,14 +41,26 @@ export const taskCompletedSignal = defineSignal<[TaskCompletionSignal]>('taskCom
  *
  * Executes the task definitions for a service item in order.
  * Tasks with the same task_order run in parallel.
- * Approval rejections cancel the entire workflow.
+ * Approval rejections reject the request. Skipping a task continues fulfillment.
+ * Cancelling a task cancels the request and skips whatever is still open.
  */
 export async function catalogFulfillment(input: FulfillmentInput): Promise<string> {
   const completedTasks = new Map<string, TaskCompletionSignal>();
+  let cancelRequested = false;
 
   setHandler(taskCompletedSignal, (signal: TaskCompletionSignal) => {
     completedTasks.set(signal.taskId, signal);
+    if (signal.outcome === 'cancelled') cancelRequested = true;
   });
+
+  const finishCancellation = async () => {
+    const signal = Array.from(completedTasks.values()).find((entry) => entry.outcome === 'cancelled');
+    if (signal) {
+      await completeRequestTask(signal.taskId, input.tenantId, 'cancelled', null, signal.userId, signal.notes);
+    }
+    await skipRemainingTasks(input.requestId, input.tenantId);
+    await updateRequestStatus(input.requestId, input.tenantId, 'cancelled');
+  };
 
   // Load task definitions
   const taskDefs = await getTaskDefinitions(input.serviceItemId, input.tenantId);
@@ -98,11 +110,25 @@ export async function catalogFulfillment(input: FulfillmentInput): Promise<strin
         });
         // In-flow approvals and manual tasks pause the automation until the child task is completed.
         while (result.suspended) {
+          if (cancelRequested) return { ok: true, skipTaskOrders: [] };
           const childTaskId = result.suspended.approvalTaskId;
           const isManual = result.suspended.taskKind === 'manual';
           if (!isManual) await updateRequestStatus(input.requestId, input.tenantId, 'pending_approval');
-          await condition(() => completedTasks.has(childTaskId));
+          await condition(() => completedTasks.has(childTaskId) || cancelRequested);
+          if (cancelRequested && !completedTasks.has(childTaskId)) return { ok: true, skipTaskOrders: [] };
           const signal = completedTasks.get(childTaskId)!;
+          if (signal.outcome === 'cancelled') return { ok: true, skipTaskOrders: [] };
+          if (isManual && signal.outcome === 'skipped') {
+            await completeRequestTask(childTaskId, input.tenantId, 'skipped', null, signal.userId, signal.notes);
+            await updateRequestStatus(input.requestId, input.tenantId, 'in_progress');
+            result = await executeAutomatedCatalogTask({
+              requestTaskId,
+              requestId: input.requestId,
+              tenantId: input.tenantId,
+              resumeOutcome: 'completed',
+            });
+            continue;
+          }
           const outcome = isManual ? 'completed' : signal.outcome === 'rejected' ? 'rejected' : 'approved';
           await completeRequestTask(
             childTaskId,
@@ -123,6 +149,10 @@ export async function catalogFulfillment(input: FulfillmentInput): Promise<strin
         return result;
       };
       const autoResults = await Promise.all(automatedInGroup.map((t) => runAutomated(t.id)));
+      if (cancelRequested) {
+        await finishCancellation();
+        return 'cancelled';
+      }
       if (autoResults.some((r) => !r.ok && r.rejectRequest)) {
         await skipRemainingTasks(input.requestId, input.tenantId);
         await updateRequestStatus(input.requestId, input.tenantId, 'rejected');
@@ -147,16 +177,13 @@ export async function catalogFulfillment(input: FulfillmentInput): Promise<strin
     );
 
     // Wait for all tasks in the group that need user action (e.g. auto-skipped manager approval is excluded)
-    while (taskIds.size > 0) {
-      // Check if all actionable tasks in this group have signals
-      const allDone = Array.from(taskIds).every((id) => completedTasks.has(id));
-      if (allDone) break;
-
-      // Wait for a new signal (check every second, timeout after 30 days)
-      await condition(
-        () => Array.from(taskIds).every((id) => completedTasks.has(id)),
-        '30 days',
-      );
+    const groupDone = () => Array.from(taskIds).every((id) => completedTasks.has(id));
+    while (taskIds.size > 0 && !cancelRequested && !groupDone()) {
+      await condition(() => groupDone() || cancelRequested, '30 days');
+    }
+    if (cancelRequested) {
+      await finishCancellation();
+      return 'cancelled';
     }
 
     // Process the completions for this group (skip tasks branch-skipped or already finalized without a signal)
@@ -177,7 +204,7 @@ export async function catalogFulfillment(input: FulfillmentInput): Promise<strin
         return 'rejected';
       }
 
-      const status = signal.outcome === 'approved' || signal.outcome === 'completed' ? 'completed' : 'completed';
+      const status = signal.outcome === 'skipped' ? 'skipped' : 'completed';
       const outcome = task.taskType === 'approval' ? signal.outcome : null;
       await completeRequestTask(task.id, input.tenantId, status, outcome, signal.userId, signal.notes);
     }

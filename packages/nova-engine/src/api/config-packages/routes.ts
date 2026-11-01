@@ -26,6 +26,7 @@ import {
   type ConfigPackageBundle,
   type ConfigPackageCategory,
   type ConfigPackageDataSource,
+  type ConfigPackageFulfillmentModel,
   type ConfigPackageNotificationRule,
   type ConfigPackageServiceItem,
 } from './service';
@@ -65,7 +66,7 @@ function emptyBundle(name: string, tenantId: string): ConfigPackageBundle {
     exported_at: new Date().toISOString(),
     source: { tenant_id: tenantId },
     contents: {
-      catalog: { categories: [], service_items: [] },
+      catalog: { categories: [], fulfillment_models: [], service_items: [] },
       notifications: { rules: [] },
       data_sources: { sources: [] },
       workflows: { definitions: [] },
@@ -93,11 +94,99 @@ async function loadPicture(storageKey: string | null): Promise<ConfigPackageServ
   };
 }
 
+function storedGroupTasks(config: Record<string, unknown>): Array<Record<string, unknown>> {
+  if (!Array.isArray(config.tasks)) return [];
+  return config.tasks.filter((task): task is Record<string, unknown> => (
+    !!task && typeof task === 'object' && !Array.isArray(task)
+  ));
+}
+
+async function packageFulfillmentModel(
+  client: PoolClient,
+  tenantId: string,
+  row: {
+    external_key: string;
+    name: string;
+    description: string | null;
+    is_active: boolean;
+    config: Record<string, unknown> | null;
+    ci_class_name: string | null;
+  },
+): Promise<ConfigPackageFulfillmentModel> {
+  const config = row.config && typeof row.config === 'object' ? row.config : {};
+  const storedTasks = storedGroupTasks(config);
+  const groupIds = storedTasks
+    .map((task) => (typeof task.assigned_group_id === 'string' ? task.assigned_group_id : null))
+    .filter((id): id is string => Boolean(id));
+  const groups = groupIds.length > 0
+    ? await client.query<{ id: string; name: string }>(
+      `SELECT id, name FROM assignment_groups WHERE tenant_id = $1 AND id = ANY($2::uuid[])`,
+      [tenantId, groupIds],
+    )
+    : { rows: [] as Array<{ id: string; name: string }> };
+  const groupNames = new Map(groups.rows.map((group) => [group.id, group.name]));
+  const ci = (config.ci && typeof config.ci === 'object' ? config.ci : {}) as Record<string, unknown>;
+  const asset = (config.asset && typeof config.asset === 'object' ? config.asset : {}) as Record<string, unknown>;
+  const status = typeof ci.status === 'string' ? ci.status : 'installed';
+  return {
+    external_key: row.external_key,
+    name: row.name,
+    description: row.description,
+    is_active: row.is_active,
+    tasks: storedTasks.map((task) => ({
+      name: typeof task.name === 'string' ? task.name : '',
+      instructions: typeof task.instructions === 'string' ? task.instructions : null,
+      assigned_group_name: typeof task.assigned_group_id === 'string'
+        ? groupNames.get(task.assigned_group_id) ?? null
+        : null,
+      sla_hours: typeof task.sla_hours === 'number' ? task.sla_hours : null,
+    })),
+    ci: {
+      enabled: ci.enabled === true,
+      class_name: row.ci_class_name,
+      name_template: typeof ci.name_template === 'string' ? ci.name_template : '{{item.name}} {{request.number}}',
+      display_name_template: typeof ci.display_name_template === 'string' ? ci.display_name_template : '{{item.name}} {{request.number}}',
+      status: (['installed', 'in_stock', 'maintenance', 'retired', 'planned'].includes(status) ? status : 'installed') as ConfigPackageFulfillmentModel['ci']['status'],
+    },
+    asset: {
+      enabled: asset.enabled === true,
+      category: typeof asset.category === 'string' ? asset.category : 'hardware',
+      name_template: typeof asset.name_template === 'string' ? asset.name_template : '{{item.name}} {{request.number}}',
+      asset_tag_template: typeof asset.asset_tag_template === 'string' ? asset.asset_tag_template : '{{request.number}}',
+    },
+  };
+}
+
+async function loadFulfillmentModel(
+  client: PoolClient,
+  tenantId: string,
+  modelId: string | null,
+): Promise<ConfigPackageFulfillmentModel | null> {
+  if (!modelId) return null;
+  const result = await client.query<{
+    external_key: string;
+    name: string;
+    description: string | null;
+    is_active: boolean;
+    config: Record<string, unknown> | null;
+    ci_class_name: string | null;
+  }>(
+    `SELECT fm.external_key, fm.name, fm.description, fm.is_active, fm.config,
+            cc.name AS ci_class_name
+     FROM fulfillment_models fm
+     LEFT JOIN ci_classes cc ON cc.id::text = fm.config #>> '{ci,class_id}'
+     WHERE fm.tenant_id = $1 AND fm.id = $2`,
+    [tenantId, modelId],
+  );
+  const row = result.rows[0];
+  return row ? packageFulfillmentModel(client, tenantId, row) : null;
+}
+
 async function exportCatalogItem(
   client: PoolClient,
   tenantId: string,
   itemId: string,
-): Promise<{ category: ConfigPackageCategory; item: ConfigPackageServiceItem } | null> {
+): Promise<{ category: ConfigPackageCategory; item: ConfigPackageServiceItem; model: ConfigPackageFulfillmentModel | null } | null> {
   const itemRes = await client.query<{
     id: string;
     external_key: string;
@@ -119,12 +208,16 @@ async function exportCatalogItem(
     approval_required: boolean;
     sla_hours: number | null;
     is_active: boolean;
+    fulfillment_model_id: string | null;
+    fulfillment_model_external_key: string | null;
   }>(
     `SELECT si.*, sc.external_key AS category_external_key, sc.name AS category_name,
             sc.description AS category_description, sc.icon AS category_icon,
-            sc.sort_order AS category_sort_order, sc.is_active AS category_is_active
+            sc.sort_order AS category_sort_order, sc.is_active AS category_is_active,
+            fm.external_key AS fulfillment_model_external_key
      FROM service_items si
      JOIN service_categories sc ON sc.id = si.category_id
+     LEFT JOIN fulfillment_models fm ON fm.id = si.fulfillment_model_id
      WHERE si.tenant_id = $1 AND si.id = $2`,
     [tenantId, itemId],
   );
@@ -154,6 +247,7 @@ async function exportCatalogItem(
   );
 
   return {
+    model: await loadFulfillmentModel(client, tenantId, row.fulfillment_model_id),
     category: {
       external_key: row.category_external_key,
       name: row.category_name,
@@ -176,6 +270,7 @@ async function exportCatalogItem(
       approval_required: row.approval_required,
       sla_hours: row.sla_hours || 72,
       is_active: row.is_active,
+      fulfillment_model_external_key: row.fulfillment_model_external_key,
       tasks: taskRes.rows.map((task) => ({
         external_key: task.external_key,
         name: task.name,
@@ -304,6 +399,7 @@ router.get('/export/catalog/items/:id', async (req: Request, res: Response, next
     const exported = await exportCatalogItem(client, req.user!.tenant_id, String(req.params.id));
     if (!exported) throw BadRequest('Service item not found');
     const bundle = emptyBundle(`Service item: ${exported.item.name}`, req.user!.tenant_id);
+    if (exported.model) bundle.contents.catalog.fulfillment_models.push(exported.model);
     bundle.contents.catalog.categories.push(exported.category);
     bundle.contents.catalog.service_items.push(exported.item);
     res.json({ package: bundle, checksum: checksumBundle(bundle) });
@@ -333,12 +429,17 @@ router.get('/export/catalog', async (req: Request, res: Response, next: NextFunc
     );
     const bundle = emptyBundle('Service catalog configuration', tenantId);
     const categoryKeys = new Set<string>();
+    const modelKeys = new Set<string>();
     for (const row of itemIds.rows) {
       const exported = await exportCatalogItem(client, tenantId, row.id);
       if (!exported) continue;
       if (!categoryKeys.has(exported.category.external_key)) {
         bundle.contents.catalog.categories.push(exported.category);
         categoryKeys.add(exported.category.external_key);
+      }
+      if (exported.model && !modelKeys.has(exported.model.external_key)) {
+        bundle.contents.catalog.fulfillment_models.push(exported.model);
+        modelKeys.add(exported.model.external_key);
       }
       bundle.contents.catalog.service_items.push(exported.item);
     }

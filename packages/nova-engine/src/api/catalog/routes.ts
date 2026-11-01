@@ -22,6 +22,8 @@ import {
   ensureCredentialSlugsExist,
   validateAndParseAutomationConfig,
 } from './automation-config';
+import { assertItemHasNoFulfillmentModel, assertServiceItemFulfillment } from './item-fulfillment';
+import fulfillmentModelRoutes from './fulfillment-model-routes';
 
 const router = Router();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
@@ -346,6 +348,7 @@ router.post(
 );
 
 router.use(authenticate, setTenantRLS, releaseTenantClient);
+router.use('/fulfillment-models', fulfillmentModelRoutes);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -516,17 +519,25 @@ router.post(
       const {
         category_id, name, short_description, description,
         icon, price, custom_attributes, form_schema, approval_required, sla_hours,
+        fulfillment_model_id,
       } = req.body;
+
+      await assertServiceItemFulfillment({
+        client,
+        serviceItemId: null,
+        fulfillmentModelId: fulfillment_model_id || null,
+        activating: Boolean(fulfillment_model_id),
+      });
 
       const result = await client.query(
         `INSERT INTO service_items (
-          tenant_id, category_id, name, short_description, description,
+          tenant_id, category_id, fulfillment_model_id, name, short_description, description,
           icon, price, custom_attributes, form_schema, approval_required, sla_hours
         ) VALUES (
-          current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+          current_tenant_id(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
         ) RETURNING *`,
         [
-          category_id, name, short_description || null, description || null,
+          category_id, fulfillment_model_id || null, name, short_description || null, description || null,
           icon || 'box', price ?? null, JSON.stringify(custom_attributes || {}),
           JSON.stringify(form_schema), approval_required, sla_hours || 72,
         ],
@@ -549,19 +560,33 @@ router.put(
         category_id, name, short_description, description,
         icon, price, custom_attributes, form_schema, approval_required, sla_hours, is_active,
       } = req.body;
+      const modelProvided = Object.prototype.hasOwnProperty.call(req.body, 'fulfillment_model_id');
+      const existing = await client.query(
+        `SELECT fulfillment_model_id, is_active FROM service_items WHERE id = $1`,
+        [req.params.id],
+      );
+      if (existing.rows.length === 0) throw NotFound('Service item not found');
+      const current = existing.rows[0] as { fulfillment_model_id: string | null; is_active: boolean };
+      const nextModelId = modelProvided
+        ? (req.body.fulfillment_model_id || null)
+        : current.fulfillment_model_id;
+      const nextActive = is_active === undefined || is_active === null
+        ? current.is_active
+        : is_active === true;
 
-      if (is_active === true) {
-        const taskCount = await client.query(
-          'SELECT count(*) FROM catalog_tasks WHERE service_item_id = $1 AND is_active = true',
-          [req.params.id],
-        );
-        if (parseInt(taskCount.rows[0].count, 10) === 0) {
-          res.json({
-            success: false,
-            error: 'Cannot activate a service item without at least one active Catalog Workflow Task',
-          });
+      try {
+        await assertServiceItemFulfillment({
+          client,
+          serviceItemId: String(req.params.id),
+          fulfillmentModelId: nextModelId,
+          activating: nextActive,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.message.startsWith('Cannot activate a service item without')) {
+          res.json({ success: false, error: err.message });
           return;
         }
+        throw err;
       }
 
       const result = await client.query(
@@ -577,8 +602,9 @@ router.put(
           approval_required = COALESCE($9, approval_required),
           sla_hours = COALESCE($10, sla_hours),
           is_active = COALESCE($11, is_active),
+          fulfillment_model_id = CASE WHEN $12::boolean THEN $13::uuid ELSE fulfillment_model_id END,
           updated_at = now()
-        WHERE id = $12
+        WHERE id = $14
         RETURNING *`,
         [
           category_id || null, name || null,
@@ -587,6 +613,7 @@ router.put(
           custom_attributes ? JSON.stringify(custom_attributes) : null,
           form_schema ? JSON.stringify(form_schema) : null,
           approval_required ?? null, sla_hours ?? null, is_active ?? null,
+          modelProvided, nextModelId,
           req.params.id,
         ],
       );
@@ -815,6 +842,7 @@ router.post('/items/:id/tasks', requireRole('admin', 'catalog_designer'),
       const client = getRequestClient(req);
       const { name, description, instructions, task_type, task_order, assigned_group_id, sla_hours, automation_config } = req.body;
       if (!name || !task_type) { res.status(400).json({ error: 'name and task_type are required' }); return; }
+      await assertItemHasNoFulfillmentModel(client, String(req.params.id));
       let automationJson: Record<string, unknown> = {};
       if (automation_config !== undefined && automation_config !== null) {
         if (typeof automation_config !== 'object' || Array.isArray(automation_config)) {
@@ -855,6 +883,7 @@ router.put('/items/:id/tasks/:taskId', requireRole('admin', 'catalog_designer'),
     try {
       const client = getRequestClient(req);
       const { name, description, instructions, task_type, task_order, assigned_group_id, sla_hours, is_active, automation_config } = req.body;
+      await assertItemHasNoFulfillmentModel(client, String(req.params.id));
 
       let automationSql = '';
       const params: unknown[] = [name, description ?? null, instructions ?? null, task_type, task_order, assigned_group_id || null, sla_hours || null, is_active, req.params.taskId, req.params.id];

@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.25`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.27`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
@@ -156,6 +156,14 @@ Also keep `CATALOG_AUTOMATION_SHARED_KEY` identical on engine and worker — in-
 ## Cost center responsible person (`v00.01.24`)
 
 Apply `infra/postgres/migrations/v00.01.24__cost_center_responsible.sql` before rolling out builds that read or write `cost_centers.responsible_user_id`. The column is nullable; existing rows stay valid with a null responsible person.
+
+## Request task cancel (`v00.01.27`)
+
+Apply `infra/postgres/migrations/v00.01.27__request_task_cancelled.sql` before using Skip or Cancel on a request task. The migration allows `cancelled` on `request_tasks.status`. Existing tasks are unchanged.
+
+## Fulfillment models (`v00.01.26`)
+
+Apply `infra/postgres/migrations/v00.01.26__fulfillment_models.sql` before using fulfillment models. The migration adds `fulfillment_models`, `service_items.fulfillment_model_id`, and the provisioned CI and asset columns on `requests`. Existing catalog items are unchanged.
 
 ## Department manager and external_id (`v00.01.25`)
 

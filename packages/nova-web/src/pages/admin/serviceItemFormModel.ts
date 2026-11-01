@@ -11,6 +11,7 @@ export const EMPTY_SERVICE_ITEM: Partial<ServiceItem> = {
   form_schema: { fields: [] },
   approval_required: false,
   sla_hours: 72,
+  fulfillment_model_id: null,
   is_active: false,
 };
 
@@ -78,7 +79,8 @@ export function serviceItemIssues(
   const sla = Number(form.sla_hours);
   if (!Number.isInteger(sla) || sla < 1) issues.sla_hours = 'slaInvalid';
 
-  if (!options.isNew && form.is_active !== false && options.taskCount === 0) {
+  const modelId = typeof form.fulfillment_model_id === 'string' ? form.fulfillment_model_id.trim() : '';
+  if (!options.isNew && form.is_active !== false && options.taskCount === 0 && !modelId) {
     issues.is_active = 'activateRequiresTask';
   }
 

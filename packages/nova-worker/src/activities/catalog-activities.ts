@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { log } from '@temporalio/activity';
+import {
+  compileFulfillmentModelTasks,
+  isFulfillmentModelAutomation,
+  parseFulfillmentModelConfig,
+} from '@nova-suite/shared';
 import { withTenantContext } from '../db';
 import { dispatchConfiguredNotifications } from './notification-activities';
 
@@ -39,7 +44,7 @@ function automatedRunsWithoutUserSignal(task: TaskDefinition): boolean {
   const raw = task.automationConfig;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
   const kind = (raw as { kind?: unknown }).kind;
-  return kind === 'state_machine';
+  return kind === 'state_machine' || isFulfillmentModelAutomation(raw);
 }
 
 export async function getTaskDefinitions(
@@ -49,10 +54,28 @@ export async function getTaskDefinitions(
   log.info('Loading task definitions', { serviceItemId });
   return withTenantContext(tenantId, async (client) => {
     const itemResult = await client.query(
-      `SELECT approval_required FROM service_items WHERE id = $1`,
+      `SELECT si.approval_required, si.fulfillment_model_id, fm.config AS model_config, fm.is_active AS model_is_active
+       FROM service_items si
+       LEFT JOIN fulfillment_models fm ON fm.id = si.fulfillment_model_id
+       WHERE si.id = $1`,
       [serviceItemId],
     );
-    const approvalRequired = Boolean(itemResult.rows[0]?.approval_required);
+    const item = itemResult.rows[0] as {
+      approval_required?: boolean;
+      fulfillment_model_id?: string | null;
+      model_config?: unknown;
+      model_is_active?: boolean | null;
+    } | undefined;
+    const approvalRequired = Boolean(item?.approval_required);
+
+    if (item?.fulfillment_model_id) {
+      if (item.model_is_active !== true) {
+        throw new Error('Fulfillment model is inactive');
+      }
+      const modelConfig = parseFulfillmentModelConfig(item.model_config);
+      if (!modelConfig) throw new Error('Fulfillment model config is invalid');
+      return compileFulfillmentModelTasks({ approvalRequired, config: modelConfig });
+    }
 
     const result = await client.query(
       `SELECT id, name, description, instructions, task_type, task_order, assigned_group_id, sla_hours, automation_config
