@@ -163,6 +163,48 @@ export const snLogicDefinitionSchema = z.object({
   type: snField,
 });
 
+export const snLegacyWorkflowSchema = z.object({
+  sys_id: snField,
+  name: snField,
+  description: snField,
+  table: snField,
+});
+
+export const snLegacyVersionSchema = z.object({
+  sys_id: snField,
+  name: snField,
+  workflow: snField,
+  published: snBool,
+});
+
+export const snLegacyActivitySchema = z.object({
+  sys_id: snField,
+  name: snField,
+  activity_definition: snField,
+  workflow_version: snField,
+  x: snInt,
+  y: snInt,
+});
+
+export const snLegacyElementSchema = z.object({
+  sys_id: snField,
+  name: snField,
+});
+
+export const snLegacyTransitionSchema = z.object({
+  sys_id: snField,
+  from: snField,
+  to: snField,
+  condition: snField,
+  name: snField,
+});
+
+export const snLegacyConditionSchema = z.object({
+  sys_id: snField,
+  name: snField,
+  condition: snField,
+});
+
 export const snFlowVariableSchema = z.object({
   sys_id: snField,
   model: snField,

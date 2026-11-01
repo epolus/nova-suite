@@ -11,6 +11,12 @@ import {
   snFlowSnapshotSchema,
   snFlowVariableSchema,
   snGroupSchema,
+  snLegacyActivitySchema,
+  snLegacyConditionSchema,
+  snLegacyElementSchema,
+  snLegacyTransitionSchema,
+  snLegacyVersionSchema,
+  snLegacyWorkflowSchema,
   snLogicDefinitionSchema,
   snUserSchema,
   snQuestionChoiceSchema,
@@ -24,6 +30,7 @@ import {
 import {
   SERVICENOW_SNAPSHOT_VERSION,
   serviceNowExtractOptionsSchema,
+  type LegacyWorkflow,
   type ServiceNowExtractOptions,
   type ServiceNowFlow,
   type ServiceNowSnapshot,
@@ -164,11 +171,6 @@ export async function extractServiceNowSnapshot(
   const flows: ServiceNowFlow[] = [];
   const seenFlows = new Set<string>();
   let queue = [...new Set(items.map((i) => i.flow_designer_flow).filter(Boolean))];
-  for (const item of items) {
-    if (item.workflow && !item.flow_designer_flow) {
-      warnings.push(`Item "${item.name}" uses a legacy workflow (${item.workflow}); legacy workflows are not converted.`);
-    }
-  }
 
   while (queue.length > 0 && seenFlows.size < MAX_FLOWS) {
     const batch = queue.filter((id) => !seenFlows.has(id));
@@ -297,8 +299,91 @@ export async function extractServiceNowSnapshot(
   }
   if (queue.length > 0) warnings.push(`Flow limit reached (${MAX_FLOWS}); some subflows were not extracted.`);
 
+  const legacyWorkflows: LegacyWorkflow[] = [];
+  const legacyIds = [...new Set(items.filter((i) => i.workflow && !i.flow_designer_flow).map((i) => i.workflow))];
+  if (legacyIds.length > 0) {
+    await onProgress?.('legacy_workflows', { workflows: legacyIds.length });
+    const wfRows = parseRows(
+      snLegacyWorkflowSchema,
+      await safeListIn('wf_workflow', 'sys_id', legacyIds, fieldsOf(snLegacyWorkflowSchema)),
+    );
+    const versions = parseRows(
+      snLegacyVersionSchema,
+      await safeListIn('wf_workflow_version', 'workflow', legacyIds, fieldsOf(snLegacyVersionSchema)),
+    );
+    const versionByWorkflow = new Map<string, (typeof versions)[number]>();
+    for (const v of versions) {
+      const current = versionByWorkflow.get(v.workflow);
+      if (!current || (v.published && !current.published)) versionByWorkflow.set(v.workflow, v);
+    }
+    const versionIds = [...versionByWorkflow.values()].map((v) => v.sys_id);
+    const activities = parseRows(
+      snLegacyActivitySchema,
+      await safeListIn('wf_activity', 'workflow_version', versionIds, fieldsOf(snLegacyActivitySchema)),
+    );
+    const defIds = [...new Set(activities.map((a) => a.activity_definition).filter(Boolean))];
+    const definitions = new Map(
+      parseRows(snLegacyElementSchema, await safeListIn('wf_element_activity', 'sys_id', defIds, fieldsOf(snLegacyElementSchema)))
+        .map((d) => [d.sys_id, d.name]),
+    );
+    const transitions = parseRows(
+      snLegacyTransitionSchema,
+      await safeListIn('wf_transition', 'from', activities.map((a) => a.sys_id), fieldsOf(snLegacyTransitionSchema)),
+    );
+    const conditionIds = [...new Set(transitions.map((t) => t.condition).filter(Boolean))];
+    const conditions = new Map(
+      parseRows(snLegacyConditionSchema, await safeListIn('wf_condition', 'sys_id', conditionIds, fieldsOf(snLegacyConditionSchema)))
+        .map((c) => [c.sys_id, c]),
+    );
+    const activityValues = new Map<string, Record<string, unknown>>();
+    for (const row of parseRows(
+      snVariableValueSchema,
+      await safeListIn('sys_variable_value', 'document_key', activities.map((a) => a.sys_id), 'document_key,value,variable.element'),
+    )) {
+      const rec = activityValues.get(row.document_key) ?? {};
+      if (row['variable.element']) rec[row['variable.element']] = row.value;
+      activityValues.set(row.document_key, rec);
+    }
+    for (const id of legacyIds) {
+      const wf = wfRows.find((w) => w.sys_id === id);
+      const version = versionByWorkflow.get(id);
+      if (!wf || !version) {
+        warnings.push(`Legacy workflow ${id} could not be read (wf_workflow / wf_workflow_version).`);
+        continue;
+      }
+      const acts = activities.filter((a) => a.workflow_version === version.sys_id);
+      legacyWorkflows.push({
+        sys_id: wf.sys_id,
+        name: wf.name || version.name,
+        description: wf.description,
+        table: wf.table,
+        versionId: version.sys_id,
+        activities: acts.map((a) => ({
+          sysId: a.sys_id,
+          name: a.name,
+          definitionName: definitions.get(a.activity_definition) || a.name,
+          x: a.x,
+          y: a.y,
+          values: activityValues.get(a.sys_id) ?? {},
+        })),
+        transitions: transitions
+          .filter((t) => acts.some((a) => a.sys_id === t.from))
+          .map((t) => {
+            const cond = t.condition ? conditions.get(t.condition) : undefined;
+            return {
+              from: t.from,
+              to: t.to,
+              name: t.name || cond?.name || '',
+              condition: cond?.condition || '',
+            };
+          }),
+      });
+    }
+  }
+
   await onProgress?.('definitions');
   const steps = flows.flatMap((f) => f.steps);
+  const legacyValues = legacyWorkflows.flatMap((w) => w.activities.map((a) => a.values));
   const actionTypeIds = [...new Set(steps.filter((s) => s.kind === 'action').map((s) => s.definitionId))];
   const actionFields = fieldsOf(snActionTypeSchema);
   let actionTypeRows = await safeListIn('sys_hub_action_type_base', 'sys_id', actionTypeIds, actionFields);
@@ -311,6 +396,11 @@ export async function extractServiceNowSnapshot(
   const referencedIds = new Set<string>();
   for (const s of steps) {
     for (const m of JSON.stringify(s.values).matchAll(/\b[0-9a-f]{32}\b/g)) {
+      if (referencedIds.size < 2000) referencedIds.add(m[0]);
+    }
+  }
+  for (const values of legacyValues) {
+    for (const m of JSON.stringify(values).matchAll(/\b[0-9a-f]{32}\b/g)) {
       if (referencedIds.size < 2000) referencedIds.add(m[0]);
     }
   }
@@ -336,6 +426,7 @@ export async function extractServiceNowSnapshot(
     variableSetItems,
     choices,
     flows,
+    legacyWorkflows,
     actionTypes: parseRows(snActionTypeSchema, actionTypeRows),
     logicDefinitions: parseRows(snLogicDefinitionSchema, logicRows),
     groups: parseRows(snGroupSchema, groupRows),

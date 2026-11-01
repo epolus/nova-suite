@@ -525,7 +525,7 @@ throw new Error('ServiceNow script step "run_script" has not been ported yet');
         "notes": [
           {
             "code": "legacy_workflow",
-            "message": "Item uses a legacy workflow, which is not converted; a manual fulfillment task was added.",
+            "message": "Item uses a legacy workflow, which could not be read; a manual fulfillment task was added.",
             "severity": "warning",
           },
         ],

@@ -135,12 +135,37 @@ describe('extractServiceNowSnapshot', () => {
     sys_hub_action_instance: [{ sys_id: 'a2', flow: 'f2', ui_id: 'u3', order: '1', action_type: 'at1' }],
     sys_hub_flow_logic: [],
     sys_hub_sub_flow_instance: [],
-    sys_variable_value: [{ document_key: 'a2', value: 'hello', 'variable.element': 'message' }],
+    sys_variable_value: [
+      { document_key: 'a2', value: 'hello', 'variable.element': 'message' },
+      { document_key: 'act_task', value: 'Ship to ${current.requested_for.email}', 'variable.element': 'short_description' },
+      { document_key: 'act_task', value: GROUP_ID, 'variable.element': 'assignment_group' },
+    ],
     sys_hub_trigger_instance_v2: [{ sys_id: 't1', flow: 's1', 'trigger_definition.name': 'Service Catalog' }],
     sys_hub_flow_variable: [],
     sys_hub_action_type_base: [{ sys_id: 'at1', name: 'Ask For Approval', internal_name: 'ask_for_approval' }],
     sys_user_group: [{ sys_id: GROUP_ID, name: 'IT Approvers' }],
     sys_user: [],
+    wf_workflow: [{ sys_id: 'wf1', name: 'Hardware request', description: '', table: 'sc_req_item' }],
+    wf_workflow_version: [{ sys_id: 'ver1', name: 'Hardware request', workflow: 'wf1', published: 'true' }],
+    wf_activity: [
+      { sys_id: 'act_begin', name: 'Begin', activity_definition: 'def_begin', workflow_version: 'ver1', x: '10', y: '10' },
+      { sys_id: 'act_appr', name: 'Requested Item Dept Head Approval', activity_definition: 'def_appr', workflow_version: 'ver1', x: '80', y: '10' },
+      { sys_id: 'act_task', name: 'Order hardware', activity_definition: 'def_task', workflow_version: 'ver1', x: '150', y: '10' },
+      { sys_id: 'act_end', name: 'End', activity_definition: 'def_end', workflow_version: 'ver1', x: '220', y: '10' },
+    ],
+    wf_element_activity: [
+      { sys_id: 'def_begin', name: 'Begin' },
+      { sys_id: 'def_appr', name: 'Approval - User' },
+      { sys_id: 'def_task', name: 'Catalog Task' },
+      { sys_id: 'def_end', name: 'End' },
+    ],
+    wf_transition: [
+      { sys_id: 'tr1', from: 'act_begin', to: 'act_appr', name: '', condition: '' },
+      { sys_id: 'tr2', from: 'act_appr', to: 'act_task', name: 'Approved', condition: '' },
+      { sys_id: 'tr3', from: 'act_appr', to: 'act_end', name: 'Rejected', condition: '' },
+      { sys_id: 'tr4', from: 'act_task', to: 'act_end', name: '', condition: '' },
+    ],
+    wf_condition: [],
   };
 
   it('extracts items, v2 compressed flows, v1 subflows and referenced groups', async () => {
@@ -166,11 +191,19 @@ describe('extractServiceNowSnapshot', () => {
 
     expect(snap.actionTypes.map((a) => a.name)).toEqual(['Ask For Approval']);
     expect(snap.groups).toEqual([{ sys_id: GROUP_ID, name: 'IT Approvers' }]);
+    expect(snap.legacyWorkflows).toHaveLength(1);
+    expect(snap.legacyWorkflows[0].activities.map((a) => a.definitionName)).toEqual([
+      'Begin', 'Approval - User', 'Catalog Task', 'End',
+    ]);
+    expect(snap.legacyWorkflows[0].activities.find((a) => a.sysId === 'act_task')?.values).toMatchObject({
+      short_description: 'Ship to ${current.requested_for.email}',
+      assignment_group: GROUP_ID,
+    });
     expect(snap.warnings).toEqual(expect.arrayContaining([
-      expect.stringMatching(/legacy workflow/),
       expect.stringMatching(/sys_hub_trigger_instance is not available/),
     ]));
-    expect(stages).toEqual(expect.arrayContaining(['catalogs', 'items', 'variables', 'flows', 'definitions']));
+    expect(snap.warnings.some((w) => /could not be read/i.test(w))).toBe(false);
+    expect(stages).toEqual(expect.arrayContaining(['catalogs', 'items', 'variables', 'flows', 'legacy_workflows', 'definitions']));
   });
 
   it('honors includeRecordProducers, includeInactive and itemIds', async () => {

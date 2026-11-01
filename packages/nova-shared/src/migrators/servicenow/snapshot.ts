@@ -41,6 +41,32 @@ export const serviceNowFlowSchema = snFlowSchema.extend({
   flowVariables: z.array(z.object({ name: z.string(), label: z.string(), type: z.string() })),
 });
 
+export const legacyTransitionSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  name: z.string(),
+  condition: z.string(),
+});
+
+export const legacyActivitySchema = z.object({
+  sysId: z.string(),
+  name: z.string(),
+  definitionName: z.string(),
+  x: z.number(),
+  y: z.number(),
+  values: z.record(z.string(), z.unknown()),
+});
+
+export const legacyWorkflowSchema = z.object({
+  sys_id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  table: z.string(),
+  versionId: z.string(),
+  activities: z.array(legacyActivitySchema),
+  transitions: z.array(legacyTransitionSchema),
+});
+
 export const serviceNowSnapshotSchema = z.object({
   version: z.literal(SERVICENOW_SNAPSHOT_VERSION),
   instanceUrl: z.string(),
@@ -54,6 +80,8 @@ export const serviceNowSnapshotSchema = z.object({
   variableSetItems: z.array(snVariableSetItemSchema),
   choices: z.array(snQuestionChoiceSchema),
   flows: z.array(serviceNowFlowSchema),
+  /** Legacy Workflow Editor graphs (wf_workflow), keyed by the catalog item's workflow reference. */
+  legacyWorkflows: z.array(legacyWorkflowSchema).default([]),
   actionTypes: z.array(snActionTypeSchema),
   logicDefinitions: z.array(snLogicDefinitionSchema),
   /** Groups and users referenced by sys_id in flow step values (approvers, assignment groups). */
@@ -64,6 +92,7 @@ export const serviceNowSnapshotSchema = z.object({
 
 export type ServiceNowStep = z.infer<typeof serviceNowStepSchema>;
 export type ServiceNowFlow = z.infer<typeof serviceNowFlowSchema>;
+export type LegacyWorkflow = z.infer<typeof legacyWorkflowSchema>;
 export type ServiceNowSnapshot = z.infer<typeof serviceNowSnapshotSchema>;
 
 export type ServiceNowProbeResult = {

@@ -3,6 +3,7 @@ import type { AutomationConfig } from '../../../automation-config';
 import type { SnCategory } from '../raw-schemas';
 import type { ServiceNowFlow, ServiceNowSnapshot } from '../snapshot';
 import { convertFlow, type FlowLookups } from './flow';
+import { convertLegacyWorkflow } from './legacy';
 import {
   NoteCollector,
   type MigrationItemReport,
@@ -99,6 +100,7 @@ export function transformServiceNowSnapshot(
   const now = (options.now ?? new Date()).toISOString();
   const categoriesById = new Map(snapshot.categories.map((c) => [c.sys_id, c]));
   const flowsById = new Map(snapshot.flows.map((f) => [f.sys_id, f]));
+  const legacyById = new Map((snapshot.legacyWorkflows ?? []).map((w) => [w.sys_id, w]));
   const lookups: FlowLookups = {
     actionTypes: new Map(snapshot.actionTypes.map((a) => [a.sys_id, a])),
     logicDefinitions: new Map(snapshot.logicDefinitions.map((l) => [l.sys_id, l])),
@@ -244,8 +246,42 @@ export function transformServiceNowSnapshot(
       }
     } else if (item.workflow) {
       servicenowAttrs.legacy_workflow = item.workflow;
-      notes.warn('legacy_workflow', 'Item uses a legacy workflow, which is not converted; a manual fulfillment task was added.');
-      manualFallback('This item used a ServiceNow legacy workflow. Fulfill manually or build an automation.');
+      const legacy = legacyById.get(item.workflow);
+      if (!legacy) {
+        notes.warn('legacy_workflow', 'Item uses a legacy workflow, which could not be read; a manual fulfillment task was added.');
+        manualFallback('This item used a ServiceNow legacy workflow. Fulfill manually or build an automation.');
+      } else {
+        servicenowAttrs.flow_name = legacy.name;
+        const result = convertLegacyWorkflow(legacy, { lookups, fields: mappings, notes, extractPreApproval: true });
+        scriptSteps = result.scriptSteps;
+        if (result.unmappedSteps.length > 0) servicenowAttrs.unmapped_steps = result.unmappedSteps;
+        if (result.preApproval?.approverType === 'requester_manager') {
+          approvalRequired = true;
+        } else if (result.preApproval) {
+          pushTask({
+            external_key: `${key}/approval`,
+            name: result.preApproval.name,
+            instructions: 'Please review and approve or reject this request.',
+            task_type: 'approval',
+            assigned_group_name: result.preApproval.groupName,
+            automation_config: { approval_mode: 'group_members' },
+          });
+        }
+        if (result.config) {
+          stateCount = result.config.states.length;
+          notes.info('legacy_workflow', `Legacy workflow "${legacy.name}" was converted to a catalog automation.`);
+          pushTask({
+            external_key: `${key}/flow`,
+            name: truncate(legacy.name || 'Automation', 255),
+            description: truncate(`Migrated from ServiceNow legacy workflow ${legacy.sys_id}.`, 2000),
+            task_type: 'automated',
+            automation_config: result.config as unknown as Record<string, unknown>,
+          });
+        } else if (notes.notes.some((n) => n.severity === 'error')) {
+          manualFallback(`The ServiceNow workflow "${legacy.name}" could not be converted automatically; fulfill manually.`);
+        }
+        if (tasks.length === 0) manualFallback('The ServiceNow workflow had no steps to convert.');
+      }
     } else {
       notes.info('no_flow', 'Item has no flow; a manual fulfillment task was added.');
       manualFallback('Fulfill this request.');

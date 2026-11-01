@@ -26,6 +26,10 @@ export const SERVICENOW_PROBE_TABLES = [
   'sys_hub_action_type_base',
   'sys_hub_flow_logic_definition',
   'sys_variable_value',
+  'wf_workflow',
+  'wf_workflow_version',
+  'wf_activity',
+  'wf_transition',
 ] as const;
 
 /** Tables without which a migration cannot produce anything useful. */

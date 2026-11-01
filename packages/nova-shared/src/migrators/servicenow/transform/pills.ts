@@ -73,9 +73,9 @@ export function translatePillPath(raw: string, ctx: PillContext): string | null 
   const parts = path.split('.');
   const head = (parts[0] ?? '').toLowerCase();
 
-  if (head === 'trigger' || head === 'trigger_inputs' || ctx.triggerAliases?.has(head)) {
+  if (head === 'current' || head === 'trigger' || head === 'trigger_inputs' || ctx.triggerAliases?.has(head)) {
     let rest = parts.slice(1);
-    if (['request_item', 'current', 'requested_item', 'ritm', 'table_record'].includes((rest[0] ?? '').toLowerCase())) {
+    if (head !== 'current' && ['request_item', 'current', 'requested_item', 'ritm', 'table_record'].includes((rest[0] ?? '').toLowerCase())) {
       rest = rest.slice(1);
     }
     if ((rest[0] ?? '').toLowerCase() === 'variables' && (rest[1] ?? '').toLowerCase() === 'requested_for') {
