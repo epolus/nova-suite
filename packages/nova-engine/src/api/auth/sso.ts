@@ -270,18 +270,21 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       time_format: '12h' | '24h';
       date_format: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
       is_active: boolean;
+      locked_out: boolean;
     };
+
+    const ssoUserColumns = 'id, tenant_id, email, display_name, time_format, date_format, is_active, locked_out';
 
     // Pre-auth subject lookup must bypass RLS (no tenant context yet).
     let user = await db.getOne<SsoUser>(
-      'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM lookup_user_for_sso($1)',
+      `SELECT ${ssoUserColumns} FROM lookup_user_for_sso($1)`,
       [ssoSubject],
     );
 
     if (!user) {
       user = await db.withTenantContext(DEFAULT_TENANT, SYSTEM_USER_ID, 'admin', async () => {
         const matched = await db.getOne<SsoUser>(
-          'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM users WHERE email = $1 AND tenant_id = $2',
+          `SELECT ${ssoUserColumns} FROM users WHERE email = $1 AND tenant_id = $2`,
           [ssoEmail, DEFAULT_TENANT],
         );
 
@@ -299,8 +302,8 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
         const newUser = await db.getOne<{ id: string }>(
           `INSERT INTO users (
             tenant_id, email, password_hash, display_name,
-            first_name, last_name, sso_provider_id, time_format, date_format, is_active
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, '24h', 'YYYY-MM-DD', true)
+            first_name, last_name, sso_provider_id, time_format, date_format, is_active, source
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, '24h', 'YYYY-MM-DD', true, 'sso')
           RETURNING id`,
           [
             DEFAULT_TENANT,
@@ -325,7 +328,7 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
         }
 
         const created = await db.getOne<SsoUser>(
-          'SELECT id, tenant_id, email, display_name, time_format, date_format, is_active FROM users WHERE id = $1',
+          `SELECT ${ssoUserColumns} FROM users WHERE id = $1`,
           [newUser!.id],
         );
         logger.info({ userId: created!.id, email: ssoEmail }, 'Auto-provisioned SSO user');
@@ -337,6 +340,19 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       res.redirect('/login?sso_error=Account+is+disabled');
       return;
     }
+
+    if (user.locked_out) {
+      res.redirect('/login?sso_error=Account+is+locked');
+      return;
+    }
+
+    await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.query(
+      `UPDATE users
+       SET last_login_at = now(),
+           failed_login_count = 0
+       WHERE id = $1`,
+      [user!.id],
+    ));
 
     const roleRows = await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.getMany<{ name: string }>(
       `SELECT r.name FROM user_roles ur

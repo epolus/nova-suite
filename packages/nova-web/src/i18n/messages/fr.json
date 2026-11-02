@@ -63,6 +63,13 @@
       "description": "Description",
       "email": "E-mail",
       "phone": "Téléphone",
+      "employeeNumber": "Numéro d'employé",
+      "vip": "VIP",
+      "lockedOut": "Verrouillé",
+      "lockReason": "Motif du verrouillage",
+      "lastLogin": "Dernière connexion",
+      "failedLoginCount": "Échecs de connexion",
+      "lockedAt": "Verrouillé le",
       "location": "Emplacement",
       "status": "Statut",
       "priority": "Priorité",
@@ -345,6 +352,7 @@
       "detailTitle": "Détails de l'incident",
       "summary": "Résumé",
       "callerProfile": "Profil de l'appelant",
+      "vip": "VIP",
       "journal": "Journal",
       "attachments": "Pièces jointes",
       "insights": "Connaissances",
@@ -420,6 +428,32 @@
     "admin": {
       "title": "Administration",
       "users": "Gérez les utilisateurs, les rôles et la structure organisationnelle.",
+      "userDetail": {
+        "lockedCannotLogin": "Verrouillé -- la connexion reste bloquée jusqu'à ce qu'un admin déverrouille le compte",
+        "unlockedCanLogin": "Non verrouillé",
+        "sources": {
+          "manual": "Manuel",
+          "sso": "SSO",
+          "import": "Import",
+          "datasource": "Source de données"
+        },
+        "lockReasons": {
+          "failed_logins": "Trop de tentatives de connexion échouées",
+          "admin": "Verrouillé par un administrateur"
+        },
+        "placeholders": {
+          "employeeNumber": "p. ex. 100234",
+          "lockReason": "Pourquoi ce compte est verrouillé"
+        }
+      },
+      "usersPage": {
+        "sources": {
+          "manual": "Manuel",
+          "sso": "SSO",
+          "import": "Import",
+          "datasource": "Source de données"
+        }
+      },
       "assignmentGroups": "Gérez les groupes d'affectation et les adhésions.",
       "theming": {
         "title": "Thème et identité",

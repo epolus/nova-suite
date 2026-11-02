@@ -503,11 +503,19 @@ export const adminCreateUserSchema = z.object({
   display_name: z.string().min(1).max(255),
   phone: e164PhoneSchema.optional().nullable(),
   mobile: e164PhoneSchema.optional().nullable(),
+  vip: z.boolean().optional(),
+  employee_number: z.string().max(100).optional().nullable(),
+  locked_out: z.boolean().optional(),
+  lock_reason: z.string().max(200).optional().nullable(),
 }).loose();
 
 export const adminUpdateUserSchema = z.object({
   phone: e164PhoneSchema.optional().nullable(),
   mobile: e164PhoneSchema.optional().nullable(),
+  vip: z.boolean().optional(),
+  employee_number: z.string().max(100).optional().nullable(),
+  locked_out: z.boolean().optional(),
+  lock_reason: z.string().max(200).optional().nullable(),
 }).loose();
 
 export const createCabMeetingSchema = z.object({

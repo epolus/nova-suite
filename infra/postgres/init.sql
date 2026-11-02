@@ -165,7 +165,7 @@ CREATE TABLE users (
   last_name           text,
   display_name        text NOT NULL,
   title               text,
-  phone               text NOT NULL DEFAULT '+41',
+  phone               text,
   mobile              text,
   location            text NOT NULL DEFAULT 'Zurich',
   timezone            text NOT NULL DEFAULT 'UTC',
@@ -184,10 +184,21 @@ CREATE TABLE users (
   cost_center_id      uuid REFERENCES cost_centers(id) ON DELETE SET NULL,
   sso_provider_id     text,
   is_active           boolean NOT NULL DEFAULT true,
+  locked_out          boolean NOT NULL DEFAULT false,
+  locked_at           timestamptz,
+  lock_reason         text,
+  failed_login_count  integer NOT NULL DEFAULT 0,
+  last_failed_login_at timestamptz,
+  last_login_at       timestamptz,
+  vip                 boolean NOT NULL DEFAULT false,
+  employee_number     text,
+  source              text NOT NULL DEFAULT 'manual',
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, email),
-  UNIQUE (tenant_id, user_id)
+  UNIQUE (tenant_id, user_id),
+  CONSTRAINT users_failed_login_count_check CHECK (failed_login_count >= 0),
+  CONSTRAINT users_source_check CHECK (source IN ('manual', 'sso', 'import', 'datasource'))
 );
 
 CREATE INDEX idx_users_tenant ON users(tenant_id);
@@ -197,6 +208,10 @@ CREATE INDEX idx_users_department ON users(department_id);
 CREATE INDEX idx_users_sso ON users(tenant_id, sso_provider_id) WHERE sso_provider_id IS NOT NULL;
 CREATE INDEX idx_users_cost_center ON users(cost_center_id);
 CREATE INDEX idx_users_company ON users(company);
+CREATE UNIQUE INDEX idx_users_employee_number
+  ON users(tenant_id, employee_number)
+  WHERE employee_number IS NOT NULL;
+CREATE INDEX idx_users_locked_out ON users(tenant_id) WHERE locked_out;
 
 ALTER TABLE cost_centers
   ADD CONSTRAINT fk_cost_centers_responsible
@@ -1095,7 +1110,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.24', 'cost_center_responsible'),
   ('v00.01.25', 'department_manager'),
   ('v00.01.26', 'fulfillment_models'),
-  ('v00.01.27', 'request_task_cancelled');
+  ('v00.01.27', 'request_task_cancelled'),
+  ('v00.01.28', 'users_phone_and_lockout');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT

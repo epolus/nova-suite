@@ -12,11 +12,21 @@ import Spinner from '../../components/Spinner';
 import SearchBar from '../../components/SearchBar';
 import DataTable, { type DataColumnDef } from '../../components/DataTable';
 import { useListParams } from '../../hooks/useListParams';
-import { formatDate } from '../../utils/dateTime';
+import { formatDate, formatDateTime } from '../../utils/dateTime';
 
 const DEFAULT_COLS = ['user', 'title', 'user_id', 'department_name', 'manager_name', 'roles', '_status'];
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 const DEFAULT_PAGE_SIZE = 20;
+
+function userSourceLabel(
+  tPage: ReturnType<typeof useTranslations<'pages.admin.usersPage'>>,
+  source: AdminUser['source'],
+): string {
+  if (source === 'sso') return tPage('sources.sso');
+  if (source === 'import') return tPage('sources.import');
+  if (source === 'datasource') return tPage('sources.datasource');
+  return tPage('sources.manual');
+}
 
 function buildColumns(
   tFields: ReturnType<typeof useTranslations<'common.fields'>>,
@@ -165,6 +175,45 @@ function buildColumns(
         ),
     },
     {
+      key: 'employee_number',
+      label: tFields('employeeNumber'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => <span className="text-gray-500 font-mono text-xs">{u.employee_number || tTable('emDash')}</span>,
+    },
+    {
+      key: 'vip',
+      label: tFields('vip'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => u.vip
+        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium">{tFields('vip')}</span>
+        : <span className="text-gray-400">{tTable('emDash')}</span>,
+    },
+    {
+      key: 'locked_out',
+      label: tFields('lockedOut'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => u.locked_out
+        ? <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700"><span className="w-1.5 h-1.5 rounded-full bg-red-500" />{tFields('lockedOut')}</span>
+        : <span className="text-gray-400">{tTable('emDash')}</span>,
+    },
+    {
+      key: 'source',
+      label: tFields('source'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => <span className="text-gray-600">{userSourceLabel(tPage, u.source)}</span>,
+    },
+    {
+      key: 'last_login_at',
+      label: tFields('lastLogin'),
+      sortable: true,
+      defaultVisible: false,
+      render: (u) => <span className="text-gray-500 text-xs">{u.last_login_at ? formatDateTime(u.last_login_at) : tTable('emDash')}</span>,
+    },
+    {
       key: 'created_at',
       label: tFields('created'),
       sortable: true,
@@ -240,6 +289,7 @@ export default function UsersPage() {
           (u.first_name && u.first_name.toLowerCase().includes(q)) ||
           (u.last_name && u.last_name.toLowerCase().includes(q)) ||
           (u.user_id && u.user_id.toLowerCase().includes(q)) ||
+          (u.employee_number && u.employee_number.toLowerCase().includes(q)) ||
           (u.title && u.title.toLowerCase().includes(q)) ||
           (u.location && u.location.toLowerCase().includes(q)) ||
           u.roles.some((r) => r.toLowerCase().includes(q)) ||

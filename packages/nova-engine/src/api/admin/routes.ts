@@ -873,7 +873,10 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
          u.title, u.phone, u.mobile, u.location, u.timezone, u.time_format, u.date_format,
          u.employee_type, u.company, c.name AS company_name, u.preferred_language,
          u.start_date, u.last_working_date,
-         u.is_active, u.manager_id, u.department_id, u.cost_center_id,
+         u.is_active, u.locked_out, u.locked_at, u.lock_reason,
+         u.failed_login_count, u.last_failed_login_at, u.last_login_at,
+         u.vip, u.employee_number, u.source,
+         u.manager_id, u.department_id, u.cost_center_id,
          u.created_at, u.updated_at,
          m.display_name AS manager_name,
          d.name AS department_name,
@@ -941,6 +944,7 @@ router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Requ
       preferred_language, start_date, last_working_date,
       user_id, email, manager_id, department_id, cost_center_id,
       is_active, role_ids, password,
+      vip, employee_number, locked_out, lock_reason,
     } = req.body;
 
     // Verify user belongs to tenant
@@ -959,7 +963,7 @@ router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Requ
     if (last_name !== undefined) { sets.push(`last_name = $${idx++}`); values.push(last_name || null); }
     if (display_name !== undefined) { sets.push(`display_name = $${idx++}`); values.push(display_name); }
     if (jobTitle !== undefined) { sets.push(`title = $${idx++}`); values.push(jobTitle || null); }
-    if (phone !== undefined) { sets.push(`phone = $${idx++}`); values.push(phone || ''); }
+    if (phone !== undefined) { sets.push(`phone = $${idx++}`); values.push(phone || null); }
     if (mobile !== undefined) { sets.push(`mobile = $${idx++}`); values.push(mobile || ''); }
     if (location !== undefined) { sets.push(`location = $${idx++}`); values.push(location || ''); }
     if (timezone !== undefined) { sets.push(`timezone = $${idx++}`); values.push(timezone || 'UTC'); }
@@ -976,6 +980,20 @@ router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Requ
     if (department_id !== undefined) { sets.push(`department_id = $${idx++}`); values.push(department_id || null); }
     if (cost_center_id !== undefined) { sets.push(`cost_center_id = $${idx++}`); values.push(cost_center_id || null); }
     if (is_active !== undefined) { sets.push(`is_active = $${idx++}`); values.push(is_active); }
+    if (vip !== undefined) { sets.push(`vip = $${idx++}`); values.push(vip); }
+    if (employee_number !== undefined) { sets.push(`employee_number = $${idx++}`); values.push(employee_number || null); }
+    if (locked_out === true) {
+      const reason = typeof lock_reason === 'string' && lock_reason.trim() ? lock_reason.trim() : 'admin';
+      sets.push('locked_out = true');
+      sets.push('locked_at = CASE WHEN locked_out THEN locked_at ELSE now() END');
+      sets.push(`lock_reason = $${idx++}`);
+      values.push(reason);
+    } else if (locked_out === false) {
+      sets.push('locked_out = false');
+      sets.push('locked_at = CASE WHEN locked_out THEN NULL ELSE locked_at END');
+      sets.push('lock_reason = CASE WHEN locked_out THEN NULL ELSE lock_reason END');
+      sets.push('failed_login_count = CASE WHEN locked_out THEN 0 ELSE failed_login_count END');
+    }
 
     if (password) {
       const hash = await bcrypt.hash(password, 10);
@@ -1017,6 +1035,7 @@ router.post('/users', validateBody(adminCreateUserSchema), async (req: Request, 
       title: jobTitle, phone, mobile, location, timezone, time_format, date_format, employee_type,
       company, preferred_language, start_date, last_working_date,
       user_id, manager_id, department_id, cost_center_id, role_ids,
+      vip, employee_number, locked_out, lock_reason,
     } = req.body;
 
     if (!email || !password || !display_name) {
@@ -1035,22 +1054,28 @@ router.post('/users', validateBody(adminCreateUserSchema), async (req: Request, 
           phone, mobile, location, timezone, time_format, date_format,
         employee_type, company, preferred_language,
         start_date, last_working_date,
-        manager_id, department_id, cost_center_id
+        manager_id, department_id, cost_center_id,
+        vip, employee_number, locked_out, locked_at, lock_reason, source
       ) VALUES (
         $1, $2, $3, $4,
         $5, $6, $7, $8,
           $9, $10, $11, $12, $13, $14,
           $15, $16, $17,
           $18, $19,
-          $20, $21, $22
+          $20, $21, $22,
+          $23, $24, $25, CASE WHEN $25 THEN now() ELSE NULL END, $26, 'manual'
       ) RETURNING id`,
       [
         tenantId, user_id || null, email, passwordHash,
         first_name || null, last_name || null, display_name, jobTitle || null,
-        phone || '', mobile || '', location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
+        phone || null, mobile || '', location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
         employee_type || 'employee', company || null, preferred_language || 'en',
         start_date || null, last_working_date || null,
         manager_id || null, department_id || null, cost_center_id || null,
+        vip === true,
+        employee_number || null,
+        locked_out === true,
+        locked_out === true ? ((typeof lock_reason === 'string' && lock_reason.trim()) ? lock_reason.trim() : 'admin') : null,
       ],
     );
 
