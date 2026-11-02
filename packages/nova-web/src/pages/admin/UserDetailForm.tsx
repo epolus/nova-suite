@@ -10,6 +10,7 @@ import type {
 } from '../../api/client';
 import Card from '../../components/Card';
 import UserDateInput from '../../components/UserDateInput';
+import UserAccountStatusSection from './UserAccountStatusSection';
 import type { UserFormState } from './userFormHelpers';
 
 interface UserDetailFormProps {
@@ -119,6 +120,10 @@ export default function UserDetailForm({
               <input type="text" value={form.user_id} onChange={(e) => set('user_id', e.target.value)} placeholder={t('placeholders.employeeId')} className={inputCls} />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">{tFields('employeeNumber')}</label>
+              <input type="text" value={form.employee_number} onChange={(e) => set('employee_number', e.target.value)} placeholder={t('placeholders.employeeNumber')} className={inputCls} />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">{t('fields.displayNameRequired')}</label>
               <input
                 required
@@ -204,6 +209,12 @@ export default function UserDetailForm({
         <fieldset>
           <legend className="text-sm font-semibold text-gray-700 mb-3">{t('sections.employment')}</legend>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={form.vip} onChange={(e) => set('vip', e.target.checked)} />
+                {tFields('vip')}
+              </label>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">{t('fields.employeeType')}</label>
               <select value={form.employee_type} onChange={(e) => set('employee_type', e.target.value)} className={selectCls}>
@@ -334,24 +345,12 @@ export default function UserDetailForm({
         </fieldset>
 
         {!isNew && (
-          <fieldset>
-            <legend className="text-sm font-semibold text-gray-700 mb-3">{t('sections.accountStatus')}</legend>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={form.is_active}
-                  onChange={(e) => set('is_active', e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-10 h-5 bg-gray-200 rounded-full peer-checked:bg-indigo-600 transition-colors" />
-                <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm peer-checked:translate-x-5 transition-transform" />
-              </div>
-              <span className="text-sm text-gray-700">
-                {form.is_active ? t('activeCanLogin') : t('inactiveCannotLogin')}
-              </span>
-            </label>
-          </fieldset>
+          <UserAccountStatusSection
+            form={form}
+            set={set}
+            currentUser={currentUser}
+            inputCls={inputCls}
+          />
         )}
       </form>
     </Card>

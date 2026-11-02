@@ -63,6 +63,13 @@
       "description": "Descrizione",
       "email": "E-mail",
       "phone": "Telefono",
+      "employeeNumber": "Numero dipendente",
+      "vip": "VIP",
+      "lockedOut": "Bloccato",
+      "lockReason": "Motivo del blocco",
+      "lastLogin": "Ultimo accesso",
+      "failedLoginCount": "Tentativi falliti",
+      "lockedAt": "Bloccato il",
       "location": "Posizione",
       "status": "Stato",
       "priority": "Priorità",
@@ -345,6 +352,7 @@
       "detailTitle": "Dettagli dell'incidente",
       "summary": "Riepilogo",
       "callerProfile": "Profilo del chiamante",
+      "vip": "VIP",
       "journal": "Diario",
       "attachments": "Allegati",
       "insights": "Approfondimenti",
@@ -420,6 +428,32 @@
     "admin": {
       "title": "Amministrazione",
       "users": "Gestire utenti, ruoli e struttura organizzativa.",
+      "userDetail": {
+        "lockedCannotLogin": "Bloccato -- l'accesso resta bloccato finché un admin sblocca l'account",
+        "unlockedCanLogin": "Non bloccato",
+        "sources": {
+          "manual": "Manuale",
+          "sso": "SSO",
+          "import": "Importazione",
+          "datasource": "Origine dati"
+        },
+        "lockReasons": {
+          "failed_logins": "Troppi tentativi di accesso non riusciti",
+          "admin": "Bloccato da un amministratore"
+        },
+        "placeholders": {
+          "employeeNumber": "es. 100234",
+          "lockReason": "Perché questo account è bloccato"
+        }
+      },
+      "usersPage": {
+        "sources": {
+          "manual": "Manuale",
+          "sso": "SSO",
+          "import": "Importazione",
+          "datasource": "Origine dati"
+        }
+      },
       "assignmentGroups": "Gestire gruppi di assegnazione e appartenenze.",
       "theming": {
         "title": "Tema e branding",

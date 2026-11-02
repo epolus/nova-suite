@@ -508,14 +508,16 @@ async function commitRow(
           phone, mobile, location, timezone, time_format, date_format,
           employee_type, company, preferred_language,
           start_date, last_working_date,
-          manager_id, department_id, cost_center_id, is_active
+          manager_id, department_id, cost_center_id, is_active,
+          vip, employee_number, source
         ) VALUES (
           current_tenant_id(), $1, $2, $3,
           $4, $5, $6, $7,
           $8, $9, $10, $11, $12, $13,
           $14, $15, $16,
           $17, $18,
-          $19, $20, $21, $22
+          $19, $20, $21, $22,
+          $23, $24, 'import'
         ) RETURNING id`,
         [
           data.user_id || null, data.email, passwordHash,
@@ -525,6 +527,8 @@ async function commitRow(
           data.start_date || null, data.last_working_date || null,
           data.manager_id || null, data.department_id || null, data.cost_center_id || null,
           data.is_active ?? true,
+          data.vip ?? false,
+          data.employee_number || null,
         ],
       );
       // Handle roles

@@ -190,7 +190,7 @@ router.get('/callers', async (req: Request, res: Response, next: NextFunction) =
   try {
     const client = getRequestClient(req);
     const result = await client.query(
-      `SELECT u.id, u.email, u.display_name, u.user_id, u.phone, u.mobile,
+      `SELECT u.id, u.email, u.display_name, u.user_id, u.phone, u.mobile, u.vip,
               COALESCE(
                 array_agg(r.name ORDER BY r.name) FILTER (WHERE r.name IS NOT NULL),
                 ARRAY[]::text[]
@@ -1064,6 +1064,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
               c.email AS caller_email,
               c.phone AS caller_phone,
               c.mobile AS caller_mobile,
+              c.vip AS caller_vip,
               cd.name AS caller_department_name,
               ci.name AS ci_name,
               ci.display_name AS ci_display_name,

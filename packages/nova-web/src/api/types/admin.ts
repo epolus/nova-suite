@@ -16,6 +16,7 @@ export interface UserListItem {
   user_id: string | null;
   phone?: string | null;
   mobile?: string | null;
+  vip?: boolean;
   roles: string[];
 }
 
@@ -40,6 +41,15 @@ export interface AdminUser {
   start_date: string | null;
   last_working_date: string | null;
   is_active: boolean;
+  locked_out: boolean;
+  locked_at: string | null;
+  lock_reason: string | null;
+  failed_login_count: number;
+  last_failed_login_at: string | null;
+  last_login_at: string | null;
+  vip: boolean;
+  employee_number: string | null;
+  source: 'manual' | 'sso' | 'import' | 'datasource';
   manager_id: string | null;
   department_id: string | null;
   cost_center_id: string | null;
@@ -146,6 +156,10 @@ export interface CreateUserPayload {
   title?: string;
   phone?: string;
   mobile?: string;
+  vip?: boolean;
+  employee_number?: string;
+  locked_out?: boolean;
+  lock_reason?: string;
   location?: string;
   timezone?: string;
   time_format?: '12h' | '24h';
@@ -248,6 +262,10 @@ export interface UpdateUserPayload {
   last_working_date?: string | null;
   email?: string;
   user_id?: string | null;
+  employee_number?: string | null;
+  vip?: boolean;
+  locked_out?: boolean;
+  lock_reason?: string | null;
   password?: string;
   manager_id?: string | null;
   department_id?: string | null;

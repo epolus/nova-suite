@@ -64,6 +64,13 @@
       "description": "Description",
       "email": "Email",
       "phone": "Phone",
+      "employeeNumber": "Employee Number",
+      "vip": "VIP",
+      "lockedOut": "Locked Out",
+      "lockReason": "Lock Reason",
+      "lastLogin": "Last Login",
+      "failedLoginCount": "Failed Logins",
+      "lockedAt": "Locked At",
       "location": "Location",
       "status": "Status",
       "priority": "Priority",
@@ -625,6 +632,7 @@
       "contactInfo": "Contact Info",
       "additionalContactInfo": "Additional contact info...",
       "searchUser": "Search user...",
+      "vip": "VIP",
       "searchService": "Search service...",
       "searchCi": "Search CI...",
       "searchProblem": "Search problem...",
@@ -2963,6 +2971,7 @@
           "displayName": "Display Name",
           "displayNameRequired": "Display Name *",
           "employeeId": "Employee ID",
+          "employeeNumber": "Employee Number",
           "userId": "User ID",
           "password": "Password",
           "passwordRequired": "Password *",
@@ -2999,7 +3008,9 @@
           "displayNameAuto": "Auto: Lastname, Firstname (ID)",
           "password": "Leave blank to keep unchanged",
           "passwordKeep": "Leave blank to keep current",
-          "phone": "+41",
+          "phone": "+41791234567",
+          "employeeNumber": "e.g. 100234",
+          "lockReason": "Why this account is locked",
           "mobile": "+41 0 1234 5678",
           "jobTitle": "e.g. Senior Engineer",
           "location": "Zurich",
@@ -3009,6 +3020,18 @@
         "noRolesSelected": "No roles selected. User will have no permissions.",
         "activeCanLogin": "Active -- user can log in",
         "inactiveCannotLogin": "Inactive -- user cannot log in",
+        "lockedCannotLogin": "Locked out -- sign-in is blocked until an admin unlocks this account",
+        "unlockedCanLogin": "Not locked",
+        "sources": {
+          "manual": "Manual",
+          "sso": "SSO",
+          "import": "Import",
+          "datasource": "Data source"
+        },
+        "lockReasons": {
+          "failed_logins": "Too many failed sign-in attempts",
+          "admin": "Locked by an administrator"
+        },
         "passwordRequired": "Password is required for new users",
         "confirmDeleteNamed": "Delete user \"{name}\"? This cannot be undone.",
         "deleting": "Deleting...",
@@ -3043,7 +3066,13 @@
         "count": "{count, plural, one {# user} other {# users}}",
         "empty": "No users found.",
         "emptySearch": "No users matching \"{query}\"",
-        "noRoles": "No roles"
+        "noRoles": "No roles",
+        "sources": {
+          "manual": "Manual",
+          "sso": "SSO",
+          "import": "Import",
+          "datasource": "Data source"
+        }
       },
       "assignmentGroupsPage": {
         "title": "Assignment Groups",
