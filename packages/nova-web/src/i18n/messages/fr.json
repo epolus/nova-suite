@@ -454,6 +454,13 @@
           "datasource": "Source de données"
         }
       },
+      "dataSources": {
+        "searchPlaceholder": "Rechercher des sources de données...",
+        "count": "{count, plural, one {# source de données} other {# sources de données}}",
+        "emptySearch": "Aucune source de données correspondant à « {query} »",
+        "filterScheduled": "Planifié",
+        "filterManual": "Manuel"
+      },
       "assignmentGroups": "Gérez les groupes d'affectation et les adhésions.",
       "theming": {
         "title": "Thème et identité",

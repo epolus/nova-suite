@@ -30,6 +30,10 @@ export const config = {
   credentials: {
     masterKey: env('CREDENTIALS_MASTER_KEY', ''),
   },
+  engine: {
+    baseUrl: env('NOVA_ENGINE_URL', 'http://nova-engine:4000'),
+    automationKey: env('CATALOG_AUTOMATION_SHARED_KEY', ''),
+  },
   notifications: {
     emailEnabled: env('MAIL_NOTIFICATIONS_ENABLED', 'false') === 'true',
     sender: env('MAIL_FROM', 'no-reply@nova.local'),

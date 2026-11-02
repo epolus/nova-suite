@@ -91,14 +91,83 @@ async function resolveSourceConfigSecrets(
   return next;
 }
 
+type DataSourceSyncNotice = {
+  dataSourceId: string;
+  runId: string;
+  name: string;
+  entityType: string;
+  status: 'firing' | 'resolved';
+  error?: string;
+};
+
+async function hasOpenDataSourceAlert(client: PoolClient, dataSourceId: string): Promise<boolean> {
+  const open = await client.query(
+    `SELECT id
+     FROM alerts
+     WHERE source = 'data_source'
+       AND fingerprint = $1
+       AND status = 'firing'
+     LIMIT 1`,
+    [dataSourceId],
+  );
+  return open.rows.length > 0;
+}
+
+async function publishDataSourceSyncEvent(tenantId: string, notice: DataSourceSyncNotice): Promise<void> {
+  const key = config.engine.automationKey;
+  if (!key) {
+    log.warn('Skipping data source sync event: CATALOG_AUTOMATION_SHARED_KEY is not set', {
+      dataSourceId: notice.dataSourceId,
+      status: notice.status,
+    });
+    return;
+  }
+  const title = notice.status === 'firing'
+    ? `Data source sync failed: ${notice.name}`
+    : `Data source sync recovered: ${notice.name}`;
+  const response = await fetch(`${config.engine.baseUrl.replace(/\/$/, '')}/api/internal/events`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-automation-key': key,
+    },
+    body: JSON.stringify({
+      tenant_id: tenantId,
+      source: 'data_source',
+      fingerprint: notice.dataSourceId,
+      event_id: notice.status === 'resolved' ? `${notice.runId}:resolved` : notice.runId,
+      status: notice.status,
+      severity: 'warning',
+      title,
+      labels: {
+        data_source_id: notice.dataSourceId,
+        name: notice.name,
+        entity_type: notice.entityType,
+        trigger: 'scheduled',
+      },
+      ...(notice.error ? { error: notice.error.slice(0, 500) } : {}),
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    log.warn('Data source sync event was rejected', {
+      dataSourceId: notice.dataSourceId,
+      status: response.status,
+      body: body.slice(0, 300),
+    });
+  }
+}
+
 export async function runDataSourceImport(
   dataSourceId: string,
   tenantId: string,
   triggerType: 'manual' | 'scheduled',
 ): Promise<void> {
   log.info('Starting data source import', { dataSourceId, triggerType });
+  let notice: DataSourceSyncNotice | null = null;
 
-  return withTenantContext(tenantId, async (client) => {
+  try {
+  await withTenantContext(tenantId, async (client) => {
     const dsRes = await client.query<DataSourceRow>(
       `SELECT * FROM data_sources WHERE id = $1`,
       [dataSourceId],
@@ -111,6 +180,7 @@ export async function runDataSourceImport(
       row.source_config as SourceConfig,
     );
     const ds: DataSourceRow = { ...row, source_config };
+    const sourceName = typeof row.name === 'string' && row.name.trim() ? row.name : 'Data source';
 
     const runRows = await client.query<{ id: string }>(
       `INSERT INTO data_source_runs (data_source_id, tenant_id, status, trigger_type)
@@ -129,6 +199,9 @@ export async function runDataSourceImport(
           `UPDATE data_sources SET last_run_at = now(), last_run_status = 'completed' WHERE id = $1`,
           [dataSourceId],
         );
+        if (triggerType === 'scheduled' && await hasOpenDataSourceAlert(client, dataSourceId)) {
+          notice = { dataSourceId, runId, name: sourceName, entityType: ds.entity_type, status: 'resolved' };
+        }
         return;
       }
 
@@ -213,6 +286,9 @@ export async function runDataSourceImport(
         `UPDATE data_sources SET last_run_at = now(), last_run_status = 'completed' WHERE id = $1`,
         [dataSourceId],
       );
+      if (triggerType === 'scheduled' && await hasOpenDataSourceAlert(client, dataSourceId)) {
+        notice = { dataSourceId, runId, name: sourceName, entityType: ds.entity_type, status: 'resolved' };
+      }
 
       log.info('Data source import completed', { dataSourceId, total: rawData.length, committed, errors, skipped });
     } catch (err) {
@@ -223,9 +299,21 @@ export async function runDataSourceImport(
         `UPDATE data_sources SET last_run_at = now(), last_run_status = 'failed' WHERE id = $1`,
         [dataSourceId],
       );
+      if (triggerType === 'scheduled') {
+        notice = { dataSourceId, runId, name: sourceName, entityType: ds.entity_type, status: 'firing', error: msg };
+      }
       throw err;
     }
   });
+  } finally {
+    if (notice) {
+      try {
+        await publishDataSourceSyncEvent(tenantId, notice);
+      } catch (err) {
+        log.warn('Failed to publish data source sync event', { dataSourceId, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  }
 }
 
 async function fetchData(ds: DataSourceRow): Promise<Record<string, string>[]> {

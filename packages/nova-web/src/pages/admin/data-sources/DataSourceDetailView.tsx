@@ -16,6 +16,7 @@ interface DataSourceDetailViewProps {
   onBack: () => void;
   onRun: (ds: DataSource) => void;
   onEdit: (ds: DataSource) => void;
+  onDelete: (id: string) => void;
   onRefresh: () => void;
   onToggleExpand: (id: string | null) => void;
 }
@@ -29,6 +30,7 @@ export default function DataSourceDetailView({
   onBack,
   onRun,
   onEdit,
+  onDelete,
   onRefresh,
   onToggleExpand,
 }: DataSourceDetailViewProps) {
@@ -43,12 +45,45 @@ export default function DataSourceDetailView({
         title={selectedDs.name}
         description={t('detailDescription')}
         action={
-          <button
-            onClick={onBack}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
-          >
-            {t('backToList')}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onBack}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {t('backToList')}
+            </button>
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={runsLoading}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {tActions('refresh')}
+            </button>
+            <button
+              type="button"
+              onClick={() => onEdit(selectedDs)}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {tActions('edit')}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(selectedDs.id)}
+              className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+            >
+              {tActions('delete')}
+            </button>
+            <button
+              type="button"
+              onClick={() => onRun(selectedDs)}
+              disabled={runningId === selectedDs.id}
+              className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {runningId === selectedDs.id ? t('starting') : t('runNowButton')}
+            </button>
+          </div>
         }
       />
 
@@ -74,29 +109,6 @@ export default function DataSourceDetailView({
             <span className="text-sm text-gray-500">{formatDate(selectedDs.last_run_at, tTable('emDash'))}</span>
           </div>
         </Card>
-      </div>
-
-      <div className="flex items-center gap-3 mb-4">
-        <button
-          onClick={() => onRun(selectedDs)}
-          disabled={runningId === selectedDs.id}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {runningId === selectedDs.id ? t('starting') : t('runNowButton')}
-        </button>
-        <button
-          onClick={() => onEdit(selectedDs)}
-          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
-        >
-          {tActions('edit')}
-        </button>
-        <button
-          onClick={onRefresh}
-          disabled={runsLoading}
-          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
-        >
-          {tActions('refresh')}
-        </button>
       </div>
 
       <Card>

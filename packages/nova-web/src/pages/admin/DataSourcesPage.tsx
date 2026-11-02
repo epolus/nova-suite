@@ -235,6 +235,10 @@ export default function DataSourcesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm(t('confirmDelete'))) return;
     await api.delete(id);
+    if (selectedDs?.id === id) {
+      setSelectedDs(null);
+      setView('list');
+    }
     await loadSources();
   };
 
@@ -286,6 +290,7 @@ export default function DataSourcesPage() {
         onBack={() => { setView('list'); setSelectedDs(null); }}
         onRun={handleRun}
         onEdit={openEdit}
+        onDelete={handleDelete}
         onRefresh={refreshRuns}
         onToggleExpand={setExpandedRunId}
       />
@@ -319,12 +324,8 @@ export default function DataSourcesPage() {
   return (
     <DataSourceListView
       sources={sources}
-      runningId={runningId}
       onCreate={openCreate}
       onOpen={openDetail}
-      onRun={handleRun}
-      onEdit={openEdit}
-      onDelete={handleDelete}
     />
   );
 }

@@ -39,6 +39,33 @@ describe('alert inbound', () => {
     expect(parseInboundAlerts({ type: 'event_callback', event: { type: 'message' } })).toBeNull();
   });
 
+  it('accepts a scheduled data source sync failure', () => {
+    const parsed = parseInboundAlerts({
+      tenant_id: 'a0000000-0000-0000-0000-000000000001',
+      source: 'data_source',
+      fingerprint: 'ds-1',
+      event_id: 'run-1',
+      status: 'firing',
+      severity: 'warning',
+      title: 'Data source sync failed: HR User Sync',
+      labels: {
+        data_source_id: 'ds-1',
+        name: 'HR User Sync',
+        entity_type: 'user',
+        trigger: 'scheduled',
+      },
+    });
+    expect(parsed?.[0]).toMatchObject({
+      source: 'data_source',
+      fingerprint: 'ds-1',
+      externalEventId: 'run-1',
+      status: 'firing',
+      severity: 'warning',
+      ciKeys: [],
+      labels: { trigger: 'scheduled', data_source_id: 'ds-1' },
+    });
+  });
+
   it('matches labels case-insensitively', () => {
     expect(labelsMatch({ alertname: 'DiskFull' }, { alertname: 'diskfull' })).toBe(true);
     expect(labelsMatch({ alertname: 'DiskFull' }, { alertname: 'Cpu' })).toBe(false);

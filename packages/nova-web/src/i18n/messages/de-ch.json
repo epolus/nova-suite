@@ -454,6 +454,13 @@
           "datasource": "Datenquelle"
         }
       },
+      "dataSources": {
+        "searchPlaceholder": "Datenquellen suchen...",
+        "count": "{count, plural, one {# Datenquelle} other {# Datenquellen}}",
+        "emptySearch": "Keine Datenquellen für „{query}“",
+        "filterScheduled": "Geplant",
+        "filterManual": "Manuell"
+      },
       "assignmentGroups": "Aufgabengruppen und Mitgliedschaften verwalten.",
       "theming": {
         "title": "Theming & Branding",
