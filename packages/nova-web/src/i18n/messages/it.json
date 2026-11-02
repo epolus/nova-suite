@@ -454,6 +454,13 @@
           "datasource": "Origine dati"
         }
       },
+      "dataSources": {
+        "searchPlaceholder": "Cerca fonti dati...",
+        "count": "{count, plural, one {# fonte dati} other {# fonti dati}}",
+        "emptySearch": "Nessuna fonte dati corrispondente a \"{query}\"",
+        "filterScheduled": "Pianificata",
+        "filterManual": "Manuale"
+      },
       "assignmentGroups": "Gestire gruppi di assegnazione e appartenenze.",
       "theming": {
         "title": "Tema e branding",

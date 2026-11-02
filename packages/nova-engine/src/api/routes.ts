@@ -35,6 +35,7 @@ import aiRoutes from './ai/routes';
 import analyticsRoutes from './analytics/routes';
 import inboundWebhookRoutes from './webhooks/inbound';
 import alertRoutes from './alerts/routes';
+import internalEventRoutes from './internal/events';
 
 const router = Router();
 
@@ -72,5 +73,6 @@ router.use('/analytics', analyticsRoutes);
 router.use('/ai', aiRoutes);
 router.use('/webhooks', inboundWebhookRoutes);
 router.use('/alerts', alertRoutes);
+router.use('/internal', internalEventRoutes);
 
 export default router;

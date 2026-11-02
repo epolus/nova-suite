@@ -59,6 +59,13 @@ export default function DataSourceFormView({
   ], [t]);
 
   const entityFields = entities.find((e) => e.key === form.entity_type)?.fields || [];
+  const sourceReady = form.source_type === 'intune'
+    ? true
+    : form.source_type === 'sftp'
+      ? Boolean(form.sftp_host && form.sftp_path)
+      : Boolean(form.url);
+  const canSave = !saving && Boolean(form.name) && Boolean(form.entity_type) && sourceReady;
+  const canTest = !testingSource && Boolean(form.entity_type) && sourceReady;
 
   return (
     <>
@@ -66,14 +73,44 @@ export default function DataSourceFormView({
         title={editId ? t('editTitle') : t('newTitle')}
         description={editId ? t('edit') : t('new')}
         action={
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
-          >
-            {tActions('cancel')}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onTest}
+              disabled={!canTest}
+              className="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50"
+            >
+              {testingSource ? t('testing') : t('testSource')}
+            </button>
+            <button
+              type="button"
+              onClick={onSaveAndClose}
+              disabled={!canSave}
+              className="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50"
+            >
+              {t('saveAndClose')}
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {tActions('cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={!canSave}
+              className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {saving ? tActions('saving') : tActions('save')}
+            </button>
+          </div>
         }
       />
+      {saveMessage ? (
+        <p className={`mb-4 text-sm ${saveOk ? 'text-green-700' : 'text-red-700'}`}>{saveMessage}</p>
+      ) : null}
 
       <div className="max-w-3xl space-y-6">
         <DataSourceBasicFields form={form} setField={setField} entities={entities} />
@@ -150,67 +187,6 @@ export default function DataSourceFormView({
             )}
           </div>
         </Card>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={onTest}
-            disabled={
-              testingSource
-              || !form.entity_type
-              || (form.source_type === 'intune'
-                ? false
-                : form.source_type === 'sftp'
-                  ? (!form.sftp_host || !form.sftp_path)
-                  : !form.url)
-            }
-            className="px-6 py-2.5 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 transition-colors"
-          >
-            {testingSource ? t('testing') : t('testSource')}
-          </button>
-          <button
-            onClick={onSave}
-            disabled={
-              saving
-              || !form.name
-              || !form.entity_type
-              || (form.source_type === 'intune'
-                ? false
-                : form.source_type === 'sftp'
-                  ? (!form.sftp_host || !form.sftp_path)
-                  : !form.url)
-            }
-            className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-          >
-            {saving ? tActions('saving') : tActions('save')}
-          </button>
-          <button
-            onClick={onSaveAndClose}
-            disabled={
-              saving
-              || !form.name
-              || !form.entity_type
-              || (form.source_type === 'intune'
-                ? false
-                : form.source_type === 'sftp'
-                  ? (!form.sftp_host || !form.sftp_path)
-                  : !form.url)
-            }
-            className="px-6 py-2.5 border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 transition-colors"
-          >
-            {t('saveAndClose')}
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
-          >
-            {tActions('cancel')}
-          </button>
-          {saveMessage ? (
-            <span className={`text-sm ${saveOk ? 'text-green-700' : 'text-red-700'}`}>
-              {saveMessage}
-            </span>
-          ) : null}
-        </div>
 
         {(testError || testResult) && (
           <Card>
