@@ -1173,6 +1173,8 @@ async function upsertDataSource(
     }
   }
 
+  const scheduleEnabled = source.source_type === 'intune' ? false : source.schedule_enabled;
+
   const row = await client.query<{ id: string }>(
     `INSERT INTO data_sources (
        tenant_id, external_key, name, description, entity_type, source_type,
@@ -1206,7 +1208,7 @@ async function upsertDataSource(
       JSON.stringify(mergedConfig),
       JSON.stringify(source.column_mapping || {}),
       source.schedule_cron,
-      source.schedule_enabled,
+      scheduleEnabled,
       source.import_mode,
       source.upsert_key || null,
       userId,
@@ -1295,7 +1297,7 @@ export async function applyBundle(
       const upserted = await upsertDataSource(client, tenantId, userId, source);
       applied.data_sources += 1;
       try {
-        if (source.schedule_enabled) {
+        if (source.schedule_enabled && source.source_type !== 'intune') {
           await enqueueDataSourceScheduleStartJob({
             dataSourceId: upserted.id,
             tenantId,

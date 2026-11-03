@@ -16,6 +16,7 @@ import { openApiSpec } from './openapi';
 import { cacheMetrics, cacheShutdown } from './cache/redis';
 import {
   getWorkflowStartQueueStats,
+  reconcileDataSourceSchedules,
   startWorkflowStartQueueDispatcher,
   stopWorkflowStartQueueDispatcher,
 } from './temporal/workflow-start-queue';
@@ -233,6 +234,9 @@ async function bootstrap(): Promise<void> {
   if (schemaCheck.ok) {
     startWorkflowStartQueueDispatcher();
     workflowDispatcherStarted = true;
+    void reconcileDataSourceSchedules().catch((err) => {
+      logger.warn({ err }, 'Data source schedule reconcile failed; enabled schedules will retry on the next engine start');
+    });
     await ensureSnapshotSchedulesStarted();
     if (
       dbSizeSnapshotScheduleStatus !== 'running'
