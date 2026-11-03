@@ -1,5 +1,12 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { Connection, Client, WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
+import {
+  Connection,
+  Client,
+  ScheduleAlreadyRunning,
+  ScheduleNotFoundError,
+  ScheduleOverlapPolicy,
+  WorkflowExecutionAlreadyStartedError,
+} from '@temporalio/client';
 import { config } from '../config';
 import { logger } from '../logger';
 
@@ -143,42 +150,116 @@ export async function signalTaskCompleted(
   }
 }
 
+const DATA_SOURCE_RUN_TIMEOUT = '2 hours' as const;
+
+export function dataSourceScheduleId(dataSourceId: string): string {
+  return `datasource-schedule-${dataSourceId}`;
+}
+
+function dataSourceScheduleAction(params: { dataSourceId: string; tenantId: string }) {
+  return {
+    type: 'startWorkflow' as const,
+    workflowType: 'dataSourceSync',
+    taskQueue: TASK_QUEUE,
+    workflowId: `datasource-scheduled-${params.dataSourceId}`,
+    args: [{
+      dataSourceId: params.dataSourceId,
+      tenantId: params.tenantId,
+      triggerType: 'scheduled' as const,
+    }],
+    // Each scheduled run is its own workflow. This timeout bounds that run,
+    // not the lifetime of the schedule.
+    workflowExecutionTimeout: DATA_SOURCE_RUN_TIMEOUT,
+    workflowRunTimeout: DATA_SOURCE_RUN_TIMEOUT,
+  };
+}
+
+async function terminateLegacyDataSourceCron(cl: Client, dataSourceId: string): Promise<void> {
+  // Older builds registered a cron workflow under this id. Cron cancel only
+  // stops the current run, and a short execution timeout closed the chain
+  // before the next tick. Terminate so a Schedule is the only timer left.
+  try {
+    const handle = cl.workflow.getHandle(dataSourceScheduleId(dataSourceId));
+    await handle.terminate('Replaced by data source Schedule');
+  } catch {
+    // No legacy cron workflow is open.
+  }
+}
+
+async function ensureDataSourceSchedule(params: {
+  dataSourceId: string;
+  tenantId: string;
+  cronSchedule?: string;
+}): Promise<string> {
+  const cronSchedule = params.cronSchedule?.trim() || '0 2 * * *';
+  const scheduleId = dataSourceScheduleId(params.dataSourceId);
+  const cl = await getClient();
+  await terminateLegacyDataSourceCron(cl, params.dataSourceId);
+
+  const action = dataSourceScheduleAction(params);
+  const policies = {
+    overlap: ScheduleOverlapPolicy.SKIP,
+    catchupWindow: '1 day' as const,
+    pauseOnFailure: false,
+  };
+
+  try {
+    await cl.schedule.create({
+      scheduleId,
+      spec: { cronExpressions: [cronSchedule] },
+      action,
+      policies,
+    });
+    logger.info({ scheduleId, dataSourceId: params.dataSourceId, cronSchedule }, 'Created data source schedule');
+  } catch (err) {
+    if (!(err instanceof ScheduleAlreadyRunning)) throw err;
+    const handle = cl.schedule.getHandle(scheduleId);
+    await handle.update((previous) => ({
+      spec: { cronExpressions: [cronSchedule] },
+      action,
+      policies: {
+        ...previous.policies,
+        ...policies,
+      },
+      state: {
+        paused: false,
+        note: 'Data source sync schedule',
+      },
+    }));
+    logger.info({ scheduleId, dataSourceId: params.dataSourceId, cronSchedule }, 'Updated data source schedule');
+  }
+
+  return scheduleId;
+}
+
 export async function startDataSourceSync(params: {
   dataSourceId: string;
   tenantId: string;
   cronSchedule?: string;
   immediate?: boolean;
 }): Promise<string> {
-  const workflowId = params.immediate
-    ? `datasource-run-${params.dataSourceId}-${Date.now()}`
-    : `datasource-schedule-${params.dataSourceId}`;
+  if (!params.immediate) {
+    try {
+      return await ensureDataSourceSchedule(params);
+    } catch (err) {
+      logger.error({ err, dataSourceId: params.dataSourceId }, 'Failed to start data source schedule');
+      throw err;
+    }
+  }
+
+  const workflowId = `datasource-run-${params.dataSourceId}-${Date.now()}`;
   try {
     const cl = await getClient();
-
-    // Cancel existing scheduled workflow if re-scheduling
-    if (!params.immediate) {
-      try {
-        const existing = cl.workflow.getHandle(workflowId);
-        await existing.cancel();
-      } catch { /* no existing workflow */ }
-    }
-
-    const opts: Record<string, unknown> = {
+    const handle = await cl.workflow.start('dataSourceSync', {
       taskQueue: TASK_QUEUE,
       workflowId,
       args: [{
         dataSourceId: params.dataSourceId,
         tenantId: params.tenantId,
-        triggerType: params.immediate ? 'manual' : 'scheduled',
+        triggerType: 'manual',
       }],
-      workflowExecutionTimeout: '2 hours',
-    };
-
-    if (!params.immediate && params.cronSchedule) {
-      opts.cronSchedule = params.cronSchedule;
-    }
-
-    const handle = await cl.workflow.start('dataSourceSync', opts as any);
+      workflowExecutionTimeout: DATA_SOURCE_RUN_TIMEOUT,
+    });
     logger.info({ workflowId: handle.workflowId, dataSourceId: params.dataSourceId }, 'Started data source sync workflow');
     return handle.workflowId;
   } catch (err) {
@@ -192,11 +273,18 @@ export async function startDataSourceSync(params: {
 }
 
 export async function cancelDataSourceSchedule(dataSourceId: string): Promise<void> {
+  const scheduleId = dataSourceScheduleId(dataSourceId);
   try {
     const cl = await getClient();
-    const handle = cl.workflow.getHandle(`datasource-schedule-${dataSourceId}`);
-    await handle.cancel();
-    logger.info({ dataSourceId }, 'Cancelled data source schedule');
+    try {
+      await cl.schedule.getHandle(scheduleId).delete();
+      logger.info({ dataSourceId, scheduleId }, 'Deleted data source schedule');
+    } catch (err) {
+      if (!(err instanceof ScheduleNotFoundError)) {
+        logger.warn({ err, dataSourceId, scheduleId }, 'Could not delete data source schedule');
+      }
+    }
+    await terminateLegacyDataSourceCron(cl, dataSourceId);
   } catch (err) {
     logger.warn({ err, dataSourceId }, 'Could not cancel data source schedule (may not exist)');
   }

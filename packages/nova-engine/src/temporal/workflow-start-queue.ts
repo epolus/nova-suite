@@ -2,6 +2,7 @@
 import { db } from '../data/db';
 import { logger } from '../logger';
 import {
+  cancelDataSourceSchedule,
   checkTemporalHealth,
   startCatalogFulfillment,
   startDataSourceSync,
@@ -85,9 +86,13 @@ let dispatcherTimer: NodeJS.Timeout | null = null;
 let dispatcherRunning = false;
 
 async function withSystemClient<T>(fn: (queryable: Queryable) => Promise<T>): Promise<T> {
+  return withTenantSystemClient(SYSTEM_TENANT_ID, fn);
+}
+
+async function withTenantSystemClient<T>(tenantId: string, fn: (queryable: Queryable) => Promise<T>): Promise<T> {
   const client = await db.getClient();
   try {
-    await db.setTenantContext(client, SYSTEM_TENANT_ID, SYSTEM_USER_ID, SYSTEM_ROLES);
+    await db.setTenantContext(client, tenantId, SYSTEM_USER_ID, SYSTEM_ROLES);
     return await fn(client);
   } finally {
     await db.clearTenantContext(client).catch(() => undefined);
@@ -173,6 +178,19 @@ function isDataSourceSchedulePayload(value: unknown): value is DataSourceSchedul
   return typeof v.dataSourceId === 'string' && (v.cronSchedule === undefined || typeof v.cronSchedule === 'string');
 }
 
+async function isDataSourceScheduleEnabled(tenantId: string, dataSourceId: string): Promise<boolean> {
+  return withTenantSystemClient(tenantId, async (queryable) => {
+    const result = await queryable.query(
+      `SELECT schedule_enabled, source_type
+       FROM data_sources
+       WHERE id = $1`,
+      [dataSourceId],
+    ) as { rows: { schedule_enabled: boolean; source_type: string }[] };
+    const row = result.rows[0];
+    return !!row && row.schedule_enabled === true && row.source_type !== 'intune';
+  });
+}
+
 function isKnowledgeApprovalPayload(value: unknown): value is KnowledgeApprovalPayload {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const v = value as Record<string, unknown>;
@@ -252,7 +270,8 @@ async function markJobCompleted(jobId: string): Promise<void> {
          locked_at = NULL,
          last_error = NULL,
          updated_at = now()
-     WHERE id = $1`,
+     WHERE id = $1
+       AND status = 'processing'`,
     [jobId],
   );
 }
@@ -268,7 +287,8 @@ async function markJobFailed(job: WorkflowStartJobRow, errorMessage: string): Pr
            locked_at = NULL,
            last_error = $3,
            updated_at = now()
-       WHERE id = $1`,
+       WHERE id = $1
+         AND status = 'processing'`,
       [job.id, nextAttemptCount, errorMessage],
     );
     return;
@@ -283,7 +303,8 @@ async function markJobFailed(job: WorkflowStartJobRow, errorMessage: string): Pr
          locked_at = NULL,
          last_error = $4,
          updated_at = now()
-     WHERE id = $1`,
+     WHERE id = $1
+       AND status = 'processing'`,
     [job.id, nextAttemptCount, retryDelaySeconds, errorMessage],
   );
 }
@@ -350,6 +371,12 @@ async function processJob(job: WorkflowStartJobRow): Promise<void> {
     if (job.job_type === 'datasource_schedule_start') {
       if (!isDataSourceSchedulePayload(job.payload)) {
         throw new Error('Invalid payload for data source schedule workflow start job');
+      }
+      const stillEnabled = await isDataSourceScheduleEnabled(job.tenant_id, job.payload.dataSourceId);
+      if (!stillEnabled) {
+        await cancelDataSourceSchedule(job.payload.dataSourceId);
+        await markJobCompleted(job.id);
+        return;
       }
       await startDataSourceSync({
         dataSourceId: job.payload.dataSourceId,
@@ -567,10 +594,12 @@ export async function enqueueDataSourceScheduleStartJob(params: {
      ON CONFLICT (tenant_id, job_type, workflow_id)
      DO UPDATE SET
        payload = EXCLUDED.payload,
-       status = CASE WHEN workflow_start_jobs.status = 'completed' THEN workflow_start_jobs.status ELSE 'pending' END,
-       next_attempt_at = CASE WHEN workflow_start_jobs.status = 'completed' THEN workflow_start_jobs.next_attempt_at ELSE now() END,
-       locked_at = CASE WHEN workflow_start_jobs.status = 'completed' THEN workflow_start_jobs.locked_at ELSE NULL END,
-       last_error = CASE WHEN workflow_start_jobs.status = 'completed' THEN workflow_start_jobs.last_error ELSE NULL END,
+       status = 'pending',
+       attempt_count = 0,
+       next_attempt_at = now(),
+       locked_at = NULL,
+       completed_at = NULL,
+       last_error = NULL,
        updated_at = now()`,
     [
       params.tenantId,
@@ -581,6 +610,35 @@ export async function enqueueDataSourceScheduleStartJob(params: {
       }),
     ],
   );
+}
+
+export async function reconcileDataSourceSchedules(): Promise<number> {
+  const tenants = await systemQuery<{ id: string }>(`SELECT id FROM tenants`);
+  let enqueued = 0;
+  for (const tenant of tenants.rows) {
+    const tenantId = tenant.id;
+    await withTenantSystemClient(tenantId, async (queryable) => {
+      const result = await queryable.query(
+        `SELECT id, schedule_cron
+         FROM data_sources
+         WHERE schedule_enabled = true
+           AND source_type <> 'intune'`,
+      ) as { rows: { id: string; schedule_cron: string }[] };
+      for (const source of result.rows) {
+        await enqueueDataSourceScheduleStartJob({
+          tenantId,
+          dataSourceId: source.id,
+          cronSchedule: source.schedule_cron,
+          queryable,
+        });
+        enqueued += 1;
+      }
+    });
+  }
+  if (enqueued > 0) {
+    logger.info({ enqueued }, 'Re-queued enabled data source schedules');
+  }
+  return enqueued;
 }
 
 export async function enqueueKnowledgeApprovalStartJob(params: {

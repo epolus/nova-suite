@@ -627,11 +627,22 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction): Pr
     const tenantId = req.user!.tenant_id;
     const dsId = req.params.id;
 
-    const existing = await db.getOne<{ id: string; schedule_enabled: boolean; schedule_cron: string }>(
-      `SELECT id, schedule_enabled, schedule_cron FROM data_sources WHERE id = $1 AND tenant_id = $2`,
+    const existing = await db.getOne<{
+      id: string;
+      schedule_enabled: boolean;
+      schedule_cron: string;
+      source_type: string;
+    }>(
+      `SELECT id, schedule_enabled, schedule_cron, source_type
+       FROM data_sources WHERE id = $1 AND tenant_id = $2`,
       [dsId, tenantId],
     );
     if (!existing) { res.status(404).json({ error: 'Data source not found' }); return; }
+
+    const nextSourceType = String(req.body.source_type ?? existing.source_type);
+    if (nextSourceType === 'intune') {
+      req.body.schedule_enabled = false;
+    }
 
     const allowed = [
       'name', 'description', 'entity_type', 'source_type', 'source_config',
@@ -663,7 +674,9 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction): Pr
       params,
     );
 
-    const newEnabled = req.body.schedule_enabled ?? existing.schedule_enabled;
+    const newEnabled = nextSourceType === 'intune'
+      ? false
+      : Boolean(req.body.schedule_enabled ?? existing.schedule_enabled);
     const newCron = String(req.body.schedule_cron ?? existing.schedule_cron);
 
     try {
