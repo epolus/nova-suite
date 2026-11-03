@@ -56,6 +56,7 @@ export function isNavItemActive(itemTo: string, pathname: string | undefined, fa
 export function useFullWidthContent(pathname: string): boolean {
   if (isWorkflowEditorPath(pathname)) return true;
   if (pathname === '/admin/catalog-tasks' || pathname.startsWith('/admin/catalog-tasks/')) return true;
+  if (pathname === '/admin/data-sources' || pathname.startsWith('/admin/data-sources/')) return true;
   const fullWidthPaths = new Set([
     '/my-todo',
     '/my-groups',
@@ -72,7 +73,6 @@ export function useFullWidthContent(pathname: string): boolean {
     '/cmdb',
     '/admin/workflows',
     '/admin/service-items',
-    '/admin/data-sources',
   ]);
   return fullWidthPaths.has(pathname);
 }

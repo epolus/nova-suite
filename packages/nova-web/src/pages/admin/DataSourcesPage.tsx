@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import {
   dataSources as api,
@@ -21,17 +22,74 @@ import {
   buildTestSourceConfig,
 } from './data-sources/dataSourceForm';
 
+const LIST_PATH = '/admin/data-sources';
+
+function formFromSource(ds: DataSource): FormData {
+  const cfg = ds.source_config;
+  return {
+    name: ds.name,
+    description: ds.description || '',
+    entity_type: ds.entity_type,
+    source_type: ds.source_type,
+    url: cfg.url || '',
+    headers: cfg.headers ? JSON.stringify(cfg.headers, null, 2) : '',
+    json_path: cfg.json_path || '',
+    schedule_cron: ds.schedule_cron,
+    schedule_enabled: ds.schedule_enabled,
+    import_mode: ds.import_mode,
+    upsert_key: ds.upsert_key || '',
+    column_mapping: JSON.stringify(ds.column_mapping || {}, null, 2),
+    auth_type: cfg.auth_type || 'none',
+    bearer_token: cfg.bearer_token || '',
+    basic_username: cfg.basic_username || '',
+    basic_password: cfg.basic_password || '',
+    oauth2_token_url: cfg.oauth2_token_url || '',
+    oauth2_client_id: cfg.oauth2_client_id || '',
+    oauth2_client_secret: cfg.oauth2_client_secret || '',
+    oauth2_scope: cfg.oauth2_scope || '',
+    credential_slug: (cfg as { credential_slug?: string }).credential_slug || '',
+    pagination_enabled: cfg.pagination?.enabled === true,
+    pagination_mode: cfg.pagination?.mode === 'offset' ? 'offset' : 'page',
+    pagination_page_param: cfg.pagination?.page_param || 'page',
+    pagination_page_start: String(cfg.pagination?.page_start ?? 1),
+    pagination_page_size_param: cfg.pagination?.page_size_param || 'limit',
+    pagination_page_size: String(cfg.pagination?.page_size ?? 100),
+    pagination_offset_param: cfg.pagination?.offset_param || 'offset',
+    pagination_offset_start: String(cfg.pagination?.offset_start ?? 0),
+    pagination_limit_param: cfg.pagination?.limit_param || 'limit',
+    pagination_limit: String(cfg.pagination?.limit ?? 100),
+    pagination_max_pages: String(cfg.pagination?.max_pages ?? 20),
+    sftp_host: cfg.sftp_host || '',
+    sftp_port: String(cfg.sftp_port || 22),
+    sftp_username: cfg.sftp_username || '',
+    sftp_password: cfg.sftp_password || '',
+    sftp_private_key: cfg.sftp_private_key || '',
+    sftp_path: cfg.sftp_path || '',
+    sftp_file_type: cfg.sftp_file_type || 'csv',
+    csv_delimiter: cfg.csv_delimiter || 'auto',
+    csv_has_headers: cfg.csv_has_headers !== false,
+    azure_tenant_id: cfg.azure_tenant_id || cfg.tenant_id || '',
+    intune_client_id: cfg.client_id || '',
+    intune_client_secret: cfg.client_secret || '',
+    intune_class_name: cfg.class_name || 'laptop',
+  };
+}
+
 export default function DataSourcesPage() {
   const t = useTranslations('pages.admin.dataSources');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id: routeId } = useParams<{ id?: string }>();
+  const isNew = location.pathname === `${LIST_PATH}/new`;
+  const isEdit = !!routeId && location.pathname === `${LIST_PATH}/${routeId}/edit`;
+  const view = isNew || isEdit ? 'form' : routeId ? 'detail' : 'list';
+  const editId = isEdit ? routeId : null;
 
   const [sources, setSources] = useState<DataSource[]>([]);
   const [entities, setEntities] = useState<EntityFieldDef[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
-  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [selectedDs, setSelectedDs] = useState<DataSource | null>(null);
   const [runs, setRuns] = useState<DataSourceRun[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -60,84 +118,49 @@ export default function DataSourcesPage() {
 
   useEffect(() => { loadSources(); }, [loadSources]);
 
-  const openCreate = () => {
-    setEditId(null);
-    setForm(EMPTY_FORM);
-    setSaveMessage('');
-    setSaveOk(false);
-    setTestResult(null);
-    setTestError('');
-    setView('form');
-  };
+  const selectedDs = routeId && !isNew ? sources.find((ds) => ds.id === routeId) ?? null : null;
+  const showList = useCallback(() => {
+    navigate(LIST_PATH);
+  }, [navigate]);
 
-  const openEdit = (ds: DataSource) => {
-    setEditId(ds.id);
-    setSaveMessage('');
-    setSaveOk(false);
-    setTestResult(null);
-    setTestError('');
-    const cfg = ds.source_config;
-    setForm({
-      name: ds.name,
-      description: ds.description || '',
-      entity_type: ds.entity_type,
-      source_type: ds.source_type,
-      url: cfg.url || '',
-      headers: cfg.headers ? JSON.stringify(cfg.headers, null, 2) : '',
-      json_path: cfg.json_path || '',
-      schedule_cron: ds.schedule_cron,
-      schedule_enabled: ds.schedule_enabled,
-      import_mode: ds.import_mode,
-      upsert_key: ds.upsert_key || '',
-      column_mapping: JSON.stringify(ds.column_mapping || {}, null, 2),
-      auth_type: cfg.auth_type || 'none',
-      bearer_token: cfg.bearer_token || '',
-      basic_username: cfg.basic_username || '',
-      basic_password: cfg.basic_password || '',
-      oauth2_token_url: cfg.oauth2_token_url || '',
-      oauth2_client_id: cfg.oauth2_client_id || '',
-      oauth2_client_secret: cfg.oauth2_client_secret || '',
-      oauth2_scope: cfg.oauth2_scope || '',
-      credential_slug: (cfg as { credential_slug?: string }).credential_slug || '',
-      pagination_enabled: cfg.pagination?.enabled === true,
-      pagination_mode: cfg.pagination?.mode === 'offset' ? 'offset' : 'page',
-      pagination_page_param: cfg.pagination?.page_param || 'page',
-      pagination_page_start: String(cfg.pagination?.page_start ?? 1),
-      pagination_page_size_param: cfg.pagination?.page_size_param || 'limit',
-      pagination_page_size: String(cfg.pagination?.page_size ?? 100),
-      pagination_offset_param: cfg.pagination?.offset_param || 'offset',
-      pagination_offset_start: String(cfg.pagination?.offset_start ?? 0),
-      pagination_limit_param: cfg.pagination?.limit_param || 'limit',
-      pagination_limit: String(cfg.pagination?.limit ?? 100),
-      pagination_max_pages: String(cfg.pagination?.max_pages ?? 20),
-      sftp_host: cfg.sftp_host || '',
-      sftp_port: String(cfg.sftp_port || 22),
-      sftp_username: cfg.sftp_username || '',
-      sftp_password: cfg.sftp_password || '',
-      sftp_private_key: cfg.sftp_private_key || '',
-      sftp_path: cfg.sftp_path || '',
-      sftp_file_type: cfg.sftp_file_type || 'csv',
-      csv_delimiter: cfg.csv_delimiter || 'auto',
-      csv_has_headers: cfg.csv_has_headers !== false,
-      azure_tenant_id: cfg.azure_tenant_id || cfg.tenant_id || '',
-      intune_client_id: cfg.client_id || '',
-      intune_client_secret: cfg.client_secret || '',
-      intune_class_name: cfg.class_name || 'laptop',
-    });
-    setView('form');
-  };
-
-  const openDetail = async (ds: DataSource) => {
-    setSelectedDs(ds);
-    setView('detail');
-    setRunsLoading(true);
-    try {
-      const { runs: r } = await api.runs(ds.id);
-      setRuns(r);
-    } finally {
-      setRunsLoading(false);
+  const formKey = isNew ? 'new' : isEdit ? routeId : null;
+  const [populatedFormKey, setPopulatedFormKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!formKey) {
+      setPopulatedFormKey(null);
+      return;
     }
-  };
+    if (populatedFormKey === formKey) return;
+    if (formKey === 'new') {
+      setForm(EMPTY_FORM);
+      setPopulatedFormKey(formKey);
+      return;
+    }
+    const ds = sources.find((source) => source.id === formKey);
+    if (!ds) return;
+    setForm(formFromSource(ds));
+    setPopulatedFormKey(formKey);
+  }, [formKey, populatedFormKey, sources]);
+
+  useEffect(() => {
+    if (view !== 'detail' || !routeId) return undefined;
+    let cancelled = false;
+    setRunsLoading(true);
+    api.runs(routeId)
+      .then(({ runs: r }) => {
+        if (!cancelled) setRuns(r);
+      })
+      .finally(() => {
+        if (!cancelled) setRunsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [view, routeId]);
+
+  useEffect(() => {
+    if (loading || !routeId || isNew) return;
+    if (sources.some((ds) => ds.id === routeId)) return;
+    navigate(LIST_PATH, { replace: true });
+  }, [loading, routeId, isNew, sources, navigate]);
 
   const handleSave = async (closeAfter: boolean) => {
     setSaving(true);
@@ -165,20 +188,21 @@ export default function DataSourcesPage() {
         upsert_key: form.import_mode === 'upsert' && form.upsert_key ? form.upsert_key : null,
       };
 
+      let savedId = editId;
       if (editId) {
         await api.update(editId, payload as Partial<DataSource>);
       } else {
-        const { id } = await api.create(payload as Partial<DataSource>);
-        setEditId(id);
+        const created = await api.create(payload as Partial<DataSource>);
+        savedId = created.id;
       }
 
       await loadSources();
       if (closeAfter) {
-        setView('list');
-        setTestResult(null);
-        setTestError('');
-        setSaveMessage('');
-        setSaveOk(false);
+        navigate(LIST_PATH);
+      } else if (!editId && savedId) {
+        navigate(`${LIST_PATH}/${savedId}/edit`, { replace: true });
+        setSaveOk(true);
+        setSaveMessage(t('savedStay'));
       } else {
         setSaveOk(true);
         setSaveMessage(t('savedStay'));
@@ -235,10 +259,7 @@ export default function DataSourcesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm(t('confirmDelete'))) return;
     await api.delete(id);
-    if (selectedDs?.id === id) {
-      setSelectedDs(null);
-      setView('list');
-    }
+    if (routeId === id) navigate(LIST_PATH);
     await loadSources();
   };
 
@@ -247,7 +268,7 @@ export default function DataSourcesPage() {
     try {
       await api.run(ds.id);
       await loadSources();
-      if (selectedDs?.id === ds.id) {
+      if (routeId === ds.id) {
         const { runs: r } = await api.runs(ds.id);
         setRuns(r);
       }
@@ -257,17 +278,15 @@ export default function DataSourcesPage() {
   };
 
   const refreshRuns = async () => {
-    if (!selectedDs) return;
+    if (!routeId) return;
     setRunsLoading(true);
     try {
       const [{ runs: r }, { data_sources }] = await Promise.all([
-        api.runs(selectedDs.id),
+        api.runs(routeId),
         api.list(),
       ]);
       setRuns(r);
       setSources(data_sources);
-      const updated = data_sources.find((d) => d.id === selectedDs.id);
-      if (updated) setSelectedDs(updated);
     } finally {
       setRunsLoading(false);
     }
@@ -279,7 +298,8 @@ export default function DataSourcesPage() {
 
   if (loading) return <Spinner />;
 
-  if (view === 'detail' && selectedDs) {
+  if (view === 'detail') {
+    if (!selectedDs) return <Spinner />;
     return (
       <DataSourceDetailView
         selectedDs={selectedDs}
@@ -287,9 +307,9 @@ export default function DataSourcesPage() {
         runsLoading={runsLoading}
         runningId={runningId}
         expandedRunId={expandedRunId}
-        onBack={() => { setView('list'); setSelectedDs(null); }}
+        onBack={showList}
         onRun={handleRun}
-        onEdit={openEdit}
+        onEdit={(ds) => navigate(`${LIST_PATH}/${ds.id}/edit`)}
         onDelete={handleDelete}
         onRefresh={refreshRuns}
         onToggleExpand={setExpandedRunId}
@@ -298,6 +318,7 @@ export default function DataSourcesPage() {
   }
 
   if (view === 'form') {
+    if (formKey && populatedFormKey !== formKey) return <Spinner />;
     return (
       <DataSourceFormView
         form={form}
@@ -314,7 +335,7 @@ export default function DataSourcesPage() {
         onSave={() => { void handleSave(false); }}
         onSaveAndClose={() => { void handleSave(true); }}
         onTest={handleTestSource}
-        onCancel={() => setView('list')}
+        onCancel={showList}
         onApplySuggestedMapping={applySuggestedMapping}
         onApplyDetectedColumnsTemplate={applyDetectedColumnsTemplate}
       />
@@ -324,8 +345,8 @@ export default function DataSourcesPage() {
   return (
     <DataSourceListView
       sources={sources}
-      onCreate={openCreate}
-      onOpen={openDetail}
+      onCreate={() => navigate(`${LIST_PATH}/new`)}
+      onOpen={(ds) => navigate(`${LIST_PATH}/${ds.id}`)}
     />
   );
 }
