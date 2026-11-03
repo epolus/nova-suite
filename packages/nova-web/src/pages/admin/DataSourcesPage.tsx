@@ -24,6 +24,148 @@ import {
 
 const LIST_PATH = '/admin/data-sources';
 
+function DataSourceEditor({
+  initialForm,
+  editId,
+  entities,
+  vaultCreds,
+  loadSources,
+}: {
+  initialForm: FormData;
+  editId: string | null;
+  entities: EntityFieldDef[];
+  vaultCreds: TenantCredentialListItem[];
+  loadSources: () => Promise<void>;
+}) {
+  const t = useTranslations('pages.admin.dataSources');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const savedOnArrival = (location.state as { saved?: boolean } | null)?.saved === true;
+  const [form, setForm] = useState(initialForm);
+  const [saving, setSaving] = useState(false);
+  const [testingSource, setTestingSource] = useState(false);
+  const [testError, setTestError] = useState('');
+  const [testResult, setTestResult] = useState<DataSourceTestResult | null>(null);
+  const [saveMessage, setSaveMessage] = useState(savedOnArrival ? t('savedStay') : '');
+  const [saveOk, setSaveOk] = useState(savedOnArrival);
+
+  const setField = (key: keyof FormData, value: string | boolean) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = async (closeAfter: boolean) => {
+    setSaving(true);
+    setSaveMessage('');
+    setSaveOk(false);
+    try {
+      let headers: Record<string, string> = {};
+      try { if (form.headers.trim()) headers = JSON.parse(form.headers); } catch { /* ignore */ }
+
+      let columnMapping: Record<string, string | string[]> = {};
+      try { if (form.column_mapping.trim()) columnMapping = JSON.parse(form.column_mapping); } catch { /* ignore */ }
+
+      const sourceConfig = buildSaveSourceConfig(form, headers);
+      const payload = {
+        name: form.name,
+        description: form.description || null,
+        entity_type: form.entity_type,
+        source_type: form.source_type,
+        source_config: sourceConfig,
+        column_mapping: columnMapping,
+        schedule_cron: form.schedule_cron,
+        schedule_enabled: form.schedule_enabled,
+        import_mode: form.import_mode,
+        upsert_key: form.import_mode === 'upsert' && form.upsert_key ? form.upsert_key : null,
+      };
+
+      let savedId = editId;
+      if (editId) {
+        await api.update(editId, payload as Partial<DataSource>);
+      } else {
+        const created = await api.create(payload as Partial<DataSource>);
+        savedId = created.id;
+      }
+
+      await loadSources();
+      if (closeAfter) {
+        navigate(LIST_PATH);
+      } else if (!editId && savedId) {
+        navigate(`${LIST_PATH}/${savedId}/edit`, { replace: true, state: { saved: true } });
+        setSaveOk(true);
+        setSaveMessage(t('savedStay'));
+      } else {
+        setSaveOk(true);
+        setSaveMessage(t('savedStay'));
+      }
+    } catch (err) {
+      setSaveOk(false);
+      setSaveMessage(err instanceof Error ? err.message : t('saveFailed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestSource = async () => {
+    setTestingSource(true);
+    setTestError('');
+    setTestResult(null);
+    try {
+      let headers: Record<string, string> = {};
+      try { if (form.headers.trim()) headers = JSON.parse(form.headers); } catch { /* ignore */ }
+
+      const sourceConfig = buildTestSourceConfig(form, headers);
+      const response = await api.testSource({
+        entity_type: form.entity_type,
+        source_type: form.source_type as DataSource['source_type'],
+        source_config: sourceConfig as DataSource['source_config'],
+      });
+      if (response.error || !response.result) {
+        setTestError(response.error || t('testFailed'));
+        return;
+      }
+      setTestResult(response.result);
+    } catch (err) {
+      setTestError(err instanceof Error ? err.message : t('testFailed'));
+    } finally {
+      setTestingSource(false);
+    }
+  };
+
+  const applySuggestedMapping = () => {
+    if (!testResult || Object.keys(testResult.suggested_mapping).length === 0) return;
+    setField('column_mapping', JSON.stringify(testResult.suggested_mapping, null, 2));
+  };
+
+  const applyDetectedColumnsTemplate = () => {
+    if (!testResult || testResult.detected_columns.length === 0) return;
+    const template: Record<string, string> = {};
+    for (const col of testResult.detected_columns) template[col] = '';
+    setField('column_mapping', JSON.stringify(template, null, 2));
+  };
+
+  return (
+    <DataSourceFormView
+      form={form}
+      setField={setField}
+      entities={entities}
+      vaultCreds={vaultCreds}
+      editId={editId}
+      saving={saving}
+      saveMessage={saveMessage}
+      saveOk={saveOk}
+      testingSource={testingSource}
+      testError={testError}
+      testResult={testResult}
+      onSave={() => { void handleSave(false); }}
+      onSaveAndClose={() => { void handleSave(true); }}
+      onTest={handleTestSource}
+      onCancel={() => navigate(LIST_PATH)}
+      onApplySuggestedMapping={applySuggestedMapping}
+      onApplyDetectedColumnsTemplate={applyDetectedColumnsTemplate}
+    />
+  );
+}
+
 function formFromSource(ds: DataSource): FormData {
   const cfg = ds.source_config;
   return {
@@ -88,18 +230,13 @@ export default function DataSourcesPage() {
   const [sources, setSources] = useState<DataSource[]>([]);
   const [entities, setEntities] = useState<EntityFieldDef[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState<FormData>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [runs, setRuns] = useState<DataSourceRun[]>([]);
-  const [runsLoading, setRunsLoading] = useState(false);
+  const [runsState, setRunsState] = useState<{ id: string | null; runs: DataSourceRun[] }>({
+    id: null,
+    runs: [],
+  });
   const [runningId, setRunningId] = useState<string | null>(null);
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
-  const [testingSource, setTestingSource] = useState(false);
-  const [testError, setTestError] = useState('');
-  const [testResult, setTestResult] = useState<DataSourceTestResult | null>(null);
   const [vaultCreds, setVaultCreds] = useState<TenantCredentialListItem[]>([]);
-  const [saveMessage, setSaveMessage] = useState('');
-  const [saveOk, setSaveOk] = useState(false);
 
   const loadSources = useCallback(async () => {
     try {
@@ -124,34 +261,19 @@ export default function DataSourcesPage() {
   }, [navigate]);
 
   const formKey = isNew ? 'new' : isEdit ? routeId : null;
-  const [populatedFormKey, setPopulatedFormKey] = useState<string | null>(null);
-  useEffect(() => {
-    if (!formKey) {
-      setPopulatedFormKey(null);
-      return;
-    }
-    if (populatedFormKey === formKey) return;
-    if (formKey === 'new') {
-      setForm(EMPTY_FORM);
-      setPopulatedFormKey(formKey);
-      return;
-    }
-    const ds = sources.find((source) => source.id === formKey);
-    if (!ds) return;
-    setForm(formFromSource(ds));
-    setPopulatedFormKey(formKey);
-  }, [formKey, populatedFormKey, sources]);
+  const runs = runsState.id === routeId ? runsState.runs : [];
+  const runsLoading = view === 'detail' && !!routeId && runsState.id !== routeId;
 
   useEffect(() => {
     if (view !== 'detail' || !routeId) return undefined;
     let cancelled = false;
-    setRunsLoading(true);
-    api.runs(routeId)
-      .then(({ runs: r }) => {
-        if (!cancelled) setRuns(r);
+    const requestedId = routeId;
+    api.runs(requestedId)
+      .then(({ runs: nextRuns }) => {
+        if (!cancelled) setRunsState({ id: requestedId, runs: nextRuns });
       })
-      .finally(() => {
-        if (!cancelled) setRunsLoading(false);
+      .catch(() => {
+        if (!cancelled) setRunsState({ id: requestedId, runs: [] });
       });
     return () => { cancelled = true; };
   }, [view, routeId]);
@@ -161,100 +283,6 @@ export default function DataSourcesPage() {
     if (sources.some((ds) => ds.id === routeId)) return;
     navigate(LIST_PATH, { replace: true });
   }, [loading, routeId, isNew, sources, navigate]);
-
-  const handleSave = async (closeAfter: boolean) => {
-    setSaving(true);
-    setSaveMessage('');
-    setSaveOk(false);
-    try {
-      let headers: Record<string, string> = {};
-      try { if (form.headers.trim()) headers = JSON.parse(form.headers); } catch { /* ignore */ }
-
-      let columnMapping: Record<string, string | string[]> = {};
-      try { if (form.column_mapping.trim()) columnMapping = JSON.parse(form.column_mapping); } catch { /* ignore */ }
-
-      const sourceConfig = buildSaveSourceConfig(form, headers);
-
-      const payload = {
-        name: form.name,
-        description: form.description || null,
-        entity_type: form.entity_type,
-        source_type: form.source_type,
-        source_config: sourceConfig,
-        column_mapping: columnMapping,
-        schedule_cron: form.schedule_cron,
-        schedule_enabled: form.schedule_enabled,
-        import_mode: form.import_mode,
-        upsert_key: form.import_mode === 'upsert' && form.upsert_key ? form.upsert_key : null,
-      };
-
-      let savedId = editId;
-      if (editId) {
-        await api.update(editId, payload as Partial<DataSource>);
-      } else {
-        const created = await api.create(payload as Partial<DataSource>);
-        savedId = created.id;
-      }
-
-      await loadSources();
-      if (closeAfter) {
-        navigate(LIST_PATH);
-      } else if (!editId && savedId) {
-        navigate(`${LIST_PATH}/${savedId}/edit`, { replace: true });
-        setSaveOk(true);
-        setSaveMessage(t('savedStay'));
-      } else {
-        setSaveOk(true);
-        setSaveMessage(t('savedStay'));
-      }
-    } catch (err) {
-      setSaveOk(false);
-      setSaveMessage(err instanceof Error ? err.message : t('saveFailed'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleTestSource = async () => {
-    setTestingSource(true);
-    setTestError('');
-    setTestResult(null);
-    try {
-      let headers: Record<string, string> = {};
-      try { if (form.headers.trim()) headers = JSON.parse(form.headers); } catch { /* ignore */ }
-
-      const sourceConfig = buildTestSourceConfig(form, headers);
-
-      const response = await api.testSource({
-        entity_type: form.entity_type,
-        source_type: form.source_type as DataSource['source_type'],
-        source_config: sourceConfig as DataSource['source_config'],
-      });
-      if (response.error || !response.result) {
-        setTestError(response.error || t('testFailed'));
-        return;
-      }
-      setTestResult(response.result);
-    } catch (err) {
-      setTestError(err instanceof Error ? err.message : t('testFailed'));
-    } finally {
-      setTestingSource(false);
-    }
-  };
-
-  const applySuggestedMapping = () => {
-    if (!testResult || Object.keys(testResult.suggested_mapping).length === 0) return;
-    setField('column_mapping', JSON.stringify(testResult.suggested_mapping, null, 2));
-  };
-
-  const applyDetectedColumnsTemplate = () => {
-    if (!testResult || testResult.detected_columns.length === 0) return;
-    const template: Record<string, string> = {};
-    for (const col of testResult.detected_columns) {
-      template[col] = '';
-    }
-    setField('column_mapping', JSON.stringify(template, null, 2));
-  };
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('confirmDelete'))) return;
@@ -269,8 +297,8 @@ export default function DataSourcesPage() {
       await api.run(ds.id);
       await loadSources();
       if (routeId === ds.id) {
-        const { runs: r } = await api.runs(ds.id);
-        setRuns(r);
+        const { runs: nextRuns } = await api.runs(ds.id);
+        setRunsState({ id: ds.id, runs: nextRuns });
       }
     } finally {
       setTimeout(() => setRunningId(null), 2000);
@@ -279,21 +307,17 @@ export default function DataSourcesPage() {
 
   const refreshRuns = async () => {
     if (!routeId) return;
-    setRunsLoading(true);
+    setRunsState({ id: null, runs: [] });
     try {
-      const [{ runs: r }, { data_sources }] = await Promise.all([
+      const [{ runs: nextRuns }, { data_sources }] = await Promise.all([
         api.runs(routeId),
         api.list(),
       ]);
-      setRuns(r);
+      setRunsState({ id: routeId, runs: nextRuns });
       setSources(data_sources);
-    } finally {
-      setRunsLoading(false);
+    } catch {
+      setRunsState({ id: routeId, runs: [] });
     }
-  };
-
-  const setField = (key: keyof FormData, value: string | boolean) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   if (loading) return <Spinner />;
@@ -317,27 +341,17 @@ export default function DataSourcesPage() {
     );
   }
 
-  if (view === 'form') {
-    if (formKey && populatedFormKey !== formKey) return <Spinner />;
+  if (view === 'form' && formKey) {
+    const initialForm = formKey === 'new' ? EMPTY_FORM : selectedDs ? formFromSource(selectedDs) : null;
+    if (!initialForm) return <Spinner />;
     return (
-      <DataSourceFormView
-        form={form}
-        setField={setField}
+      <DataSourceEditor
+        key={formKey}
+        initialForm={initialForm}
+        editId={editId}
         entities={entities}
         vaultCreds={vaultCreds}
-        editId={editId}
-        saving={saving}
-        saveMessage={saveMessage}
-        saveOk={saveOk}
-        testingSource={testingSource}
-        testError={testError}
-        testResult={testResult}
-        onSave={() => { void handleSave(false); }}
-        onSaveAndClose={() => { void handleSave(true); }}
-        onTest={handleTestSource}
-        onCancel={showList}
-        onApplySuggestedMapping={applySuggestedMapping}
-        onApplyDetectedColumnsTemplate={applyDetectedColumnsTemplate}
+        loadSources={loadSources}
       />
     );
   }
