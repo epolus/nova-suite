@@ -144,7 +144,7 @@ async function listAssignmentGroupsForTenant(tenantId: string) {
 router.get(
   '/assignment-groups',
   authenticate,
-  requireRole('admin', 'fulfiller'),
+  requireRole('admin', 'fulfiller', 'catalog_designer'),
   setTenantRLS,
   releaseTenantClient,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -520,14 +520,16 @@ router.get('/departments', async (req: Request, res: Response, next: NextFunctio
   try {
     const tenantId = req.user!.tenant_id;
     const rows = await db.getMany(
-      `SELECT d.id, d.name, d.description, d.parent_department_id, d.cost_center_id, d.is_active, d.created_at, d.updated_at,
+      `SELECT d.id, d.name, d.description, d.parent_department_id, d.cost_center_id, d.manager_id, d.external_id, d.is_active, d.created_at, d.updated_at,
               pd.name AS parent_department_name,
               cc.name AS cost_center_name,
               cc.code AS cost_center_code,
+              mu.display_name AS manager_name,
               (SELECT count(*) FROM users u WHERE u.department_id = d.id AND u.is_active)::int AS user_count
        FROM departments d
        LEFT JOIN departments pd ON pd.id = d.parent_department_id
        LEFT JOIN cost_centers cc ON cc.id = d.cost_center_id
+       LEFT JOIN users mu ON mu.id = d.manager_id
        WHERE d.tenant_id = $1
        ORDER BY d.name`,
       [tenantId],
@@ -539,10 +541,12 @@ router.get('/departments', async (req: Request, res: Response, next: NextFunctio
 router.post('/departments', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { name, description, parent_department_id, cost_center_id } = req.body;
+    const { name, description, parent_department_id, cost_center_id, manager_id, external_id } = req.body;
     if (!name) throw new AppError(400, 'name is required');
     const parentDepartmentId = parent_department_id || null;
     const costCenterId = cost_center_id || null;
+    const managerId = manager_id || null;
+    const externalId = external_id || null;
     if (parentDepartmentId) {
       const parent = await db.getOne<{ id: string }>(
         'SELECT id FROM departments WHERE id = $1 AND tenant_id = $2',
@@ -557,9 +561,16 @@ router.post('/departments', async (req: Request, res: Response, next: NextFuncti
       );
       if (!costCenter) throw new AppError(400, 'cost_center_id must reference an existing cost center in this tenant');
     }
+    if (managerId) {
+      const manager = await db.getOne<{ id: string }>(
+        'SELECT id FROM users WHERE id = $1 AND tenant_id = $2',
+        [managerId, tenantId],
+      );
+      if (!manager) throw new AppError(400, 'manager_id must reference an existing user in this tenant');
+    }
     const row = await db.getOne<{ id: string }>(
-      'INSERT INTO departments (tenant_id, name, description, parent_department_id, cost_center_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [tenantId, name, description || null, parentDepartmentId, costCenterId],
+      'INSERT INTO departments (tenant_id, name, description, parent_department_id, cost_center_id, manager_id, external_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      [tenantId, name, description || null, parentDepartmentId, costCenterId, managerId, externalId],
     );
     res.status(201).json(row);
   } catch (err) { next(err); }
@@ -568,7 +579,7 @@ router.post('/departments', async (req: Request, res: Response, next: NextFuncti
 router.patch('/departments/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { name, description, is_active, parent_department_id, cost_center_id } = req.body;
+    const { name, description, is_active, parent_department_id, cost_center_id, manager_id, external_id } = req.body;
     if (parent_department_id !== undefined) {
       const parentDepartmentId = parent_department_id || null;
       if (parentDepartmentId === req.params.id) {
@@ -592,6 +603,16 @@ router.patch('/departments/:id', async (req: Request, res: Response, next: NextF
         if (!costCenter) throw new AppError(400, 'cost_center_id must reference an existing cost center in this tenant');
       }
     }
+    if (manager_id !== undefined) {
+      const managerId = manager_id || null;
+      if (managerId) {
+        const manager = await db.getOne<{ id: string }>(
+          'SELECT id FROM users WHERE id = $1 AND tenant_id = $2',
+          [managerId, tenantId],
+        );
+        if (!manager) throw new AppError(400, 'manager_id must reference an existing user in this tenant');
+      }
+    }
     const sets: string[] = [];
     const vals: unknown[] = [];
     let i = 1;
@@ -599,6 +620,8 @@ router.patch('/departments/:id', async (req: Request, res: Response, next: NextF
     if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description || null); }
     if (parent_department_id !== undefined) { sets.push(`parent_department_id = $${i++}`); vals.push(parent_department_id || null); }
     if (cost_center_id !== undefined) { sets.push(`cost_center_id = $${i++}`); vals.push(cost_center_id || null); }
+    if (manager_id !== undefined) { sets.push(`manager_id = $${i++}`); vals.push(manager_id || null); }
+    if (external_id !== undefined) { sets.push(`external_id = $${i++}`); vals.push(external_id || null); }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
     if (sets.length === 0) { res.json({ success: true }); return; }
     vals.push(req.params.id, tenantId);
@@ -616,8 +639,14 @@ router.get('/cost-centers', async (req: Request, res: Response, next: NextFuncti
     const tenantId = req.user!.tenant_id;
     const rows = await db.getMany(
       `SELECT cc.id, cc.code, cc.name, cc.description, cc.is_active, cc.created_at, cc.updated_at,
-              (SELECT count(*) FROM users u WHERE u.cost_center_id = cc.id AND u.is_active)::int AS user_count
-       FROM cost_centers cc WHERE cc.tenant_id = $1 ORDER BY cc.code`,
+              cc.responsible_user_id,
+              ru.display_name AS responsible_user_name,
+              (SELECT count(*) FROM users u WHERE u.cost_center_id = cc.id AND u.is_active)::int AS user_count,
+              (SELECT count(*) FROM departments d WHERE d.cost_center_id = cc.id AND d.is_active)::int AS department_count
+       FROM cost_centers cc
+       LEFT JOIN users ru ON ru.id = cc.responsible_user_id
+       WHERE cc.tenant_id = $1
+       ORDER BY cc.code`,
       [tenantId],
     );
     res.json({ cost_centers: rows });
@@ -627,11 +656,19 @@ router.get('/cost-centers', async (req: Request, res: Response, next: NextFuncti
 router.post('/cost-centers', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { code, name, description } = req.body;
+    const { code, name, description, responsible_user_id } = req.body;
     if (!code || !name) throw new AppError(400, 'code and name are required');
+    const responsibleUserId = responsible_user_id || null;
+    if (responsibleUserId) {
+      const user = await db.getOne<{ id: string }>(
+        'SELECT id FROM users WHERE id = $1 AND tenant_id = $2',
+        [responsibleUserId, tenantId],
+      );
+      if (!user) throw new AppError(400, 'responsible_user_id must reference an existing user in this tenant');
+    }
     const row = await db.getOne<{ id: string }>(
-      'INSERT INTO cost_centers (tenant_id, code, name, description) VALUES ($1, $2, $3, $4) RETURNING id',
-      [tenantId, code, name, description || null],
+      'INSERT INTO cost_centers (tenant_id, code, name, description, responsible_user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [tenantId, code, name, description || null, responsibleUserId],
     );
     res.status(201).json(row);
   } catch (err) { next(err); }
@@ -640,13 +677,24 @@ router.post('/cost-centers', async (req: Request, res: Response, next: NextFunct
 router.patch('/cost-centers/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenant_id;
-    const { code, name, description, is_active } = req.body;
+    const { code, name, description, is_active, responsible_user_id } = req.body;
+    if (responsible_user_id !== undefined) {
+      const responsibleUserId = responsible_user_id || null;
+      if (responsibleUserId) {
+        const user = await db.getOne<{ id: string }>(
+          'SELECT id FROM users WHERE id = $1 AND tenant_id = $2',
+          [responsibleUserId, tenantId],
+        );
+        if (!user) throw new AppError(400, 'responsible_user_id must reference an existing user in this tenant');
+      }
+    }
     const sets: string[] = [];
     const vals: unknown[] = [];
     let i = 1;
     if (code !== undefined) { sets.push(`code = $${i++}`); vals.push(code); }
     if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(name); }
     if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description || null); }
+    if (responsible_user_id !== undefined) { sets.push(`responsible_user_id = $${i++}`); vals.push(responsible_user_id || null); }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
     if (sets.length === 0) { res.json({ success: true }); return; }
     vals.push(req.params.id, tenantId);
@@ -825,7 +873,10 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
          u.title, u.phone, u.mobile, u.location, u.timezone, u.time_format, u.date_format,
          u.employee_type, u.company, c.name AS company_name, u.preferred_language,
          u.start_date, u.last_working_date,
-         u.is_active, u.manager_id, u.department_id, u.cost_center_id,
+         u.is_active, u.locked_out, u.locked_at, u.lock_reason,
+         u.failed_login_count, u.last_failed_login_at, u.last_login_at,
+         u.vip, u.employee_number, u.source,
+         u.manager_id, u.department_id, u.cost_center_id,
          u.created_at, u.updated_at,
          m.display_name AS manager_name,
          d.name AS department_name,
@@ -893,6 +944,7 @@ router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Requ
       preferred_language, start_date, last_working_date,
       user_id, email, manager_id, department_id, cost_center_id,
       is_active, role_ids, password,
+      vip, employee_number, locked_out, lock_reason,
     } = req.body;
 
     // Verify user belongs to tenant
@@ -911,7 +963,7 @@ router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Requ
     if (last_name !== undefined) { sets.push(`last_name = $${idx++}`); values.push(last_name || null); }
     if (display_name !== undefined) { sets.push(`display_name = $${idx++}`); values.push(display_name); }
     if (jobTitle !== undefined) { sets.push(`title = $${idx++}`); values.push(jobTitle || null); }
-    if (phone !== undefined) { sets.push(`phone = $${idx++}`); values.push(phone || ''); }
+    if (phone !== undefined) { sets.push(`phone = $${idx++}`); values.push(phone || null); }
     if (mobile !== undefined) { sets.push(`mobile = $${idx++}`); values.push(mobile || ''); }
     if (location !== undefined) { sets.push(`location = $${idx++}`); values.push(location || ''); }
     if (timezone !== undefined) { sets.push(`timezone = $${idx++}`); values.push(timezone || 'UTC'); }
@@ -928,6 +980,20 @@ router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Requ
     if (department_id !== undefined) { sets.push(`department_id = $${idx++}`); values.push(department_id || null); }
     if (cost_center_id !== undefined) { sets.push(`cost_center_id = $${idx++}`); values.push(cost_center_id || null); }
     if (is_active !== undefined) { sets.push(`is_active = $${idx++}`); values.push(is_active); }
+    if (vip !== undefined) { sets.push(`vip = $${idx++}`); values.push(vip); }
+    if (employee_number !== undefined) { sets.push(`employee_number = $${idx++}`); values.push(employee_number || null); }
+    if (locked_out === true) {
+      const reason = typeof lock_reason === 'string' && lock_reason.trim() ? lock_reason.trim() : 'admin';
+      sets.push('locked_out = true');
+      sets.push('locked_at = CASE WHEN locked_out THEN locked_at ELSE now() END');
+      sets.push(`lock_reason = $${idx++}`);
+      values.push(reason);
+    } else if (locked_out === false) {
+      sets.push('locked_out = false');
+      sets.push('locked_at = CASE WHEN locked_out THEN NULL ELSE locked_at END');
+      sets.push('lock_reason = CASE WHEN locked_out THEN NULL ELSE lock_reason END');
+      sets.push('failed_login_count = CASE WHEN locked_out THEN 0 ELSE failed_login_count END');
+    }
 
     if (password) {
       const hash = await bcrypt.hash(password, 10);
@@ -969,6 +1035,7 @@ router.post('/users', validateBody(adminCreateUserSchema), async (req: Request, 
       title: jobTitle, phone, mobile, location, timezone, time_format, date_format, employee_type,
       company, preferred_language, start_date, last_working_date,
       user_id, manager_id, department_id, cost_center_id, role_ids,
+      vip, employee_number, locked_out, lock_reason,
     } = req.body;
 
     if (!email || !password || !display_name) {
@@ -987,22 +1054,28 @@ router.post('/users', validateBody(adminCreateUserSchema), async (req: Request, 
           phone, mobile, location, timezone, time_format, date_format,
         employee_type, company, preferred_language,
         start_date, last_working_date,
-        manager_id, department_id, cost_center_id
+        manager_id, department_id, cost_center_id,
+        vip, employee_number, locked_out, locked_at, lock_reason, source
       ) VALUES (
         $1, $2, $3, $4,
         $5, $6, $7, $8,
           $9, $10, $11, $12, $13, $14,
           $15, $16, $17,
           $18, $19,
-          $20, $21, $22
+          $20, $21, $22,
+          $23, $24, $25, CASE WHEN $25 THEN now() ELSE NULL END, $26, 'manual'
       ) RETURNING id`,
       [
         tenantId, user_id || null, email, passwordHash,
         first_name || null, last_name || null, display_name, jobTitle || null,
-        phone || '', mobile || '', location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
+        phone || null, mobile || '', location || 'Zurich', timezone || 'UTC', time_format || '24h', date_format || 'YYYY-MM-DD',
         employee_type || 'employee', company || null, preferred_language || 'en',
         start_date || null, last_working_date || null,
         manager_id || null, department_id || null, cost_center_id || null,
+        vip === true,
+        employee_number || null,
+        locked_out === true,
+        locked_out === true ? ((typeof lock_reason === 'string' && lock_reason.trim()) ? lock_reason.trim() : 'admin') : null,
       ],
     );
 

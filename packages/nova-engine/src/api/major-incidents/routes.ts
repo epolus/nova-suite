@@ -166,6 +166,22 @@ router.get(
         conds.push(`(mi.title ILIKE '%' || $${p} || '%' OR mi.number ILIKE '%' || $${p} || '%')`);
         params.push(search.trim());
       }
+      const columnFilters: Record<string, string> = {
+        number: 'mi.number',
+        title: 'mi.title',
+        status: 'mi.status::text',
+        priority: 'mi.priority::text',
+        declared_major_at: 'mi.declared_major_at::text',
+        participant_count: '(SELECT count(*) FROM major_incident_participants mp WHERE mp.major_incident_id = mi.id)::text',
+      };
+      for (const [key, value] of Object.entries(req.query)) {
+        if (!key.startsWith('cf.') || typeof value !== 'string' || !value) continue;
+        const column = columnFilters[key.slice(3)];
+        if (!column) continue;
+        p += 1;
+        conds.push(`${column} ILIKE $${p}`);
+        params.push(`${value}%`);
+      }
       if (priority_lte !== undefined) {
         p += 1;
         conds.push(`mi.priority <= $${p}`);

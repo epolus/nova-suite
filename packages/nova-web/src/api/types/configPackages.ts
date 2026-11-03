@@ -9,6 +9,7 @@ export interface ConfigPackageBundle {
   contents: {
     catalog: {
       categories: Array<Record<string, unknown>>;
+      fulfillment_models?: Array<Record<string, unknown>>;
       service_items: Array<Record<string, unknown>>;
     };
     notifications: {
@@ -30,7 +31,7 @@ export interface ConfigPackageValidationIssue {
 }
 
 export interface ConfigPackageChange {
-  type: 'category' | 'service_item' | 'catalog_task' | 'notification_rule' | 'data_source' | 'workflow_definition';
+  type: 'category' | 'fulfillment_model' | 'service_item' | 'catalog_task' | 'notification_rule' | 'data_source' | 'workflow_definition';
   external_key: string;
   name: string;
   action: 'create' | 'update' | 'skip';

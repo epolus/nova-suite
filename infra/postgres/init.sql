@@ -80,6 +80,8 @@ CREATE TABLE departments (
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   parent_department_id uuid REFERENCES departments(id) ON DELETE SET NULL,
   cost_center_id uuid,
+  manager_id  uuid,
+  external_id text,
   name        text NOT NULL,
   description text,
   is_active   boolean NOT NULL DEFAULT true,
@@ -90,6 +92,10 @@ CREATE TABLE departments (
 
 CREATE INDEX idx_departments_tenant ON departments(tenant_id);
 CREATE INDEX idx_departments_cost_center ON departments(cost_center_id);
+CREATE INDEX idx_departments_manager ON departments(manager_id);
+CREATE UNIQUE INDEX uq_departments_tenant_external_id
+  ON departments(tenant_id, external_id)
+  WHERE external_id IS NOT NULL;
 
 -- ============================================================
 -- COST CENTERS
@@ -100,6 +106,7 @@ CREATE TABLE cost_centers (
   code        text NOT NULL,
   name        text NOT NULL,
   description text,
+  responsible_user_id uuid,
   is_active   boolean NOT NULL DEFAULT true,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
@@ -107,6 +114,7 @@ CREATE TABLE cost_centers (
 );
 
 CREATE INDEX idx_cost_centers_tenant ON cost_centers(tenant_id);
+CREATE INDEX idx_cost_centers_responsible ON cost_centers(responsible_user_id);
 
 ALTER TABLE departments
   ADD CONSTRAINT fk_departments_cost_center
@@ -157,7 +165,7 @@ CREATE TABLE users (
   last_name           text,
   display_name        text NOT NULL,
   title               text,
-  phone               text NOT NULL DEFAULT '+41',
+  phone               text,
   mobile              text,
   location            text NOT NULL DEFAULT 'Zurich',
   timezone            text NOT NULL DEFAULT 'UTC',
@@ -176,10 +184,21 @@ CREATE TABLE users (
   cost_center_id      uuid REFERENCES cost_centers(id) ON DELETE SET NULL,
   sso_provider_id     text,
   is_active           boolean NOT NULL DEFAULT true,
+  locked_out          boolean NOT NULL DEFAULT false,
+  locked_at           timestamptz,
+  lock_reason         text,
+  failed_login_count  integer NOT NULL DEFAULT 0,
+  last_failed_login_at timestamptz,
+  last_login_at       timestamptz,
+  vip                 boolean NOT NULL DEFAULT false,
+  employee_number     text,
+  source              text NOT NULL DEFAULT 'manual',
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, email),
-  UNIQUE (tenant_id, user_id)
+  UNIQUE (tenant_id, user_id),
+  CONSTRAINT users_failed_login_count_check CHECK (failed_login_count >= 0),
+  CONSTRAINT users_source_check CHECK (source IN ('manual', 'sso', 'import', 'datasource'))
 );
 
 CREATE INDEX idx_users_tenant ON users(tenant_id);
@@ -189,6 +208,18 @@ CREATE INDEX idx_users_department ON users(department_id);
 CREATE INDEX idx_users_sso ON users(tenant_id, sso_provider_id) WHERE sso_provider_id IS NOT NULL;
 CREATE INDEX idx_users_cost_center ON users(cost_center_id);
 CREATE INDEX idx_users_company ON users(company);
+CREATE UNIQUE INDEX idx_users_employee_number
+  ON users(tenant_id, employee_number)
+  WHERE employee_number IS NOT NULL;
+CREATE INDEX idx_users_locked_out ON users(tenant_id) WHERE locked_out;
+
+ALTER TABLE cost_centers
+  ADD CONSTRAINT fk_cost_centers_responsible
+  FOREIGN KEY (responsible_user_id) REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE departments
+  ADD CONSTRAINT fk_departments_manager
+  FOREIGN KEY (manager_id) REFERENCES users(id) ON DELETE SET NULL;
 
 -- ============================================================
 -- COMPANIES
@@ -396,6 +427,26 @@ CREATE INDEX idx_service_categories_tenant ON service_categories(tenant_id);
 CREATE UNIQUE INDEX uq_service_categories_tenant_external_key ON service_categories(tenant_id, external_key);
 
 -- ============================================================
+-- FULFILLMENT MODELS
+-- Reusable simple fulfillment for service items (group task, CI, asset).
+-- Distinct from ITSM business services.
+-- ============================================================
+CREATE TABLE fulfillment_models (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  external_key text,
+  name         text NOT NULL,
+  description  text,
+  config       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  is_active    boolean NOT NULL DEFAULT true,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_fulfillment_models_tenant ON fulfillment_models(tenant_id);
+CREATE UNIQUE INDEX uq_fulfillment_models_tenant_external_key ON fulfillment_models(tenant_id, external_key);
+
+-- ============================================================
 -- SERVICE CATALOG ITEMS
 -- ============================================================
 CREATE TABLE service_items (
@@ -403,6 +454,7 @@ CREATE TABLE service_items (
   tenant_id           uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   external_key         text,
   category_id         uuid NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
+  fulfillment_model_id uuid REFERENCES fulfillment_models(id) ON DELETE RESTRICT,
   name                text NOT NULL,
   short_description   text,
   description         text,
@@ -420,6 +472,7 @@ CREATE TABLE service_items (
 
 CREATE INDEX idx_service_items_tenant ON service_items(tenant_id);
 CREATE INDEX idx_service_items_category ON service_items(category_id);
+CREATE INDEX idx_service_items_fulfillment_model ON service_items(fulfillment_model_id);
 CREATE UNIQUE INDEX uq_service_items_tenant_external_key ON service_items(tenant_id, external_key);
 CREATE INDEX idx_service_items_custom_attributes_gin ON service_items USING gin (custom_attributes);
 CREATE INDEX idx_service_items_form_schema_gin ON service_items USING gin (form_schema);
@@ -1053,7 +1106,12 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.20', 'assignment_group_ola'),
   ('v00.01.21', 'chat_threads'),
   ('v00.01.22', 'event_management'),
-  ('v00.01.23', 'servicenow_migrator');
+  ('v00.01.23', 'servicenow_migrator'),
+  ('v00.01.24', 'cost_center_responsible'),
+  ('v00.01.25', 'department_manager'),
+  ('v00.01.26', 'fulfillment_models'),
+  ('v00.01.27', 'request_task_cancelled'),
+  ('v00.01.28', 'users_phone_and_lockout');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1074,7 +1132,7 @@ BEGIN
     SELECT unnest(ARRAY[
       'tenants', 'departments', 'cost_centers', 'roles', 'processes',
       'users', 'companies', 'locations', 'user_preferences', 'user_dashboards', 'assignment_groups', 'services',
-      'service_categories', 'service_items',
+      'service_categories', 'service_items', 'fulfillment_models',
       'requests', 'workflow_start_jobs', 'ai_conversations', 'incidents', 'major_incidents', 'postmortems', 'ci_classes', 'configuration_items'
     ])
   LOOP
@@ -1126,6 +1184,13 @@ CREATE UNIQUE INDEX uq_assets_tenant_external_id_2
 CREATE TRIGGER trg_assets_updated_at
   BEFORE UPDATE ON assets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE requests
+  ADD COLUMN provisioned_ci_id uuid REFERENCES configuration_items(id) ON DELETE SET NULL,
+  ADD COLUMN provisioned_asset_id uuid REFERENCES assets(id) ON DELETE SET NULL;
+
+CREATE INDEX idx_requests_provisioned_ci ON requests(provisioned_ci_id);
+CREATE INDEX idx_requests_provisioned_asset ON requests(provisioned_asset_id);
 
 -- ============================================================
 -- FUNCTION CALCULATE PRIORITY
@@ -1875,7 +1940,7 @@ CREATE TABLE request_tasks (
                     CHECK (task_type IN ('approval', 'manual', 'automated')),
   is_active         boolean NOT NULL DEFAULT true,
   status            text NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending', 'in_progress', 'completed', 'skipped', 'rejected', 'failed')),
+                    CHECK (status IN ('pending', 'in_progress', 'completed', 'skipped', 'rejected', 'failed', 'cancelled')),
   assigned_to       uuid REFERENCES users(id),
   assigned_group_id uuid REFERENCES assignment_groups(id),
   started_at        timestamptz,
@@ -3471,7 +3536,7 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'problems' THEN
     NEW.is_active := (NEW.status::text NOT IN ('resolved', 'closed'));
   ELSIF TG_TABLE_NAME = 'request_tasks' THEN
-    NEW.is_active := (NEW.status::text NOT IN ('completed', 'skipped', 'rejected'));
+    NEW.is_active := (NEW.status::text NOT IN ('completed', 'skipped', 'rejected', 'cancelled'));
   ELSIF TG_TABLE_NAME = 'requests' THEN
     NEW.is_active := (NEW.status::text NOT IN ('fulfilled', 'cancelled'));
   END IF;

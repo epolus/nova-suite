@@ -129,7 +129,7 @@ export default function MajorIncidentsPage() {
   const tStates = useTranslations('common.states');
   const statusLabelFn = useStatusLabel();
 
-  const { params, setSearch, setSort, setCols, setPage, setFilter } = useListParams({
+  const { params, setSearch, setSort, setCols, setPage, setFilter, setColumnFilter } = useListParams({
     defaultCols: DEFAULT_COLS,
     filterKeys: ['status'],
     storageKey: 'major_incidents',
@@ -140,16 +140,18 @@ export default function MajorIncidentsPage() {
   const rawStatusFilter = params.filters.status || '';
   const statusFilter = rawStatusFilter || 'active';
 
-  const apiParams = useMemo(
-    () =>
-      createMajorIncidentListParams({
-        statusFilter,
-        search: params.search,
-        sort: params.sort,
-        dir: params.dir,
-      }),
-    [statusFilter, params.search, params.sort, params.dir],
-  );
+  const apiParams = useMemo(() => {
+    const query = createMajorIncidentListParams({
+      statusFilter,
+      search: params.search,
+      sort: params.sort,
+      dir: params.dir,
+    });
+    for (const [col, val] of Object.entries(params.columnFilters)) {
+      if (val) query[`cf.${col}`] = val;
+    }
+    return query;
+  }, [statusFilter, params.search, params.sort, params.dir, params.columnFilters]);
 
   const { data: listResult, isLoading: loading, error: listError } = useMajorIncidentsList(
     apiParams,
@@ -216,6 +218,8 @@ export default function MajorIncidentsPage() {
           sortKey={params.sort}
           sortDir={params.dir}
           onSort={setSort}
+          columnFilters={params.columnFilters}
+          onColumnFilter={setColumnFilter}
           emptyMessage={params.search ? t('emptySearch', { query: params.search }) : t('empty')}
           onRowClick={(row) => navigate(`/major-incidents/${row.id}`, { state: { listParams: getListParams() } })}
           pagination={

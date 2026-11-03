@@ -171,6 +171,11 @@ export function convertFlow(
     if (groups.length + users.length > 1) {
       notes.warn('approval_multiple', 'Multiple approvers/rules found; only the first is migrated.', n.label);
     }
+    const described = `${n.defName} ${n.step.comment} ${rules}`;
+    if (/dept(?:artment)?[\s_-]*head|department[\s_-]*manager/i.test(described)) {
+      notes.info('department_manager', 'Department head approval uses the manager of the request subject\'s department.', n.label);
+      return { type: 'department_manager', template: '' };
+    }
     if (/manager/i.test(rules) && groups.length === 0 && users.length === 0) {
       return { type: 'requester_manager', template: '' };
     }
@@ -366,8 +371,8 @@ export function convertFlow(
         const to = pick(values, 'ah_to', 'to', 'recipients', 'users', 'recipient');
         let recipientType = 'requester';
         const toPath = singlePillPath(to, ctx);
-        if (toPath === 'request.requested_for') recipientType = 'requested_for';
-        else if (toPath === 'request.requester_id') recipientType = 'requester';
+        if (toPath === 'request.requested_for' || toPath === 'request.requested_for_email') recipientType = 'requested_for';
+        else if (toPath === 'request.requester_id' || toPath === 'request.requester_email') recipientType = 'requester';
         else if (toPath) recipientType = `{{${toPath}}}`;
         else if (/^[^@\s]+@[^@\s]+$/.test(to)) {
           recipientType = to;

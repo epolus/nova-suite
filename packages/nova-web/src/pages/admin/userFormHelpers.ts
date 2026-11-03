@@ -24,6 +24,10 @@ export interface UserFormState {
   department_id: string;
   cost_center_id: string;
   is_active: boolean;
+  vip: boolean;
+  employee_number: string;
+  locked_out: boolean;
+  lock_reason: string;
   role_ids: string[];
 }
 
@@ -35,7 +39,7 @@ export const EMPTY_USER_FORM: UserFormState = {
   user_id: '',
   password: '',
   title: '',
-  phone: '+41',
+  phone: '',
   mobile: '',
   location: 'Zurich',
   timezone: 'UTC',
@@ -50,6 +54,10 @@ export const EMPTY_USER_FORM: UserFormState = {
   department_id: '',
   cost_center_id: '',
   is_active: true,
+  vip: false,
+  employee_number: '',
+  locked_out: false,
+  lock_reason: '',
   role_ids: [],
 };
 
@@ -77,6 +85,10 @@ export function userToForm(user: AdminUser): UserFormState {
     department_id: user.department_id ?? '',
     cost_center_id: user.cost_center_id ?? '',
     is_active: user.is_active ?? true,
+    vip: user.vip ?? false,
+    employee_number: user.employee_number ?? '',
+    locked_out: user.locked_out ?? false,
+    lock_reason: user.lock_reason ?? '',
     role_ids: user.role_details?.map((r) => r.id) ?? [],
   };
 }

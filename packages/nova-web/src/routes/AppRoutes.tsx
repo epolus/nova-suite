@@ -128,6 +128,7 @@ export default function AppRoutes() {
           <Route path="workflows/:workflowId/:runId" element={<Lazy><Pages.WorkflowDetailPage /></Lazy>} />
           <Route path="categories" element={<Lazy><Pages.CategoriesPage /></Lazy>} />
           <Route path="service-items" element={<Lazy><Pages.ServiceItemsPage /></Lazy>} />
+          <Route path="fulfillment-models" element={<Lazy><Pages.FulfillmentModelsPage /></Lazy>} />
           <Route path="catalog-tasks" element={<Lazy><Pages.CatalogTasksPage /></Lazy>} />
           <Route path="catalog-tasks/:serviceItemId/new" element={<Lazy><Pages.CatalogTaskDetailPage /></Lazy>} />
           <Route path="catalog-tasks/:serviceItemId/:taskId" element={<Lazy><Pages.CatalogTaskDetailPage /></Lazy>} />

@@ -45,6 +45,7 @@ export interface Incident {
   caller_email?: string;
   caller_phone?: string;
   caller_mobile?: string;
+  caller_vip?: boolean;
   caller_department_name?: string;
   service_name?: string;
   ci_name?: string;

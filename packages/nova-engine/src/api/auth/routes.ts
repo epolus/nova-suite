@@ -18,6 +18,9 @@ import { getClientIp } from '../../middleware/client-ip';
 
 const router = Router();
 
+/** Consecutive bad passwords before the account is locked. */
+const MAX_FAILED_LOGINS = 5;
+
 // ─── POST /api/auth/login ───
 router.post(
   '/login',
@@ -40,12 +43,13 @@ router.post(
         time_format: '12h' | '24h';
         date_format: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
         is_active: boolean;
+        locked_out: boolean;
       }>(
-        'SELECT id, tenant_id, email, password_hash, display_name, time_format, date_format, is_active FROM lookup_user_for_login($1)',
+        'SELECT id, tenant_id, email, password_hash, display_name, time_format, date_format, is_active, locked_out FROM lookup_user_for_login($1)',
         [email],
       );
 
-      if (!user || !user.is_active) {
+      if (!user || !user.is_active || user.locked_out) {
         if (user?.tenant_id) {
           void db.withTenantContext(user.tenant_id, user.id, 'user', () => recordAuditEvent({
             tenantId: user.tenant_id,
@@ -54,7 +58,7 @@ router.post(
             action: 'auth.login.failed',
             level: 'warning',
             clientIp: getClientIp(req),
-            metadata: { email, reason: 'inactive_or_unknown' },
+            metadata: { email, reason: !user.is_active ? 'inactive_or_unknown' : 'locked_out' },
           }));
         }
         throw new AppError(401, 'Invalid email or password');
@@ -62,6 +66,26 @@ router.post(
 
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid) {
+        const failure = await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.getOne<{
+          locked_out: boolean;
+          failed_login_count: number;
+        }>(
+          `UPDATE users
+           SET failed_login_count = failed_login_count + 1,
+               last_failed_login_at = now(),
+               locked_out = (failed_login_count + 1 >= $2),
+               locked_at = CASE
+                 WHEN failed_login_count + 1 >= $2 THEN now()
+                 ELSE locked_at
+               END,
+               lock_reason = CASE
+                 WHEN failed_login_count + 1 >= $2 THEN 'failed_logins'
+                 ELSE lock_reason
+               END
+           WHERE id = $1
+           RETURNING locked_out, failed_login_count`,
+          [user.id, MAX_FAILED_LOGINS],
+        ));
         void db.withTenantContext(user.tenant_id, user.id, 'user', () => recordAuditEvent({
           tenantId: user.tenant_id,
           actorUserId: user.id,
@@ -69,10 +93,22 @@ router.post(
           action: 'auth.login.failed',
           level: 'warning',
           clientIp: getClientIp(req),
-          metadata: { email, reason: 'invalid_password' },
+          metadata: {
+            email,
+            reason: failure?.locked_out ? 'locked_out' : 'invalid_password',
+            failed_login_count: failure?.failed_login_count ?? null,
+          },
         }));
         throw new AppError(401, 'Invalid email or password');
       }
+
+      await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.query(
+        `UPDATE users
+         SET last_login_at = now(),
+             failed_login_count = 0
+         WHERE id = $1`,
+        [user.id],
+      ));
 
       // Fetch roles for this user
       const roleRows = await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.getMany<{ name: string }>(
@@ -163,14 +199,14 @@ router.post(
           phone, mobile, location, timezone, time_format, date_format,
           employee_type, company, preferred_language,
           start_date, last_working_date,
-          manager_id, department_id, cost_center_id
+          manager_id, department_id, cost_center_id, source
         ) VALUES (
           $1, $2, $3, $4,
           $5, $6, $7, $8,
           $9, $10, $11, $12, $13, $14,
           $15, $16, $17,
           $18, $19,
-          $20, $21, $22
+          $20, $21, $22, 'manual'
         ) RETURNING id`,
         [
           tenantId, user_id || null, email, passwordHash,
@@ -317,7 +353,7 @@ router.get(
     try {
       const tenantId = req.user!.tenant_id;
       const result = await db.getMany(
-        `SELECT u.id, u.email, u.display_name, u.user_id,
+        `SELECT u.id, u.email, u.display_name, u.user_id, u.phone, u.mobile, u.vip,
                 COALESCE(
                   array_agg(r.name ORDER BY r.name) FILTER (WHERE r.name IS NOT NULL),
                   ARRAY[]::text[]

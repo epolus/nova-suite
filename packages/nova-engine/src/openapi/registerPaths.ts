@@ -27,6 +27,14 @@ import {
   updateIncidentSchema,
   uuidSchema,
 } from '../domain/schemas';
+import { registerAuthExtras } from './paths/authExtras';
+import { registerCoreGaps } from './paths/coreGaps';
+import { registerProblemPaths } from './paths/problems';
+import { registerChangePaths } from './paths/changes';
+import { registerAssetPaths } from './paths/assets';
+import { registerAlertPaths } from './paths/alerts';
+import { registerMajorIncidentPaths } from './paths/majorIncidents';
+import { registerTemporalPaths } from './paths/temporal';
 
 const uuidParam = z.object({ id: uuidSchema });
 
@@ -35,7 +43,7 @@ const catalogItemsQuerySchema = z
     category_id: uuidSchema.optional(),
     include_inactive: z.enum(['true']).optional(),
   })
-  .passthrough();
+  .loose();
 
 const incidentListQuerySchema = paginationSchema.merge(
   z
@@ -72,7 +80,7 @@ const cmdbItemsNavQuerySchema = z
     environment: z.string().optional(),
     search: z.string().optional(),
   })
-  .passthrough();
+  .loose();
 
 const cmdbImpactQuerySchema = z.object({
   depth: z.coerce.number().int().min(1).max(50).default(5).optional(),
@@ -602,4 +610,13 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
     200: { description: 'Apply result' },
     400: { description: 'Validation failed' },
   }, { params: uuidParam, ...jsonBody(serviceNowApplySchema) });
+
+  registerAuthExtras(registry);
+  registerCoreGaps(registry);
+  registerProblemPaths(registry);
+  registerChangePaths(registry);
+  registerAssetPaths(registry);
+  registerAlertPaths(registry);
+  registerMajorIncidentPaths(registry);
+  registerTemporalPaths(registry);
 }

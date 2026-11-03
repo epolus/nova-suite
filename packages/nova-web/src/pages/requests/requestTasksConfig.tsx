@@ -6,7 +6,7 @@ import { type DataColumnDef } from '../../components/DataTable';
 import { formatDate, formatDateTime } from '../../utils/dateTime';
 import { useFieldLabel } from '@/i18n/hooks';
 
-export const STATUS_OPTIONS = ['', 'pending', 'in_progress', 'completed', 'rejected'];
+export const STATUS_OPTIONS = ['', 'pending', 'in_progress', 'completed', 'skipped', 'cancelled', 'rejected'];
 export const TYPE_COLORS: Record<string, string> = {
   approval: 'bg-amber-100 text-amber-700',
   manual: 'bg-blue-100 text-blue-700',

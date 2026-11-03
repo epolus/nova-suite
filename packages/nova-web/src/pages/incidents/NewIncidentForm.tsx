@@ -43,11 +43,22 @@ export function NewIncidentForm({ state }: { state: NewIncidentState }) {
                 renderItem={(u) => (
                   <>
                     <span className="font-medium">{u.display_name}</span>
+                    {u.vip && (
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold uppercase">{tIncidents('vip')}</span>
+                    )}
                     <span className="text-gray-400 ml-2">{u.email}</span>
                   </>
                 )}
               />
             </div>
+            {state.selectedCaller?.vip && (
+              <div>
+                <dt className="text-xs text-gray-500">{tIncidents('vip')}</dt>
+                <dd className="mt-0.5">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold uppercase">{tIncidents('vip')}</span>
+                </dd>
+              </div>
+            )}
             {state.selectedCaller?.email && (
               <div>
                 <dt className="text-xs text-gray-500">{fieldLabel('email')}</dt>

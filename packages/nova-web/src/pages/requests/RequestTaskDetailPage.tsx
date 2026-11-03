@@ -10,6 +10,7 @@ import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import { formatDateTime } from '../../utils/dateTime';
+import RequestTaskCancelDialog from '../../components/RequestTaskCancelDialog';
 
 const TYPE_BADGE: Record<string, string> = {
   approval: 'bg-amber-100 text-amber-700 border border-amber-200',
@@ -29,6 +30,8 @@ export default function RequestTaskDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const [prevTaskId, setPrevTaskId] = useState(taskId);
   if (taskId !== prevTaskId) {
@@ -72,12 +75,17 @@ export default function RequestTaskDetailPage() {
     }
   };
 
-  const handleComplete = async (outcome: 'approved' | 'rejected' | 'completed') => {
+  const handleComplete = async (outcome: 'approved' | 'rejected' | 'completed' | 'skipped' | 'cancelled', notes?: string) => {
     if (!task) return;
     setActionLoading(true);
+    setError('');
     try {
-      await requestsApi.completeTask(task.request_id, task.id, { outcome });
+      await requestsApi.completeTask(task.request_id, task.id, { outcome, notes });
+      setCancelOpen(false);
+      setCancelReason('');
       await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tRequests('loadTaskFailed'));
     } finally {
       setActionLoading(false);
     }
@@ -221,18 +229,50 @@ export default function RequestTaskDetailPage() {
                 </>
               )}
               {canComplete && (
-                <button
-                  onClick={() => handleComplete('completed')}
-                  disabled={actionLoading}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {tRequests('complete')}
-                </button>
+                <>
+                  <button
+                    onClick={() => handleComplete('skipped')}
+                    disabled={actionLoading}
+                    className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {tRequests('skip')}
+                  </button>
+                  <button
+                    onClick={() => { setCancelReason(''); setError(''); setCancelOpen(true); }}
+                    disabled={actionLoading}
+                    className="px-3 py-1.5 text-xs font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {tRequests('cancelRequest')}
+                  </button>
+                  <button
+                    onClick={() => handleComplete('completed')}
+                    disabled={actionLoading}
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {tRequests('complete')}
+                  </button>
+                </>
               )}
             </div>
           )}
 
-          {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
+          {error && !cancelOpen && <p className="mt-3 text-xs text-red-600">{error}</p>}
+          <RequestTaskCancelDialog
+            open={cancelOpen}
+            reason={cancelReason}
+            error={cancelOpen ? error : ''}
+            loading={actionLoading}
+            onReason={(value) => { setCancelReason(value); setError(''); }}
+            onClose={() => { setCancelOpen(false); setError(''); }}
+            onConfirm={() => {
+              const reason = cancelReason.trim();
+              if (!reason) {
+                setError(tRequests('cancelReasonRequired'));
+                return;
+              }
+              handleComplete('cancelled', reason);
+            }}
+          />
         </Card>
       </div>
     </>

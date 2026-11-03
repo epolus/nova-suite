@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "rm -f dist/openapi.js dist/openapi.js.map dist/openapi.d.ts dist/openapi.d.ts.map && tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",

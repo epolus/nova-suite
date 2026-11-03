@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { RefObject } from 'react';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
-import type { Category, CIClass, FormField } from '../../api/client';
+import type { Category, CIClass, FormField, FulfillmentModel } from '../../api/client';
+import { fulfillmentGroupTasks } from '../../api/types/catalog';
 import Card from '../../components/Card';
 import FormBuilder from '../../components/FormBuilder';
 import { formatCurrency } from '../../utils/currency';
@@ -250,17 +252,20 @@ export function ServiceItemSettingsCard({
   form,
   fieldErrors,
   currencyCode,
+  fulfillmentModels,
   set,
 }: {
   form: Record<string, unknown>;
   fieldErrors: ServiceItemFieldErrors;
   currencyCode: string;
+  fulfillmentModels: FulfillmentModel[];
   set: SetField;
 }) {
   const t = useTranslations('pages.admin.serviceItems');
   const tForm = useTranslations('pages.admin.serviceItems.form');
   const tFields = useTranslations('common.fields');
   const tStates = useTranslations('common.states');
+  const selectedModel = fulfillmentModels.find((model) => model.id === form.fulfillment_model_id);
   return (
     <Card>
       <h3 className="font-semibold text-gray-900 mb-4">{tForm('settings')}</h3>
@@ -308,6 +313,37 @@ export function ServiceItemSettingsCard({
             <label htmlFor="approval_required" className="text-sm text-gray-700">{t('managerApproval')}</label>
           </div>
           <p className="text-xs text-gray-500 pl-7">{tForm('approvalHint')}</p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{tForm('fulfillmentModel')}</label>
+          <select
+            value={(form.fulfillment_model_id as string) || ''}
+            onChange={(e) => set('fulfillment_model_id', e.target.value || null)}
+            className={controlClass(false)}
+          >
+            <option value="">{tForm('fulfillmentModelNone')}</option>
+            {fulfillmentModels.map((model) => (
+              <option key={model.id} value={model.id}>{model.name}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">{tForm('fulfillmentModelHint')}</p>
+          {selectedModel && (
+            <ul className="mt-2 text-xs text-gray-600 list-disc pl-4 space-y-1">
+              {fulfillmentGroupTasks(selectedModel.config).map((task, index) => (
+                <li key={`${task.name}-${index}`}>
+                  {tForm('modelSummaryTask', {
+                    name: task.name,
+                    group: selectedModel.task_group_names?.[index] || '',
+                  })}
+                </li>
+              ))}
+              {selectedModel.config.ci?.enabled && <li>{tForm('modelSummaryCi')}</li>}
+              {selectedModel.config.asset?.enabled && <li>{tForm('modelSummaryAsset')}</li>}
+            </ul>
+          )}
+          <Link to="/admin/fulfillment-models" className="inline-block mt-2 text-xs text-indigo-700 hover:underline">
+            {tForm('openFulfillmentModels')}
+          </Link>
         </div>
         <div className="flex items-center gap-3">
           <input

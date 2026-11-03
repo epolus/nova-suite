@@ -11,8 +11,9 @@ import SearchBar from './SearchBar';
 import DataTable, { type DataColumnDef } from './DataTable';
 import { useListParams } from '../hooks/useListParams';
 import { formatDate, formatDateTime } from '../utils/dateTime';
+import RequestTaskCancelDialog from './RequestTaskCancelDialog';
 
-const STATUS_OPTIONS = ['', 'pending', 'in_progress', 'completed', 'rejected'];
+const STATUS_OPTIONS = ['', 'pending', 'in_progress', 'completed', 'skipped', 'cancelled', 'rejected'];
 
 const DEFAULT_COLS = [
   'number', 'name', 'task_type', 'status', 'request_number',
@@ -31,6 +32,7 @@ interface Props {
 
 export default function RequestTasksTab({ filterKey }: Props) {
   const t = useTranslations('components.requestTasksTab');
+  const tRequests = useTranslations('pages.requests');
   const tActions = useTranslations('common.actions');
   const tTable = useTranslations('common.table');
   const navigate = useNavigate();
@@ -46,6 +48,9 @@ export default function RequestTasksTab({ filterKey }: Props) {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [cancelTask, setCancelTask] = useState<RequestTaskListItem | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState('');
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const statusFilter = params.filters.status || '';
@@ -80,17 +85,20 @@ export default function RequestTasksTab({ filterKey }: Props) {
     setRefreshNonce((n) => n + 1);
   }, []);
 
-  const handleComplete = useCallback(async (task: RequestTaskListItem, outcome: string) => {
+  const handleComplete = useCallback(async (task: RequestTaskListItem, outcome: string, notes?: string) => {
     setActionLoadingId(task.id);
+    setCancelError('');
     try {
-      await requestsApi.completeTask(task.request_id, task.id, { outcome });
+      await requestsApi.completeTask(task.request_id, task.id, { outcome, notes });
+      setCancelTask(null);
+      setCancelReason('');
       fetchTasks();
     } catch (err) {
-      console.error(err);
+      setCancelError(err instanceof Error ? err.message : tRequests('loadTaskFailed'));
     } finally {
       setActionLoadingId(null);
     }
-  }, [fetchTasks]);
+  }, [fetchTasks, tRequests]);
 
   const handleAssign = useCallback(async (task: RequestTaskListItem) => {
     setActionLoadingId(task.id);
@@ -249,13 +257,34 @@ export default function RequestTasksTab({ filterKey }: Props) {
           </>
         )}
         {canComplete && (
-          <button
-            onClick={(e) => { e.stopPropagation(); handleComplete(task, 'completed'); }}
-            disabled={isLoading}
-            className="px-2.5 py-1 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
-          >
-            {t('complete')}
-          </button>
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleComplete(task, 'skipped'); }}
+              disabled={isLoading}
+              className="px-2.5 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
+            >
+              {t('skip')}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setCancelTask(task);
+                setCancelReason('');
+                setCancelError('');
+              }}
+              disabled={isLoading}
+              className="px-2.5 py-1 text-xs font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 whitespace-nowrap"
+            >
+              {t('cancel')}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleComplete(task, 'completed'); }}
+              disabled={isLoading}
+              className="px-2.5 py-1 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
+            >
+              {t('complete')}
+            </button>
+          </>
         )}
       </div>
     );
@@ -309,6 +338,23 @@ export default function RequestTasksTab({ filterKey }: Props) {
           }
         />
       )}
+      <RequestTaskCancelDialog
+        open={cancelTask !== null}
+        reason={cancelReason}
+        error={cancelError}
+        loading={actionLoadingId === cancelTask?.id}
+        onReason={(value) => { setCancelReason(value); setCancelError(''); }}
+        onClose={() => { setCancelTask(null); setCancelError(''); }}
+        onConfirm={() => {
+          if (!cancelTask) return;
+          const reason = cancelReason.trim();
+          if (!reason) {
+            setCancelError(tRequests('cancelReasonRequired'));
+            return;
+          }
+          handleComplete(cancelTask, 'cancelled', reason);
+        }}
+      />
     </>
   );
 }

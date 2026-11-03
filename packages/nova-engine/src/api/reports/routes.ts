@@ -122,7 +122,13 @@ async function runComponentPreview(
       type: 'table',
       dataset: component.dataset,
       row_count: rows.rows.length,
-      rows: rows.rows,
+      rows: (rows.rows as Record<string, unknown>[]).map((row) => {
+        const projected: Record<string, unknown> = { _row_id: row._row_id };
+        compiled.columns.forEach((name, index) => {
+          projected[name] = row[`c${index}`];
+        });
+        return projected;
+      }),
     };
   }
 

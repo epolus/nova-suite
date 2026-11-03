@@ -29,6 +29,7 @@ export const agentNav: RawNavItemDef[] = [
 export const catalogDesignerNav: RawNavItemDef[] = [
   { to: '/admin/categories', labelKey: 'admin.categories', icon: 'catalog' },
   { to: '/admin/service-items', labelKey: 'admin.serviceItems', icon: 'service_item' },
+  { to: '/admin/fulfillment-models', labelKey: 'admin.fulfillmentModels', icon: 'service_item' },
   { to: '/admin/catalog-tasks', labelKey: 'admin.catalogTasks', icon: 'request_tasks' },
 ];
 
@@ -104,6 +105,7 @@ export const adminSections: RawAdminSection[] = [
       { to: '/admin/services', labelKey: 'admin.services', icon: 'services' },
       { to: '/admin/categories', labelKey: 'admin.categories', icon: 'catalog' },
       { to: '/admin/service-items', labelKey: 'admin.serviceItems', icon: 'service_item' },
+      { to: '/admin/fulfillment-models', labelKey: 'admin.fulfillmentModels', icon: 'service_item' },
       { to: '/admin/catalog-tasks', labelKey: 'admin.catalogTasks', icon: 'request_tasks' },
     ],
   },

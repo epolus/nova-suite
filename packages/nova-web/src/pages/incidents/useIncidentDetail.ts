@@ -195,9 +195,10 @@ export function useIncidentDetail() {
           phone: inc.caller_phone,
           mobile: inc.caller_mobile,
           department: inc.caller_department_name,
+          vip: inc.caller_vip === true,
         }
       : callerUser
-        ? { email: callerUser.email, phone: null, mobile: null, department: null }
+        ? { email: callerUser.email, phone: callerUser.phone ?? null, mobile: callerUser.mobile ?? null, department: null, vip: callerUser.vip === true }
         : null;
 
   const groupMembers = useMemo(() => {

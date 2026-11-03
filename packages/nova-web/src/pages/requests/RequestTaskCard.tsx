@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { useState } from 'react';
 import type { RequestTask } from '../../api/client';
 import { formatDateTime } from '../../utils/dateTime';
 import { useTranslations } from 'use-intl';
+import RequestTaskCancelDialog from '../../components/RequestTaskCancelDialog';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-gray-100 text-gray-600',
@@ -10,6 +12,7 @@ const STATUS_COLORS: Record<string, string> = {
   skipped: 'bg-gray-100 text-gray-400',
   rejected: 'bg-red-100 text-red-700',
   failed: 'bg-orange-100 text-orange-800',
+  cancelled: 'bg-gray-100 text-gray-500',
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -29,13 +32,13 @@ export function TaskCard({
   actionLoading: boolean;
   taskNote: string;
   onNoteChange: (val: string) => void;
-  onComplete: (taskId: string, outcome: string) => void;
+  onComplete: (taskId: string, outcome: string, notes?: string) => void;
   onAssign: (taskId: string) => void;
 }) {
   const tRequests = useTranslations('pages.requests');
   const tActions = useTranslations('common.actions');
   const isActive = task.status === 'in_progress';
-  const isDone = ['completed', 'skipped', 'rejected', 'failed'].includes(task.status);
+  const isDone = ['completed', 'skipped', 'rejected', 'failed', 'cancelled'].includes(task.status);
   // Block only classic manager-of-subject self-approval. An explicit assignee
   // (group_manager) may still decide even when they opened the request.
   const isSelfApprovalBlocked =
@@ -47,6 +50,9 @@ export function TaskCard({
   const canApprove = task.task_type === 'approval' && !isSelfApprovalBlocked;
   const canComplete = task.task_type !== 'approval';
   const hasActions = isActive && (canAssign || canApprove || canComplete);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState('');
 
   return (
     <div className={`p-4 ${isDone ? 'opacity-60' : ''}`}>
@@ -109,14 +115,47 @@ export function TaskCard({
               </button>
             </div>
           ) : canComplete ? (
-            <button
-              onClick={() => onComplete(task.id, 'completed')}
-              disabled={actionLoading}
-              className="w-full px-3 py-1.5 bg-indigo-600 text-white rounded-sm text-xs font-medium hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {tRequests('markComplete')}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onComplete(task.id, 'skipped', taskNote || undefined)}
+                disabled={actionLoading}
+                className="flex-1 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-sm text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                {tRequests('skip')}
+              </button>
+              <button
+                onClick={() => { setCancelReason(''); setCancelError(''); setCancelOpen(true); }}
+                disabled={actionLoading}
+                className="flex-1 px-3 py-1.5 border border-red-300 text-red-700 rounded-sm text-xs font-medium hover:bg-red-50 disabled:opacity-50"
+              >
+                {tRequests('cancelRequest')}
+              </button>
+              <button
+                onClick={() => onComplete(task.id, 'completed', taskNote || undefined)}
+                disabled={actionLoading}
+                className="flex-1 px-3 py-1.5 bg-indigo-600 text-white rounded-sm text-xs font-medium hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {tRequests('markComplete')}
+              </button>
+            </div>
           ) : null}
+          <RequestTaskCancelDialog
+            open={cancelOpen}
+            reason={cancelReason}
+            error={cancelError}
+            loading={actionLoading}
+            onReason={(value) => { setCancelReason(value); setCancelError(''); }}
+            onClose={() => setCancelOpen(false)}
+            onConfirm={() => {
+              const reason = cancelReason.trim();
+              if (!reason) {
+                setCancelError(tRequests('cancelReasonRequired'));
+                return;
+              }
+              setCancelOpen(false);
+              onComplete(task.id, 'cancelled', reason);
+            }}
+          />
         </div>
       )}
     </div>

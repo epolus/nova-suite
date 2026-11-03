@@ -20,15 +20,41 @@ export const admin = {
     request<{ success: boolean }>(`/admin/roles/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   // Departments
   departments: () => request<{ departments: DepartmentItem[] }>('/admin/departments'),
-  createDepartment: (data: { name: string; description?: string; parent_department_id?: string; cost_center_id?: string }) =>
+  createDepartment: (data: {
+    name: string;
+    description?: string;
+    parent_department_id?: string;
+    cost_center_id?: string;
+    manager_id?: string | null;
+    external_id?: string | null;
+  }) =>
     request<{ id: string }>('/admin/departments', { method: 'POST', body: JSON.stringify(data) }),
-  updateDepartment: (id: string, data: { name?: string; description?: string; parent_department_id?: string; cost_center_id?: string; is_active?: boolean }) =>
+  updateDepartment: (id: string, data: {
+    name?: string;
+    description?: string;
+    parent_department_id?: string;
+    cost_center_id?: string;
+    manager_id?: string | null;
+    external_id?: string | null;
+    is_active?: boolean;
+  }) =>
     request<{ success: boolean }>(`/admin/departments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   // Cost Centers
   costCenters: () => request<{ cost_centers: CostCenterItem[] }>('/admin/cost-centers'),
-  createCostCenter: (data: { code: string; name: string; description?: string }) =>
+  createCostCenter: (data: {
+    code: string;
+    name: string;
+    description?: string;
+    responsible_user_id?: string | null;
+  }) =>
     request<{ id: string }>('/admin/cost-centers', { method: 'POST', body: JSON.stringify(data) }),
-  updateCostCenter: (id: string, data: { code?: string; name?: string; description?: string; is_active?: boolean }) =>
+  updateCostCenter: (id: string, data: {
+    code?: string;
+    name?: string;
+    description?: string;
+    is_active?: boolean;
+    responsible_user_id?: string | null;
+  }) =>
     request<{ success: boolean }>(`/admin/cost-centers/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   // Companies
   companies: () => request<{ companies: CompanyItem[] }>('/admin/companies'),

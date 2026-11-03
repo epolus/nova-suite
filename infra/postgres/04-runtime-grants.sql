@@ -51,7 +51,8 @@ RETURNS TABLE (
   display_name text,
   time_format text,
   date_format text,
-  is_active boolean
+  is_active boolean,
+  locked_out boolean
 )
 LANGUAGE sql
 STABLE
@@ -59,7 +60,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT u.id, u.tenant_id, u.email, u.password_hash, u.display_name,
-         u.time_format, u.date_format, u.is_active
+         u.time_format, u.date_format, u.is_active, u.locked_out
   FROM users u
   WHERE lower(u.email) = lower(p_email)
   ORDER BY u.created_at
@@ -74,7 +75,8 @@ RETURNS TABLE (
   display_name text,
   time_format text,
   date_format text,
-  is_active boolean
+  is_active boolean,
+  locked_out boolean
 )
 LANGUAGE sql
 STABLE
@@ -82,7 +84,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT u.id, u.tenant_id, u.email, u.display_name,
-         u.time_format, u.date_format, u.is_active
+         u.time_format, u.date_format, u.is_active, u.locked_out
   FROM users u
   WHERE u.sso_provider_id = p_subject
   ORDER BY u.created_at

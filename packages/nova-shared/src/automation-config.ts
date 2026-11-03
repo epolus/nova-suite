@@ -30,7 +30,7 @@ export const AUTOMATION_STATE_TYPES = [
   'variables.set',
 ] as const;
 
-export const AUTOMATION_APPROVER_TYPES = ['user', 'group', 'group_manager', 'requester_manager'] as const;
+export const AUTOMATION_APPROVER_TYPES = ['user', 'group', 'group_manager', 'requester_manager', 'department_manager'] as const;
 export type AutomationApproverType = (typeof AUTOMATION_APPROVER_TYPES)[number];
 
 export const AUTOMATION_LOOP_DEFAULT_MAX_ITERATIONS = 100;

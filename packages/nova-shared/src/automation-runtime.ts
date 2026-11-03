@@ -162,8 +162,13 @@ function buildTemplateContext(params: {
       form_data: formData,
       delivery_info: deliveryInfo,
       requester_id: request.requester_id,
+      requester_email: request.requester_email,
       requested_for: request.requested_for,
+      requested_for_email: request.requested_for_email,
       assigned_to: request.assigned_to,
+      created_at: request.created_at instanceof Date ? request.created_at.toISOString() : (request.created_at ?? ''),
+      notes: request.notes ?? '',
+      quantity: 1,
     },
     response: response
       ? {
@@ -625,7 +630,9 @@ type SuspensionWithoutCheckpoint = AutomationSuspension extends infer S
   : never;
 
 function normalizeApproverType(raw: unknown): AutomationApproverType {
-  return raw === 'user' || raw === 'group' || raw === 'group_manager' ? raw : 'requester_manager';
+  return raw === 'user' || raw === 'group' || raw === 'group_manager' || raw === 'department_manager'
+    ? raw
+    : 'requester_manager';
 }
 
 export async function executeAutomationGraph(

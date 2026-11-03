@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request, uploadFile, BASE } from '../http';
-import type { AllCatalogTask, CatalogTask, Category, ServiceItem } from '../types';
+import type { AllCatalogTask, CatalogTask, Category, FulfillmentModel, ServiceItem } from '../types';
 
 export const catalog = {
   categories: (options?: { includeInactive?: boolean }) =>
@@ -46,4 +46,12 @@ export const catalog = {
     request<CatalogTask>(`/catalog/items/${itemId}/tasks/${taskId}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteItemTask: (itemId: string, taskId: string) =>
     request<{ success: boolean }>(`/catalog/items/${itemId}/tasks/${taskId}`, { method: 'DELETE' }),
+  fulfillmentModels: () => request<{ fulfillment_models: FulfillmentModel[] }>('/catalog/fulfillment-models'),
+  fulfillmentModel: (id: string) => request<FulfillmentModel>(`/catalog/fulfillment-models/${id}`),
+  createFulfillmentModel: (data: { name: string; description?: string | null; is_active?: boolean; config: FulfillmentModel['config'] }) =>
+    request<FulfillmentModel>('/catalog/fulfillment-models', { method: 'POST', body: JSON.stringify(data) }),
+  updateFulfillmentModel: (id: string, data: { name?: string; description?: string | null; is_active?: boolean; config?: FulfillmentModel['config'] }) =>
+    request<FulfillmentModel>(`/catalog/fulfillment-models/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteFulfillmentModel: (id: string) =>
+    request<{ success: boolean }>(`/catalog/fulfillment-models/${id}`, { method: 'DELETE' }),
 };

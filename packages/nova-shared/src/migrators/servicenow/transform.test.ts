@@ -78,6 +78,13 @@ describe('data pills', () => {
     expect(translatePillPath('trigger.request_item.number', c)).toBe('request.number');
     expect(translatePillPath('trigger.request_item.requested_for', c)).toBe('request.requested_for');
     expect(translatePillPath('trigger.request_item.variables.requested_for', c)).toBe('request.requested_for');
+    c.triggerAliases = new Set(['servicecatalog_1']);
+    expect(translatePillPath('ServiceCatalog_1.request_item.requested_for.email', c)).toBe('request.requested_for_email');
+    expect(translatePillPath('ServiceCatalog_1.request_item.opened_by.email', c)).toBe('request.requester_email');
+    expect(translatePillPath('ServiceCatalog_1.request_item.opened_at', c)).toBe('request.created_at');
+    expect(translatePillPath('ServiceCatalog_1.request_item.quantity', c)).toBe('request.quantity');
+    expect(translatePillPath('ServiceCatalog_1.request_item.comments', c)).toBe('request.notes');
+    expect(c.notes.notes.some((n) => n.code === 'pill_dot_walk' || n.code === 'pill_request_field')).toBe(false);
     expect(translatePillPath('flow_variables.count', c)).toBe('vars.count');
     expect(translatePillPath('look_up_record_1.Record.name', c)).toBe('state.lookup.body.name');
     expect(translatePillPath('for_each_1.item.name', c)).toBe('loop.each.item.name');

@@ -63,6 +63,13 @@
       "description": "Beschreibung",
       "email": "E-Mail",
       "phone": "Telefon",
+      "employeeNumber": "Personalnummer",
+      "vip": "VIP",
+      "lockedOut": "Gesperrt",
+      "lockReason": "Sperrgrund",
+      "lastLogin": "Letzte Anmeldung",
+      "failedLoginCount": "Fehlversuche",
+      "lockedAt": "Gesperrt am",
       "location": "Standort",
       "status": "Status",
       "priority": "Priorität",
@@ -74,7 +81,11 @@
       "assignedTo": "Zugewiesen an",
       "createdAt": "Erstellt am",
       "updatedAt": "Aktualisiert am",
-      "search": "Suchen"
+      "search": "Suchen",
+      "manager": "Manager",
+      "externalId": "Externe ID",
+      "responsiblePerson": "Verantwortliche Person",
+      "departments": "Abteilungen"
     },
     "table": {
       "number": "Nummer",
@@ -341,6 +352,7 @@
       "detailTitle": "Details zum Vorfall",
       "summary": "Zusammenfassung",
       "callerProfile": "Anruferprofil",
+      "vip": "VIP",
       "journal": "Zeitschrift",
       "attachments": "Anhänge",
       "insights": "Einblicke",
@@ -416,6 +428,39 @@
     "admin": {
       "title": "Verwaltung",
       "users": "Verwalten Sie Benutzer, Rollen und Organisationsstruktur.",
+      "userDetail": {
+        "lockedCannotLogin": "Gesperrt -- die Anmeldung bleibt blockiert, bis ein Admin das Konto entsperrt",
+        "unlockedCanLogin": "Nicht gesperrt",
+        "sources": {
+          "manual": "Manuell",
+          "sso": "SSO",
+          "import": "Import",
+          "datasource": "Datenquelle"
+        },
+        "lockReasons": {
+          "failed_logins": "Zu viele fehlgeschlagene Anmeldeversuche",
+          "admin": "Von einem Administrator gesperrt"
+        },
+        "placeholders": {
+          "employeeNumber": "z. B. 100234",
+          "lockReason": "Warum dieses Konto gesperrt ist"
+        }
+      },
+      "usersPage": {
+        "sources": {
+          "manual": "Manuell",
+          "sso": "SSO",
+          "import": "Import",
+          "datasource": "Datenquelle"
+        }
+      },
+      "dataSources": {
+        "searchPlaceholder": "Datenquellen suchen...",
+        "count": "{count, plural, one {# Datenquelle} other {# Datenquellen}}",
+        "emptySearch": "Keine Datenquellen für „{query}“",
+        "filterScheduled": "Geplant",
+        "filterManual": "Manuell"
+      },
       "assignmentGroups": "Aufgabengruppen und Mitgliedschaften verwalten.",
       "theming": {
         "title": "Theming & Branding",

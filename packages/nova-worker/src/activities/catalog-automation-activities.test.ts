@@ -102,4 +102,20 @@ describe('catalog automation v2 helpers', () => {
     expect(insert.params[10]).toBeInstanceOf(Date);
     expect(String(insert.params[11])).toContain('without waiting');
   });
+
+  it('assigns a department-manager approval to the subject department manager', async () => {
+    const client = {
+      query: async (sql: string) => {
+        if (sql.includes('FROM users u')) return { rows: [{ manager_id: 'mgr-1' }] };
+        return { rows: [] };
+      },
+    };
+    const assignee = await __test__.resolveApprovalAssignee(
+      client as unknown as Parameters<typeof __test__.resolveApprovalAssignee>[0],
+      'tenant-1',
+      { requester_id: 'user-1', requested_for: null },
+      { name: 'Dept head', instructions: '', approverType: 'department_manager', approver: '' },
+    );
+    expect(assignee).toEqual({ assignedTo: 'mgr-1', assignedGroupId: null, note: null });
+  });
 });

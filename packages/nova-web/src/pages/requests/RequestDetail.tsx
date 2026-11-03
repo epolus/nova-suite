@@ -6,17 +6,16 @@ import type { ServiceRequest, RequestTask, FormField } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
-import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
-import { formatDateTime } from '../../utils/dateTime';
 import { isFulfillerRole } from '../../utils/roles';
 import { useFieldLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
 import { TaskCard } from './RequestTaskCard';
 import { FormFieldValue } from './ResolvedRefs';
 import { RequestDetailSidebar } from './RequestDetailSidebar';
+import { RequestDetailsCard } from './RequestDetailsCard';
 
 export default function RequestDetail() {
   const { id } = useParams<{ id: string }>();
@@ -129,13 +128,13 @@ export default function RequestDetail() {
     }
   };
 
-  const handleTaskComplete = async (taskId: string, outcome: string) => {
+  const handleTaskComplete = async (taskId: string, outcome: string, notes?: string) => {
     if (!id) return;
     setActionLoading(true);
     try {
       const updated = await requestsApi.completeTask(id, taskId, {
         outcome,
-        notes: taskNotes[taskId] || undefined,
+        notes: notes ?? (taskNotes[taskId] || undefined),
       });
       setTasks(tasks.map((t) => (t.id === updated.id ? updated : t)));
       setTaskNotes((prev) => ({ ...prev, [taskId]: '' }));
@@ -247,51 +246,7 @@ export default function RequestDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main details */}
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <h3 className="font-semibold text-gray-900 mb-4">{tRequests('requestDetails')}</h3>
-            <dl className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <dt className="text-gray-500">{tRequests('serviceItem')}</dt>
-                <dd className="font-medium text-gray-900 mt-0.5">{req.service_item_name}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">{tRequests('requester')}</dt>
-                <dd className="font-medium text-gray-900 mt-0.5">{req.requester_name}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">{fieldLabel('priority')}</dt>
-                <dd className="mt-0.5"><Badge value={req.priority} /></dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">{fieldLabel('status')}</dt>
-                <dd className="mt-0.5"><Badge value={req.status} /></dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">{fieldLabel('created')}</dt>
-                <dd className="font-medium text-gray-900 mt-0.5">{formatDateTime(req.created_at)}</dd>
-              </div>
-              {req.approved_by_name && (
-                <div>
-                  <dt className="text-gray-500">{tRequests('approvedBy')}</dt>
-                  <dd className="font-medium text-gray-900 mt-0.5">{req.approved_by_name} &middot; {formatDateTime(req.approved_at)}</dd>
-                </div>
-              )}
-              {req.requested_for_name && req.requested_for !== req.requester_id && (
-                <div>
-                  <dt className="text-gray-500">{tRequests('requestedFor')}</dt>
-                  <dd className="font-medium text-gray-900 mt-0.5">{req.requested_for_name}</dd>
-                </div>
-              )}
-              {req.batch_id && (
-                <div>
-                  <dt className="text-gray-500">{tRequests('order')}</dt>
-                  <dd className="font-medium text-indigo-600 mt-0.5">
-                    {tRequests('partOfOrder', { count: req.batch_count || '?' })}
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </Card>
+          <RequestDetailsCard req={req} />
 
           {/* Form data */}
           {req.form_data && Object.keys(req.form_data).length > 0 && (
