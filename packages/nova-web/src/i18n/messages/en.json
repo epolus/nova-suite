@@ -376,6 +376,7 @@
       "configPackages": "Config Packages",
       "serviceNowMigration": "ServiceNow Migration (experimental)",
       "importData": "Import Data",
+      "dataManagement": "Data Management",
       "theming": "Theming",
       "aiSettings": "AI Settings",
       "status": "Status"
@@ -2761,6 +2762,104 @@
           "assignment_groups": "Assignment Groups",
           "cmdb": "CMDB / Configuration Items",
           "incidents": "Incidents"
+        }
+      },
+      "dataManagement": {
+        "title": "Data management",
+        "description": "Preview a filter, confirm the match count, then archive or delete those incidents.",
+        "listDescription": "Retention jobs for allowlisted records.",
+        "newJob": "New job",
+        "searchPlaceholder": "Search by actor, action, or status",
+        "empty": "No jobs yet",
+        "count": "{count} jobs",
+        "back": "Back to jobs",
+        "started": "Started",
+        "completedAt": "Completed",
+        "target": "Table",
+        "action": "Action",
+        "actions": {
+          "delete": "Delete",
+          "archive": "Archive"
+        },
+        "targets": {
+          "incidents": "Incidents"
+        },
+        "includeOpen": "Include open records",
+        "includeOpenHint": "Only closed and cancelled incidents match unless this is checked. Delete cannot be undone. Archive sets the record inactive.",
+        "filters": "Filters",
+        "addFilter": "Add filter",
+        "removeFilter": "Remove",
+        "field": "Field",
+        "operator": "Operator",
+        "value": "Value",
+        "amount": "Amount",
+        "unit": "Unit",
+        "units": {
+          "days": "Days",
+          "months": "Months",
+          "years": "Years"
+        },
+        "operators": {
+          "eq": "equals",
+          "neq": "does not equal",
+          "contains": "contains",
+          "in": "is any of",
+          "gte": "is at least",
+          "lte": "is at most",
+          "older_than": "older than"
+        },
+        "inHint": "Comma-separated values",
+        "yes": "Yes",
+        "no": "No",
+        "preview": "Preview",
+        "previewing": "Previewing...",
+        "matchCount": "{count} records match",
+        "sample": "Sample",
+        "noSample": "No matching records.",
+        "confirmLabel": "Type {count} to confirm",
+        "run": "Run job",
+        "running": "Starting...",
+        "history": "Job history",
+        "emptyHistory": "No jobs yet",
+        "refresh": "Refresh",
+        "loadFailed": "Could not load data management",
+        "previewFailed": "Preview failed",
+        "runFailed": "Could not start the job",
+        "filterRequired": "Each filter needs a value.",
+        "columns": {
+          "number": "Number",
+          "title": "Title",
+          "status": "Status",
+          "created": "Created",
+          "closed": "Closed",
+          "when": "When",
+          "actor": "Actor",
+          "action": "Action",
+          "jobStatus": "Status",
+          "matched": "Matched",
+          "affected": "Affected",
+          "error": "Error"
+        },
+        "jobStatus": {
+          "pending": "Pending",
+          "running": "Running",
+          "completed": "Completed",
+          "failed": "Failed",
+          "cancelled": "Cancelled"
+        },
+        "fields": {
+          "number": "Number",
+          "title": "Title",
+          "status": "Status",
+          "priority": "Priority",
+          "category": "Category",
+          "sla_breached": "SLA breached",
+          "created_at": "Created",
+          "updated_at": "Updated",
+          "resolved_at": "Resolved",
+          "closed_at": "Closed",
+          "assigned_to": "Assigned to",
+          "caller_id": "Caller"
         }
       },
       "importHistory": {

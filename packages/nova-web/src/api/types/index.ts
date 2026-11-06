@@ -22,3 +22,4 @@ export * from './ai';
 export * from './analytics';
 export * from './improvements';
 export * from './alerts';
+export * from './dataManagement';

@@ -18,7 +18,7 @@ export const config = {
     database: env('POSTGRES_DB', 'nova'),
     user: env('POSTGRES_APP_USER', 'nova_runtime'),
     password: env('POSTGRES_APP_PASSWORD', env('POSTGRES_PASSWORD', 'changeme')),
-    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.28'),
+    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.29'),
   },
   temporal: {
     address: env('TEMPORAL_ADDRESS', 'localhost:7233'),
@@ -29,6 +29,9 @@ export const config = {
   /** Must match nova-engine CREDENTIALS_MASTER_KEY for pgp_sym_decrypt. */
   credentials: {
     masterKey: env('CREDENTIALS_MASTER_KEY', ''),
+  },
+  uploads: {
+    dir: env('UPLOAD_DIR', '/data/uploads'),
   },
   engine: {
     baseUrl: env('NOVA_ENGINE_URL', 'http://nova-engine:4000'),
