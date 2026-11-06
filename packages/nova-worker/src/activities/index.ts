@@ -67,3 +67,7 @@ export {
 export {
   scanProblemRecurrenceForAllTenants,
 } from './problem-recurrence-activities';
+
+export {
+  runDataManagementJob,
+} from './data-management-activities';

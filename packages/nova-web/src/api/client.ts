@@ -26,6 +26,7 @@ export { search } from './domains/search';
 export { approvals } from './domains/approvals';
 export { temporal } from './domains/temporal';
 export { importer } from './domains/importer';
+export { dataManagement } from './domains/dataManagement';
 export { attachments } from './domains/attachments';
 export { credentials } from './domains/credentials';
 export { dataSources } from './domains/dataSources';

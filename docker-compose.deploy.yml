@@ -83,7 +83,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nova}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-nova_runtime}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD}}
-      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.28}
+      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.29}
       JWT_PRIVATE_KEY_PATH: /secrets/jwt-private.pem
       JWT_PUBLIC_KEY_PATH: /secrets/jwt-public.pem
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
@@ -173,7 +173,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nova}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-nova_runtime}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD}}
-      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.28}
+      DB_SCHEMA_VERSION: ${DB_SCHEMA_VERSION:-v00.01.29}
       TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
       TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-nova-itsm}
@@ -187,8 +187,11 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
+      UPLOAD_DIR: /data/uploads
       NODE_ENV: ${NODE_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - uploads_data:/data/uploads
 
   # ─── Nova Web (SPA + API passthrough) ───
   nova-web:

@@ -4,6 +4,7 @@ import {
   hasChangeRole,
   hasConfigurationRole,
   hasKnowledgeRole,
+  canManageData,
   hasRole,
   isAdminRole,
   isCatalogDesignerRole,
@@ -38,6 +39,9 @@ export function canAccessAdminRoute(pathname: string, roles: string[] | undefine
   }
   if (pathname.startsWith('/admin/credentials')) {
     return isAdminRole(r) || hasRole(r, 'credential_manager') || isCatalogDesignerRole(r);
+  }
+  if (pathname.startsWith('/admin/data-management')) {
+    return canManageData(r);
   }
   return isAdminRole(r);
 }

@@ -10,6 +10,9 @@ export type { FulfillmentInput, TaskCompletionSignal } from './catalog-fulfillme
 export { dataSourceSync } from './datasource-sync';
 export type { DataSourceSyncInput } from './datasource-sync';
 
+export { dataManagementJob } from './data-management';
+export type { DataManagementJobInput } from './data-management';
+
 export { serviceNowCatalogMigration } from './servicenow-migration';
 export type { ServiceNowMigrationWorkflowInput } from './servicenow-migration';
 
