@@ -92,7 +92,7 @@ body:
     attributes:
       label: Version
       description: Release, git commit, or image tag (`NOVA_TAG`). Package version is in the root and workspace `package.json` files.
-      placeholder: e.g. 0.1.4 or engine-0.1.4
+      placeholder: e.g. 0.1.5 or engine-0.1.5
     validations:
       required: true
 
