@@ -19,7 +19,7 @@ export const openApiSpec: OpenAPIObject = generator.generateDocument({
   openapi: '3.0.3',
   info: {
     title: 'Nova Suite API',
-    version: '0.1.4',
+    version: '0.1.5',
     description:
       'Nova Suite is an open-source ITSM platform for internal IT teams, MSPs, and small enterprises. ' +
       'It covers service catalog & requests, incident/problem/change management, CMDB & assets, alerts, ' +

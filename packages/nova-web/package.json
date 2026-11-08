@@ -1,6 +1,6 @@
 {
   "name": "@nova-suite/web",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
-    "@nova-suite/shared": "0.1.4",
+    "@nova-suite/shared": "0.1.5",
     "@radix-ui/react-slot": "^1.5.0",
     "@tanstack/react-query": "^5.105.3",
     "@workflowbuilder/sdk": "^3.0.0",

@@ -1,6 +1,6 @@
 {
   "name": "@nova-suite/shared",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Shared workflow/automation schema for Nova Suite",
   "license": "AGPL-3.0",
   "main": "dist/cjs/index.js",
@@ -25,8 +25,12 @@
   },
   "typesVersions": {
     "*": {
-      "node": ["dist/esm/node/index.d.ts"],
-      "migrators/servicenow": ["dist/esm/migrators/servicenow/index.d.ts"]
+      "node": [
+        "dist/esm/node/index.d.ts"
+      ],
+      "migrators/servicenow": [
+        "dist/esm/migrators/servicenow/index.d.ts"
+      ]
     }
   },
   "scripts": {
