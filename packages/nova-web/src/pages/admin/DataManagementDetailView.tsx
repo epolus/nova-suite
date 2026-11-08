@@ -20,7 +20,8 @@ function filterText(
   }
   if (Array.isArray(filter.value)) return `${field} ${operator} ${filter.value.join(', ')}`;
   if (typeof filter.value === 'boolean') return `${field} ${operator} ${filter.value ? t('yes') : t('no')}`;
-  if (typeof filter.value === 'string' && !Number.isNaN(Date.parse(filter.value)) && filter.field.endsWith('_at')) {
+  const dateField = filter.field.endsWith('_at') || filter.field.endsWith('_date') || filter.field.endsWith('_start') || filter.field.endsWith('_end');
+  if (typeof filter.value === 'string' && dateField && !Number.isNaN(Date.parse(filter.value))) {
     return `${field} ${operator} ${formatDateTime(filter.value)}`;
   }
   return `${field} ${operator} ${String(filter.value)}`;

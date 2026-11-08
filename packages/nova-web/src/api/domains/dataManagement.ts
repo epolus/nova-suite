@@ -6,10 +6,11 @@ import type {
   DataManagementJob,
   DataManagementPreview,
   DataManagementTarget,
+  DataManagementTargetKey,
 } from '../types';
 
 export interface DataManagementRequest {
-  target: 'incidents';
+  target: DataManagementTargetKey;
   action: DataManagementAction;
   filters: DataManagementFilter[];
   include_open: boolean;

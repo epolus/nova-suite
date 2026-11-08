@@ -201,7 +201,7 @@ CREATE POLICY tenant_isolation_requests ON requests
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller', 'system')
+      current_user_has_role('admin', 'fulfiller', 'system', 'data_manager')
       OR requester_id = current_user_id()
       OR requested_for = current_user_id()
     )
@@ -345,7 +345,7 @@ CREATE POLICY tenant_isolation_problems ON problems
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller', 'problem', 'system')
+      current_user_has_role('admin', 'fulfiller', 'problem', 'system', 'data_manager')
       OR reported_by = current_user_id()
       OR assigned_to = current_user_id()
     )
@@ -378,7 +378,7 @@ CREATE POLICY tenant_isolation_changes ON changes
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller', 'change_manager', 'system')
+      current_user_has_role('admin', 'fulfiller', 'change_manager', 'system', 'data_manager')
       OR requested_by = current_user_id()
       OR assigned_to = current_user_id()
     )
@@ -663,11 +663,11 @@ CREATE POLICY tenant_isolation_events ON events
 CREATE POLICY tenant_isolation_alerts ON alerts
   FOR ALL USING (
     tenant_id = current_tenant_id()
-    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system', 'data_manager')
   )
   WITH CHECK (
     tenant_id = current_tenant_id()
-    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system', 'data_manager')
   );
 
 CREATE POLICY tenant_isolation_alert_definitions ON alert_definitions

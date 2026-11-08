@@ -9,6 +9,7 @@ import type {
   DataManagementOperator,
   DataManagementPreview,
   DataManagementTarget,
+  DataManagementTargetKey,
   DataManagementUnit,
 } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
@@ -21,7 +22,7 @@ export default function DataManagementFormView() {
   const navigate = useNavigate();
   const t = useTranslations('pages.admin.dataManagement');
   const [targets, setTargets] = useState<DataManagementTarget[]>([]);
-  const [targetKey, setTargetKey] = useState<'incidents'>('incidents');
+  const [targetKey, setTargetKey] = useState<DataManagementTargetKey>('incidents');
   const [action, setAction] = useState<DataManagementAction>('delete');
   const [includeOpen, setIncludeOpen] = useState(false);
   const [rows, setRows] = useState<FilterRow[]>([defaultFilterRow()]);
@@ -60,7 +61,6 @@ export default function DataManagementFormView() {
     return () => {
       cancelled = true;
     };
-    // Initial catalog and history load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -88,7 +88,7 @@ export default function DataManagementFormView() {
     setError('');
     try {
       const result = await dataManagement.preview({
-        target: 'incidents',
+        target: targetKey,
         action,
         filters,
         include_open: includeOpen,
@@ -111,7 +111,7 @@ export default function DataManagementFormView() {
     setError('');
     try {
       const created = await dataManagement.createJob({
-        target: 'incidents',
+        target: targetKey,
         action,
         filters,
         include_open: includeOpen,
@@ -155,12 +155,18 @@ export default function DataManagementFormView() {
                 <select
                   value={target?.key ?? 'incidents'}
                   onChange={(event) => {
-                    setTargetKey(event.target.value as 'incidents');
+                    const nextKey = event.target.value as DataManagementTargetKey;
+                    const next = targets.find((item) => item.key === nextKey);
+                    setTargetKey(nextKey);
+                    if (next && !next.actions.includes(action)) setAction(next.actions[0] ?? 'delete');
+                    const created = next?.fields.find((field) => field.key === 'created_at');
+                    setRows([defaultFilterRow(created)]);
                     setPreview(null);
+                    setConfirmText('');
                   }}
                   className={`${fieldInputClass} mt-1`}
                 >
-                  {(targets.length > 0 ? targets : [{ key: 'incidents' as const, actions: [], fields: [] }]).map((item) => (
+                  {(targets.length > 0 ? targets : [{ key: 'incidents' as const, actions: [], closed_statuses: [], fields: [] }]).map((item) => (
                     <option key={item.key} value={item.key}>{t(`targets.${item.key}`)}</option>
                   ))}
                 </select>
@@ -196,7 +202,9 @@ export default function DataManagementFormView() {
               />
               <span>
                 <span className="font-medium">{t('includeOpen')}</span>
-                <span className="block text-gray-500">{t('includeOpenHint')}</span>
+                <span className="block text-gray-500">
+                  {t('includeOpenHint', { statuses: (target?.closed_statuses ?? []).join(', ') })}
+                </span>
               </span>
             </label>
 

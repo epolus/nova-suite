@@ -21,7 +21,7 @@ export const fieldInputClass = 'w-full px-3 py-2 border border-gray-200 rounded-
 export function defaultFilterRow(field?: DataManagementField): FilterRow {
   return {
     field: field?.key ?? 'created_at',
-    operator: field?.operators.includes('older_than') ? 'older_than' : (field?.operators[0] ?? 'eq'),
+    operator: !field || field.operators.includes('older_than') ? 'older_than' : (field.operators[0] ?? 'eq'),
     text: '',
     amount: '2',
     unit: 'years',

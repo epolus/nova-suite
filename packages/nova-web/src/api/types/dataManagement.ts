@@ -1,4 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type { DataManagementTargetKey } from '@nova-suite/shared';
+
+export type { DataManagementTargetKey };
 
 export type DataManagementOperator = 'eq' | 'neq' | 'contains' | 'in' | 'gte' | 'lte' | 'older_than';
 export type DataManagementFieldType = 'text' | 'number' | 'boolean' | 'timestamp';
@@ -12,8 +15,9 @@ export interface DataManagementField {
 }
 
 export interface DataManagementTarget {
-  key: 'incidents';
+  key: DataManagementTargetKey;
   actions: DataManagementAction[];
+  closed_statuses: string[];
   fields: DataManagementField[];
 }
 

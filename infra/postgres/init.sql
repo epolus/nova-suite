@@ -1020,7 +1020,10 @@ CREATE TABLE data_management_jobs (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   actor_user_id   uuid REFERENCES users(id) ON DELETE SET NULL,
-  target          text NOT NULL CHECK (target IN ('incidents')),
+  target          text NOT NULL CHECK (target IN (
+                    'incidents', 'requests', 'configuration_items', 'assets', 'problems',
+                    'changes', 'knowledge_articles', 'alerts', 'releases', 'improvements'
+                  )),
   action          text NOT NULL CHECK (action IN ('delete', 'archive')),
   filters         jsonb NOT NULL,
   include_open    boolean NOT NULL DEFAULT false,
@@ -1138,7 +1141,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.26', 'fulfillment_models'),
   ('v00.01.27', 'request_task_cancelled'),
   ('v00.01.28', 'users_phone_and_lockout'),
-  ('v00.01.29', 'data_management');
+  ('v00.01.29', 'data_management'),
+  ('v00.01.30', 'data_management_targets');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT

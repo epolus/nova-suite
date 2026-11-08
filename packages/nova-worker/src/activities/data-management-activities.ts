@@ -3,8 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   DATA_MANAGEMENT_CHUNK_SIZE,
-  compileIncidentMatch,
-  incidentIdPageSql,
+  compileDataManagementMatch,
+  dataManagementIdPageSql,
+  dataManagementTargetSpec,
   type DataManagementAction,
   type DataManagementFilter,
 } from '@nova-suite/shared';
@@ -46,17 +47,19 @@ export async function runDataManagementJob(jobId: string, tenantId: string): Pro
   });
 
   if (!job || job.status === 'completed' || job.status === 'cancelled') return;
-  if (job.target !== 'incidents') {
-    await failJob(tenantId, job, `Unsupported target "${job.target}"`);
+  const specResult = resolveTarget(job);
+  if (typeof specResult === 'string') {
+    await failJob(tenantId, job, specResult);
     return;
   }
+  const spec = specResult;
 
   try {
-    const match = compileIncidentMatch(job.filters, {
+    const match = compileDataManagementMatch(job.target, job.filters, {
       includeOpen: job.include_open,
       onlyActive: job.action === 'archive',
     });
-    const pageSql = incidentIdPageSql(match);
+    const pageSql = dataManagementIdPageSql(job.target, match);
     let cursor: string | null = null;
     let finished = false;
 
@@ -85,29 +88,32 @@ export async function runDataManagementJob(jobId: string, tenantId: string): Pro
           let keys: string[] = [];
           let affected = ids.length;
           if (job.action === 'delete') {
+            for (const statement of spec.beforeDelete) {
+              await client.query(statement, [ids]);
+            }
             const attachments = await client.query<{ storage_key: string }>(
               `SELECT storage_key
                FROM attachments
-               WHERE entity_type = 'incident' AND entity_id = ANY($1::uuid[])`,
-              [ids],
+               WHERE entity_type = ANY($2::text[]) AND entity_id = ANY($1::uuid[])`,
+              [ids, spec.cleanupEntityTypes],
             );
             keys = attachments.rows.map((row) => row.storage_key);
             await client.query(
-              `DELETE FROM attachments WHERE entity_type = 'incident' AND entity_id = ANY($1::uuid[])`,
-              [ids],
+              `DELETE FROM attachments WHERE entity_type = ANY($2::text[]) AND entity_id = ANY($1::uuid[])`,
+              [ids, spec.cleanupEntityTypes],
             );
             await client.query(
-              `DELETE FROM chat_threads WHERE entity_type = 'incident' AND entity_id = ANY($1::uuid[])`,
-              [ids],
+              `DELETE FROM chat_threads WHERE entity_type = ANY($2::text[]) AND entity_id = ANY($1::uuid[])`,
+              [ids, spec.cleanupEntityTypes],
             );
             const deleted = await client.query(
-              `DELETE FROM incidents WHERE id = ANY($1::uuid[])`,
+              `DELETE FROM ${spec.table} WHERE id = ANY($1::uuid[])`,
               [ids],
             );
             affected = deleted.rowCount ?? ids.length;
           } else {
             const archived = await client.query(
-              `UPDATE incidents
+              `UPDATE ${spec.table}
                SET is_active = false, updated_at = now()
                WHERE id = ANY($1::uuid[]) AND is_active = true`,
               [ids],
@@ -216,6 +222,18 @@ async function writeAudit(
     job.id,
     JSON.stringify(metadata),
   ]);
+}
+
+function resolveTarget(job: JobRow): ReturnType<typeof dataManagementTargetSpec> | string {
+  try {
+    const found = dataManagementTargetSpec(job.target);
+    if (!found.actions.includes(job.action)) {
+      return `Action "${job.action}" is not allowed for ${job.target}`;
+    }
+    return found;
+  } catch (err) {
+    return err instanceof Error ? err.message : `Unsupported target "${job.target}"`;
+  }
 }
 
 function unlinkStorageKey(uploadDir: string, storageKey: string): void {

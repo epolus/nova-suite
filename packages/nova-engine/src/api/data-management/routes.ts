@@ -3,14 +3,14 @@ import { Router, Request, Response, NextFunction } from 'express';
 import type { PoolClient } from 'pg';
 import {
   DataManagementQueryError,
-  compileIncidentMatch,
+  compileDataManagementMatch,
+  dataManagementCountSql,
   dataManagementJobRequestSchema,
   dataManagementPreviewSchema,
-  incidentCountSql,
-  incidentSampleSql,
+  dataManagementSampleSql,
   listDataManagementTargets,
-  type DataManagementAction,
-  type DataManagementFilter,
+  type DataManagementJobRequest,
+  type DataManagementPreviewRequest,
 } from '@nova-suite/shared';
 import { recordAuditEvent } from '../../audit/events';
 import { AppError, NotFound } from '../../middleware/errorHandler';
@@ -33,13 +33,9 @@ router.post(
   validateBody(dataManagementPreviewSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const body = req.body as {
-        action: DataManagementAction;
-        filters: DataManagementFilter[];
-        include_open: boolean;
-      };
+      const body = req.body as DataManagementPreviewRequest;
       const client = getRequestClient(req);
-      const { count, sample } = await previewMatches(client, body.filters, body.include_open, body.action);
+      const { count, sample } = await previewMatches(client, body.target, body.filters, body.include_open, body.action);
       res.json({ count, sample });
     } catch (err) {
       next(asQueryError(err));
@@ -70,15 +66,9 @@ router.post(
   validateBody(dataManagementJobRequestSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const body = req.body as {
-        target: 'incidents';
-        action: DataManagementAction;
-        filters: DataManagementFilter[];
-        include_open: boolean;
-        confirm_count: number;
-      };
+      const body = req.body as DataManagementJobRequest;
       const client = getRequestClient(req);
-      const { count } = await previewMatches(client, body.filters, body.include_open, body.action);
+      const { count } = await previewMatches(client, body.target, body.filters, body.include_open, body.action);
       if (count === 0) {
         next(new AppError(400, 'No records match these filters', 'BAD_REQUEST'));
         return;
@@ -195,16 +185,17 @@ router.get('/jobs/:id', async (req: Request, res: Response, next: NextFunction) 
 
 async function previewMatches(
   client: PoolClient,
-  filters: DataManagementFilter[],
+  target: DataManagementPreviewRequest['target'],
+  filters: DataManagementPreviewRequest['filters'],
   includeOpen: boolean,
-  action: DataManagementAction,
+  action: DataManagementPreviewRequest['action'],
 ): Promise<{ count: number; sample: Record<string, unknown>[] }> {
-  const match = compileIncidentMatch(filters, {
+  const match = compileDataManagementMatch(target, filters, {
     includeOpen,
     onlyActive: action === 'archive',
   });
-  const countQuery = incidentCountSql(match);
-  const sampleQuery = incidentSampleSql(match);
+  const countQuery = dataManagementCountSql(target, match);
+  const sampleQuery = dataManagementSampleSql(target, match);
   const countResult = await client.query<{ count: number }>(countQuery.text, countQuery.values);
   const sampleResult = await client.query(sampleQuery.text, sampleQuery.values);
   return {
