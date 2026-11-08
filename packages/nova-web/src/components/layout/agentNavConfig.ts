@@ -57,6 +57,7 @@ export function useFullWidthContent(pathname: string): boolean {
   if (isWorkflowEditorPath(pathname)) return true;
   if (pathname === '/admin/catalog-tasks' || pathname.startsWith('/admin/catalog-tasks/')) return true;
   if (pathname === '/admin/data-sources' || pathname.startsWith('/admin/data-sources/')) return true;
+  if (pathname === '/admin/data-management' || pathname.startsWith('/admin/data-management/')) return true;
   const fullWidthPaths = new Set([
     '/my-todo',
     '/my-groups',
@@ -144,6 +145,7 @@ export const adminSections: RawAdminSection[] = [
       { to: '/admin/config-packages', labelKey: 'admin.configPackages', icon: 'config_packages' },
       { to: '/admin/migrations/servicenow', labelKey: 'admin.serviceNowMigration', icon: 'import' },
       { to: '/admin/import', labelKey: 'admin.importData', icon: 'import' },
+      { to: '/admin/data-management', labelKey: 'admin.dataManagement', icon: 'data_sources' },
     ],
   },
   {

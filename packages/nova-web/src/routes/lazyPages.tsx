@@ -63,6 +63,7 @@ export const WorkflowsPage = lazy(() => import('@/pages/admin/WorkflowsPage'));
 export const WorkflowDetailPage = lazy(() => import('@/pages/admin/WorkflowDetailPage'));
 export const WorkflowEditorPage = lazy(() => import('@/pages/admin/WorkflowEditorPage'));
 export const ImportPage = lazy(() => import('@/pages/admin/ImportPage'));
+export const DataManagementPage = lazy(() => import('@/pages/admin/DataManagementPage'));
 export const ImportHistoryPage = lazy(() => import('@/pages/admin/ImportHistoryPage'));
 export const CatalogTasksPage = lazy(() => import('@/pages/admin/CatalogTasksPage'));
 export const CatalogTaskDetailPage = lazy(() => import('@/pages/admin/CatalogTaskDetailPage'));

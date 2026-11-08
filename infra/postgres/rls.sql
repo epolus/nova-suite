@@ -201,20 +201,21 @@ CREATE POLICY tenant_isolation_requests ON requests
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller', 'system')
+      current_user_has_role('admin', 'fulfiller', 'system', 'data_manager')
       OR requester_id = current_user_id()
       OR requested_for = current_user_id()
     )
   );
 
 -- ─── Incidents ───
--- Fulfillers/admins/system see all in-tenant. ESS users see incidents they
--- reported (caller) or submitted (creation journal), matching the API filter.
+-- Fulfillers/admins/system see all in-tenant. data_manager can read and
+-- purge for retention jobs. ESS users see incidents they reported (caller)
+-- or submitted (creation journal), matching the API filter.
 CREATE POLICY tenant_isolation_incidents ON incidents
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller', 'system')
+      current_user_has_role('admin', 'fulfiller', 'system', 'data_manager')
       OR caller_id = current_user_id()
       OR EXISTS (
         SELECT 1
@@ -344,7 +345,7 @@ CREATE POLICY tenant_isolation_problems ON problems
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller', 'problem', 'system')
+      current_user_has_role('admin', 'fulfiller', 'problem', 'system', 'data_manager')
       OR reported_by = current_user_id()
       OR assigned_to = current_user_id()
     )
@@ -377,7 +378,7 @@ CREATE POLICY tenant_isolation_changes ON changes
   FOR ALL USING (
     tenant_id = current_tenant_id()
     AND (
-      current_user_has_role('admin', 'fulfiller', 'change_manager', 'system')
+      current_user_has_role('admin', 'fulfiller', 'change_manager', 'system', 'data_manager')
       OR requested_by = current_user_id()
       OR assigned_to = current_user_id()
     )
@@ -662,11 +663,11 @@ CREATE POLICY tenant_isolation_events ON events
 CREATE POLICY tenant_isolation_alerts ON alerts
   FOR ALL USING (
     tenant_id = current_tenant_id()
-    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system', 'data_manager')
   )
   WITH CHECK (
     tenant_id = current_tenant_id()
-    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system')
+    AND current_user_has_role('admin', 'event_operator', 'event_manager', 'system', 'data_manager')
   );
 
 CREATE POLICY tenant_isolation_alert_definitions ON alert_definitions
@@ -906,6 +907,20 @@ ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON attachments
   USING (tenant_id = current_tenant_id());
 ALTER TABLE attachments FORCE ROW LEVEL SECURITY;
+
+-- Data management jobs (admin and data_manager; worker uses system)
+ALTER TABLE data_management_jobs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_data_management_jobs ON data_management_jobs
+  FOR ALL
+  USING (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'data_manager', 'system')
+  )
+  WITH CHECK (
+    tenant_id = current_tenant_id()
+    AND current_user_has_role('admin', 'data_manager', 'system')
+  );
+ALTER TABLE data_management_jobs FORCE ROW LEVEL SECURITY;
 
 -- ============================================================
 -- DONE – RLS policies active

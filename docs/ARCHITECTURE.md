@@ -126,7 +126,7 @@ This supports Google and Microsoft Entra ID without code-path changes.
 | `admin` | Everything: users, catalog, CMDB, all practice queues |
 | `fulfiller` | Incidents, CMDB, request approval, journal entries |
 | `user` | Browse catalog, submit requests, view own requests |
-| Practice roles | Examples: `change_manager`, `problem`, `major_incident_manager`, `configuration_manager`, `event_operator` (alert queue), `event_manager` (alert definitions). Assign under Admin → Roles. |
+| Practice roles | Examples: `change_manager`, `problem`, `major_incident_manager`, `configuration_manager`, `event_operator` (alert queue), `event_manager` (alert definitions), `data_manager` (retention jobs). Assign under Admin → Roles. |
 
 ## API Design Principles
 

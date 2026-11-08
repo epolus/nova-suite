@@ -13,6 +13,7 @@ const AGENT_ROLES = new Set([
   'report_admin',
   'event_operator',
   'event_manager',
+  'data_manager',
 ]);
 
 type RoleList = string[] | undefined;
@@ -73,6 +74,11 @@ export function hasReportingViewRole(roles: RoleList): boolean {
 
 export function hasReportingCreateRole(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'report_creator', 'report_admin']);
+}
+
+/** Retention jobs under Admin → Data management. */
+export function canManageData(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'data_manager']);
 }
 
 /** War room / postmortem edits (not read-only fulfiller). */

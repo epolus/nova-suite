@@ -151,6 +151,9 @@ export default function AppRoutes() {
           <Route path="config-packages" element={<Lazy><Pages.ConfigPackagesPage /></Lazy>} />
           <Route path="migrations/servicenow" element={<Lazy><Pages.ServiceNowMigrationPage /></Lazy>} />
           <Route path="import" element={<Lazy><Pages.ImportPage /></Lazy>} />
+          <Route path="data-management/new" element={<Lazy><Pages.DataManagementPage /></Lazy>} />
+          <Route path="data-management/:id" element={<Lazy><Pages.DataManagementPage /></Lazy>} />
+          <Route path="data-management" element={<Lazy><Pages.DataManagementPage /></Lazy>} />
           <Route path="import/history" element={<Lazy><Pages.ImportHistoryPage /></Lazy>} />
         </Route>
         <Route path="/profile/settings" element={<Lazy><Pages.ProfileSettingsPage /></Lazy>} />

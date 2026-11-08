@@ -553,6 +553,31 @@ export async function queryMajorIncidentWorkflowStatus(majorIncidentId: string):
   }
 }
 
+export async function startDataManagementJob(params: {
+  jobId: string;
+  tenantId: string;
+}): Promise<string> {
+  const workflowId = `data-management-${params.jobId}`;
+  try {
+    const cl = await getClient();
+    const handle = await cl.workflow.start('dataManagementJob', {
+      taskQueue: TASK_QUEUE,
+      workflowId,
+      args: [{ jobId: params.jobId, tenantId: params.tenantId }],
+      workflowExecutionTimeout: '6 hours',
+    });
+    logger.info({ workflowId: handle.workflowId, jobId: params.jobId }, 'Started data management job');
+    return handle.workflowId;
+  } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, jobId: params.jobId }, 'Data management job already running');
+      return workflowId;
+    }
+    logger.error({ err, jobId: params.jobId }, 'Failed to start data management job');
+    throw err;
+  }
+}
+
 export async function signalPostmortemPublished(postmortemId: string): Promise<void> {
   try {
     const cl = await getClient();

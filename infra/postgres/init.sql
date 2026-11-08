@@ -1014,6 +1014,35 @@ CREATE INDEX idx_workflow_start_jobs_tenant
   ON workflow_start_jobs(tenant_id, status, created_at DESC);
 
 -- ============================================================
+-- DATA MANAGEMENT JOBS
+-- ============================================================
+CREATE TABLE data_management_jobs (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  actor_user_id   uuid REFERENCES users(id) ON DELETE SET NULL,
+  target          text NOT NULL CHECK (target IN (
+                    'incidents', 'requests', 'configuration_items', 'assets', 'problems',
+                    'changes', 'knowledge_articles', 'alerts', 'releases', 'improvements'
+                  )),
+  action          text NOT NULL CHECK (action IN ('delete', 'archive')),
+  filters         jsonb NOT NULL,
+  include_open    boolean NOT NULL DEFAULT false,
+  status          text NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+  match_count     integer,
+  affected_count  integer NOT NULL DEFAULT 0,
+  error           text,
+  workflow_id     text,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  started_at      timestamptz,
+  completed_at    timestamptz,
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_data_management_jobs_tenant
+  ON data_management_jobs(tenant_id, created_at DESC);
+
+-- ============================================================
 -- SYSTEM METRICS SNAPSHOTS
 -- ============================================================
 CREATE TABLE system_metrics_db_size_snapshots (
@@ -1111,7 +1140,9 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.25', 'department_manager'),
   ('v00.01.26', 'fulfillment_models'),
   ('v00.01.27', 'request_task_cancelled'),
-  ('v00.01.28', 'users_phone_and_lockout');
+  ('v00.01.28', 'users_phone_and_lockout'),
+  ('v00.01.29', 'data_management'),
+  ('v00.01.30', 'data_management_targets');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1133,7 +1164,7 @@ BEGIN
       'tenants', 'departments', 'cost_centers', 'roles', 'processes',
       'users', 'companies', 'locations', 'user_preferences', 'user_dashboards', 'assignment_groups', 'services',
       'service_categories', 'service_items', 'fulfillment_models',
-      'requests', 'workflow_start_jobs', 'ai_conversations', 'incidents', 'major_incidents', 'postmortems', 'ci_classes', 'configuration_items'
+      'requests', 'workflow_start_jobs', 'data_management_jobs', 'ai_conversations', 'incidents', 'major_incidents', 'postmortems', 'ci_classes', 'configuration_items'
     ])
   LOOP
     EXECUTE format(
@@ -1337,7 +1368,10 @@ INSERT INTO roles (id, tenant_id, name, description) VALUES
    'event_operator', 'Can view and work monitoring alerts'),
   ('a3000000-0000-0000-0000-000000000017',
    'a0000000-0000-0000-0000-000000000001',
-   'event_manager', 'Can manage alert definitions and work monitoring alerts');
+   'event_manager', 'Can manage alert definitions and work monitoring alerts'),
+  ('a3000000-0000-0000-0000-000000000018',
+   'a0000000-0000-0000-0000-000000000001',
+   'data_manager', 'Can run retention jobs on allowlisted records');
 
 -- Demo company
 INSERT INTO companies (

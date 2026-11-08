@@ -11,3 +11,4 @@ export * from './notification-webhooks';
 export * from './chat-inbound';
 export * from './alert-inbound';
 export * from './problem-recurrence';
+export * from './data-management';

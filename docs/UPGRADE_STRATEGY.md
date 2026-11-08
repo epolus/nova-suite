@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.28`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.30`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
@@ -172,6 +172,14 @@ Apply `infra/postgres/migrations/v00.01.26__fulfillment_models.sql` before using
 ## Department manager and external_id (`v00.01.25`)
 
 Apply `infra/postgres/migrations/v00.01.25__department_manager.sql` before rolling out builds that read or write `departments.manager_id` or `departments.external_id`. Both columns are nullable; existing rows stay valid with null values. `external_id` is unique per tenant when set.
+
+## Data management (`v00.01.29`)
+
+Apply `infra/postgres/migrations/v00.01.29__data_management.sql` before opening Admin → Data management. The migration adds the `data_manager` role, lets that role read incidents, and creates `data_management_jobs`. Mount the uploads volume on `nova-worker` (`UPLOAD_DIR`) so a delete job can remove attachment files. Older app builds ignore the new table.
+
+## Data management targets (`v00.01.30`)
+
+Apply `infra/postgres/migrations/v00.01.30__data_management_targets.sql` before running retention jobs on requests, CMDB, assets, problems, changes, knowledge, alerts, releases, or improvements. The migration widens `data_management_jobs.target` and lets `data_manager` read those role-gated tables. CMDB, assets, knowledge, releases, and improvements were already visible to every tenant role.
 
 ## Pre-Deploy Checklist
 
