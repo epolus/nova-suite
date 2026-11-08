@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Semver part to increment (ignored when version is set)
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+      version:
+        description: Optional exact version (for example 0.2.0)
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  bump:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Bump version
+        id: bump
+        env:
+          EXACT_VERSION: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+          if [ -n "${EXACT_VERSION}" ]; then
+            node scripts/bump-version.mjs "${EXACT_VERSION}"
+          else
+            node scripts/bump-version.mjs "${BUMP}"
+          fi
+          echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          set -euo pipefail
+          branch="release/v${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add -u
+          git commit -m "chore(release): bump version to ${VERSION}"
+          git push -u origin "$branch"
+          gh pr create \
+            --title "chore(release): bump version to ${VERSION}" \
+            --body "$(cat <<EOF
+          ## Summary
+          - Bump workspace packages, engine/web version strings, and release docs to **${VERSION}**
+
+          Merge this PR, then the tag job on \`main\` will create \`v${VERSION}\` and a GitHub release (which publishes Docker images).
+          EOF
+          )"
+
+  tag:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub release if tag is missing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! git diff -U0 HEAD^ HEAD -- package.json | grep -qE '^[+-]  "version":'; then
+            echo "Root package.json version was not changed"
+            exit 0
+          fi
+          version="$(jq -r .version package.json)"
+          tag="v${version}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "Tag ${tag} already exists"
+            exit 0
+          fi
+          gh release create "$tag" --generate-notes --target "${GITHUB_SHA}" --title "$tag"
