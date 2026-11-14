@@ -101,9 +101,42 @@ AS $$
   SELECT tenant_id FROM requests WHERE id = p_request_id
 $$;
 
+CREATE OR REPLACE FUNCTION lookup_satisfaction_by_token(p_token text)
+RETURNS TABLE (
+  id uuid,
+  tenant_id uuid,
+  incident_id uuid,
+  score integer,
+  comment text,
+  submitted_at timestamptz,
+  incident_number text,
+  incident_title text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    sr.id,
+    sr.tenant_id,
+    sr.incident_id,
+    sr.score,
+    sr.comment,
+    sr.submitted_at,
+    i.number::text AS incident_number,
+    i.title AS incident_title
+  FROM satisfaction_responses sr
+  JOIN incidents i ON i.id = sr.incident_id
+  WHERE sr.token = p_token
+  LIMIT 1;
+$$;
+
 REVOKE ALL ON FUNCTION lookup_user_for_login(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION lookup_user_for_sso(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION lookup_request_tenant(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION lookup_satisfaction_by_token(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION lookup_user_for_login(text) TO nova_runtime;
 GRANT EXECUTE ON FUNCTION lookup_user_for_sso(text) TO nova_runtime;
 GRANT EXECUTE ON FUNCTION lookup_request_tenant(uuid) TO nova_runtime;
+GRANT EXECUTE ON FUNCTION lookup_satisfaction_by_token(text) TO nova_runtime;

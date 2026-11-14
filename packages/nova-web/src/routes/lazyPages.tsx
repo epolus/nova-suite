@@ -40,6 +40,7 @@ export const ReportBuilderPage = lazy(() => import('@/pages/reports/ReportBuilde
 export const ReportViewerPage = lazy(() => import('@/pages/reports/ReportViewerPage'));
 export const ESSHomePage = lazy(() => import('@/pages/ess/ESSHomePage'));
 export const ESSApprovalsPage = lazy(() => import('@/pages/ess/ESSApprovalsPage'));
+export const CsatSurveyPage = lazy(() => import('@/pages/csat/CsatSurveyPage'));
 export const ProfileSettingsPage = lazy(() => import('@/pages/ProfileSettingsPage'));
 export const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage'));
 export const MyTodoPage = lazy(() => import('@/pages/MyTodoPage'));

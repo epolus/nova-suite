@@ -1187,7 +1187,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.33', 'record_links'),
   ('v00.01.34', 'inbound_email'),
   ('v00.01.35', 'email_templates_signatures'),
-  ('v00.01.36', 'work_logs');
+  ('v00.01.36', 'work_logs'),
+  ('v00.01.37', 'satisfaction_responses');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1522,6 +1523,30 @@ CREATE INDEX idx_work_logs_user
   ON work_logs(tenant_id, user_id, worked_on DESC);
 CREATE TRIGGER trg_work_logs_updated_at
   BEFORE UPDATE ON work_logs
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE satisfaction_responses (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  incident_id   uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  score         integer CHECK (score IS NULL OR (score >= 1 AND score <= 5)),
+  comment       text,
+  submitted_at  timestamptz,
+  token         text NOT NULL,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT satisfaction_responses_incident_unique UNIQUE (incident_id),
+  CONSTRAINT satisfaction_responses_token_unique UNIQUE (token),
+  CONSTRAINT satisfaction_responses_submitted_chk CHECK (
+    (submitted_at IS NULL AND score IS NULL)
+    OR (submitted_at IS NOT NULL AND score IS NOT NULL)
+  )
+);
+
+CREATE INDEX idx_satisfaction_responses_tenant_incident
+  ON satisfaction_responses(tenant_id, incident_id);
+CREATE TRIGGER trg_satisfaction_responses_updated_at
+  BEFORE UPDATE ON satisfaction_responses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 ALTER TABLE requests

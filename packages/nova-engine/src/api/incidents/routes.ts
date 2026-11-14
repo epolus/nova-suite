@@ -44,6 +44,7 @@ import {
   resolveResolutionCodeAssignment,
 } from '../../domain/incident-classification';
 import { loadCustomFieldsMap, upsertCustomFields } from '../../domain/custom-fields';
+import { ensureSatisfactionResponse } from '../../domain/satisfaction';
 import {
   signalIncidentResolved,
   cancelIncidentAutoClose,
@@ -1851,6 +1852,7 @@ router.patch(
             entityId: incidentId as string,
             actorUserId: req.user!.id,
           }).catch(() => {});
+          await ensureSatisfactionResponse(client, incidentId as string);
         }
 
         // Start/reset auto-close timer when resolved; cancel when leaving resolved.

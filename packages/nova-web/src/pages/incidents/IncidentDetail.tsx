@@ -5,6 +5,7 @@ import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import RelatedRecordsCard from '../../components/RelatedRecordsCard';
 import WorkLogsCard from '../../components/WorkLogsCard';
+import SatisfactionCard from '../../components/SatisfactionCard';
 import Spinner from '../../components/Spinner';
 import { Button } from '../../components/ui/button';
 import { useIncidentDetail } from './useIncidentDetail';
@@ -118,6 +119,10 @@ export default function IncidentDetail() {
               )}
 
               {id && <WorkLogsCard entityType="incident" entityId={id} readonly={readonly} />}
+
+              {id && (inc.status === 'resolved' || inc.status === 'closed') && (
+                <SatisfactionCard incidentId={id} />
+              )}
 
               <IncidentJournalCard d={d} />
             </div>

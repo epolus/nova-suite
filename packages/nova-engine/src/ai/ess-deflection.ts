@@ -2,6 +2,7 @@
 import type { PoolClient } from 'pg';
 import { searchKnowledgeByText, type KnowledgeSearchHit } from './knowledge-search';
 import { loadTenantAiSettings } from './tenant-ai-settings';
+import { ensureSatisfactionResponse } from '../domain/satisfaction';
 
 export interface DeflectionProposal {
   article: KnowledgeSearchHit;
@@ -88,6 +89,7 @@ export async function evaluateEssDeflection(
       ],
     );
 
+    await ensureSatisfactionResponse(client, params.incidentId);
     proposal.autoResolved = true;
   }
 
