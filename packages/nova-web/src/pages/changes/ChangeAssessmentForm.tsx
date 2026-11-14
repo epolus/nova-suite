@@ -9,6 +9,7 @@ import type {
   ServiceListItem,
 } from '@/api/client';
 import Card from '../../components/Card';
+import CustomFieldsSection from '../../components/CustomFieldsSection';
 import { SearchableDropdown } from '../../components/SearchableDropdown';
 import UserDateTimeInput from '../../components/UserDateTimeInput';
 import { useFieldLabel } from '@/i18n/hooks';
@@ -18,6 +19,9 @@ import type { ChangeFormState } from './changeFormState';
 export function ChangeAssessmentForm({
   form,
   setForm,
+  customFields,
+  setCustomFields,
+  isNew,
   services,
   cis,
   incidentsList,
@@ -34,6 +38,9 @@ export function ChangeAssessmentForm({
 }: {
   form: ChangeFormState;
   setForm: Dispatch<SetStateAction<ChangeFormState>>;
+  customFields: Record<string, unknown>;
+  setCustomFields: Dispatch<SetStateAction<Record<string, unknown>>>;
+  isNew: boolean;
   services: ServiceListItem[];
   cis: CI[];
   incidentsList: Incident[];
@@ -51,6 +58,7 @@ export function ChangeAssessmentForm({
   const tChanges = useTranslations('pages.changes');
   const tStates = useTranslations('common.states');
   const fieldLabel = useFieldLabel();
+  const customMode = isNew ? 'create' : 'all';
 
   return (
     <div className="grid gap-6 grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -85,6 +93,13 @@ export function ChangeAssessmentForm({
                 {tChanges('downtimeRequired')}
               </label>
             </div>
+            <CustomFieldsSection
+              entityType="change"
+              section="scheduling"
+              values={customFields}
+              onChange={setCustomFields}
+              mode={customMode}
+            />
           </div>
         </Card>
         <Card>
@@ -117,6 +132,13 @@ export function ChangeAssessmentForm({
                 renderItem={(ci) => ci.display_name || ci.name}
               />
             </div>
+            <CustomFieldsSection
+              entityType="change"
+              section="service"
+              values={customFields}
+              onChange={setCustomFields}
+              mode={customMode}
+            />
           </div>
         </Card>
         <Card>
@@ -140,6 +162,13 @@ export function ChangeAssessmentForm({
               <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('estimatedCost')}</label>
               <input type="number" value={form.estimated_cost} onChange={(e) => setForm((p) => ({ ...p, estimated_cost: e.target.value }))} className={inputCls} placeholder="0.00" />
             </div>
+            <CustomFieldsSection
+              entityType="change"
+              section="relationships"
+              values={customFields}
+              onChange={setCustomFields}
+              mode={customMode}
+            />
           </div>
         </Card>
       </div>
@@ -165,6 +194,13 @@ export function ChangeAssessmentForm({
               <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('businessJustification')}</label>
               <textarea rows={2} value={form.business_justification} onChange={(e) => setForm((p) => ({ ...p, business_justification: e.target.value }))} className={textareaCls} placeholder={tChanges('businessJustificationPlaceholder')} />
             </div>
+            <CustomFieldsSection
+              entityType="change"
+              section="details"
+              values={customFields}
+              onChange={setCustomFields}
+              mode={customMode}
+            />
           </div>
         </Card>
         <Card>
@@ -182,6 +218,13 @@ export function ChangeAssessmentForm({
               <label className="block text-xs font-medium text-gray-500 mb-1">{tChanges('testPlan')}</label>
               <textarea rows={2} value={form.test_plan} onChange={(e) => setForm((p) => ({ ...p, test_plan: e.target.value }))} className={textareaCls} placeholder={tChanges('testPlanPlaceholder')} />
             </div>
+            <CustomFieldsSection
+              entityType="change"
+              section="plans"
+              values={customFields}
+              onChange={setCustomFields}
+              mode={customMode}
+            />
           </div>
         </Card>
 

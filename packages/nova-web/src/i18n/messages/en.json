@@ -1583,10 +1583,11 @@
       },
       "customFields": {
         "title": "Custom Fields",
-        "description": "Define extra typed fields for incidents, changes, and assets.",
+        "description": "Define extra typed fields for incidents, changes, and assets. Choose a form section to place each field.",
         "entityLabel": "custom field",
         "fieldKey": "Field key",
         "fieldType": "Type",
+        "section": "Form section",
         "requiredOn": "Required on",
         "requiredCreate": "Create",
         "requiredResolve": "Resolve",
@@ -1598,6 +1599,27 @@
           "incident": "Incidents",
           "change": "Changes",
           "asset": "Assets"
+        },
+        "sections": {
+          "incident": {
+            "caller": "Caller profile",
+            "summary": "Summary",
+            "service": "Service / CI context",
+            "details": "Incident details"
+          },
+          "change": {
+            "summary": "Summary",
+            "scheduling": "Scheduling",
+            "service": "Service / CI context",
+            "relationships": "Relationships",
+            "details": "Change details",
+            "plans": "Plans"
+          },
+          "asset": {
+            "general": "General",
+            "purchase": "Purchase & warranty",
+            "notes": "Notes"
+          }
         }
       },
       "services": {

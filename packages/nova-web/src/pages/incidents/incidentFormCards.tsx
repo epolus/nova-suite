@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import Card from '../../components/Card';
 import Badge from '../../components/Badge';
+import CustomFieldsSection from '../../components/CustomFieldsSection';
 import { SearchableDropdown } from '../../components/SearchableDropdown';
 import { formatDateTime } from '../../utils/dateTime';
 import type { UserListItem, ServiceListItem, CI, Problem } from '../../api/client';
@@ -10,7 +11,10 @@ import { FieldCaption, getInputCls, INCIDENT_FIELD, type IncidentDetailState } f
 import { IncidentCategoryFields } from './IncidentCategoryFields';
 
 export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
-  const { inc, readonly, fields, setField, requiredFieldMissing, assignmentGroups, groupMembers } = d;
+  const {
+    inc, readonly, fields, setField, requiredFieldMissing, assignmentGroups, groupMembers,
+    customFields, setCustomFields,
+  } = d;
   const tIncidents = useTranslations('pages.incidents');
   const tTable = useTranslations('common.table');
   const fieldLabel = useFieldLabel();
@@ -155,13 +159,23 @@ export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
             )}
           </div>
         )}
+        <CustomFieldsSection
+          entityType="incident"
+          section="summary"
+          values={customFields}
+          onChange={setCustomFields}
+          readonly={readonly}
+        />
       </div>
     </Card>
   );
 }
 
 export function IncidentCallerCard({ d }: { d: IncidentDetailState }) {
-  const { inc, readonly, fields, setField, requiredFieldMissing, users, callerInfo } = d;
+  const {
+    inc, readonly, fields, setField, requiredFieldMissing, users, callerInfo,
+    customFields, setCustomFields,
+  } = d;
   const tIncidents = useTranslations('pages.incidents');
   const tTable = useTranslations('common.table');
   const fieldLabel = useFieldLabel();
@@ -242,6 +256,13 @@ export function IncidentCallerCard({ d }: { d: IncidentDetailState }) {
             <input id={INCIDENT_FIELD.contactInfo} name={INCIDENT_FIELD.contactInfo} type="text" value={fields.contactInfo} onChange={(e) => setField('contactInfo', e.target.value)} placeholder={tIncidents('additionalContactInfo')} className={inputCls} />
           )}
         </div>
+        <CustomFieldsSection
+          entityType="incident"
+          section="caller"
+          values={customFields}
+          onChange={setCustomFields}
+          readonly={readonly}
+        />
       </div>
     </Card>
   );
@@ -251,6 +272,7 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
   const {
     inc, readonly, fields, setField, requiredFieldMissing, services, ciOptions,
     problemOptions, selectedProblem, incidentCategories,
+    customFields, setCustomFields,
   } = d;
   const tIncidents = useTranslations('pages.incidents');
   const tTable = useTranslations('common.table');
@@ -353,6 +375,13 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
             )}
           </dd>
         </div>
+        <CustomFieldsSection
+          entityType="incident"
+          section="service"
+          values={customFields}
+          onChange={setCustomFields}
+          readonly={readonly}
+        />
       </dl>
     </Card>
   );

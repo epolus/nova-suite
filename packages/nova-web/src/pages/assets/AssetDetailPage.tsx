@@ -265,6 +265,13 @@ export default function AssetDetailPage() {
               </select>
             </div>
           </div>
+          <CustomFieldsSection
+            entityType="asset"
+            section="general"
+            values={customFields}
+            onChange={setCustomFields}
+            mode={isNew ? 'create' : 'all'}
+          />
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">{t('vendor')}</label>
             <input value={form.vendor_name} onChange={(e) => setForm((p) => ({ ...p, vendor_name: e.target.value }))} className={inputCls} />
@@ -299,12 +306,20 @@ export default function AssetDetailPage() {
               <input type="number" min="0" step="1" value={form.depreciation_months} onChange={(e) => setForm((p) => ({ ...p, depreciation_months: e.target.value }))} className={inputCls} />
             </div>
           </div>
+          <CustomFieldsSection
+            entityType="asset"
+            section="purchase"
+            values={customFields}
+            onChange={setCustomFields}
+            mode={isNew ? 'create' : 'all'}
+          />
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">{t('notes')}</label>
             <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={4} className={`${inputCls} resize-none`} />
           </div>
           <CustomFieldsSection
             entityType="asset"
+            section="notes"
             values={customFields}
             onChange={setCustomFields}
             mode={isNew ? 'create' : 'all'}

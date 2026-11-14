@@ -7,6 +7,11 @@ import {
   type CustomFieldEntityType,
   type CustomFieldType,
 } from '../../api/client';
+import {
+  DEFAULT_CUSTOM_FIELD_SECTION,
+  resolveCustomFieldSection,
+  sectionsForEntity,
+} from '../../components/customFieldSections';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
 
 const ENTITY_TYPES: CustomFieldEntityType[] = ['incident', 'change', 'asset'];
@@ -25,6 +30,13 @@ export default function CustomFieldsPage() {
   const [entityType, setEntityType] = useState<CustomFieldEntityType>('incident');
 
   const noneOption = `— ${tStates('none')} —`;
+  const sectionOptions = useMemo(
+    () => sectionsForEntity(entityType).map((section) => ({
+      value: section,
+      label: t(`sections.${entityType}.${section}` as 'sections.incident.details'),
+    })),
+    [entityType, t],
+  );
 
   const columns = useMemo((): ColumnDef<CustomFieldDefinition>[] => [
     {
@@ -44,6 +56,19 @@ export default function CustomFieldsPage() {
       label: t('fieldType'),
       sortable: true,
       render: (item) => <span className="text-gray-600">{item.field_type}</span>,
+    },
+    {
+      key: 'section',
+      label: t('section'),
+      sortable: true,
+      render: (item) => {
+        const section = resolveCustomFieldSection(item);
+        return (
+          <span className="text-gray-600">
+            {t(`sections.${item.entity_type}.${section}` as 'sections.incident.details')}
+          </span>
+        );
+      },
     },
     {
       key: 'required_on',
@@ -74,6 +99,13 @@ export default function CustomFieldsPage() {
       options: FIELD_TYPES.map((ft) => ({ value: ft, label: ft })),
     },
     {
+      key: 'section',
+      label: t('section'),
+      type: 'select',
+      required: true,
+      options: sectionOptions,
+    },
+    {
       key: 'required_on',
       label: t('requiredOn'),
       type: 'select',
@@ -92,7 +124,7 @@ export default function CustomFieldsPage() {
       type: 'textarea',
       placeholder: t('optionsHint'),
     },
-  ], [entityType, noneOption, t, tFields]);
+  ], [entityType, noneOption, sectionOptions, t, tFields]);
 
   const fetchItems = useCallback(async () => {
     const res = await admin.fieldDefinitions(entityType);
@@ -113,6 +145,10 @@ export default function CustomFieldsPage() {
     (item?.options || [])
       .map((o) => (o.label && o.label !== o.value ? `${o.value}|${o.label}` : o.value))
       .join('\n');
+
+  const buildConfig = (sectionRaw: unknown) => ({
+    section: String(sectionRaw ?? '').trim() || DEFAULT_CUSTOM_FIELD_SECTION[entityType],
+  });
 
   return (
     <div className="space-y-6">
@@ -147,6 +183,7 @@ export default function CustomFieldsPage() {
           field_key: String(data.field_key ?? '').trim(),
           label: String(data.label ?? '').trim(),
           field_type: String(data.field_type ?? 'text'),
+          config: buildConfig(data.section),
           required_on: String(data.required_on ?? ''),
           sort_order: Number(String(data.sort_order ?? '0')) || 0,
           options: parseOptions(data.options),
@@ -154,6 +191,7 @@ export default function CustomFieldsPage() {
         updateItem={(id, data) => admin.updateFieldDefinition(id, {
           label: String(data.label ?? '').trim(),
           field_type: String(data.field_type ?? 'text'),
+          config: buildConfig(data.section),
           required_on: String(data.required_on ?? ''),
           sort_order: Number(String(data.sort_order ?? '0')) || 0,
           is_active: Boolean(data.is_active),
@@ -163,6 +201,7 @@ export default function CustomFieldsPage() {
           field_key: item?.field_key ?? '',
           label: item?.label ?? '',
           field_type: item?.field_type ?? 'text',
+          section: item ? resolveCustomFieldSection(item) : DEFAULT_CUSTOM_FIELD_SECTION[entityType],
           required_on: item?.required_on ?? '',
           sort_order: item ? String(item.sort_order) : '0',
           options: formatOptions(item),

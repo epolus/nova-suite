@@ -79,6 +79,7 @@ export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
         )}
         <CustomFieldsSection
           entityType="incident"
+          section="details"
           values={customFields}
           onChange={setCustomFields}
           readonly={readonly}

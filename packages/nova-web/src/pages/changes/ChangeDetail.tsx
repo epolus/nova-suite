@@ -328,6 +328,7 @@ export default function ChangeDetailPage() {
         <div className="mt-4">
           <CustomFieldsSection
             entityType="change"
+            section="summary"
             values={customFields}
             onChange={setCustomFields}
             mode={isNew ? 'create' : 'all'}
@@ -357,6 +358,9 @@ export default function ChangeDetailPage() {
         <ChangeAssessmentForm
           form={form}
           setForm={setForm}
+          customFields={customFields}
+          setCustomFields={setCustomFields}
+          isNew={isNew}
           services={services}
           cis={cis}
           incidentsList={incidentsList}

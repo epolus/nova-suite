@@ -4,9 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'use-intl';
 import { customFields, type CustomFieldDefinition, type CustomFieldEntityType, type FormField } from '../api/client';
 import DynamicFormField from './DynamicFormField';
+import { resolveCustomFieldSection, type CustomFieldSection } from './customFieldSections';
 
 type Props = {
   entityType: CustomFieldEntityType;
+  /** Only render fields assigned to this form section. */
+  section: CustomFieldSection;
   values: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
   readonly?: boolean;
@@ -62,6 +65,7 @@ function stringToValue(def: CustomFieldDefinition, text: string): unknown {
 
 export default function CustomFieldsSection({
   entityType,
+  section,
   values,
   onChange,
   readonly = false,
@@ -75,17 +79,17 @@ export default function CustomFieldsSection({
 
   const definitions = useMemo(() => {
     const list = (data || []).filter((d) => d.is_active);
+    const forSection = list.filter((d) => resolveCustomFieldSection(d) === section);
     if (mode === 'create') {
-      return list.filter((d) => d.required_on === 'create' || d.required_on === '');
+      return forSection.filter((d) => d.required_on === 'create' || d.required_on === '');
     }
-    return list;
-  }, [data, mode]);
+    return forSection;
+  }, [data, mode, section]);
 
   if (definitions.length === 0) return null;
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-gray-900">{t('title')}</h3>
       {definitions.map((def) => {
         const formField = toFormField(def);
         const textValue = valueToString(def, values[def.field_key]);
