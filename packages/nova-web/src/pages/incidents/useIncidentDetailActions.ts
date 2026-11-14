@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, type Dispatch, type FormEvent, type SetStateAction } from 'react';
-import { incidents as incidentsApi, knowledge as knowledgeApi } from '../../api/client';
+import { checklists as checklistsApi, incidents as incidentsApi, knowledge as knowledgeApi } from '../../api/client';
 import type { Incident, JournalEntry } from '../../api/client';
 import { buildIncidentUpdates, type EMPTY_FIELDS } from './incidentDetailFields';
 
@@ -21,6 +21,19 @@ type ActionParams = {
   refresh: () => Promise<void>;
   withSave: (fn: () => Promise<void>) => Promise<void>;
 };
+
+async function assertIncidentChecklistsComplete(incidentId: string): Promise<void> {
+  const { checklist_instances } = await checklistsApi.listInstances('incident', incidentId);
+  const openRequired = checklist_instances.reduce(
+    (sum, instance) => sum + instance.open_required_count,
+    0,
+  );
+  if (openRequired > 0) {
+    throw new Error(
+      `Complete ${openRequired} required checklist item${openRequired === 1 ? '' : 's'} before resolving`,
+    );
+  }
+}
 
 export function useIncidentDetailActions({
   id,
@@ -57,6 +70,10 @@ export function useIncidentDetailActions({
       }
     }
     try {
+      if (fields.status === 'resolved' || fields.status === 'closed') {
+        await assertIncidentChecklistsComplete(id);
+      }
+
       await withSave(async () => {
         const updates = buildIncidentUpdates(fields, inc);
         const prevCustom = inc.custom_fields || {};
@@ -83,7 +100,8 @@ export function useIncidentDetailActions({
         }
       });
       return true;
-    } catch {
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to save incident');
       return false;
     }
   }, [customFields, fields, id, inc, linkedProblemIds, readonly, refresh, setFormError, withSave]);
@@ -109,17 +127,23 @@ export function useIncidentDetailActions({
   const handleResolveWithKb = useCallback(
     async (kbId: string, resolutionNotes: string) => {
       if (!id || !inc) return;
-      await withSave(async () => {
-        await knowledgeApi.linkIncidentResolution(id, kbId);
-        await incidentsApi.update(id, {
-          status: 'resolved',
-          resolution_notes: resolutionNotes || null,
-        } as Partial<Incident>);
-        await refresh();
-      });
-      setKbResolveOpen(false);
+      setFormError(null);
+      try {
+        await assertIncidentChecklistsComplete(id);
+        await withSave(async () => {
+          await knowledgeApi.linkIncidentResolution(id, kbId);
+          await incidentsApi.update(id, {
+            status: 'resolved',
+            resolution_notes: resolutionNotes || null,
+          } as Partial<Incident>);
+          await refresh();
+        });
+        setKbResolveOpen(false);
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : 'Failed to resolve incident');
+      }
     },
-    [id, inc, refresh, setKbResolveOpen, withSave],
+    [id, inc, refresh, setFormError, setKbResolveOpen, withSave],
   );
 
   const handleAddJournal = useCallback(

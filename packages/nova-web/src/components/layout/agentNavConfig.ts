@@ -124,6 +124,7 @@ export const adminSections: RawAdminSection[] = [
       { to: '/admin/alert-definitions', labelKey: 'admin.alertDefinitions', icon: 'notifications' },
       { to: '/admin/inbound-email', labelKey: 'admin.inboundEmail', icon: 'mailbox' },
       { to: '/admin/email-templates', labelKey: 'admin.emailTemplates', icon: 'mailbox' },
+      { to: '/admin/checklists', labelKey: 'admin.checklists', icon: 'settings' },
       { to: '/admin/notification-deliveries', labelKey: 'admin.notificationDeliveries', icon: 'notification_deliveries' },
       { to: '/admin/change-management', labelKey: 'admin.changeManagement', icon: 'change' },
       { to: '/admin/knowledge-workflows', labelKey: 'admin.knowledgeWorkflows', icon: 'knowledge' },

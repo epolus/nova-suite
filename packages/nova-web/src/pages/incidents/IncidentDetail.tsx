@@ -6,6 +6,7 @@ import Card from '../../components/Card';
 import RelatedRecordsCard from '../../components/RelatedRecordsCard';
 import WorkLogsCard from '../../components/WorkLogsCard';
 import SatisfactionCard from '../../components/SatisfactionCard';
+import ChecklistsCard from '../../components/ChecklistsCard';
 import Spinner from '../../components/Spinner';
 import { Button } from '../../components/ui/button';
 import { useIncidentDetail } from './useIncidentDetail';
@@ -60,7 +61,10 @@ export default function IncidentDetail() {
       <IncidentMajorLinkCard d={d} />
 
       {formError && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">
+        <div
+          role="alert"
+          className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium"
+        >
           {formError}
         </div>
       )}
@@ -119,6 +123,14 @@ export default function IncidentDetail() {
               )}
 
               {id && <WorkLogsCard entityType="incident" entityId={id} readonly={readonly} />}
+
+              {id && (
+                <ChecklistsCard
+                  entityType="incident"
+                  entityId={id}
+                  readonly={readonly || inc.status === 'resolved' || inc.status === 'closed'}
+                />
+              )}
 
               {id && (inc.status === 'resolved' || inc.status === 'closed') && (
                 <SatisfactionCard incidentId={id} />

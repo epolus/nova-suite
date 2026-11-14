@@ -62,6 +62,11 @@ export function hasReportingAdminRole(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'report_admin']);
 }
 
+/** Checklist template admin (Admin → Checklists). */
+export function canManageChecklistTemplates(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'checklist_admin']);
+}
+
 /** Accept, war room actions, postmortem edits, standalone major incident create. */
 export function canManageMajorIncidents(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'major_incident_manager']);

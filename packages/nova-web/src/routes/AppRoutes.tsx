@@ -142,6 +142,7 @@ export default function AppRoutes() {
           <Route path="alert-definitions" element={<Lazy><Pages.AlertDefinitionsPage /></Lazy>} />
           <Route path="inbound-email" element={<Lazy><Pages.InboundEmailPage /></Lazy>} />
           <Route path="email-templates" element={<Lazy><Pages.EmailTemplatesPage /></Lazy>} />
+          <Route path="checklists" element={<Lazy><Pages.ChecklistsPage /></Lazy>} />
           <Route path="notification-deliveries" element={<Lazy><Pages.NotificationEmailDeliveriesPage /></Lazy>} />
           <Route path="change-management" element={<Lazy><Pages.ChangeAdminPage /></Lazy>} />
           <Route path="knowledge-workflows" element={<Lazy><Pages.KnowledgeWorkflowsPage /></Lazy>} />

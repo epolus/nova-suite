@@ -4,6 +4,7 @@ export * from './admin';
 export * from './inboundEmail';
 export * from './emailTemplates';
 export * from './workLogs';
+export * from './checklists';
 export * from './catalog';
 export * from './incidents';
 export * from './problems';

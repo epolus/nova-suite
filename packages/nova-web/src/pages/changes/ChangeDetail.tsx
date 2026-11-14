@@ -10,6 +10,7 @@ import Card from '../../components/Card';
 import CustomFieldsSection from '../../components/CustomFieldsSection';
 import RelatedRecordsCard from '../../components/RelatedRecordsCard';
 import WorkLogsCard from '../../components/WorkLogsCard';
+import ChecklistsCard from '../../components/ChecklistsCard';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
@@ -24,14 +25,7 @@ import {
   ChangeImplementationPanel,
   ChangeReviewPanel,
 } from './ChangeDetailPanels';
-
-function hasInvalidScheduleRange(start: string, end: string): boolean {
-  if (!start || !end) return false;
-  const startMs = new Date(start).getTime();
-  const endMs = new Date(end).getTime();
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return false;
-  return endMs < startMs;
-}
+import { hasInvalidScheduleRange } from './changeSchedule';
 
 export default function ChangeDetailPage() {
   const { user } = useAuth();
@@ -411,6 +405,11 @@ export default function ChangeDetailPage() {
         <div className="mt-6 space-y-6">
           <RelatedRecordsCard entityType="change" entityId={id} />
           <WorkLogsCard entityType="change" entityId={id} />
+          <ChecklistsCard
+            entityType="change"
+            entityId={id}
+            readonly={change?.status === 'implemented' || change?.status === 'closed'}
+          />
         </div>
       )}
 

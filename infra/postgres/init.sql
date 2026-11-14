@@ -1188,7 +1188,9 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.34', 'inbound_email'),
   ('v00.01.35', 'email_templates_signatures'),
   ('v00.01.36', 'work_logs'),
-  ('v00.01.37', 'satisfaction_responses');
+  ('v00.01.37', 'satisfaction_responses'),
+  ('v00.01.38', 'checklists'),
+  ('v00.01.39', 'checklist_item_done_fix');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1549,6 +1551,86 @@ CREATE TRIGGER trg_satisfaction_responses_updated_at
   BEFORE UPDATE ON satisfaction_responses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+CREATE TABLE checklist_templates (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name          text NOT NULL,
+  entity_type   text NOT NULL
+                CHECK (entity_type IN ('incident', 'change')),
+  description   text,
+  is_active     boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT checklist_templates_name_unique UNIQUE (tenant_id, entity_type, name)
+);
+
+CREATE INDEX idx_checklist_templates_entity
+  ON checklist_templates(tenant_id, entity_type, is_active);
+CREATE TRIGGER trg_checklist_templates_updated_at
+  BEFORE UPDATE ON checklist_templates
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE checklist_template_items (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  template_id   uuid NOT NULL REFERENCES checklist_templates(id) ON DELETE CASCADE,
+  label         text NOT NULL,
+  sort_order    integer NOT NULL DEFAULT 0,
+  required      boolean NOT NULL DEFAULT false,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_checklist_template_items_template
+  ON checklist_template_items(tenant_id, template_id, sort_order);
+CREATE TRIGGER trg_checklist_template_items_updated_at
+  BEFORE UPDATE ON checklist_template_items
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE checklist_instances (
+  id             uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id      uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  entity_type    text NOT NULL
+                 CHECK (entity_type IN ('incident', 'change')),
+  entity_id      uuid NOT NULL,
+  template_id    uuid REFERENCES checklist_templates(id) ON DELETE SET NULL,
+  template_name  text NOT NULL,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT checklist_instances_entity_template_unique
+    UNIQUE (tenant_id, entity_type, entity_id, template_id)
+);
+
+CREATE INDEX idx_checklist_instances_entity
+  ON checklist_instances(tenant_id, entity_type, entity_id);
+CREATE TRIGGER trg_checklist_instances_updated_at
+  BEFORE UPDATE ON checklist_instances
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE checklist_instance_items (
+  id                uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id         uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  instance_id       uuid NOT NULL REFERENCES checklist_instances(id) ON DELETE CASCADE,
+  template_item_id  uuid REFERENCES checklist_template_items(id) ON DELETE SET NULL,
+  label             text NOT NULL,
+  sort_order        integer NOT NULL DEFAULT 0,
+  required          boolean NOT NULL DEFAULT false,
+  is_done           boolean NOT NULL DEFAULT false,
+  done_by           uuid REFERENCES users(id) ON DELETE SET NULL,
+  done_at           timestamptz,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_checklist_instance_items_instance
+  ON checklist_instance_items(tenant_id, instance_id, sort_order);
+CREATE INDEX idx_checklist_instance_items_open_required
+  ON checklist_instance_items(tenant_id, instance_id)
+  WHERE required = true AND is_done = false;
+CREATE TRIGGER trg_checklist_instance_items_updated_at
+  BEFORE UPDATE ON checklist_instance_items
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
 ALTER TABLE requests
   ADD COLUMN provisioned_ci_id uuid REFERENCES configuration_items(id) ON DELETE SET NULL,
   ADD COLUMN provisioned_asset_id uuid REFERENCES assets(id) ON DELETE SET NULL;
@@ -1704,7 +1786,10 @@ INSERT INTO roles (id, tenant_id, name, description) VALUES
    'event_manager', 'Can manage alert definitions and work monitoring alerts'),
   ('a3000000-0000-0000-0000-000000000018',
    'a0000000-0000-0000-0000-000000000001',
-   'data_manager', 'Can run retention jobs on allowlisted records');
+   'data_manager', 'Can run retention jobs on allowlisted records'),
+  ('a3000000-0000-0000-0000-000000000019',
+   'a0000000-0000-0000-0000-000000000001',
+   'checklist_admin', 'Can manage checklist templates for incidents and changes');
 
 -- Demo company
 INSERT INTO companies (

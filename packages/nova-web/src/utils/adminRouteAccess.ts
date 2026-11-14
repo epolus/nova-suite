@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import {
   canManageAlertDefinitions,
+  canManageChecklistTemplates,
   hasChangeRole,
   hasConfigurationRole,
   hasKnowledgeRole,
@@ -42,6 +43,9 @@ export function canAccessAdminRoute(pathname: string, roles: string[] | undefine
   }
   if (pathname.startsWith('/admin/data-management')) {
     return canManageData(r);
+  }
+  if (pathname.startsWith('/admin/checklists')) {
+    return canManageChecklistTemplates(r);
   }
   return isAdminRole(r);
 }

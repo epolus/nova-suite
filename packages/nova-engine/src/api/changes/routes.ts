@@ -29,6 +29,7 @@ import { resolveSlaDueAt } from '../../domain/sla';
 import { normalizeChangePir } from '../../domain/change-pir';
 import { standardChangeSuccessRate } from '../../domain/standard-change-outcome';
 import { loadCustomFieldsMap, upsertCustomFields } from '../../domain/custom-fields';
+import { assertRequiredChecklistsComplete } from '../../domain/checklists';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -1437,6 +1438,12 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
       const ok = await isChangeEnabledGroup(client, updates.assignment_group_id);
       if (!ok) throw new AppError(400, 'Assignment group is not enabled for Change Management');
     }
+    {
+      const nextStatus = String(updates.status ?? current.status);
+      if (nextStatus === 'implemented' || nextStatus === 'closed') {
+        await assertRequiredChecklistsComplete(client, 'change', String(req.params.id));
+      }
+    }
     const sets: string[] = [];
     const vals: unknown[] = [];
     let i = 1;
@@ -1583,6 +1590,9 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
     }
     if (action === 'schedule' && (!scheduled_start || !scheduled_end)) {
       throw new AppError(400, 'scheduled_start and scheduled_end are required to schedule');
+    }
+    if (action === 'mark_implemented') {
+      await assertRequiredChecklistsComplete(client, 'change', String(change.id));
     }
     if (action === 'approve') {
       if (!change.scheduled_start || !change.scheduled_end) {

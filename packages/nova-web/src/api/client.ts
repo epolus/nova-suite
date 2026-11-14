@@ -41,3 +41,11 @@ export { emailTemplates, emailSignatures } from './domains/emailTemplates';
 export { workLogs } from './domains/workLogs';
 export { csat } from './domains/csat';
 export type { CsatPublicView, CsatIncidentView } from './domains/csat';
+export { checklists } from './domains/checklists';
+export type {
+  ChecklistEntityType,
+  ChecklistInstance,
+  ChecklistInstanceItem,
+  ChecklistTemplate,
+  ChecklistTemplatePayload,
+} from './domains/checklists';

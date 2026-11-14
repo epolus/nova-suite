@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@nova-suite/shared": "0.1.5",
+    "@radix-ui/react-checkbox": "^1.4.1",
     "@radix-ui/react-slot": "^1.5.0",
     "@tanstack/react-query": "^5.107.1",
     "@workflowbuilder/sdk": "^3.0.0",

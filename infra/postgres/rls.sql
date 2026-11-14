@@ -91,6 +91,10 @@ ALTER TABLE email_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_email_signatures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE work_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE satisfaction_responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checklist_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checklist_template_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checklist_instances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checklist_instance_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions ENABLE ROW LEVEL SECURITY;
@@ -625,6 +629,15 @@ CREATE POLICY tenant_isolation_work_logs ON work_logs
 CREATE POLICY tenant_isolation_satisfaction_responses ON satisfaction_responses
   FOR ALL USING (tenant_id = current_tenant_id());
 
+CREATE POLICY tenant_isolation_checklist_templates ON checklist_templates
+  FOR ALL USING (tenant_id = current_tenant_id());
+CREATE POLICY tenant_isolation_checklist_template_items ON checklist_template_items
+  FOR ALL USING (tenant_id = current_tenant_id());
+CREATE POLICY tenant_isolation_checklist_instances ON checklist_instances
+  FOR ALL USING (tenant_id = current_tenant_id());
+CREATE POLICY tenant_isolation_checklist_instance_items ON checklist_instance_items
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Knowledge Categories ───
 CREATE POLICY tenant_isolation_knowledge_categories ON knowledge_categories
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -868,6 +881,10 @@ ALTER TABLE email_templates FORCE ROW LEVEL SECURITY;
 ALTER TABLE user_email_signatures FORCE ROW LEVEL SECURITY;
 ALTER TABLE work_logs FORCE ROW LEVEL SECURITY;
 ALTER TABLE satisfaction_responses FORCE ROW LEVEL SECURITY;
+ALTER TABLE checklist_templates FORCE ROW LEVEL SECURITY;
+ALTER TABLE checklist_template_items FORCE ROW LEVEL SECURITY;
+ALTER TABLE checklist_instances FORCE ROW LEVEL SECURITY;
+ALTER TABLE checklist_instance_items FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles FORCE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions FORCE ROW LEVEL SECURITY;

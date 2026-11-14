@@ -45,6 +45,7 @@ import {
 } from '../../domain/incident-classification';
 import { loadCustomFieldsMap, upsertCustomFields } from '../../domain/custom-fields';
 import { ensureSatisfactionResponse } from '../../domain/satisfaction';
+import { assertRequiredChecklistsComplete } from '../../domain/checklists';
 import {
   signalIncidentResolved,
   cancelIncidentAutoClose,
@@ -1733,6 +1734,14 @@ router.patch(
         if (!resolutionText || String(resolutionText).trim().length === 0) {
           res.status(400).json({ error: 'Resolution notes are required when setting status to resolved' });
           return;
+        }
+      }
+
+      // Keep required checklists complete while resolved/closed (including later saves).
+      {
+        const nextStatus = String(updates.status ?? current.status);
+        if (nextStatus === 'resolved' || nextStatus === 'closed') {
+          await assertRequiredChecklistsComplete(client, 'incident', String(incidentId));
         }
       }
 
