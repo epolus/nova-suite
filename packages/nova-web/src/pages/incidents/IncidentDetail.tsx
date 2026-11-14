@@ -61,7 +61,10 @@ export default function IncidentDetail() {
       <IncidentMajorLinkCard d={d} />
 
       {formError && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">
+        <div
+          role="alert"
+          className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium"
+        >
           {formError}
         </div>
       )}

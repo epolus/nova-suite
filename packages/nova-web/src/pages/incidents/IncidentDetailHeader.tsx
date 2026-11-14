@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { majorIncidents as majorIncidentsApi } from '../../api/client';
 import { useInvalidateMajorIncidents } from '../../hooks/queries';
-import PageHeader from '../../components/PageHeader';
 import { Button } from '../../components/ui/button';
 import { canCreateMajorIncidentRecord } from '../../utils/roles';
 import { useTranslations } from 'use-intl';
@@ -59,71 +58,71 @@ export function IncidentDetailHeader({ d }: { d: IncidentDetailState }) {
 
   return (
     <>
-      <PageHeader
-        title={`${inc.number} — ${inc.title}`}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            {showPromoteButton && (
-              <Button
-                type="button"
-                className="bg-orange-600 hover:bg-orange-500 text-white border-0"
-                onClick={handleDeclareMajor}
-                disabled={declareMajorBusy}
-              >
-                {declareMajorBusy ? tIncidents('promoting') : tIncidents('promoteToMajor')}
-              </Button>
-            )}
-            {isResolved && (isFulfiller || isCaller) && (
-              <Button type="button" onClick={handleReopen} disabled={saving} variant="warning">
-                {tIncidents('reopenIncident')}
-              </Button>
-            )}
-            {!isClosed && isCaller && !isResolved && (
-              <Button type="button" onClick={handleCancel} disabled={saving} variant="outline">
-                {tIncidents('cancelIncident')}
-              </Button>
-            )}
-            {!readonly && (
-              <Button type="button" onClick={handleUpdate} disabled={saving}>
-                {saving ? tActions('saving') : tMaster('saveChanges')}
-              </Button>
-            )}
-            {!readonly && !isClosed && !isResolved && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  if (fields.status === 'pending') {
-                    // If pending was already saved, restore to in_progress (not back to pending).
-                    setField('status', inc.status === 'pending' ? 'in_progress' : inc.status);
-                    setField('pendingReason', '');
-                  } else {
-                    setField('status', 'pending');
-                  }
-                }}
-              >
-                {fields.status === 'pending' ? tIncidents('undoPending') : tIncidents('setPending')}
-              </Button>
-            )}
-            {!readonly && !isClosed && !isResolved && (
-              <Button type="button" variant="outline" onClick={() => setField('status', 'resolved')}>
-                {tActions('resolve')}
-              </Button>
-            )}
-            {!readonly && !isClosed && !isResolved && (
-              <Button type="button" variant="outline" onClick={() => setKbResolveOpen(true)}>
-                {tIncidents('resolveWithKb')}
-              </Button>
-            )}
-            <Button type="button" onClick={() => prevId && goTo(prevId)} disabled={!prevId} title={tIncidents('previousIncident')} variant="outline" size="icon">&#8592;</Button>
-            <Button type="button" onClick={() => nextId && goTo(nextId)} disabled={!nextId} title={tIncidents('nextIncident')} variant="outline" size="icon">&#8594;</Button>
-            <Button type="button" variant="outline" onClick={() => setIntelligenceOpen((prev) => !prev)} title={intelligenceOpen ? tIncidents('hideIntelligentSidebar') : tIncidents('showIntelligentSidebar')}>
-              {intelligenceOpen ? tIncidents('hideInsights') : tIncidents('showInsights')}
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/incidents')}>{tIncidents('backToList')}</Button>
-          </div>
-        }
-      />
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-gray-900 truncate">{`${inc.number} — ${inc.title}`}</h1>
+      </div>
+
+      {/* Full-width toolbar so alerts below never sit on top of the action buttons */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {showPromoteButton && (
+          <Button
+            type="button"
+            className="bg-orange-600 hover:bg-orange-500 text-white border-0"
+            onClick={handleDeclareMajor}
+            disabled={declareMajorBusy}
+          >
+            {declareMajorBusy ? tIncidents('promoting') : tIncidents('promoteToMajor')}
+          </Button>
+        )}
+        {isResolved && (isFulfiller || isCaller) && (
+          <Button type="button" onClick={handleReopen} disabled={saving} variant="warning">
+            {tIncidents('reopenIncident')}
+          </Button>
+        )}
+        {!isClosed && isCaller && !isResolved && (
+          <Button type="button" onClick={handleCancel} disabled={saving} variant="outline">
+            {tIncidents('cancelIncident')}
+          </Button>
+        )}
+        {!readonly && (
+          <Button type="button" onClick={handleUpdate} disabled={saving}>
+            {saving ? tActions('saving') : tMaster('saveChanges')}
+          </Button>
+        )}
+        {!readonly && !isClosed && !isResolved && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (fields.status === 'pending') {
+                // If pending was already saved, restore to in_progress (not back to pending).
+                setField('status', inc.status === 'pending' ? 'in_progress' : inc.status);
+                setField('pendingReason', '');
+              } else {
+                setField('status', 'pending');
+              }
+            }}
+          >
+            {fields.status === 'pending' ? tIncidents('undoPending') : tIncidents('setPending')}
+          </Button>
+        )}
+        {!readonly && !isClosed && !isResolved && (
+          <Button type="button" variant="outline" onClick={() => setField('status', 'resolved')}>
+            {tActions('resolve')}
+          </Button>
+        )}
+        {!readonly && !isClosed && !isResolved && (
+          <Button type="button" variant="outline" onClick={() => setKbResolveOpen(true)}>
+            {tIncidents('resolveWithKb')}
+          </Button>
+        )}
+        <Button type="button" onClick={() => prevId && goTo(prevId)} disabled={!prevId} title={tIncidents('previousIncident')} variant="outline" size="icon">&#8592;</Button>
+        <Button type="button" onClick={() => nextId && goTo(nextId)} disabled={!nextId} title={tIncidents('nextIncident')} variant="outline" size="icon">&#8594;</Button>
+        <Button type="button" variant="outline" onClick={() => setIntelligenceOpen((prev) => !prev)} title={intelligenceOpen ? tIncidents('hideIntelligentSidebar') : tIncidents('showIntelligentSidebar')}>
+          {intelligenceOpen ? tIncidents('hideInsights') : tIncidents('showInsights')}
+        </Button>
+        <Button type="button" variant="outline" onClick={() => navigate('/incidents')}>{tIncidents('backToList')}</Button>
+      </div>
 
       {declareMajorErr && (
         <div className="mb-4 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 font-medium">

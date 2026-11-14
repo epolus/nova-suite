@@ -67,7 +67,6 @@ export function useIncidentDetailActions({
           setFormError(
             `Complete ${openRequired} required checklist item${openRequired === 1 ? '' : 's'} before resolving`,
           );
-          document.getElementById('entity-checklists')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           return false;
         }
       }
