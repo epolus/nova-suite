@@ -89,6 +89,7 @@ ALTER TABLE email_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inbound_email_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_email_signatures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE work_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions ENABLE ROW LEVEL SECURITY;
@@ -617,6 +618,8 @@ CREATE POLICY tenant_isolation_user_email_signatures ON user_email_signatures
       OR current_user_has_role('admin', 'system')
     )
   );
+CREATE POLICY tenant_isolation_work_logs ON work_logs
+  FOR ALL USING (tenant_id = current_tenant_id());
 
 -- ─── Knowledge Categories ───
 CREATE POLICY tenant_isolation_knowledge_categories ON knowledge_categories
@@ -859,6 +862,7 @@ ALTER TABLE email_messages FORCE ROW LEVEL SECURITY;
 ALTER TABLE inbound_email_rules FORCE ROW LEVEL SECURITY;
 ALTER TABLE email_templates FORCE ROW LEVEL SECURITY;
 ALTER TABLE user_email_signatures FORCE ROW LEVEL SECURITY;
+ALTER TABLE work_logs FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles FORCE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions FORCE ROW LEVEL SECURITY;

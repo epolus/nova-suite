@@ -1186,7 +1186,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.32', 'custom_fields'),
   ('v00.01.33', 'record_links'),
   ('v00.01.34', 'inbound_email'),
-  ('v00.01.35', 'email_templates_signatures');
+  ('v00.01.35', 'email_templates_signatures'),
+  ('v00.01.36', 'work_logs');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1498,6 +1499,29 @@ CREATE INDEX idx_user_email_signatures_user
   ON user_email_signatures(tenant_id, user_id);
 CREATE TRIGGER trg_user_email_signatures_updated_at
   BEFORE UPDATE ON user_email_signatures
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE work_logs (
+  id                   uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id            uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  entity_type          text NOT NULL
+                       CHECK (entity_type IN ('incident', 'request_task', 'problem_task', 'change')),
+  entity_id            uuid NOT NULL,
+  user_id              uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  minutes              integer NOT NULL CHECK (minutes > 0 AND minutes <= 24 * 60),
+  worked_on            date NOT NULL DEFAULT (CURRENT_DATE),
+  note                 text,
+  is_customer_visible  boolean NOT NULL DEFAULT false,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_at           timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_work_logs_entity
+  ON work_logs(tenant_id, entity_type, entity_id, worked_on DESC);
+CREATE INDEX idx_work_logs_user
+  ON work_logs(tenant_id, user_id, worked_on DESC);
+CREATE TRIGGER trg_work_logs_updated_at
+  BEFORE UPDATE ON work_logs
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 ALTER TABLE requests

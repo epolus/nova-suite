@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import type { Dispatch, SetStateAction } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import { Link } from 'react-router';
 import type { KnownError, ProblemIncidentLink, ProblemTask } from '@/api/client';
 import Card from '../../components/Card';
+import WorkLogsCard from '../../components/WorkLogsCard';
 import { Button } from '../../components/ui/button';
 import { useStatusLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
@@ -108,6 +109,7 @@ export function ProblemTasksPanel({
 }) {
   const tProblems = useTranslations('pages.problems');
   const tActions = useTranslations('common.actions');
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const taskTypeLabel = (t: string) => tProblems(`taskTypes.${t}` as 'taskTypes.investigate');
   const taskStatusLabel = (s: string) => {
     const key = s === 'in_progress' ? 'inProgress' : s;
@@ -127,18 +129,32 @@ export function ProblemTasksPanel({
         </div>
       </div>
       <div className="space-y-2">
-        {tasks.map((t) => (
-          <div key={t.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-gray-900">{t.title}</p>
-              <p className="text-xs text-gray-500">{taskTypeLabel(t.task_type || 'investigate')} · {t.assigned_to_name || tProblems('unassigned')}</p>
+        {tasks.map((task) => {
+          const expanded = expandedTaskId === task.id;
+          return (
+            <div key={task.id} className="rounded-lg bg-gray-50 p-2.5 space-y-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setExpandedTaskId(expanded ? null : task.id)}
+                  className="flex-1 min-w-0 text-left"
+                >
+                  <p className="text-sm text-gray-900">{task.title}</p>
+                  <p className="text-xs text-gray-500">
+                    {taskTypeLabel(task.task_type || 'investigate')} · {task.assigned_to_name || tProblems('unassigned')}
+                    {' · '}
+                    {expanded ? tProblems('hideWorkLogs') : tProblems('showWorkLogs')}
+                  </p>
+                </button>
+                <select value={task.status} onChange={(e) => updateTaskStatus(task, e.target.value as ProblemTask['status'])} className="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white">
+                  {['pending', 'in_progress', 'blocked', 'completed'].map((s) => <option key={s} value={s}>{taskStatusLabel(s)}</option>)}
+                </select>
+                <Button variant="ghost" size="sm" onClick={() => removeTask(task.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">{tActions('delete')}</Button>
+              </div>
+              {expanded && <WorkLogsCard entityType="problem_task" entityId={task.id} />}
             </div>
-            <select value={t.status} onChange={(e) => updateTaskStatus(t, e.target.value as ProblemTask['status'])} className="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white">
-              {['pending', 'in_progress', 'blocked', 'completed'].map((s) => <option key={s} value={s}>{taskStatusLabel(s)}</option>)}
-            </select>
-            <Button variant="ghost" size="sm" onClick={() => removeTask(t.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">{tActions('delete')}</Button>
-          </div>
-        ))}
+          );
+        })}
         {tasks.length === 0 && <p className="text-sm text-gray-400 text-center py-4">{tProblems('noTasks')}</p>}
       </div>
     </Card>

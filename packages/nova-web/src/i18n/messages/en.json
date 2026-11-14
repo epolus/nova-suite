@@ -1029,6 +1029,8 @@
       "descriptionOptional": "Description (optional)",
       "addTask": "+ Add Task",
       "unassigned": "unassigned",
+      "showWorkLogs": "Show work logs",
+      "hideWorkLogs": "Hide work logs",
       "noTasks": "No tasks yet.",
       "knownErrorsTitle": "Known Errors",
       "knownErrorTitle": "Known error title",
@@ -3821,6 +3823,23 @@
       "title": "Custom fields",
       "yes": "Yes",
       "no": "No"
+    },
+    "workLogs": {
+      "title": "Work logs",
+      "loading": "Loading work logs…",
+      "empty": "No time entries yet.",
+      "add": "Add time",
+      "addTitle": "Add work log",
+      "minutes": "Minutes",
+      "workedOn": "Worked on",
+      "note": "Note",
+      "notePlaceholder": "What did you work on?",
+      "customerVisible": "Customer visible",
+      "internal": "Internal",
+      "total": "Total {duration}",
+      "loadFailed": "Failed to load work logs",
+      "saveFailed": "Failed to save work log",
+      "deleteFailed": "Failed to delete work log"
     },
     "relatedRecords": {
       "title": "Related records",
