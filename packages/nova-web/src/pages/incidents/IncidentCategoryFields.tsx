@@ -2,6 +2,7 @@
 import type { IncidentCategory } from '../../api/client';
 import { useFieldLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
+import type { IncidentFields } from './incidentDetailFields';
 import { INCIDENT_FIELD } from './incidentDetailShared';
 import {
   childIncidentCategories,
@@ -20,7 +21,7 @@ type Props = {
   incidentCategories: IncidentCategory[];
   inputCls: string;
   selectCls: string;
-  setField: (key: 'category' | 'subcategory' | 'categoryId', val: string) => void;
+  setField: (key: keyof IncidentFields, val: string) => void;
 };
 
 export function IncidentCategoryFields({
