@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, type Dispatch, type FormEvent, type SetStateAction } from 'react';
-import { incidents as incidentsApi, knowledge as knowledgeApi } from '../../api/client';
+import { checklists as checklistsApi, incidents as incidentsApi, knowledge as knowledgeApi } from '../../api/client';
 import type { Incident, JournalEntry } from '../../api/client';
 import { buildIncidentUpdates, type EMPTY_FIELDS } from './incidentDetailFields';
 
@@ -57,6 +57,21 @@ export function useIncidentDetailActions({
       }
     }
     try {
+      if (fields.status === 'resolved' && fields.status !== inc.status) {
+        const { checklist_instances } = await checklistsApi.listInstances('incident', id);
+        const openRequired = checklist_instances.reduce(
+          (sum, instance) => sum + instance.open_required_count,
+          0,
+        );
+        if (openRequired > 0) {
+          setFormError(
+            `Complete ${openRequired} required checklist item${openRequired === 1 ? '' : 's'} before resolving`,
+          );
+          document.getElementById('entity-checklists')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return false;
+        }
+      }
+
       await withSave(async () => {
         const updates = buildIncidentUpdates(fields, inc);
         const prevCustom = inc.custom_fields || {};

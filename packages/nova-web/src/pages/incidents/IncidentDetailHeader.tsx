@@ -74,22 +74,23 @@ export function IncidentDetailHeader({ d }: { d: IncidentDetailState }) {
               </Button>
             )}
             {isResolved && (isFulfiller || isCaller) && (
-              <Button onClick={handleReopen} disabled={saving} variant="warning">
+              <Button type="button" onClick={handleReopen} disabled={saving} variant="warning">
                 {tIncidents('reopenIncident')}
               </Button>
             )}
             {!isClosed && isCaller && !isResolved && (
-              <Button onClick={handleCancel} disabled={saving} variant="outline">
+              <Button type="button" onClick={handleCancel} disabled={saving} variant="outline">
                 {tIncidents('cancelIncident')}
               </Button>
             )}
             {!readonly && (
-              <Button onClick={handleUpdate} disabled={saving}>
+              <Button type="button" onClick={handleUpdate} disabled={saving}>
                 {saving ? tActions('saving') : tMaster('saveChanges')}
               </Button>
             )}
             {!readonly && !isClosed && !isResolved && (
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => {
                   if (fields.status === 'pending') {
@@ -105,18 +106,18 @@ export function IncidentDetailHeader({ d }: { d: IncidentDetailState }) {
               </Button>
             )}
             {!readonly && !isClosed && !isResolved && (
-              <Button variant="outline" onClick={() => setField('status', 'resolved')}>
+              <Button type="button" variant="outline" onClick={() => setField('status', 'resolved')}>
                 {tActions('resolve')}
               </Button>
             )}
             {!readonly && !isClosed && !isResolved && (
-              <Button variant="outline" onClick={() => setKbResolveOpen(true)}>
+              <Button type="button" variant="outline" onClick={() => setKbResolveOpen(true)}>
                 {tIncidents('resolveWithKb')}
               </Button>
             )}
-            <Button onClick={() => prevId && goTo(prevId)} disabled={!prevId} title={tIncidents('previousIncident')} variant="outline" size="icon">&#8592;</Button>
-            <Button onClick={() => nextId && goTo(nextId)} disabled={!nextId} title={tIncidents('nextIncident')} variant="outline" size="icon">&#8594;</Button>
-            <Button variant="outline" onClick={() => setIntelligenceOpen((prev) => !prev)} title={intelligenceOpen ? tIncidents('hideIntelligentSidebar') : tIncidents('showIntelligentSidebar')}>
+            <Button type="button" onClick={() => prevId && goTo(prevId)} disabled={!prevId} title={tIncidents('previousIncident')} variant="outline" size="icon">&#8592;</Button>
+            <Button type="button" onClick={() => nextId && goTo(nextId)} disabled={!nextId} title={tIncidents('nextIncident')} variant="outline" size="icon">&#8594;</Button>
+            <Button type="button" variant="outline" onClick={() => setIntelligenceOpen((prev) => !prev)} title={intelligenceOpen ? tIncidents('hideIntelligentSidebar') : tIncidents('showIntelligentSidebar')}>
               {intelligenceOpen ? tIncidents('hideInsights') : tIncidents('showInsights')}
             </Button>
             <Button variant="outline" onClick={() => navigate('/incidents')}>{tIncidents('backToList')}</Button>

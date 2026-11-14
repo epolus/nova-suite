@@ -6,6 +6,7 @@ import {
   checklists as checklistsApi,
   type ChecklistEntityType,
   type ChecklistInstance,
+  type ChecklistInstanceItem,
 } from '@/api/client';
 import { useAuth } from '@/context/AuthContext';
 import { isAgentRole } from '@/utils/roles';
@@ -63,13 +64,49 @@ export default function ChecklistsCard({ entityType, entityId, readonly = false 
     await queryClient.invalidateQueries({ queryKey: instancesKey });
   }
 
+  function patchItemInCache(itemId: string, patch: Partial<ChecklistInstanceItem>) {
+    queryClient.setQueryData<{ checklist_instances: ChecklistInstance[] }>(instancesKey, (prev) => {
+      if (!prev) return prev;
+      return {
+        checklist_instances: prev.checklist_instances.map((instance) => {
+          const items = instance.items.map((item) => (
+            item.id === itemId ? { ...item, ...patch } : item
+          ));
+          return {
+            ...instance,
+            items,
+            open_required_count: items.filter((i) => i.required && !i.is_done).length,
+          };
+        }),
+      };
+    });
+  }
+
   async function toggleItem(itemId: string, next: boolean) {
+    if (!canEdit || busyId === itemId) return;
     setBusyId(itemId);
     setActionError('');
+    const previous = instances
+      .flatMap((instance) => instance.items)
+      .find((item) => item.id === itemId);
+    patchItemInCache(itemId, {
+      is_done: next,
+      done_at: next ? new Date().toISOString() : null,
+      done_by_name: next ? (user?.display_name || user?.email || t('unknownUser')) : null,
+    });
     try {
-      await checklistsApi.setItemDone(itemId, next);
+      const updated = await checklistsApi.setItemDone(itemId, next);
+      patchItemInCache(itemId, updated);
       await refresh();
     } catch (err) {
+      if (previous) {
+        patchItemInCache(itemId, {
+          is_done: previous.is_done,
+          done_at: previous.done_at,
+          done_by: previous.done_by,
+          done_by_name: previous.done_by_name,
+        });
+      }
       setActionError(err instanceof Error ? err.message : t('saveFailed'));
     } finally {
       setBusyId(null);
@@ -112,7 +149,7 @@ export default function ChecklistsCard({ entityType, entityId, readonly = false 
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
+      <div id="entity-checklists" className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">{t('title')}</h3>
           {instances.some((i) => i.open_required_count > 0) && (
@@ -191,20 +228,26 @@ export default function ChecklistsCard({ entityType, entityId, readonly = false 
                 )}
               </div>
               <ul className="mt-3 space-y-2">
-                {instance.items.map((item) => {
-                  const id = `checklist-item-${item.id}`;
-                  return (
-                    <li key={item.id} className="flex items-start gap-3">
+                {instance.items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      disabled={!canEdit || busyId === item.id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void toggleItem(item.id, !item.is_done);
+                      }}
+                      className="flex w-full items-start gap-3 rounded-md px-1 py-1 text-left hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
                       <Checkbox
-                        id={id}
                         checked={item.is_done}
                         disabled={!canEdit || busyId === item.id}
-                        onCheckedChange={(checked) => {
-                          void toggleItem(item.id, checked === true);
-                        }}
-                        className="mt-0.5"
+                        // Visual only — the row button owns the click to avoid form/label side effects.
+                        tabIndex={-1}
+                        className="mt-0.5 pointer-events-none"
                       />
-                      <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
+                      <span className="min-w-0 flex-1">
                         <span className={[
                           'text-sm',
                           item.is_done ? 'text-gray-500 line-through' : 'text-gray-800',
@@ -222,10 +265,10 @@ export default function ChecklistsCard({ entityType, entityId, readonly = false 
                             })}
                           </span>
                         )}
-                      </label>
-                    </li>
-                  );
-                })}
+                      </span>
+                    </button>
+                  </li>
+                ))}
               </ul>
             </div>
           ))}

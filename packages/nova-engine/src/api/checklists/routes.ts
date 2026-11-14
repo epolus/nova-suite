@@ -67,6 +67,7 @@ const toggleBodySchema = z.object({
 function canManageChecklists(req: Request): boolean {
   return hasAnyRole(req, [
     'admin',
+    'checklist_admin',
     'fulfiller',
     'change_manager',
     'major_incident_manager',
