@@ -25,14 +25,7 @@ import {
   ChangeImplementationPanel,
   ChangeReviewPanel,
 } from './ChangeDetailPanels';
-
-function hasInvalidScheduleRange(start: string, end: string): boolean {
-  if (!start || !end) return false;
-  const startMs = new Date(start).getTime();
-  const endMs = new Date(end).getTime();
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return false;
-  return endMs < startMs;
-}
+import { hasInvalidScheduleRange } from './changeSchedule';
 
 export default function ChangeDetailPage() {
   const { user } = useAuth();

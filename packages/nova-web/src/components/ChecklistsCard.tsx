@@ -47,7 +47,10 @@ export default function ChecklistsCard({ entityType, entityId, readonly = false 
     enabled: applyOpen && canEdit,
   });
 
-  const instances = instancesQuery.data?.checklist_instances ?? [];
+  const instances = useMemo(
+    () => instancesQuery.data?.checklist_instances ?? [],
+    [instancesQuery.data?.checklist_instances],
+  );
   const templates = templatesQuery.data?.checklist_templates ?? [];
   const appliedIds = useMemo(
     () => new Set(instances.map((i) => i.template_id).filter(Boolean)),
