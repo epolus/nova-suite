@@ -6,9 +6,13 @@ import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import { db } from '../../data/db';
 import { config } from '../../config';
-import { authenticate, requireRole, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
+import { authenticate, requireRole, setTenantRLS, releaseTenantClient, getRequestClient } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { AppError, BadRequest } from '../../middleware/errorHandler';
+import {
+  countCategoryReferences,
+  countResolutionCodeReferences,
+} from '../../domain/incident-classification';
 import { checkTemporalHealth, startNotificationDispatch } from '../../temporal/workflows';
 import { getWorkflowStartQueueStats } from '../../temporal/workflow-start-queue';
 import { adminCreateUserSchema, adminUpdateUserSchema } from '../../domain/schemas';
@@ -2472,6 +2476,193 @@ router.post('/automation/dry-run', async (req: Request, res: Response, next: Nex
       await db.clearTenantContext(client).catch(() => undefined);
       client.release();
     }
+  } catch (err) { next(err); }
+});
+
+// ════════════════════════════════════════════
+// INCIDENT CLASSIFICATION
+// ════════════════════════════════════════════
+
+router.get('/incident-categories', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const rows = await client.query(
+      `SELECT c.id, c.name, c.description, c.parent_id, p.name AS parent_name,
+              c.is_active, c.created_at, c.updated_at
+       FROM incident_categories c
+       LEFT JOIN incident_categories p ON p.id = c.parent_id
+       WHERE c.tenant_id = current_tenant_id()
+       ORDER BY COALESCE(p.name, c.name), CASE WHEN c.parent_id IS NULL THEN 0 ELSE 1 END, c.name`,
+    );
+    res.json({ categories: rows.rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/incident-categories', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const { name, description, parent_id, is_active } = req.body || {};
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      throw new AppError(400, 'name is required');
+    }
+    if (parent_id) {
+      const parent = await client.query(
+        `SELECT id FROM incident_categories WHERE id = $1 AND tenant_id = current_tenant_id()`,
+        [parent_id],
+      );
+      if (parent.rows.length === 0) throw new AppError(400, 'parent_id not found');
+    }
+    const row = await client.query(
+      `INSERT INTO incident_categories (tenant_id, name, description, parent_id, is_active)
+       VALUES (current_tenant_id(), $1, $2, $3, COALESCE($4, true))
+       RETURNING id`,
+      [name.trim(), description || null, parent_id || null, is_active],
+    );
+    res.status(201).json({ id: row.rows[0].id });
+  } catch (err) { next(err); }
+});
+
+router.patch('/incident-categories/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const id = String(req.params.id);
+    const { name, description, parent_id, is_active } = req.body || {};
+    if (parent_id === id) throw new AppError(400, 'Category cannot be its own parent');
+    if (parent_id) {
+      const parent = await client.query(
+        `SELECT id FROM incident_categories WHERE id = $1 AND tenant_id = current_tenant_id()`,
+        [parent_id],
+      );
+      if (parent.rows.length === 0) throw new AppError(400, 'parent_id not found');
+    }
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    let i = 1;
+    if (name !== undefined) {
+      if (!name || typeof name !== 'string' || !String(name).trim()) {
+        throw new AppError(400, 'name is required');
+      }
+      sets.push(`name = $${i++}`);
+      vals.push(String(name).trim());
+    }
+    if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description || null); }
+    if (parent_id !== undefined) { sets.push(`parent_id = $${i++}`); vals.push(parent_id || null); }
+    if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
+    if (sets.length === 0) return void res.json({ success: true });
+    vals.push(id);
+    const result = await client.query(
+      `UPDATE incident_categories
+       SET ${sets.join(', ')}
+       WHERE id = $${i} AND tenant_id = current_tenant_id()
+       RETURNING id`,
+      vals,
+    );
+    if (result.rows.length === 0) throw new AppError(404, 'Category not found');
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/incident-categories/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const id = String(req.params.id);
+    const refs = await countCategoryReferences(client, id);
+    if (refs > 0) {
+      throw new AppError(409, 'Category is still referenced; set is_active to false instead of deleting');
+    }
+    const result = await client.query(
+      `DELETE FROM incident_categories WHERE id = $1 AND tenant_id = current_tenant_id() RETURNING id`,
+      [id],
+    );
+    if (result.rows.length === 0) throw new AppError(404, 'Category not found');
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.get('/incident-resolution-codes', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const rows = await client.query(
+      `SELECT id, code, label, is_active, created_at, updated_at
+       FROM incident_resolution_codes
+       WHERE tenant_id = current_tenant_id()
+       ORDER BY code`,
+    );
+    res.json({ resolution_codes: rows.rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/incident-resolution-codes', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const { code, label, is_active } = req.body || {};
+    if (!code || typeof code !== 'string' || !code.trim()) {
+      throw new AppError(400, 'code is required');
+    }
+    if (!label || typeof label !== 'string' || !label.trim()) {
+      throw new AppError(400, 'label is required');
+    }
+    const row = await client.query(
+      `INSERT INTO incident_resolution_codes (tenant_id, code, label, is_active)
+       VALUES (current_tenant_id(), $1, $2, COALESCE($3, true))
+       RETURNING id`,
+      [code.trim(), label.trim(), is_active],
+    );
+    res.status(201).json({ id: row.rows[0].id });
+  } catch (err) { next(err); }
+});
+
+router.patch('/incident-resolution-codes/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const id = String(req.params.id);
+    const { code, label, is_active } = req.body || {};
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    let i = 1;
+    if (code !== undefined) {
+      if (!code || typeof code !== 'string' || !String(code).trim()) {
+        throw new AppError(400, 'code is required');
+      }
+      sets.push(`code = $${i++}`);
+      vals.push(String(code).trim());
+    }
+    if (label !== undefined) {
+      if (!label || typeof label !== 'string' || !String(label).trim()) {
+        throw new AppError(400, 'label is required');
+      }
+      sets.push(`label = $${i++}`);
+      vals.push(String(label).trim());
+    }
+    if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
+    if (sets.length === 0) return void res.json({ success: true });
+    vals.push(id);
+    const result = await client.query(
+      `UPDATE incident_resolution_codes
+       SET ${sets.join(', ')}
+       WHERE id = $${i} AND tenant_id = current_tenant_id()
+       RETURNING id`,
+      vals,
+    );
+    if (result.rows.length === 0) throw new AppError(404, 'Resolution code not found');
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/incident-resolution-codes/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const id = String(req.params.id);
+    const refs = await countResolutionCodeReferences(client, id);
+    if (refs > 0) {
+      throw new AppError(409, 'Resolution code is still referenced; set is_active to false instead of deleting');
+    }
+    const result = await client.query(
+      `DELETE FROM incident_resolution_codes WHERE id = $1 AND tenant_id = current_tenant_id() RETURNING id`,
+      [id],
+    );
+    if (result.rows.length === 0) throw new AppError(404, 'Resolution code not found');
+    res.json({ success: true });
   } catch (err) { next(err); }
 });
 

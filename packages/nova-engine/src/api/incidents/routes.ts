@@ -40,6 +40,10 @@ import {
   startOlaClock,
 } from '../../domain/sla';
 import {
+  resolveCategoryAssignment,
+  resolveResolutionCodeAssignment,
+} from '../../domain/incident-classification';
+import {
   signalIncidentResolved,
   cancelIncidentAutoClose,
 } from '../../temporal/workflows';
@@ -388,12 +392,21 @@ router.post(
         title, description, impact, urgency,
         assigned_to, assignment_group_id, caller_id,
         contact_info, service_id, configuration_item_id,
-        category, subcategory, request_id,
+        category, subcategory, category_id, request_id,
       } = req.body;
 
       if (!assignment_group_id) {
         throw new AppError(400, 'assignment_group_id is required');
       }
+
+      const categoryAssignment = await resolveCategoryAssignment(client, category_id, null);
+      const resolvedCategoryId = categoryAssignment?.category_id ?? null;
+      const resolvedCategory = categoryAssignment
+        ? categoryAssignment.category
+        : (category || null);
+      const resolvedSubcategory = categoryAssignment
+        ? categoryAssignment.subcategory
+        : (subcategory || null);
 
       // Calculate priority from matrix
       const priorityResult = await client.query(
@@ -410,7 +423,7 @@ router.post(
         priority,
         impact,
         urgency,
-        category: category || null,
+        category: resolvedCategory || null,
         serviceId: service_id || null,
       });
       const ola = await startOlaClock(client, assignment_group_id || null);
@@ -421,7 +434,7 @@ router.post(
           status, impact, urgency, priority,
           assigned_to, assignment_group_id, caller_id,
           contact_info, service_id, configuration_item_id,
-          category, subcategory, sla_due_at, response_due_at, sla_definition_id,
+          category, subcategory, category_id, sla_due_at, response_due_at, sla_definition_id,
           ola_group_id, ola_response_due_at, ola_resolution_due_at, ola_responded_at,
           ola_paused_at, ola_paused_ms
         ) VALUES (
@@ -429,15 +442,16 @@ router.post(
           $5, $6, $7, $8,
           $9, $10, $11,
           $12, $13, $14,
-          $15, $16, $17, $18, $19,
-          $20, $21, $22, $23, $24, $25
+          $15, $16, $17, $18, $19, $20,
+          $21, $22, $23, $24, $25, $26
         ) RETURNING *`,
         [
           number, request_id || null, title, description || null,
           'new', impact, urgency, priority,
           assigned_to || null, assignment_group_id || null, caller_id || null,
           contact_info || null, service_id || null, configuration_item_id || null,
-          category || null, subcategory || null, sla.resolutionDueAt, sla.responseDueAt,
+          resolvedCategory, resolvedSubcategory, resolvedCategoryId,
+          sla.resolutionDueAt, sla.responseDueAt,
           sla.slaDefinitionId,
           ola.ola_group_id, ola.ola_response_due_at, ola.ola_resolution_due_at, ola.ola_responded_at,
           ola.ola_paused_at, ola.ola_paused_ms,
@@ -575,6 +589,45 @@ router.get('/assignment-groups', async (req: Request, res: Response, next: NextF
   }
 });
 
+// ─── GET /api/incidents/categories ───
+router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const includeInactive = String((req.query as Record<string, unknown>).include_inactive ?? '') === 'true';
+    const result = await client.query(
+      `SELECT c.id, c.name, c.description, c.parent_id, p.name AS parent_name, c.is_active
+       FROM incident_categories c
+       LEFT JOIN incident_categories p ON p.id = c.parent_id
+       WHERE c.tenant_id = current_tenant_id()
+         AND ($1::boolean OR c.is_active = true)
+       ORDER BY COALESCE(p.name, c.name), CASE WHEN c.parent_id IS NULL THEN 0 ELSE 1 END, c.name`,
+      [includeInactive],
+    );
+    res.json({ categories: result.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /api/incidents/resolution-codes ───
+router.get('/resolution-codes', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const includeInactive = String((req.query as Record<string, unknown>).include_inactive ?? '') === 'true';
+    const result = await client.query(
+      `SELECT id, code, label, is_active
+       FROM incident_resolution_codes
+       WHERE tenant_id = current_tenant_id()
+         AND ($1::boolean OR is_active = true)
+       ORDER BY code`,
+      [includeInactive],
+    );
+    res.json({ resolution_codes: result.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── PATCH /api/incidents/bulk ───
 router.patch(
   '/bulk',
@@ -588,7 +641,11 @@ router.patch(
       }
       if (action === 'close') {
         await client.query(
-          `UPDATE incidents SET status = 'closed', closed_at = NOW(), updated_at = NOW()
+          `UPDATE incidents SET
+             status = 'closed',
+             closed_at = NOW(),
+             closure_category_id = COALESCE(closure_category_id, category_id),
+             updated_at = NOW()
            WHERE id = ANY($1::uuid[]) AND status NOT IN ('closed', 'cancelled')`,
           [ids],
         );
@@ -1514,6 +1571,40 @@ router.patch(
         }
       }
 
+      const categoryAssignment = await resolveCategoryAssignment(
+        client,
+        updates.category_id,
+        current.category_id,
+      );
+      if (categoryAssignment) {
+        updates.category_id = categoryAssignment.category_id;
+        updates.category = categoryAssignment.category;
+        updates.subcategory = categoryAssignment.subcategory;
+      }
+
+      const closureCategoryAssignment = await resolveCategoryAssignment(
+        client,
+        updates.closure_category_id,
+        current.closure_category_id,
+      );
+      if (closureCategoryAssignment) {
+        updates.closure_category_id = closureCategoryAssignment.category_id;
+      }
+
+      const resolutionCodeAssignment = await resolveResolutionCodeAssignment(
+        client,
+        updates.resolution_code_id,
+        current.resolution_code_id,
+      );
+      if (resolutionCodeAssignment) {
+        updates.resolution_code_id = resolutionCodeAssignment.resolution_code_id;
+        if (resolutionCodeAssignment.resolution_code_id === null) {
+          updates.resolution_code = null;
+        } else if (updates.resolution_code === undefined) {
+          updates.resolution_code = resolutionCodeAssignment.resolution_code;
+        }
+      }
+
       // Status automation
       if (updates.assignment_group_id !== undefined
         && updates.assignment_group_id !== current.assignment_group_id
@@ -1651,6 +1742,19 @@ router.patch(
       }
       if (updates.status === 'closed' && !current.closed_at) {
         updates.closed_at = new Date().toISOString();
+      }
+      if (updates.status === 'closed') {
+        const nextClosure = updates.closure_category_id !== undefined
+          ? updates.closure_category_id
+          : current.closure_category_id;
+        if (!nextClosure) {
+          const nextCategoryId = updates.category_id !== undefined
+            ? updates.category_id
+            : current.category_id;
+          if (nextCategoryId) {
+            updates.closure_category_id = nextCategoryId;
+          }
+        }
       }
 
       if (

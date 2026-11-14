@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
-import type { AssignmentGroupItem, CorrelationHint, Incident, IncidentAiSuggestion, IncidentProblemLink, IncidentStats, JournalEntry, KnownErrorSuggestion, Pagination, ServiceListItem, SimilarIncident, UserListItem } from '../types';
+import type { AssignmentGroupItem, CorrelationHint, Incident, IncidentAiSuggestion, IncidentCategory, IncidentProblemLink, IncidentResolutionCode, IncidentStats, JournalEntry, KnownErrorSuggestion, Pagination, ServiceListItem, SimilarIncident, UserListItem } from '../types';
 
 export const incidents = {
   list: (params: Record<string, string> = {}, page = 1, limit = 20) => {
@@ -55,6 +55,20 @@ export const incidents = {
     return request<{ incidents: SimilarIncident[] }>(`/incidents/similar-by-text?${qs}`);
   },
   assignmentGroups: () => request<{ assignment_groups: AssignmentGroupItem[] }>('/incidents/assignment-groups'),
+  categories: (params: { includeInactive?: boolean } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.includeInactive) qs.set('include_inactive', 'true');
+    return request<{ categories: IncidentCategory[] }>(
+      `/incidents/categories${qs.size ? `?${qs}` : ''}`,
+    );
+  },
+  resolutionCodes: (params: { includeInactive?: boolean } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.includeInactive) qs.set('include_inactive', 'true');
+    return request<{ resolution_codes: IncidentResolutionCode[] }>(
+      `/incidents/resolution-codes${qs.size ? `?${qs}` : ''}`,
+    );
+  },
   bulkUpdate: (ids: string[], action: string, value?: string) =>
     request<{ success: boolean; updated: number }>('/incidents/bulk', {
       method: 'PATCH',

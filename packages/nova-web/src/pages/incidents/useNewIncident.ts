@@ -17,6 +17,7 @@ import type {
   SimilarIncident,
   KnowledgeSuggestion,
   KnownErrorSuggestion,
+  IncidentCategory,
 } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { isAgentRole } from '../../utils/roles';
@@ -26,6 +27,7 @@ import {
   hasNewIncidentFormChanges,
   type NewIncidentFormState,
 } from './incidentDetailFields';
+import { leafCategoryId } from './incidentClassification';
 
 export function useNewIncident(tIncidents: (key: string) => string) {
   const navigate = useNavigate();
@@ -44,6 +46,9 @@ export function useNewIncident(tIncidents: (key: string) => string) {
   const [configItemId, setConfigItemId] = useState('');
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [rootCategoryId, setRootCategoryId] = useState('');
+  const [subcategoryId, setSubcategoryId] = useState('');
   const [relatedProblemId, setRelatedProblemId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -58,6 +63,13 @@ export function useNewIncident(tIncidents: (key: string) => string) {
   const [services, setServices] = useState<ServiceListItem[]>([]);
   const [cis, setCis] = useState<CI[]>([]);
   const [problems, setProblems] = useState<Problem[]>([]);
+  const [incidentCategories, setIncidentCategories] = useState<IncidentCategory[]>([]);
+
+  const setCategorySelection = useCallback((rootId: string, childId: string) => {
+    setRootCategoryId(rootId);
+    setSubcategoryId(childId);
+    setCategoryId(leafCategoryId(rootId, childId) || '');
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -75,6 +87,7 @@ export function useNewIncident(tIncidents: (key: string) => string) {
       incidentsApi.services().then((res) => setServices(res.services)).catch(() => {});
       cmdbApi.items({ status: 'installed' }, 1, 100).then((res) => setCis(res.items)).catch(() => {});
       problemsApi.list({}, 1, 100).then((res) => setProblems(res.problems)).catch(() => {});
+      incidentsApi.categories().then((res) => setIncidentCategories(res.categories)).catch(() => {});
     }
   }, [user, isEss]);
 
@@ -104,12 +117,14 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     configItemId,
     category,
     subcategory,
+    categoryId,
     relatedProblemId,
   }), [
     assignedTo,
     assignmentGroupId,
     callerId,
     category,
+    categoryId,
     configItemId,
     contactInfo,
     description,
@@ -232,8 +247,12 @@ export function useNewIncident(tIncidents: (key: string) => string) {
             assigned_to: assignedTo || undefined,
             service_id: serviceId || undefined,
             configuration_item_id: configItemId || undefined,
-            category: category || undefined,
-            subcategory: subcategory || undefined,
+            ...(categoryId
+              ? { category_id: categoryId }
+              : {
+                category: category || undefined,
+                subcategory: subcategory || undefined,
+              }),
           }),
       };
       const res = isEss
@@ -257,6 +276,7 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     assignmentGroupId,
     callerId,
     category,
+    categoryId,
     configItemId,
     contactInfo,
     description,
@@ -302,6 +322,11 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     setCategory,
     subcategory,
     setSubcategory,
+    categoryId,
+    rootCategoryId,
+    subcategoryId,
+    setCategorySelection,
+    incidentCategories,
     relatedProblemId,
     setRelatedProblemId,
     submitting,

@@ -7,6 +7,12 @@ import type { UserListItem, ServiceListItem, CI, Problem } from '../../api/clien
 import { useFieldLabel, useImpactUrgencyLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
 import { FieldCaption, getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
+import {
+  childIncidentCategories,
+  leafCategoryId,
+  rootIncidentCategories,
+  splitCategorySelection,
+} from './incidentClassification';
 
 export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
   const { inc, readonly, fields, setField, requiredFieldMissing, assignmentGroups, groupMembers } = d;
@@ -247,12 +253,23 @@ export function IncidentCallerCard({ d }: { d: IncidentDetailState }) {
 }
 
 export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
-  const { inc, readonly, fields, setField, requiredFieldMissing, services, ciOptions, problemOptions, selectedProblem } = d;
+  const {
+    inc, readonly, fields, setField, requiredFieldMissing, services, ciOptions,
+    problemOptions, selectedProblem, incidentCategories,
+  } = d;
   const tIncidents = useTranslations('pages.incidents');
   const tTable = useTranslations('common.table');
   const fieldLabel = useFieldLabel();
   if (!inc) return null;
   const inputCls = getInputCls(readonly);
+  const selectCls = getInputCls(readonly);
+  const activeCategories = incidentCategories.filter((c) => c.is_active || c.id === fields.categoryId);
+  const { rootId, childId } = splitCategorySelection(activeCategories, fields.categoryId);
+  const rootOptions = rootIncidentCategories(activeCategories);
+  const childOptions = childIncidentCategories(activeCategories, rootId);
+  const setCategoryLeaf = (nextRootId: string, nextChildId: string) => {
+    setField('categoryId', leafCategoryId(nextRootId, nextChildId) || '');
+  };
   return (
     <Card>
       <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('serviceCiContext')}</h3>
@@ -316,6 +333,20 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
           <dd className="text-gray-900 mt-0.5">
             {readonly ? (
               inc.category || tTable('emDash')
+            ) : rootOptions.length > 0 ? (
+              <select
+                id={INCIDENT_FIELD.category}
+                name={INCIDENT_FIELD.category}
+                value={rootId}
+                onChange={(e) => setCategoryLeaf(e.target.value, '')}
+                className={selectCls}
+                aria-labelledby={`${INCIDENT_FIELD.category}-label`}
+              >
+                <option value="">{tTable('emDash')}</option>
+                {rootOptions.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             ) : (
               <input id={INCIDENT_FIELD.category} name={INCIDENT_FIELD.category} type="text" value={fields.category} onChange={(e) => setField('category', e.target.value)} placeholder={fieldLabel('category')} className={inputCls} aria-labelledby={`${INCIDENT_FIELD.category}-label`} />
             )}
@@ -326,6 +357,21 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
           <dd className="text-gray-900 mt-0.5">
             {readonly ? (
               inc.subcategory || tTable('emDash')
+            ) : rootOptions.length > 0 ? (
+              <select
+                id={INCIDENT_FIELD.subcategory}
+                name={INCIDENT_FIELD.subcategory}
+                value={childId}
+                onChange={(e) => setCategoryLeaf(rootId, e.target.value)}
+                className={selectCls}
+                aria-labelledby={`${INCIDENT_FIELD.subcategory}-label`}
+                disabled={!rootId || childOptions.length === 0}
+              >
+                <option value="">{tTable('emDash')}</option>
+                {childOptions.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             ) : (
               <input id={INCIDENT_FIELD.subcategory} name={INCIDENT_FIELD.subcategory} type="text" value={fields.subcategory} onChange={(e) => setField('subcategory', e.target.value)} placeholder={fieldLabel('subcategory')} className={inputCls} aria-labelledby={`${INCIDENT_FIELD.subcategory}-label`} />
             )}
