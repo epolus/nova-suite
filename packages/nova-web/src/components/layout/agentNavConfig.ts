@@ -117,6 +117,7 @@ export const adminSections: RawAdminSection[] = [
     items: [
       { to: '/admin/processes', labelKey: 'admin.processes', icon: 'processes' },
       { to: '/admin/incident-classification', labelKey: 'admin.incidentClassification', icon: 'incident' },
+      { to: '/admin/custom-fields', labelKey: 'admin.customFields', icon: 'settings' },
       { to: '/admin/sla-config', labelKey: 'admin.slaConfiguration', icon: 'sla' },
       { to: '/admin/business-calendars', labelKey: 'admin.businessCalendars', icon: 'sla' },
       { to: '/admin/notification-config', labelKey: 'admin.notificationWorkflows', icon: 'notifications' },

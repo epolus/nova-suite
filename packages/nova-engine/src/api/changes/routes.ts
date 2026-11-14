@@ -28,6 +28,7 @@ import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-sta
 import { resolveSlaDueAt } from '../../domain/sla';
 import { normalizeChangePir } from '../../domain/change-pir';
 import { standardChangeSuccessRate } from '../../domain/standard-change-outcome';
+import { loadCustomFieldsMap, upsertCustomFields } from '../../domain/custom-fields';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -1263,12 +1264,14 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     ]);
     const pendingApprovals = approvals.rows.filter((a: { status: string }) => a.status === 'pending').length;
     const allowedActions = computeAllowedChangeActions(change, pendingApprovals, cis.rows.length > 0);
+    const custom_fields = await loadCustomFieldsMap(client, 'change', String(req.params.id));
     res.json({
       ...change,
       affected_cis: cis.rows,
       approvals: approvals.rows,
       conflicts: conflicts.rows,
       allowed_actions: allowedActions,
+      custom_fields,
     });
   } catch (err) {
     next(err);
@@ -1389,7 +1392,9 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
       entityId: String(change.id),
       actorUserId: req.user!.id,
     }).catch(() => {});
-    res.status(201).json(change);
+    await upsertCustomFields(client, 'change', change.id, b.custom_fields ?? {}, 'create');
+    const custom_fields = await loadCustomFieldsMap(client, 'change', change.id);
+    res.status(201).json({ ...change, custom_fields });
   } catch (err) {
     if ((err as { code?: string }).code === '23505') {
       return next(new AppError(409, 'Change number conflict; retry create'));
@@ -1411,7 +1416,9 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
     const current = currentRes.rows[0];
     const canWork = await canWorkOnChange(client, req, current);
     if (!canWork) throw new AppError(403, 'Insufficient permissions');
-    const updates = req.body || {};
+    const updates = { ...(req.body || {}) };
+    const customFieldsPayload = updates.custom_fields as Record<string, unknown> | undefined;
+    delete updates.custom_fields;
     validateScheduleRange(
       updates.scheduled_start ?? current.scheduled_start,
       updates.scheduled_end ?? current.scheduled_end,
@@ -1511,7 +1518,17 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
     for (const templateId of templateIds) {
       await refreshStandardChangeOutcome(client, templateId);
     }
-    res.json(updated.rows[0]);
+    if (customFieldsPayload !== undefined) {
+      await upsertCustomFields(
+        client,
+        'change',
+        String(req.params.id),
+        customFieldsPayload,
+        'update',
+      );
+    }
+    const custom_fields = await loadCustomFieldsMap(client, 'change', String(req.params.id));
+    res.json({ ...updated.rows[0], custom_fields });
   } catch (err) {
     next(err);
   }

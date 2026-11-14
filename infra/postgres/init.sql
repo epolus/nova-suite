@@ -1182,7 +1182,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.28', 'users_phone_and_lockout'),
   ('v00.01.29', 'data_management'),
   ('v00.01.30', 'data_management_targets'),
-  ('v00.01.31', 'incident_classification');
+  ('v00.01.31', 'incident_classification'),
+  ('v00.01.32', 'custom_fields');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1262,6 +1263,79 @@ CREATE UNIQUE INDEX uq_assets_tenant_external_id_2
   WHERE external_id_2 IS NOT NULL;
 CREATE TRIGGER trg_assets_updated_at
   BEFORE UPDATE ON assets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
+-- CUSTOM FIELDS (incident / change / asset)
+-- ============================================================
+CREATE TABLE field_definitions (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  entity_type   text NOT NULL
+                CHECK (entity_type IN ('incident', 'change', 'asset')),
+  field_key     text NOT NULL
+                CHECK (
+                  char_length(field_key) BETWEEN 1 AND 64
+                  AND field_key ~ '^[a-z][a-z0-9_]*$'
+                ),
+  label         text NOT NULL,
+  field_type    text NOT NULL
+                CHECK (field_type IN (
+                  'text', 'textarea', 'date', 'number', 'email', 'checkbox',
+                  'select', 'multiselect', 'cmdb_ref', 'user_ref', 'location_ref'
+                )),
+  config        jsonb NOT NULL DEFAULT '{}'::jsonb,
+  required_on   text NOT NULL DEFAULT ''
+                CHECK (required_on IN ('', 'create', 'resolve')),
+  sort_order    integer NOT NULL DEFAULT 0,
+  is_active     boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, entity_type, field_key)
+);
+CREATE INDEX idx_field_definitions_tenant_entity
+  ON field_definitions(tenant_id, entity_type, is_active, sort_order);
+CREATE TRIGGER trg_field_definitions_updated_at
+  BEFORE UPDATE ON field_definitions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE field_options (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  field_id      uuid NOT NULL REFERENCES field_definitions(id) ON DELETE CASCADE,
+  value         text NOT NULL,
+  label         text NOT NULL,
+  sort_order    integer NOT NULL DEFAULT 0,
+  is_active     boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (field_id, value)
+);
+CREATE INDEX idx_field_options_field ON field_options(field_id, sort_order);
+CREATE TRIGGER trg_field_options_updated_at
+  BEFORE UPDATE ON field_options
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE field_values (
+  id                 uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id          uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  entity_type        text NOT NULL
+                     CHECK (entity_type IN ('incident', 'change', 'asset')),
+  entity_id          uuid NOT NULL,
+  field_id           uuid NOT NULL REFERENCES field_definitions(id) ON DELETE RESTRICT,
+  value_text         text,
+  value_number       numeric,
+  value_bool         boolean,
+  value_timestamptz  timestamptz,
+  value_json         jsonb,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, entity_type, entity_id, field_id)
+);
+CREATE INDEX idx_field_values_entity ON field_values(tenant_id, entity_type, entity_id);
+CREATE INDEX idx_field_values_field ON field_values(tenant_id, field_id);
+CREATE TRIGGER trg_field_values_updated_at
+  BEFORE UPDATE ON field_values
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 ALTER TABLE requests

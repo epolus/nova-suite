@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
-import type { AdminUser, AssignmentGroupItem, AuditEvent, BusinessCalendar, BusinessHourRow, CompanyItem, ConfigDeploymentRun, ConfigPackageApplyResponse, ConfigPackageBundle, ConfigPackageExportResponse, ConfigPackageValidateResponse, CostCenterItem, CreateAssignmentGroupPayload, CreateUserPayload, DepartmentItem, HolidayRow, IncidentCategory, IncidentResolutionCode, LocationItem, NotificationEmailDelivery, NotificationEmailDeliverySummary, NotificationRule, NotificationWebhook, ProcessItem, RoleItem, RuntimeHealth, ServiceAdminItem, SlaDefinition, SystemMetrics, UpdateAssignmentGroupPayload, UpdateUserPayload, WorkflowDefinition } from '../types';
+import type { AdminUser, AssignmentGroupItem, AuditEvent, BusinessCalendar, BusinessHourRow, CompanyItem, ConfigDeploymentRun, ConfigPackageApplyResponse, ConfigPackageBundle, ConfigPackageExportResponse, ConfigPackageValidateResponse, CostCenterItem, CreateAssignmentGroupPayload, CreateUserPayload, CustomFieldDefinition, CustomFieldEntityType, CustomFieldOption, DepartmentItem, HolidayRow, IncidentCategory, IncidentResolutionCode, LocationItem, NotificationEmailDelivery, NotificationEmailDeliverySummary, NotificationRule, NotificationWebhook, ProcessItem, RoleItem, RuntimeHealth, ServiceAdminItem, SlaDefinition, SystemMetrics, UpdateAssignmentGroupPayload, UpdateUserPayload, WorkflowDefinition } from '../types';
 import type { AutomationDryRunRequestContext, AutomationDryRunResult } from '../types/automationDryRun';
 
 export const admin = {
@@ -260,4 +260,39 @@ export const admin = {
     }),
   deleteIncidentResolutionCode: (id: string) =>
     request<{ success: boolean }>(`/admin/incident-resolution-codes/${id}`, { method: 'DELETE' }),
+  // Custom fields
+  fieldDefinitions: (entityType: CustomFieldEntityType) =>
+    request<{ definitions: CustomFieldDefinition[] }>(
+      `/admin/field-definitions?entity_type=${encodeURIComponent(entityType)}`,
+    ),
+  createFieldDefinition: (data: {
+    entity_type: CustomFieldEntityType;
+    field_key: string;
+    label: string;
+    field_type: string;
+    config?: Record<string, unknown>;
+    required_on?: string;
+    sort_order?: number;
+    is_active?: boolean;
+    options?: CustomFieldOption[];
+  }) =>
+    request<{ id: string }>('/admin/field-definitions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateFieldDefinition: (id: string, data: {
+    label?: string;
+    field_type?: string;
+    config?: Record<string, unknown>;
+    required_on?: string;
+    sort_order?: number;
+    is_active?: boolean;
+    options?: CustomFieldOption[];
+  }) =>
+    request<{ success: boolean }>(`/admin/field-definitions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteFieldDefinition: (id: string) =>
+    request<{ success: boolean }>(`/admin/field-definitions/${id}`, { method: 'DELETE' }),
 };

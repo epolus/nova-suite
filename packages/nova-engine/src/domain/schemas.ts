@@ -359,6 +359,7 @@ export const createIncidentSchema = z.object({
   subcategory: z.string().max(255).optional(),
   category_id: uuidSchema.optional(),
   request_id: uuidSchema.optional(),
+  custom_fields: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateIncidentSchema = z.object({
@@ -383,6 +384,7 @@ export const updateIncidentSchema = z.object({
   resolution_code_id: uuidSchema.nullable().optional(),
   pending_reason: z.string().max(255).nullable().optional(),
   resolution_notes: z.string().max(10000).nullable().optional(),
+  custom_fields: z.record(z.string(), z.unknown()).optional(),
 });
 
 // ─── Problems ───
@@ -465,6 +467,7 @@ export const createChangeSchema = z.object({
   business_justification: z.string().max(10000).optional(),
   estimated_cost: z.number().nonnegative().nullable().optional(),
   review_notes: z.string().max(10000).optional(),
+  custom_fields: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateChangeSchema = createChangeSchema.partial();
@@ -724,10 +727,13 @@ export const createAssetSchema = z.object({
   notes: z.string().max(10000).nullable().optional(),
   external_id_1: z.string().max(255).nullable().optional(),
   external_id_2: z.string().max(255).nullable().optional(),
+  custom_fields: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateAssetSchema = createAssetSchema.partial();
-export const ASSET_UPDATE_COLUMNS = Object.keys(updateAssetSchema.shape);
+export const ASSET_UPDATE_COLUMNS = Object.keys(updateAssetSchema.shape).filter(
+  (key) => key !== 'custom_fields',
+);
 
 // ─── Releases ───
 const releaseStatusSchema = z.enum(['planned', 'in_progress', 'deployed', 'cancelled']);

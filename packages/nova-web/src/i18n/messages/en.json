@@ -362,6 +362,7 @@
       "catalogTasks": "Catalog Tasks",
       "processes": "Processes",
       "incidentClassification": "Incident Classification",
+      "customFields": "Custom Fields",
       "slaConfiguration": "SLA Configuration",
       "businessCalendars": "Business Calendars",
       "notificationWorkflows": "Notification Workflows",
@@ -1579,6 +1580,47 @@
         "placeholderDescription": "What belongs in this category",
         "placeholderCode": "e.g. solved_permanently",
         "placeholderLabel": "e.g. Solved permanently"
+      },
+      "customFields": {
+        "title": "Custom Fields",
+        "description": "Define extra typed fields for incidents, changes, and assets. Choose a form section to place each field.",
+        "entityLabel": "custom field",
+        "fieldKey": "Field key",
+        "fieldType": "Type",
+        "section": "Form section",
+        "requiredOn": "Required on",
+        "requiredCreate": "Create",
+        "requiredResolve": "Resolve",
+        "sortOrder": "Sort order",
+        "options": "Options (select types)",
+        "optionsHint": "One option per line. Optional label: value|Label",
+        "placeholderLabel": "e.g. Business impact",
+        "entity": {
+          "incident": "Incidents",
+          "change": "Changes",
+          "asset": "Assets"
+        },
+        "sections": {
+          "incident": {
+            "caller": "Caller profile",
+            "summary": "Summary",
+            "service": "Service / CI context",
+            "details": "Incident details"
+          },
+          "change": {
+            "summary": "Summary",
+            "scheduling": "Scheduling",
+            "service": "Service / CI context",
+            "relationships": "Relationships",
+            "details": "Change details",
+            "plans": "Plans"
+          },
+          "asset": {
+            "general": "General",
+            "purchase": "Purchase & warranty",
+            "notes": "Notes"
+          }
+        }
       },
       "services": {
         "title": "Services",
@@ -3691,6 +3733,11 @@
       "noCorrelations": "No recent alerts or changes for this CI.",
       "score": "Score {score}",
       "general": "General"
+    },
+    "customFields": {
+      "title": "Custom fields",
+      "yes": "Yes",
+      "no": "No"
     },
     "dynamicFormField": {
       "select": "Select...",

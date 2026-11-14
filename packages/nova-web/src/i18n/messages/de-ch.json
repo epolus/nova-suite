@@ -197,6 +197,7 @@
       "catalogTasks": "Katalogaufgaben",
       "processes": "Prozesse",
       "incidentClassification": "Incident-Klassifikation",
+      "customFields": "Benutzerdefinierte Felder",
       "slaConfiguration": "SLA-Konfiguration",
       "notificationWorkflows": "Benachrichtigungsworkflows",
       "notificationDeliveries": "Benachrichtigungszustellungen",

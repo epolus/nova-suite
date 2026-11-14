@@ -2,6 +2,7 @@
 import type { PoolClient } from 'pg';
 import type { CreateIncidentInput } from '../schemas';
 import { schedulePostCreateAiAssist } from '../../ai/post-create';
+import { loadCustomFieldsMap, upsertCustomFields } from '../custom-fields';
 import { resolveSlaDueAt, startOlaClock } from '../sla';
 import {
   enqueueIncidentEscalationStartJob,
@@ -118,5 +119,13 @@ export async function createEssIncident(
     essChannel: true,
   });
 
-  return incident;
+  await upsertCustomFields(
+    client,
+    'incident',
+    String(incident.id),
+    input.custom_fields ?? {},
+    'create',
+  );
+  const custom_fields = await loadCustomFieldsMap(client, 'incident', String(incident.id));
+  return { ...incident, custom_fields };
 }

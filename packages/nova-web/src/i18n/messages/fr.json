@@ -197,6 +197,7 @@
       "catalogTasks": "Tâches de catalogue",
       "processes": "Processus",
       "incidentClassification": "Classification des incidents",
+      "customFields": "Champs personnalisés",
       "slaConfiguration": "Configuration du SLA",
       "notificationWorkflows": "Flux de travail de notification",
       "notificationDeliveries": "Livraisons de notifications",

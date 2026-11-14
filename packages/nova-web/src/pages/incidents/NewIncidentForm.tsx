@@ -6,6 +6,7 @@ import type {
   Problem,
 } from '../../api/client';
 import Card from '../../components/Card';
+import CustomFieldsSection from '../../components/CustomFieldsSection';
 import { SearchableDropdown } from '../../components/SearchableDropdown';
 import { useFieldLabel, useImpactUrgencyLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
@@ -91,6 +92,13 @@ export function NewIncidentForm({ state }: { state: NewIncidentState }) {
                 className={inputCls}
               />
             </div>
+            <CustomFieldsSection
+              entityType="incident"
+              section="caller"
+              values={state.customFields}
+              onChange={state.setCustomFields}
+              mode="create"
+            />
           </div>
         </Card>
 
@@ -122,6 +130,13 @@ export function NewIncidentForm({ state }: { state: NewIncidentState }) {
                   ))}
                 </select>
               </div>
+              <CustomFieldsSection
+                entityType="incident"
+                section="summary"
+                values={state.customFields}
+                onChange={state.setCustomFields}
+                mode="create"
+              />
             </div>
           </Card>
         )}
@@ -218,6 +233,13 @@ export function NewIncidentForm({ state }: { state: NewIncidentState }) {
                   renderItem={(p) => `${p.number} - ${p.title}`}
                 />
               </div>
+              <CustomFieldsSection
+                entityType="incident"
+                section="service"
+                values={state.customFields}
+                onChange={state.setCustomFields}
+                mode="create"
+              />
             </div>
           </Card>
         )}
@@ -263,6 +285,13 @@ export function NewIncidentForm({ state }: { state: NewIncidentState }) {
                 </select>
               </div>
             </div>
+            <CustomFieldsSection
+              entityType="incident"
+              section="details"
+              values={state.customFields}
+              onChange={state.setCustomFields}
+              mode="create"
+            />
           </div>
         </Card>
       </div>
