@@ -97,8 +97,17 @@ async function findIncidentByInReplyTo(
   return r.rows[0] || null;
 }
 
+function extractEmailAddress(fromAddress: string): string {
+  const open = fromAddress.lastIndexOf('<');
+  const close = fromAddress.indexOf('>', open + 1);
+  const raw = open >= 0 && close > open
+    ? fromAddress.slice(open + 1, close)
+    : fromAddress;
+  return raw.trim().toLowerCase();
+}
+
 async function resolveCallerUserId(client: PoolClient, fromAddress: string): Promise<string | null> {
-  const email = fromAddress.replace(/^.*<([^>]+)>.*$/, '$1').trim().toLowerCase();
+  const email = extractEmailAddress(fromAddress);
   if (!email || !email.includes('@')) return null;
   const r = await client.query(
     `SELECT id FROM users WHERE lower(email) = $1 AND is_active = true LIMIT 1`,
