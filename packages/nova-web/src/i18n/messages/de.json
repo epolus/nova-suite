@@ -200,6 +200,7 @@
       "customFields": "Benutzerdefinierte Felder",
       "slaConfiguration": "SLA-Konfiguration",
       "notificationWorkflows": "Benachrichtigungsworkflows",
+      "inboundEmail": "Eingehende E-Mail",
       "notificationDeliveries": "Benachrichtigungszustellungen",
       "changeManagement": "Änderungsmanagement",
       "knowledgeWorkflows": "Wissensworkflows",

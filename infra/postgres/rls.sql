@@ -84,6 +84,9 @@ ALTER TABLE field_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE field_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE field_values ENABLE ROW LEVEL SECURITY;
 ALTER TABLE record_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mailboxes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inbound_email_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions ENABLE ROW LEVEL SECURITY;
@@ -587,6 +590,14 @@ CREATE POLICY tenant_isolation_field_values ON field_values
 CREATE POLICY tenant_isolation_record_links ON record_links
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Inbound Email ───
+CREATE POLICY tenant_isolation_mailboxes ON mailboxes
+  FOR ALL USING (tenant_id = current_tenant_id());
+CREATE POLICY tenant_isolation_email_messages ON email_messages
+  FOR ALL USING (tenant_id = current_tenant_id());
+CREATE POLICY tenant_isolation_inbound_email_rules ON inbound_email_rules
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Knowledge Categories ───
 CREATE POLICY tenant_isolation_knowledge_categories ON knowledge_categories
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -823,6 +834,9 @@ ALTER TABLE field_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE field_options FORCE ROW LEVEL SECURITY;
 ALTER TABLE field_values FORCE ROW LEVEL SECURITY;
 ALTER TABLE record_links FORCE ROW LEVEL SECURITY;
+ALTER TABLE mailboxes FORCE ROW LEVEL SECURITY;
+ALTER TABLE email_messages FORCE ROW LEVEL SECURITY;
+ALTER TABLE inbound_email_rules FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles FORCE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions FORCE ROW LEVEL SECURITY;

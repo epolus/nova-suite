@@ -36,3 +36,4 @@ export { dashboards } from './domains/dashboards';
 export { analytics } from './domains/analytics';
 export { customFields } from './domains/customFields';
 export { recordLinks } from './domains/recordLinks';
+export { inboundEmail } from './domains/inboundEmail';

@@ -71,3 +71,7 @@ export {
 export {
   runDataManagementJob,
 } from './data-management-activities';
+
+export {
+  pollInboundEmailMailboxes,
+} from './inbound-email-activities';

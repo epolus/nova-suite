@@ -252,6 +252,16 @@ export function AppIcon({ name, className }: { name: IconName; className?: strin
           <path {...path} d="M13.73 21a2 2 0 01-3.46 0" />
         </Icon>
       );
+    case 'mailbox':
+      return (
+        <Icon className={className}>
+          <path {...path} d="M6 19V9a4 4 0 014-4h6a4 4 0 014 4v10" />
+          <path {...path} d="M6 19h14" />
+          <path {...path} d="M10 5V3" />
+          <path {...path} d="M10 3h5l-1 3H10" />
+          <path {...path} d="M10 12h6" />
+        </Icon>
+      );
     case 'notification_deliveries':
       return (
         <Icon className={className}>
