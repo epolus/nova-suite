@@ -6,6 +6,7 @@ import { admin, type IncidentCategory, type IncidentResolutionCode } from '../..
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
 
 const ADMIN_INCIDENT_CATEGORIES_KEY = ['admin', 'incident-categories'] as const;
+const EMPTY_CATEGORIES: IncidentCategory[] = [];
 
 export default function IncidentClassificationPage() {
   const t = useTranslations('pages.admin.incidentClassification');
@@ -20,7 +21,7 @@ export default function IncidentClassificationPage() {
     queryKey: ADMIN_INCIDENT_CATEGORIES_KEY,
     queryFn: () => admin.incidentCategories().then((r) => r.categories),
   });
-  const categories = categoriesQuery.data ?? [];
+  const categories = categoriesQuery.data ?? EMPTY_CATEGORIES;
 
   const noneOption = `— ${tStates('none')} —`;
 
