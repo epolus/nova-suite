@@ -31,7 +31,10 @@ export function formatDate(value: string | Date | null | undefined): string {
   // Date-only ISO must not go through Date() (UTC midnight shifts the calendar day).
   if (typeof value === 'string') {
     const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T00:00:00(?:\.0+)?(?:Z)?$)/);
-    if (dateOnly) return formatParts(dateOnly[1], dateOnly[2], dateOnly[3]);
+    const yyyy = dateOnly?.[1];
+    const mm = dateOnly?.[2];
+    const dd = dateOnly?.[3];
+    if (yyyy && mm && dd) return formatParts(yyyy, mm, dd);
   }
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
