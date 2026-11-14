@@ -7,6 +7,7 @@ import { hasRole } from '../../utils/roles';
 import { useChangeDetail } from './useChangeDetail';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
+import CustomFieldsSection from '../../components/CustomFieldsSection';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
@@ -47,6 +48,8 @@ export default function ChangeDetailPage() {
     change,
     form,
     setForm,
+    customFields,
+    setCustomFields,
     types,
     templates,
     templateOptions,
@@ -321,6 +324,14 @@ export default function ChangeDetailPage() {
             <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('category')}</label>
             <input value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} className={inputCls} placeholder={fieldLabel('category')} />
           </div>
+        </div>
+        <div className="mt-4">
+          <CustomFieldsSection
+            entityType="change"
+            values={customFields}
+            onChange={setCustomFields}
+            mode={isNew ? 'create' : 'all'}
+          />
         </div>
       </Card>
 

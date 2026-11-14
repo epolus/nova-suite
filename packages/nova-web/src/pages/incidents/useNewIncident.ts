@@ -64,6 +64,7 @@ export function useNewIncident(tIncidents: (key: string) => string) {
   const [cis, setCis] = useState<CI[]>([]);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [incidentCategories, setIncidentCategories] = useState<IncidentCategory[]>([]);
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
 
   const setCategorySelection = useCallback((rootId: string, childId: string) => {
     setRootCategoryId(rootId);
@@ -142,8 +143,10 @@ export function useNewIncident(tIncidents: (key: string) => string) {
   );
 
   const isFormDirty = useMemo(
-    () => hasNewIncidentFormChanges(formSnapshot, baseline),
-    [baseline, formSnapshot],
+    () =>
+      hasNewIncidentFormChanges(formSnapshot, baseline) ||
+      Object.keys(customFields).length > 0,
+    [baseline, customFields, formSnapshot],
   );
 
   const saveRef = useRef<() => Promise<boolean>>(async () => false);
@@ -240,6 +243,7 @@ export function useNewIncident(tIncidents: (key: string) => string) {
         urgency: urgency as 'low' | 'medium' | 'high',
         caller_id: callerId || user.id,
         contact_info: contactInfo || undefined,
+        custom_fields: customFields,
         ...(isEss
           ? {}
           : {
@@ -279,6 +283,7 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     categoryId,
     configItemId,
     contactInfo,
+    customFields,
     description,
     impact,
     isEss,
@@ -327,6 +332,8 @@ export function useNewIncident(tIncidents: (key: string) => string) {
     subcategoryId,
     setCategorySelection,
     incidentCategories,
+    customFields,
+    setCustomFields,
     relatedProblemId,
     setRelatedProblemId,
     submitting,

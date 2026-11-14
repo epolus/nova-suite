@@ -68,6 +68,7 @@ export function useIncidentDetail() {
 
   // Edit fields — all grouped
   const [fields, setFields] = useState(EMPTY_FIELDS);
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const setField = useCallback((key: keyof typeof EMPTY_FIELDS, val: string) => {
     setFields((prev) => ({ ...prev, [key]: val }));
   }, []);
@@ -120,6 +121,7 @@ export function useIncidentDetail() {
 
   const syncFields = useCallback((i: Incident) => {
     setFields(buildFieldsFromIncident(i));
+    setCustomFields(i.custom_fields || {});
   }, []);
 
   const relatedProblemSync = linkedProblemIds[0] || '';
@@ -239,6 +241,7 @@ export function useIncidentDetail() {
     id,
     inc,
     fields,
+    customFields,
     readonly,
     linkedProblemIds,
     journalContent,
@@ -253,7 +256,10 @@ export function useIncidentDetail() {
   });
 
   const isFormDirty = Boolean(
-    inc && !readonly && hasIncidentFormChanges(fields, inc, linkedProblemIds),
+    inc &&
+      !readonly &&
+      (hasIncidentFormChanges(fields, inc, linkedProblemIds) ||
+        JSON.stringify(inc.custom_fields || {}) !== JSON.stringify(customFields)),
   );
 
   const {
@@ -322,6 +328,8 @@ export function useIncidentDetail() {
     // Edit fields
     fields,
     setField,
+    customFields,
+    setCustomFields,
     // Computed
     callerUser,
     selectedService,

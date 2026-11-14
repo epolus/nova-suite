@@ -51,6 +51,7 @@ export function useChangeDetail() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState<ChangeFormState>(EMPTY_CHANGE_FORM);
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [types, setTypes] = useState<ChangeType[]>([]);
   const [templates, setTemplates] = useState<StandardChangeTemplate[]>([]);
   const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
@@ -83,6 +84,7 @@ export function useChangeDetail() {
     setPrevChange(change);
     if (change) {
       setForm(formFromDetail(change));
+      setCustomFields(change.custom_fields || {});
       setApprovals(change.approvals || []);
       setConflicts(change.conflicts || []);
     }
@@ -113,6 +115,7 @@ export function useChangeDetail() {
 
       if (isNew) {
         setForm({ ...EMPTY_CHANGE_FORM, change_type_id: typesRes.change_types[0]?.id || '' });
+        setCustomFields({});
         setApprovals([]);
         setConflicts([]);
         setRiskScores({});
@@ -156,8 +159,12 @@ export function useChangeDetail() {
   const loading = changeLoading || metaLoading;
 
   const isFormDirty = useMemo(
-    () => hasChangeFormChanges(form, change ?? null, isNew),
-    [form, change, isNew],
+    () =>
+      hasChangeFormChanges(form, change ?? null, isNew) ||
+      (!isNew &&
+        JSON.stringify(change?.custom_fields || {}) !== JSON.stringify(customFields)) ||
+      (isNew && Object.keys(customFields).length > 0),
+    [form, change, isNew, customFields],
   );
 
   const saveRef = useRef<() => Promise<boolean>>(async () => false);
@@ -220,6 +227,7 @@ export function useChangeDetail() {
         planned_downtime_minutes: form.planned_downtime_minutes === '' ? null : Number(form.planned_downtime_minutes),
         actual_downtime_minutes: form.actual_downtime_minutes === '' ? null : Number(form.actual_downtime_minutes),
         affected_cis: form.affected_cis,
+        custom_fields: customFields,
       };
       if (isNew || !id) {
         const created = await changes.create(payload);
@@ -264,6 +272,7 @@ export function useChangeDetail() {
     }
   }, [
     allowNextNavigation,
+    customFields,
     form,
     id,
     invalidateChanges,
@@ -309,6 +318,8 @@ export function useChangeDetail() {
     change: change ?? null,
     form,
     setForm,
+    customFields,
+    setCustomFields,
     types,
     templates,
     templateOptions,

@@ -5,6 +5,7 @@ import { useTranslations } from 'use-intl';
 import { assets } from '@/api/client';
 import PageHeader from '@/components/PageHeader';
 import Card from '@/components/Card';
+import CustomFieldsSection from '@/components/CustomFieldsSection';
 import Spinner from '@/components/Spinner';
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog';
 import { Button } from '@/components/ui/button';
@@ -68,6 +69,8 @@ export default function AssetDetailPage() {
   const [error, setError] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
   const [baseline, setBaseline] = useState(EMPTY_FORM);
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
+  const [baselineCustomFields, setBaselineCustomFields] = useState<Record<string, unknown>>({});
   const [linkedCi, setLinkedCi] = useState<{ id: string; name: string } | null>(null);
   const [prevId, setPrevId] = useState(id);
 
@@ -78,6 +81,8 @@ export default function AssetDetailPage() {
     if (isNew) {
       setForm(EMPTY_FORM);
       setBaseline(EMPTY_FORM);
+      setCustomFields({});
+      setBaselineCustomFields({});
       setLinkedCi(null);
     }
   }
@@ -102,8 +107,11 @@ export default function AssetDetailPage() {
           depreciation_months: textInput(asset.depreciation_months),
           notes: asset.notes || '',
         };
+        const nextCustom = asset.custom_fields || {};
         setForm(next);
         setBaseline(next);
+        setCustomFields(nextCustom);
+        setBaselineCustomFields(nextCustom);
         setLinkedCi(asset.linked_ci_id
           ? { id: asset.linked_ci_id, name: asset.linked_ci_name || asset.linked_ci_id }
           : null);
@@ -118,8 +126,10 @@ export default function AssetDetailPage() {
   }, [id, isNew, t]);
 
   const isDirty = useMemo(
-    () => JSON.stringify(form) !== JSON.stringify(baseline),
-    [baseline, form],
+    () =>
+      JSON.stringify(form) !== JSON.stringify(baseline) ||
+      JSON.stringify(customFields) !== JSON.stringify(baselineCustomFields),
+    [baseline, baselineCustomFields, customFields, form],
   );
 
   const saveRef = useRef<() => Promise<boolean>>(async () => false);
@@ -169,6 +179,7 @@ export default function AssetDetailPage() {
         contract_ref: form.contract_ref.trim() || null,
         depreciation_months: depreciationMonths,
         notes: form.notes || null,
+        custom_fields: customFields,
       };
       if (isNew) {
         const created = await assets.create(payload);
@@ -177,6 +188,7 @@ export default function AssetDetailPage() {
       } else if (id) {
         await assets.update(id, payload);
         setBaseline(form);
+        setBaselineCustomFields(customFields);
       }
       return true;
     } catch (err: unknown) {
@@ -185,7 +197,7 @@ export default function AssetDetailPage() {
     } finally {
       setSaving(false);
     }
-  }, [allowNextNavigation, form, id, isNew, navigate, t]);
+  }, [allowNextNavigation, customFields, form, id, isNew, navigate, t]);
 
   useEffect(() => {
     saveRef.current = handleSave;
@@ -291,6 +303,12 @@ export default function AssetDetailPage() {
             <label className="block text-xs font-medium text-gray-500 mb-1">{t('notes')}</label>
             <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={4} className={`${inputCls} resize-none`} />
           </div>
+          <CustomFieldsSection
+            entityType="asset"
+            values={customFields}
+            onChange={setCustomFields}
+            mode={isNew ? 'create' : 'all'}
+          />
         </div>
       </Card>
     </>

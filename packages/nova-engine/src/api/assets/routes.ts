@@ -6,6 +6,7 @@ import { validateBody } from '../../middleware/validate';
 import { ASSET_UPDATE_COLUMNS, createAssetSchema, updateAssetSchema } from '../../domain/schemas';
 import { parameterizedSet } from '../../data/parameterized-set';
 import { hasChangeRole, hasProblemRole, isAdminRole } from '../roles';
+import { loadCustomFieldsMap, upsertCustomFields } from '../../domain/custom-fields';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -72,7 +73,9 @@ router.post('/', validateBody(createAssetSchema), async (req: Request, res: Resp
         b.external_id_2 || null,
       ],
     );
-    res.status(201).json(created.rows[0]);
+    await upsertCustomFields(client, 'asset', created.rows[0].id, b.custom_fields ?? {}, 'create');
+    const custom_fields = await loadCustomFieldsMap(client, 'asset', created.rows[0].id);
+    res.status(201).json({ ...created.rows[0], custom_fields });
   } catch (err) {
     next(err);
   }
@@ -90,7 +93,8 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       [req.params.id],
     );
     if (row.rows.length === 0) throw NotFound('Asset not found');
-    res.json(row.rows[0]);
+    const custom_fields = await loadCustomFieldsMap(client, 'asset', String(req.params.id));
+    res.json({ ...row.rows[0], custom_fields });
   } catch (err) {
     next(err);
   }
@@ -99,20 +103,36 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.patch('/:id', validateBody(updateAssetSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!canManageAssets(req)) throw new AppError(403, 'Insufficient permissions');
-    const patch = parameterizedSet(ASSET_UPDATE_COLUMNS, req.body || {});
-    if (!patch) return void res.json({ success: true });
-    const vals = [...patch.values, req.params.id];
+    const body = req.body || {};
+    const customFieldsPayload = body.custom_fields as Record<string, unknown> | undefined;
+    const patch = parameterizedSet(ASSET_UPDATE_COLUMNS, body);
     const client = getRequestClient(req);
-    const updated = await client.query(
-      `UPDATE assets
-       SET ${patch.sets.join(', ')}
-       WHERE tenant_id = current_tenant_id()
-         AND id = $${patch.sets.length + 1}
-       RETURNING *`,
-      vals,
-    );
-    if (updated.rows.length === 0) throw NotFound('Asset not found');
-    res.json(updated.rows[0]);
+    let updated = null as Record<string, unknown> | null;
+    if (patch) {
+      const vals = [...patch.values, req.params.id];
+      const result = await client.query(
+        `UPDATE assets
+         SET ${patch.sets.join(', ')}
+         WHERE tenant_id = current_tenant_id()
+           AND id = $${patch.sets.length + 1}
+         RETURNING *`,
+        vals,
+      );
+      if (result.rows.length === 0) throw NotFound('Asset not found');
+      updated = result.rows[0];
+    } else {
+      const existing = await client.query(
+        `SELECT * FROM assets WHERE tenant_id = current_tenant_id() AND id = $1`,
+        [req.params.id],
+      );
+      if (existing.rows.length === 0) throw NotFound('Asset not found');
+      updated = existing.rows[0];
+    }
+    if (customFieldsPayload !== undefined) {
+      await upsertCustomFields(client, 'asset', String(req.params.id), customFieldsPayload, 'update');
+    }
+    const custom_fields = await loadCustomFieldsMap(client, 'asset', String(req.params.id));
+    res.json({ ...updated, custom_fields });
   } catch (err) {
     next(err);
   }

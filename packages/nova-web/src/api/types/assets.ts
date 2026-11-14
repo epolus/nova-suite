@@ -19,6 +19,7 @@ export interface Asset {
   updated_at: string;
   owner_name?: string;
   linked_ci_name?: string;
+  custom_fields?: Record<string, unknown>;
 }
 
 export interface Release {

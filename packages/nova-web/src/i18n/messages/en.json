@@ -362,6 +362,7 @@
       "catalogTasks": "Catalog Tasks",
       "processes": "Processes",
       "incidentClassification": "Incident Classification",
+      "customFields": "Custom Fields",
       "slaConfiguration": "SLA Configuration",
       "businessCalendars": "Business Calendars",
       "notificationWorkflows": "Notification Workflows",
@@ -1579,6 +1580,25 @@
         "placeholderDescription": "What belongs in this category",
         "placeholderCode": "e.g. solved_permanently",
         "placeholderLabel": "e.g. Solved permanently"
+      },
+      "customFields": {
+        "title": "Custom Fields",
+        "description": "Define extra typed fields for incidents, changes, and assets.",
+        "entityLabel": "custom field",
+        "fieldKey": "Field key",
+        "fieldType": "Type",
+        "requiredOn": "Required on",
+        "requiredCreate": "Create",
+        "requiredResolve": "Resolve",
+        "sortOrder": "Sort order",
+        "options": "Options (select types)",
+        "optionsHint": "One option per line. Optional label: value|Label",
+        "placeholderLabel": "e.g. Business impact",
+        "entity": {
+          "incident": "Incidents",
+          "change": "Changes",
+          "asset": "Assets"
+        }
       },
       "services": {
         "title": "Services",
@@ -3691,6 +3711,11 @@
       "noCorrelations": "No recent alerts or changes for this CI.",
       "score": "Score {score}",
       "general": "General"
+    },
+    "customFields": {
+      "title": "Custom fields",
+      "yes": "Yes",
+      "no": "No"
     },
     "dynamicFormField": {
       "select": "Select...",

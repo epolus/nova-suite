@@ -2,6 +2,7 @@
 import { type FormEvent } from 'react';
 import type { JournalEntry } from '../../api/client';
 import Card from '../../components/Card';
+import CustomFieldsSection from '../../components/CustomFieldsSection';
 import Badge from '../../components/Badge';
 import { formatDateTime } from '../../utils/dateTime';
 import { useFieldLabel } from '@/i18n/hooks';
@@ -9,7 +10,7 @@ import { useTranslations } from 'use-intl';
 import { FieldCaption, getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
 
 export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
-  const { inc, readonly, fields, setField, resolutionCodes } = d;
+  const { inc, readonly, fields, setField, resolutionCodes, customFields, setCustomFields } = d;
   const tIncidents = useTranslations('pages.incidents');
   const tTable = useTranslations('common.table');
   const fieldLabel = useFieldLabel();
@@ -76,6 +77,12 @@ export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
             )}
           </div>
         )}
+        <CustomFieldsSection
+          entityType="incident"
+          values={customFields}
+          onChange={setCustomFields}
+          readonly={readonly}
+        />
       </div>
     </Card>
   );

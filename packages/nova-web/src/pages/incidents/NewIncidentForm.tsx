@@ -6,6 +6,7 @@ import type {
   Problem,
 } from '../../api/client';
 import Card from '../../components/Card';
+import CustomFieldsSection from '../../components/CustomFieldsSection';
 import { SearchableDropdown } from '../../components/SearchableDropdown';
 import { useFieldLabel, useImpactUrgencyLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
@@ -263,6 +264,12 @@ export function NewIncidentForm({ state }: { state: NewIncidentState }) {
                 </select>
               </div>
             </div>
+            <CustomFieldsSection
+              entityType="incident"
+              values={state.customFields}
+              onChange={state.setCustomFields}
+              mode="create"
+            />
           </div>
         </Card>
       </div>

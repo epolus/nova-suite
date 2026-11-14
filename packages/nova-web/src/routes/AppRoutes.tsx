@@ -134,6 +134,7 @@ export default function AppRoutes() {
           <Route path="catalog-tasks/:serviceItemId/:taskId" element={<Lazy><Pages.CatalogTaskDetailPage /></Lazy>} />
           <Route path="services" element={<Lazy><Pages.ServicesPage /></Lazy>} />
           <Route path="incident-classification" element={<Lazy><Pages.IncidentClassificationPage /></Lazy>} />
+          <Route path="custom-fields" element={<Lazy><Pages.CustomFieldsPage /></Lazy>} />
           <Route path="sla-config" element={<Lazy><Pages.SlaConfigPage /></Lazy>} />
           <Route path="business-calendars" element={<Lazy><Pages.BusinessCalendarsPage /></Lazy>} />
           <Route path="notification-config" element={<Lazy><Pages.NotificationConfigPage /></Lazy>} />

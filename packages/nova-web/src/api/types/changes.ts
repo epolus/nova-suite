@@ -124,6 +124,7 @@ export interface Change {
   requested_by_name?: string;
   conflict_count?: number;
   pending_approvals?: number;
+  custom_fields?: Record<string, unknown>;
 }
 
 export interface ChangeDetail extends Change {

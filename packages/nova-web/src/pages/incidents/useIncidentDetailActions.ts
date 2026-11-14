@@ -8,6 +8,7 @@ type ActionParams = {
   id: string | undefined;
   inc: Incident | null;
   fields: typeof EMPTY_FIELDS;
+  customFields: Record<string, unknown>;
   readonly: boolean;
   linkedProblemIds: string[];
   journalContent: string;
@@ -25,6 +26,7 @@ export function useIncidentDetailActions({
   id,
   inc,
   fields,
+  customFields,
   readonly,
   linkedProblemIds,
   journalContent,
@@ -57,6 +59,11 @@ export function useIncidentDetailActions({
     try {
       await withSave(async () => {
         const updates = buildIncidentUpdates(fields, inc);
+        const prevCustom = inc.custom_fields || {};
+        const customChanged = JSON.stringify(prevCustom) !== JSON.stringify(customFields);
+        if (customChanged) {
+          updates.custom_fields = customFields;
+        }
 
         if (Object.keys(updates).length > 0) {
           await incidentsApi.update(id, updates as Partial<Incident>);
@@ -79,7 +86,7 @@ export function useIncidentDetailActions({
     } catch {
       return false;
     }
-  }, [fields, id, inc, linkedProblemIds, readonly, refresh, setFormError, withSave]);
+  }, [customFields, fields, id, inc, linkedProblemIds, readonly, refresh, setFormError, withSave]);
 
   const handleReopen = useCallback(
     () =>

@@ -43,6 +43,7 @@ import {
   resolveCategoryAssignment,
   resolveResolutionCodeAssignment,
 } from '../../domain/incident-classification';
+import { loadCustomFieldsMap, upsertCustomFields } from '../../domain/custom-fields';
 import {
   signalIncidentResolved,
   cancelIncidentAutoClose,
@@ -493,7 +494,15 @@ router.post(
         essChannel: false,
       });
 
-      res.status(201).json(result.rows[0]);
+      await upsertCustomFields(
+        client,
+        'incident',
+        result.rows[0].id,
+        req.body.custom_fields ?? {},
+        'create',
+      );
+      const custom_fields = await loadCustomFieldsMap(client, 'incident', result.rows[0].id);
+      res.status(201).json({ ...result.rows[0], custom_fields });
     } catch (err) {
       next(err);
     }
@@ -1183,11 +1192,13 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     );
 
     const marks = olaMarks(incident);
+    const custom_fields = await loadCustomFieldsMap(client, 'incident', String(req.params.id));
     res.json({
       ...incident,
       linked_major_incidents: links.rows,
       ola_response_mark: marks.response,
       ola_resolution_mark: marks.resolution,
+      custom_fields,
     });
   } catch (err) {
     next(err);
@@ -1552,7 +1563,9 @@ router.patch(
       }
 
       const current = existing.rows[0];
-      const updates = req.body;
+      const updates = { ...req.body };
+      const customFieldsPayload = updates.custom_fields as Record<string, unknown> | undefined;
+      delete updates.custom_fields;
       const isFulfiller = isFulfillerRole(req);
       const isCaller = current.caller_id === req.user!.id;
 
@@ -1786,18 +1799,27 @@ router.patch(
         params.push(value);
       }
 
-      if (setClauses.length === 0) {
-        res.json(current);
-        return;
+      let updated = current;
+      if (setClauses.length > 0) {
+        idx++;
+        params.push(incidentId);
+        const result = await client.query(
+          `UPDATE incidents SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+          params,
+        );
+        updated = result.rows[0];
       }
 
-      idx++;
-      params.push(incidentId);
-
-      const result = await client.query(
-        `UPDATE incidents SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
-        params,
-      );
+      const customPhase = nextStatus === 'resolved' ? 'resolve' : 'update';
+      if (customFieldsPayload !== undefined || customPhase === 'resolve') {
+        await upsertCustomFields(
+          client,
+          'incident',
+          String(incidentId),
+          customFieldsPayload,
+          customPhase,
+        );
+      }
 
       // Journal entries for key changes
       if (updates.status && updates.status !== current.status) {
@@ -1886,7 +1908,8 @@ router.patch(
         }).catch(() => {});
       }
 
-      res.json(result.rows[0]);
+      const custom_fields = await loadCustomFieldsMap(client, 'incident', String(incidentId));
+      res.json({ ...updated, custom_fields });
     } catch (err) {
       next(err);
     }

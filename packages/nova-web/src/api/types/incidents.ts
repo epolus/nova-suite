@@ -60,6 +60,7 @@ export interface Incident {
     status: string;
     link_kind: 'primary' | 'related';
   }>;
+  custom_fields?: Record<string, unknown>;
 }
 
 export interface IncidentCategory {
