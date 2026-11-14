@@ -33,6 +33,7 @@ export type IconName =
   | 'services'
   | 'processes'
   | 'notifications'
+  | 'mailbox'
   | 'notification_deliveries'
   | 'data_sources'
   | 'credentials'
