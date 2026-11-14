@@ -111,7 +111,7 @@ export function coerceFieldValue(
   }
 
   if (def.field_type === 'multiselect') {
-    let arr: unknown[] = [];
+    let arr: unknown[];
     if (raw == null || raw === '') arr = [];
     else if (Array.isArray(raw)) arr = raw;
     else if (typeof raw === 'string') {
