@@ -1,26 +1,26 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'use-intl';
 import { admin, type IncidentCategory, type IncidentResolutionCode } from '../../api/client';
 import MasterDataPage, { type ColumnDef, type FieldDef } from './MasterDataPage';
+
+const ADMIN_INCIDENT_CATEGORIES_KEY = ['admin', 'incident-categories'] as const;
 
 export default function IncidentClassificationPage() {
   const t = useTranslations('pages.admin.incidentClassification');
   const tFields = useTranslations('common.fields');
   const tTable = useTranslations('common.table');
   const tStates = useTranslations('common.states');
+  const queryClient = useQueryClient();
 
-  const [categories, setCategories] = useState<IncidentCategory[]>([]);
   const [tab, setTab] = useState<'categories' | 'codes'>('categories');
 
-  const reloadCategories = useCallback(async () => {
-    const catRes = await admin.incidentCategories();
-    setCategories(catRes.categories);
-  }, []);
-
-  useEffect(() => {
-    void reloadCategories().catch(() => setCategories([]));
-  }, [reloadCategories]);
+  const categoriesQuery = useQuery({
+    queryKey: ADMIN_INCIDENT_CATEGORIES_KEY,
+    queryFn: () => admin.incidentCategories().then((r) => r.categories),
+  });
+  const categories = categoriesQuery.data ?? [];
 
   const noneOption = `— ${tStates('none')} —`;
 
@@ -88,9 +88,9 @@ export default function IncidentClassificationPage() {
 
   const fetchCategories = useCallback(async () => {
     const res = await admin.incidentCategories();
-    setCategories(res.categories);
+    queryClient.setQueryData(ADMIN_INCIDENT_CATEGORIES_KEY, res.categories);
     return res.categories;
-  }, []);
+  }, [queryClient]);
 
   const fetchCodes = useCallback(async () => {
     const res = await admin.incidentResolutionCodes();
@@ -154,7 +154,7 @@ export default function IncidentClassificationPage() {
             || (item.description?.toLowerCase().includes(q) ?? false)
             || (item.parent_name?.toLowerCase().includes(q) ?? false)
           }
-          onAfterMutate={() => { void reloadCategories(); }}
+          onAfterMutate={() => { void categoriesQuery.refetch(); }}
         />
       ) : (
         <MasterDataPage<IncidentResolutionCode>
