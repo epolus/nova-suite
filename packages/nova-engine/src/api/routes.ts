@@ -51,6 +51,7 @@ import {
 } from './email-templates/routes';
 import workLogRoutes from './work-logs/routes';
 import csatRoutes from './csat/routes';
+import checklistRoutes, { checklistTemplatesAdminRoutes } from './checklists/routes';
 
 const router = Router();
 
@@ -64,11 +65,13 @@ router.use('/admin/migrations/servicenow', serviceNowMigrationRoutes);
 router.use('/admin/mailboxes', inboundEmailMailboxesRoutes);
 router.use('/admin/inbound-email-rules', inboundEmailRulesRoutes);
 router.use('/admin/email-templates', emailTemplatesAdminRoutes);
+router.use('/admin/checklist-templates', checklistTemplatesAdminRoutes);
 router.use('/admin', adminRoutes);
 router.use('/email-templates', emailTemplatesAgentRoutes);
 router.use('/email-signatures', emailSignatureRoutes);
 router.use('/work-logs', workLogRoutes);
 router.use('/csat', csatRoutes);
+router.use('/checklists', checklistRoutes);
 router.use('/custom-fields', customFieldRoutes);
 router.use('/record-links', recordLinkRoutes);
 router.use('/catalog', catalogRoutes);

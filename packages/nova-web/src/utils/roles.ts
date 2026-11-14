@@ -14,6 +14,7 @@ const AGENT_ROLES = new Set([
   'event_operator',
   'event_manager',
   'data_manager',
+  'checklist_admin',
 ]);
 
 type RoleList = string[] | undefined;
@@ -79,6 +80,11 @@ export function hasReportingCreateRole(roles: RoleList): boolean {
 /** Retention jobs under Admin → Data management. */
 export function canManageData(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'data_manager']);
+}
+
+/** Checklist templates under Admin → Checklists. */
+export function canManageChecklistTemplates(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'checklist_admin']);
 }
 
 /** War room / postmortem edits (not read-only fulfiller). */

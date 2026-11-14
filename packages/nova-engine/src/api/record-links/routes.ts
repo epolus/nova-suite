@@ -37,6 +37,7 @@ function canManageRecordLinks(req: Request): boolean {
     'event_operator',
     'event_manager',
     'data_manager',
+    'checklist_admin',
   ]);
 }
 
