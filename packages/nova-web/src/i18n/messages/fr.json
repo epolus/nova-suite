@@ -201,6 +201,7 @@
       "slaConfiguration": "Configuration du SLA",
       "notificationWorkflows": "Flux de travail de notification",
       "inboundEmail": "E-mail entrant",
+      "emailTemplates": "Modèles d'e-mail",
       "notificationDeliveries": "Livraisons de notifications",
       "changeManagement": "Gestion du changement",
       "knowledgeWorkflows": "Flux de travail de connaissances",
