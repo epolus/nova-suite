@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'use-intl';
 import {
   recordLinks,
@@ -35,71 +36,50 @@ export default function RelatedRecordsCard({ entityType, entityId, readonly = fa
   const t = useTranslations('components.relatedRecords');
   const { user } = useAuth();
   const canEdit = !readonly && isAgentRole(user?.roles);
+  const queryClient = useQueryClient();
 
-  const [links, setLinks] = useState<RecordLink[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [targetType, setTargetType] = useState<RecordLinkEntityType>(
     ENTITY_TYPES.find((x) => x !== entityType) || 'incident',
   );
   const [linkType, setLinkType] = useState<RecordLinkType>('related');
   const [query, setQuery] = useState('');
-  const [hits, setHits] = useState<RecordLinkSearchHit[]>([]);
-  const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await recordLinks.list(entityType, entityId);
-      setLinks(res.links);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t('loadFailed'));
-    } finally {
-      setLoading(false);
-    }
-  }, [entityId, entityType, t]);
+  const linksQueryKey = ['record-links', entityType, entityId] as const;
+  const {
+    data: links = [],
+    isLoading,
+    error: loadError,
+  } = useQuery({
+    queryKey: linksQueryKey,
+    queryFn: () => recordLinks.list(entityType, entityId).then((r) => r.links),
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    if (!canEdit || query.trim().length < 1) {
-      setHits([]);
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      setSearching(true);
-      recordLinks.search(targetType, query.trim())
-        .then((res) => {
-          if (!cancelled) {
-            setHits(res.results.filter((h) => !(h.entity_type === entityType && h.id === entityId)));
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setHits([]);
-        })
-        .finally(() => {
-          if (!cancelled) setSearching(false);
-        });
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [canEdit, entityId, entityType, query, targetType]);
+  const deferredQuery = useDeferredValue(query.trim());
+  const {
+    data: searchHits = [],
+    isFetching: searching,
+  } = useQuery({
+    queryKey: ['record-links-search', targetType, deferredQuery, entityType, entityId],
+    queryFn: async () => {
+      const res = await recordLinks.search(targetType, deferredQuery);
+      return res.results.filter((h) => !(h.entity_type === entityType && h.id === entityId));
+    },
+    enabled: canEdit && deferredQuery.length > 0,
+  });
 
   const targetOptions = useMemo(
     () => ENTITY_TYPES.filter((x) => x !== entityType),
     [entityType],
   );
 
+  const error = actionError
+    || (loadError instanceof Error ? loadError.message : loadError ? t('loadFailed') : '');
+
   const addLink = async (hit: RecordLinkSearchHit) => {
     setSaving(true);
-    setError('');
+    setActionError('');
     try {
       // parent: selected record is the parent of the current entity.
       const payload = linkType === 'parent'
@@ -119,10 +99,9 @@ export default function RelatedRecordsCard({ entityType, entityId, readonly = fa
         };
       await recordLinks.create(payload);
       setQuery('');
-      setHits([]);
-      await load();
+      await queryClient.invalidateQueries({ queryKey: linksQueryKey });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t('saveFailed'));
+      setActionError(err instanceof Error ? err.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -130,12 +109,12 @@ export default function RelatedRecordsCard({ entityType, entityId, readonly = fa
 
   const removeLink = async (id: string) => {
     setSaving(true);
-    setError('');
+    setActionError('');
     try {
       await recordLinks.remove(id);
-      await load();
+      await queryClient.invalidateQueries({ queryKey: linksQueryKey });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t('deleteFailed'));
+      setActionError(err instanceof Error ? err.message : t('deleteFailed'));
     } finally {
       setSaving(false);
     }
@@ -163,7 +142,7 @@ export default function RelatedRecordsCard({ entityType, entityId, readonly = fa
         </div>
       )}
 
-      {loading ? (
+      {isLoading ? (
         <p className="text-sm text-gray-500">{t('loading')}</p>
       ) : links.length === 0 ? (
         <p className="text-sm text-gray-500 mb-4">{t('empty')}</p>
@@ -250,13 +229,15 @@ export default function RelatedRecordsCard({ entityType, entityId, readonly = fa
               className={inputCls}
             />
           </div>
-          {searching && <p className="text-xs text-gray-400">{t('searching')}</p>}
-          {!searching && query.trim() && hits.length === 0 && (
+          {(searching || query.trim() !== deferredQuery) && (
+            <p className="text-xs text-gray-400">{t('searching')}</p>
+          )}
+          {!searching && deferredQuery && query.trim() === deferredQuery && searchHits.length === 0 && (
             <p className="text-xs text-gray-400">{t('noResults')}</p>
           )}
-          {hits.length > 0 && (
+          {searchHits.length > 0 && (
             <ul className="max-h-48 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg">
-              {hits.map((hit) => (
+              {searchHits.map((hit) => (
                 <li key={hit.id}>
                   <button
                     type="button"
