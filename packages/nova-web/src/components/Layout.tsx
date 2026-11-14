@@ -93,8 +93,11 @@ function AdminSubMenu({ section, expanded, onToggle, collapsed = false, currentP
         </svg>
       </button>
       <div
-        className={`overflow-hidden transition-all duration-200 ${expanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
+        className={`grid transition-[grid-template-rows,opacity] duration-200 ${
+          expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
       >
+        <div className="overflow-hidden min-h-0">
         <div className="pl-3 pt-0.5 space-y-0.5">
           {section.items.map((item) => (
             <NavLink
@@ -121,6 +124,7 @@ function AdminSubMenu({ section, expanded, onToggle, collapsed = false, currentP
               {item.label}
             </NavLink>
           ))}
+        </div>
         </div>
       </div>
     </div>

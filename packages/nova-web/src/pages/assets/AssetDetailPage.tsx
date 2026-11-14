@@ -6,6 +6,7 @@ import { assets } from '@/api/client';
 import PageHeader from '@/components/PageHeader';
 import Card from '@/components/Card';
 import CustomFieldsSection from '@/components/CustomFieldsSection';
+import RelatedRecordsCard from '@/components/RelatedRecordsCard';
 import Spinner from '@/components/Spinner';
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog';
 import { Button } from '@/components/ui/button';
@@ -326,6 +327,11 @@ export default function AssetDetailPage() {
           />
         </div>
       </Card>
+      {!isNew && id && (
+        <div className="mt-6 max-w-2xl">
+          <RelatedRecordsCard entityType="asset" entityId={id} />
+        </div>
+      )}
     </>
   );
 }

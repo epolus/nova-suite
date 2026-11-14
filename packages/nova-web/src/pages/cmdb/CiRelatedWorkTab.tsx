@@ -3,17 +3,21 @@ import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import type { Incident, Problem } from '../../api/client';
 import Card from '../../components/Card';
+import RelatedRecordsCard from '../../components/RelatedRecordsCard';
 
 export default function CiRelatedWorkTab({
+  ciId,
   relatedProblems,
   relatedIncidents,
 }: {
+  ciId: string;
   relatedProblems: Problem[];
   relatedIncidents: Incident[];
 }) {
   const tCmdb = useTranslations('pages.cmdb');
 
   return (
+    <div className="space-y-6">
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card>
         <h3 className="font-semibold text-gray-900 mb-2">{tCmdb('relatedProblems')}</h3>
@@ -56,6 +60,8 @@ export default function CiRelatedWorkTab({
           </div>
         )}
       </Card>
+    </div>
+    <RelatedRecordsCard entityType="configuration_item" entityId={ciId} />
     </div>
   );
 }

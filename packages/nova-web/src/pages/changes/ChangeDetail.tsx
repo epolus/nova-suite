@@ -8,6 +8,7 @@ import { useChangeDetail } from './useChangeDetail';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import CustomFieldsSection from '../../components/CustomFieldsSection';
+import RelatedRecordsCard from '../../components/RelatedRecordsCard';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
@@ -403,6 +404,12 @@ export default function ChangeDetailPage() {
           changeId={id}
           savedUnsuccessful={change?.success === false}
         />
+      )}
+
+      {!isNew && id && (
+        <div className="mt-6">
+          <RelatedRecordsCard entityType="change" entityId={id} />
+        </div>
       )}
 
     </>

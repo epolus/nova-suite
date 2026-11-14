@@ -163,8 +163,9 @@ export default function CIDetail() {
         />
       )}
 
-      {activeTab === 'related' && (
+      {activeTab === 'related' && id && (
         <CiRelatedWorkTab
+          ciId={id}
           relatedProblems={relatedProblems}
           relatedIncidents={relatedIncidents}
         />

@@ -5,6 +5,7 @@ import { attachments as attachmentsApi } from '@/api/client';
 import type { Attachment, KnownError, Problem, ProblemIncidentLink, ProblemTask } from '@/api/client';
 import Card from '../../components/Card';
 import { AttachmentCard } from '../../components/AttachmentCard';
+import RelatedRecordsCard from '../../components/RelatedRecordsCard';
 import { useFieldLabel } from '@/i18n/hooks';
 import {
   ProblemIncidentsPanel,
@@ -215,6 +216,8 @@ export function ProblemDetailBody({
             formatSize={formatSize}
           />
         )}
+
+        {!isNew && id && <RelatedRecordsCard entityType="problem" entityId={id} />}
 
         {!isNew && id && (
           <>

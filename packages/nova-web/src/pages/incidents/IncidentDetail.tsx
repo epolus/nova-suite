@@ -3,6 +3,7 @@ import { attachments as attachmentsApi } from '../../api/client';
 import { AttachmentCard } from '../../components/AttachmentCard';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
+import RelatedRecordsCard from '../../components/RelatedRecordsCard';
 import Spinner from '../../components/Spinner';
 import { Button } from '../../components/ui/button';
 import { useIncidentDetail } from './useIncidentDetail';
@@ -106,6 +107,14 @@ export default function IncidentDetail() {
                 onClosePreview={closePreview}
                 formatSize={formatSize}
               />
+
+              {id && (
+                <RelatedRecordsCard
+                  entityType="incident"
+                  entityId={id}
+                  readonly={readonly}
+                />
+              )}
 
               <IncidentJournalCard d={d} />
             </div>
