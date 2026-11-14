@@ -66,13 +66,18 @@ export function isRecordLinkType(value: unknown): value is RecordLinkType {
     && (RECORD_LINK_TYPES as readonly string[]).includes(value);
 }
 
-/** Incidents already have a dedicated configuration_item_id field. */
+/**
+ * Pairs covered by dedicated incident FKs / join tables — use those instead of record_links.
+ * - configuration_item → incidents.configuration_item_id
+ * - problem → problem_incidents / related problem field
+ */
 export function isDisallowedRecordLinkPair(
   a: RecordLinkEntityType,
   b: RecordLinkEntityType,
 ): boolean {
-  return (a === 'incident' && b === 'configuration_item')
-    || (a === 'configuration_item' && b === 'incident');
+  const pair = new Set([a, b]);
+  return (pair.has('incident') && pair.has('configuration_item'))
+    || (pair.has('incident') && pair.has('problem'));
 }
 
 async function assertEntityExists(
@@ -205,6 +210,13 @@ export async function createRecordLink(
     throw new AppError(400, 'Cannot link a record to itself');
   }
   if (isDisallowedRecordLinkPair(input.source_type, input.target_type)) {
+    const types = new Set([input.source_type, input.target_type]);
+    if (types.has('problem')) {
+      throw new AppError(
+        400,
+        'Link incidents to problems with the incident Related Problem field',
+      );
+    }
     throw new AppError(
       400,
       'Link incidents to configuration items with the incident Configuration Item field',

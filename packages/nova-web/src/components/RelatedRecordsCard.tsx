@@ -26,10 +26,11 @@ const ENTITY_TYPES: RecordLinkEntityType[] = [
 
 const LINK_TYPES: RecordLinkType[] = ['related', 'parent', 'duplicate'];
 
-/** Incidents already have a dedicated configuration_item field. */
+/** Pairs covered by dedicated incident fields — use those instead of record_links. */
 function isDisallowedPair(a: RecordLinkEntityType, b: RecordLinkEntityType): boolean {
-  return (a === 'incident' && b === 'configuration_item')
-    || (a === 'configuration_item' && b === 'incident');
+  const pair = new Set([a, b]);
+  return (pair.has('incident') && pair.has('configuration_item'))
+    || (pair.has('incident') && pair.has('problem'));
 }
 
 function targetTypesFor(entityType: RecordLinkEntityType): RecordLinkEntityType[] {
