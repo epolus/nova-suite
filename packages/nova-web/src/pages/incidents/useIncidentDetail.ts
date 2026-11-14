@@ -12,6 +12,8 @@ import {
   useIncidentLinkedProblems,
   useReferenceAssignmentGroups,
   useReferenceCmdbItems,
+  useReferenceIncidentCategories,
+  useReferenceIncidentResolutionCodes,
   useReferenceIncidentServices,
   useReferenceProblemPicker,
   useReferenceUsers,
@@ -56,6 +58,8 @@ export function useIncidentDetail() {
   const { data: ciOptions = [] } = useReferenceCmdbItems({ status: 'installed' }, 1, 100, isFulfiller);
   const { data: users = [] } = useReferenceUsers(isFulfiller);
   const { data: problemOptions = [] } = useReferenceProblemPicker(isFulfiller);
+  const { data: incidentCategories = [] } = useReferenceIncidentCategories(isFulfiller, true);
+  const { data: resolutionCodes = [] } = useReferenceIncidentResolutionCodes(isFulfiller, true);
   const { data: linkedProblems = [] } = useIncidentLinkedProblems(id, isFulfiller);
   const linkedProblemIds = useMemo(
     () => linkedProblems.map((p) => p.problem_id),
@@ -312,6 +316,8 @@ export function useIncidentDetail() {
     ciOptions,
     users,
     problemOptions,
+    incidentCategories,
+    resolutionCodes,
     groupMembers,
     // Edit fields
     fields,

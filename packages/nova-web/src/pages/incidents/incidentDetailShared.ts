@@ -17,6 +17,7 @@ export const INCIDENT_FIELD = {
   configurationItemId: 'incident-configuration-item',
   category: 'incident-category',
   subcategory: 'incident-subcategory',
+  resolutionCodeId: 'incident-resolution-code',
   relatedProblemId: 'incident-related-problem',
   title: 'incident-title',
   description: 'incident-description',

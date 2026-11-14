@@ -9,12 +9,20 @@ import { useTranslations } from 'use-intl';
 import { FieldCaption, getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
 
 export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
-  const { inc, readonly, fields, setField } = d;
+  const { inc, readonly, fields, setField, resolutionCodes } = d;
   const tIncidents = useTranslations('pages.incidents');
   const tTable = useTranslations('common.table');
   const fieldLabel = useFieldLabel();
   if (!inc) return null;
   const inputCls = getInputCls(readonly);
+  const showResolution = fields.status === 'resolved' || fields.status === 'closed'
+    || inc.status === 'resolved' || inc.status === 'closed'
+    || Boolean(inc.resolution_notes) || Boolean(inc.resolution_code_id);
+  const codeOptions = resolutionCodes.filter(
+    (c) => c.is_active || c.id === fields.resolutionCodeId,
+  );
+  const selectedCode = resolutionCodes.find((c) => c.id === fields.resolutionCodeId)
+    || resolutionCodes.find((c) => c.id === (inc.resolution_code_id || ''));
   return (
     <Card>
       <h3 className="font-semibold text-gray-900 mb-4">{tIncidents('incidentDetails')}</h3>
@@ -35,7 +43,30 @@ export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
             <textarea id={INCIDENT_FIELD.description} name={INCIDENT_FIELD.description} value={fields.description} onChange={(e) => setField('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder={tIncidents('describeIncident')} />
           )}
         </div>
-        {(fields.status === 'resolved' || inc.status === 'resolved' || inc.resolution_notes) && (
+        {showResolution && (
+          <div>
+            <FieldCaption htmlFor={INCIDENT_FIELD.resolutionCodeId} hasControl={!readonly} className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('resolutionCode')}</FieldCaption>
+            {readonly ? (
+              <p className="text-sm text-gray-900">
+                {selectedCode ? `${selectedCode.code} — ${selectedCode.label}` : (inc.resolution_code || tTable('emDash'))}
+              </p>
+            ) : (
+              <select
+                id={INCIDENT_FIELD.resolutionCodeId}
+                name={INCIDENT_FIELD.resolutionCodeId}
+                value={fields.resolutionCodeId}
+                onChange={(e) => setField('resolutionCodeId', e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{tTable('emDash')}</option>
+                {codeOptions.map((c) => (
+                  <option key={c.id} value={c.id}>{c.code} — {c.label}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+        {showResolution && (
           <div>
             <FieldCaption htmlFor={INCIDENT_FIELD.resolutionNotes} hasControl={!readonly} className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('resolutionNotes')}</FieldCaption>
             {readonly ? (

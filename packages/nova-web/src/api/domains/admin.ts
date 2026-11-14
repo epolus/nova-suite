@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { request } from '../http';
-import type { AdminUser, AssignmentGroupItem, AuditEvent, BusinessCalendar, BusinessHourRow, CompanyItem, ConfigDeploymentRun, ConfigPackageApplyResponse, ConfigPackageBundle, ConfigPackageExportResponse, ConfigPackageValidateResponse, CostCenterItem, CreateAssignmentGroupPayload, CreateUserPayload, DepartmentItem, HolidayRow, LocationItem, NotificationEmailDelivery, NotificationEmailDeliverySummary, NotificationRule, NotificationWebhook, ProcessItem, RoleItem, RuntimeHealth, ServiceAdminItem, SlaDefinition, SystemMetrics, UpdateAssignmentGroupPayload, UpdateUserPayload, WorkflowDefinition } from '../types';
+import type { AdminUser, AssignmentGroupItem, AuditEvent, BusinessCalendar, BusinessHourRow, CompanyItem, ConfigDeploymentRun, ConfigPackageApplyResponse, ConfigPackageBundle, ConfigPackageExportResponse, ConfigPackageValidateResponse, CostCenterItem, CreateAssignmentGroupPayload, CreateUserPayload, DepartmentItem, HolidayRow, IncidentCategory, IncidentResolutionCode, LocationItem, NotificationEmailDelivery, NotificationEmailDeliverySummary, NotificationRule, NotificationWebhook, ProcessItem, RoleItem, RuntimeHealth, ServiceAdminItem, SlaDefinition, SystemMetrics, UpdateAssignmentGroupPayload, UpdateUserPayload, WorkflowDefinition } from '../types';
 import type { AutomationDryRunRequestContext, AutomationDryRunResult } from '../types/automationDryRun';
 
 export const admin = {
@@ -217,4 +217,47 @@ export const admin = {
     request<RuntimeHealth>('/admin/runtime-health'),
   systemMetrics: () =>
     request<SystemMetrics>('/admin/system-metrics'),
+  // Incident classification
+  incidentCategories: () =>
+    request<{ categories: IncidentCategory[] }>('/admin/incident-categories'),
+  createIncidentCategory: (data: {
+    name: string;
+    description?: string | null;
+    parent_id?: string | null;
+    is_active?: boolean;
+  }) =>
+    request<{ id: string }>('/admin/incident-categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateIncidentCategory: (id: string, data: {
+    name?: string;
+    description?: string | null;
+    parent_id?: string | null;
+    is_active?: boolean;
+  }) =>
+    request<{ success: boolean }>(`/admin/incident-categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteIncidentCategory: (id: string) =>
+    request<{ success: boolean }>(`/admin/incident-categories/${id}`, { method: 'DELETE' }),
+  incidentResolutionCodes: () =>
+    request<{ resolution_codes: IncidentResolutionCode[] }>('/admin/incident-resolution-codes'),
+  createIncidentResolutionCode: (data: { code: string; label: string; is_active?: boolean }) =>
+    request<{ id: string }>('/admin/incident-resolution-codes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateIncidentResolutionCode: (id: string, data: {
+    code?: string;
+    label?: string;
+    is_active?: boolean;
+  }) =>
+    request<{ success: boolean }>(`/admin/incident-resolution-codes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteIncidentResolutionCode: (id: string) =>
+    request<{ success: boolean }>(`/admin/incident-resolution-codes/${id}`, { method: 'DELETE' }),
 };

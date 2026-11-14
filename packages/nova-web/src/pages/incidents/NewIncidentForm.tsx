@@ -158,23 +158,52 @@ export function NewIncidentForm({ state }: { state: NewIncidentState }) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('category')}</label>
-                <input
-                  type="text"
-                  value={state.category}
-                  onChange={(e) => state.setCategory(e.target.value)}
-                  placeholder={fieldLabel('category')}
-                  className={inputCls}
-                />
+                {state.incidentCategories.some((c) => !c.parent_id) ? (
+                  <select
+                    value={state.rootCategoryId}
+                    onChange={(e) => state.setCategorySelection(e.target.value, '')}
+                    className={inputCls}
+                  >
+                    <option value="">—</option>
+                    {state.incidentCategories.filter((c) => !c.parent_id).map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={state.category}
+                    onChange={(e) => state.setCategory(e.target.value)}
+                    placeholder={fieldLabel('category')}
+                    className={inputCls}
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">{fieldLabel('subcategory')}</label>
-                <input
-                  type="text"
-                  value={state.subcategory}
-                  onChange={(e) => state.setSubcategory(e.target.value)}
-                  placeholder={fieldLabel('subcategory')}
-                  className={inputCls}
-                />
+                {state.incidentCategories.some((c) => !c.parent_id) ? (
+                  <select
+                    value={state.subcategoryId}
+                    onChange={(e) => state.setCategorySelection(state.rootCategoryId, e.target.value)}
+                    className={inputCls}
+                    disabled={!state.rootCategoryId}
+                  >
+                    <option value="">—</option>
+                    {state.incidentCategories
+                      .filter((c) => c.parent_id === state.rootCategoryId)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={state.subcategory}
+                    onChange={(e) => state.setSubcategory(e.target.value)}
+                    placeholder={fieldLabel('subcategory')}
+                    className={inputCls}
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">{tIncidents('relatedProblem')}</label>

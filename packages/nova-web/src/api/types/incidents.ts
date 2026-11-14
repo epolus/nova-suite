@@ -17,7 +17,10 @@ export interface Incident {
   configuration_item_id: string | null;
   category: string | null;
   subcategory: string | null;
+  category_id?: string | null;
+  closure_category_id?: string | null;
   resolution_code: string | null;
+  resolution_code_id?: string | null;
   pending_reason?: string | null;
   resolution_notes: string | null;
   resolved_at: string | null;
@@ -57,6 +60,26 @@ export interface Incident {
     status: string;
     link_kind: 'primary' | 'related';
   }>;
+}
+
+export interface IncidentCategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  parent_id: string | null;
+  parent_name?: string | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface IncidentResolutionCode {
+  id: string;
+  code: string;
+  label: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface IncidentProblemLink {

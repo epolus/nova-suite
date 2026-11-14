@@ -5,6 +5,8 @@ export const queryKeys = {
     all: ['reference'] as const,
     assignmentGroups: () => [...queryKeys.reference.all, 'assignment-groups'] as const,
     incidentServices: () => [...queryKeys.reference.all, 'incident-services'] as const,
+    incidentCategories: () => [...queryKeys.reference.all, 'incident-categories'] as const,
+    incidentResolutionCodes: () => [...queryKeys.reference.all, 'incident-resolution-codes'] as const,
     users: () => [...queryKeys.reference.all, 'users'] as const,
     cmdbItems: (params: Record<string, string>, page: number, limit: number) =>
       [...queryKeys.reference.all, 'cmdb-items', params, page, limit] as const,

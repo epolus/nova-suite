@@ -18,6 +18,8 @@ export const EMPTY_FIELDS = {
   description: '',
   category: '',
   subcategory: '',
+  categoryId: '',
+  resolutionCodeId: '',
   resolutionNotes: '',
   relatedProblemId: '',
 };
@@ -40,6 +42,8 @@ export function buildFieldsFromIncident(i: Incident): IncidentFields {
     description: i.description || '',
     category: i.category || '',
     subcategory: i.subcategory || '',
+    categoryId: i.category_id || '',
+    resolutionCodeId: i.resolution_code_id || '',
     resolutionNotes: i.resolution_notes || '',
     relatedProblemId: '',
   };
@@ -52,8 +56,17 @@ export function buildIncidentUpdates(fields: IncidentFields, inc: Incident): Rec
   if (fields.status !== inc.status) updates.status = fields.status;
   if (fields.title !== inc.title) updates.title = fields.title;
   if (fields.description !== (inc.description || '')) updates.description = fields.description || null;
-  if (fields.category !== (inc.category || '')) updates.category = fields.category || null;
-  if (fields.subcategory !== (inc.subcategory || '')) updates.subcategory = fields.subcategory || null;
+  const nextCategoryId = fields.categoryId || null;
+  if (nextCategoryId !== (inc.category_id || null)) {
+    updates.category_id = nextCategoryId;
+  } else {
+    if (fields.category !== (inc.category || '')) updates.category = fields.category || null;
+    if (fields.subcategory !== (inc.subcategory || '')) updates.subcategory = fields.subcategory || null;
+  }
+  const nextResolutionCodeId = fields.resolutionCodeId || null;
+  if (nextResolutionCodeId !== (inc.resolution_code_id || null)) {
+    updates.resolution_code_id = nextResolutionCodeId;
+  }
   if (fields.contactInfo !== (inc.contact_info || '')) updates.contact_info = fields.contactInfo || null;
   const currentPending = inc.pending_reason || (inc.status === 'pending' ? inc.resolution_code : '') || '';
   if (fields.pendingReason !== currentPending) updates.pending_reason = fields.pendingReason || null;
@@ -113,6 +126,7 @@ export type NewIncidentFormState = {
   configItemId: string;
   category: string;
   subcategory: string;
+  categoryId: string;
   relatedProblemId: string;
 };
 
@@ -130,6 +144,7 @@ export function buildNewIncidentBaseline(defaultCallerId: string): NewIncidentFo
     configItemId: '',
     category: '',
     subcategory: '',
+    categoryId: '',
     relatedProblemId: '',
   };
 }

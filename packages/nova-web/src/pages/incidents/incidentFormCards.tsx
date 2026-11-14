@@ -7,6 +7,7 @@ import type { UserListItem, ServiceListItem, CI, Problem } from '../../api/clien
 import { useFieldLabel, useImpactUrgencyLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
 import { FieldCaption, getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
+import { IncidentCategoryFields } from './IncidentCategoryFields';
 
 export function IncidentSummaryCard({ d }: { d: IncidentDetailState }) {
   const { inc, readonly, fields, setField, requiredFieldMissing, assignmentGroups, groupMembers } = d;
@@ -247,7 +248,10 @@ export function IncidentCallerCard({ d }: { d: IncidentDetailState }) {
 }
 
 export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
-  const { inc, readonly, fields, setField, requiredFieldMissing, services, ciOptions, problemOptions, selectedProblem } = d;
+  const {
+    inc, readonly, fields, setField, requiredFieldMissing, services, ciOptions,
+    problemOptions, selectedProblem, incidentCategories,
+  } = d;
   const tIncidents = useTranslations('pages.incidents');
   const tTable = useTranslations('common.table');
   const fieldLabel = useFieldLabel();
@@ -311,26 +315,18 @@ export function IncidentServiceContextCard({ d }: { d: IncidentDetailState }) {
             )}
           </dd>
         </div>
-        <div>
-          <dt id={`${INCIDENT_FIELD.category}-label`} className="text-gray-500">{fieldLabel('category')}</dt>
-          <dd className="text-gray-900 mt-0.5">
-            {readonly ? (
-              inc.category || tTable('emDash')
-            ) : (
-              <input id={INCIDENT_FIELD.category} name={INCIDENT_FIELD.category} type="text" value={fields.category} onChange={(e) => setField('category', e.target.value)} placeholder={fieldLabel('category')} className={inputCls} aria-labelledby={`${INCIDENT_FIELD.category}-label`} />
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt id={`${INCIDENT_FIELD.subcategory}-label`} className="text-gray-500">{fieldLabel('subcategory')}</dt>
-          <dd className="text-gray-900 mt-0.5">
-            {readonly ? (
-              inc.subcategory || tTable('emDash')
-            ) : (
-              <input id={INCIDENT_FIELD.subcategory} name={INCIDENT_FIELD.subcategory} type="text" value={fields.subcategory} onChange={(e) => setField('subcategory', e.target.value)} placeholder={fieldLabel('subcategory')} className={inputCls} aria-labelledby={`${INCIDENT_FIELD.subcategory}-label`} />
-            )}
-          </dd>
-        </div>
+        <IncidentCategoryFields
+          readonly={readonly}
+          category={fields.category}
+          subcategory={fields.subcategory}
+          categoryId={fields.categoryId}
+          legacyCategory={inc.category}
+          legacySubcategory={inc.subcategory}
+          incidentCategories={incidentCategories}
+          inputCls={inputCls}
+          selectCls={inputCls}
+          setField={setField}
+        />
         <div>
           <dt id={`${INCIDENT_FIELD.relatedProblemId}-label`} className="text-gray-500 mb-1">{tIncidents('relatedProblem')}</dt>
           <dd className="mt-0.5">

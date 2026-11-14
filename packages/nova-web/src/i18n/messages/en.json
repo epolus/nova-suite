@@ -361,6 +361,7 @@
       "fulfillmentModels": "Fulfillment Models",
       "catalogTasks": "Catalog Tasks",
       "processes": "Processes",
+      "incidentClassification": "Incident Classification",
       "slaConfiguration": "SLA Configuration",
       "businessCalendars": "Business Calendars",
       "notificationWorkflows": "Notification Workflows",
@@ -603,6 +604,7 @@
       "configurationItem": "Configuration Item",
       "relatedProblem": "Related Problem",
       "incidentDetails": "Incident Details",
+      "resolutionCode": "Resolution Code",
       "resolutionNotes": "Resolution Notes",
       "describeIncident": "Describe the incident...",
       "howResolved": "How was the incident resolved?",
@@ -1561,6 +1563,22 @@
         "description": "Define business processes and workflows.",
         "placeholderName": "e.g. Incident Management",
         "placeholderDescription": "What this process covers"
+      },
+      "incidentClassification": {
+        "categoriesTab": "Categories",
+        "codesTab": "Resolution codes",
+        "categoriesTitle": "Incident Categories",
+        "categoriesDescription": "Tree of categories and subcategories used when classifying incidents.",
+        "categoryEntity": "category",
+        "codesTitle": "Resolution Codes",
+        "codesDescription": "Codes agents select when resolving or closing an incident.",
+        "codeEntity": "resolution code",
+        "parent": "Parent category",
+        "code": "Code",
+        "placeholderCategory": "e.g. Hardware",
+        "placeholderDescription": "What belongs in this category",
+        "placeholderCode": "e.g. solved_permanently",
+        "placeholderLabel": "e.g. Solved permanently"
       },
       "services": {
         "title": "Services",

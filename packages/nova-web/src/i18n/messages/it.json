@@ -196,6 +196,7 @@
       "serviceItems": "Articoli di servizio",
       "catalogTasks": "Attività del catalogo",
       "processes": "Processi",
+      "incidentClassification": "Classificazione incident",
       "slaConfiguration": "Configurazione SLA",
       "notificationWorkflows": "Workflow di notifica",
       "notificationDeliveries": "Consegne notifiche",

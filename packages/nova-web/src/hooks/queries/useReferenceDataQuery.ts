@@ -31,6 +31,24 @@ export function useReferenceIncidentServices(enabled = true) {
   });
 }
 
+export function useReferenceIncidentCategories(enabled = true, includeInactive = false) {
+  return useQuery({
+    queryKey: [...queryKeys.reference.incidentCategories(), includeInactive] as const,
+    queryFn: () => incidents.categories({ includeInactive }).then((r) => r.categories),
+    enabled,
+    ...referenceQueryDefaults,
+  });
+}
+
+export function useReferenceIncidentResolutionCodes(enabled = true, includeInactive = false) {
+  return useQuery({
+    queryKey: [...queryKeys.reference.incidentResolutionCodes(), includeInactive] as const,
+    queryFn: () => incidents.resolutionCodes({ includeInactive }).then((r) => r.resolution_codes),
+    enabled,
+    ...referenceQueryDefaults,
+  });
+}
+
 export function useReferenceUsers(enabled = true) {
   return useQuery({
     queryKey: queryKeys.reference.users(),
@@ -72,6 +90,10 @@ export function createReferenceDataInvalidators(queryClient: QueryClient) {
     },
     incidentServices: () =>
       queryClient.invalidateQueries({ queryKey: queryKeys.reference.incidentServices() }),
+    incidentCategories: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.reference.incidentCategories() }),
+    incidentResolutionCodes: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.reference.incidentResolutionCodes() }),
     users: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.reference.users() });
       // Groups embed member display names in list payloads.

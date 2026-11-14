@@ -571,6 +571,39 @@ CREATE TYPE incident_status_enum AS ENUM (
   'new', 'assigned', 'in_progress', 'pending', 'resolved', 'closed', 'cancelled'
 );
 
+CREATE TABLE incident_categories (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name          text NOT NULL,
+  description   text,
+  parent_id     uuid REFERENCES incident_categories(id) ON DELETE SET NULL,
+  is_active     boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, parent_id, name)
+);
+
+CREATE UNIQUE INDEX uq_incident_categories_root_name
+  ON incident_categories(tenant_id, name)
+  WHERE parent_id IS NULL;
+
+CREATE INDEX idx_incident_categories_tenant
+  ON incident_categories(tenant_id, is_active);
+
+CREATE TABLE incident_resolution_codes (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  code          text NOT NULL,
+  label         text NOT NULL,
+  is_active     boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, code)
+);
+
+CREATE INDEX idx_incident_resolution_codes_tenant
+  ON incident_resolution_codes(tenant_id, is_active);
+
 CREATE TABLE incidents (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -594,7 +627,10 @@ CREATE TABLE incidents (
   configuration_item_id uuid,
   category        text,
   subcategory     text,
+  category_id     uuid REFERENCES incident_categories(id) ON DELETE SET NULL,
+  closure_category_id uuid REFERENCES incident_categories(id) ON DELETE SET NULL,
   resolution_code text,
+  resolution_code_id uuid REFERENCES incident_resolution_codes(id) ON DELETE SET NULL,
   pending_reason  text,
   resolution_notes text,
   resolved_at     timestamptz,
@@ -624,6 +660,9 @@ CREATE INDEX idx_incidents_assignment_group ON incidents(assignment_group_id);
 CREATE INDEX idx_incidents_sla ON incidents(tenant_id, sla_breached, sla_due_at);
 CREATE INDEX idx_incidents_response_due ON incidents(tenant_id, response_breached, response_due_at);
 CREATE INDEX idx_incidents_request ON incidents(request_id);
+CREATE INDEX idx_incidents_category_id ON incidents(tenant_id, category_id);
+CREATE INDEX idx_incidents_closure_category_id ON incidents(tenant_id, closure_category_id);
+CREATE INDEX idx_incidents_resolution_code_id ON incidents(tenant_id, resolution_code_id);
 
 CREATE SEQUENCE incident_number_seq START 1000;
 
@@ -1142,7 +1181,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.27', 'request_task_cancelled'),
   ('v00.01.28', 'users_phone_and_lockout'),
   ('v00.01.29', 'data_management'),
-  ('v00.01.30', 'data_management_targets');
+  ('v00.01.30', 'data_management_targets'),
+  ('v00.01.31', 'incident_classification');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1154,6 +1194,14 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_incident_categories_updated_at
+  BEFORE UPDATE ON incident_categories
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_incident_resolution_codes_updated_at
+  BEFORE UPDATE ON incident_resolution_codes
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 DO $$
 DECLARE
@@ -3231,6 +3279,24 @@ INSERT INTO change_approvals (
 INSERT INTO knowledge_categories (tenant_id, name, description) VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Incidents', 'Known issues, troubleshooting and workarounds'),
   ('a0000000-0000-0000-0000-000000000001', 'Services', 'Service-specific procedures and FAQs');
+
+INSERT INTO incident_categories (id, tenant_id, name, description) VALUES
+  ('ic000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Hardware', 'Hardware and peripherals'),
+  ('ic000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Software', 'Applications and OS'),
+  ('ic000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'Network', 'Connectivity and network services');
+
+INSERT INTO incident_categories (tenant_id, name, description, parent_id) VALUES
+  ('a0000000-0000-0000-0000-000000000001', 'Laptop', 'Laptop hardware', 'ic000000-0000-0000-0000-000000000001'),
+  ('a0000000-0000-0000-0000-000000000001', 'Desktop', 'Desktop hardware', 'ic000000-0000-0000-0000-000000000001'),
+  ('a0000000-0000-0000-0000-000000000001', 'Email', 'Email client or mailbox', 'ic000000-0000-0000-0000-000000000002'),
+  ('a0000000-0000-0000-0000-000000000001', 'VPN', 'VPN access issues', 'ic000000-0000-0000-0000-000000000003');
+
+INSERT INTO incident_resolution_codes (tenant_id, code, label) VALUES
+  ('a0000000-0000-0000-0000-000000000001', 'solved_permanently', 'Solved permanently'),
+  ('a0000000-0000-0000-0000-000000000001', 'solved_workaround', 'Solved with workaround'),
+  ('a0000000-0000-0000-0000-000000000001', 'not_reproducible', 'Not reproducible'),
+  ('a0000000-0000-0000-0000-000000000001', 'cancelled_by_user', 'Cancelled by user'),
+  ('a0000000-0000-0000-0000-000000000001', 'duplicate', 'Duplicate');
 
 -- NOTIFICATIONS
 CREATE TABLE notifications (

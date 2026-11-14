@@ -357,6 +357,7 @@ export const createIncidentSchema = z.object({
   configuration_item_id: uuidSchema.optional(),
   category: z.string().max(255).optional(),
   subcategory: z.string().max(255).optional(),
+  category_id: uuidSchema.optional(),
   request_id: uuidSchema.optional(),
 });
 
@@ -376,7 +377,10 @@ export const updateIncidentSchema = z.object({
   configuration_item_id: uuidSchema.nullable().optional(),
   category: z.string().max(255).nullable().optional(),
   subcategory: z.string().max(255).nullable().optional(),
+  category_id: uuidSchema.nullable().optional(),
+  closure_category_id: uuidSchema.nullable().optional(),
   resolution_code: z.string().max(255).nullable().optional(),
+  resolution_code_id: uuidSchema.nullable().optional(),
   pending_reason: z.string().max(255).nullable().optional(),
   resolution_notes: z.string().max(10000).nullable().optional(),
 });

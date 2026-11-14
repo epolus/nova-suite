@@ -78,6 +78,8 @@ ALTER TABLE business_calendars ENABLE ROW LEVEL SECURITY;
 ALTER TABLE business_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE incident_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE incident_resolution_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions ENABLE ROW LEVEL SECURITY;
@@ -561,6 +563,14 @@ CREATE POLICY tenant_isolation_holidays ON holidays
 CREATE POLICY tenant_isolation_tenant_settings ON tenant_settings
   FOR ALL USING (tenant_id = current_tenant_id());
 
+-- ─── Incident Categories ───
+CREATE POLICY tenant_isolation_incident_categories ON incident_categories
+  FOR ALL USING (tenant_id = current_tenant_id());
+
+-- ─── Incident Resolution Codes ───
+CREATE POLICY tenant_isolation_incident_resolution_codes ON incident_resolution_codes
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Knowledge Categories ───
 CREATE POLICY tenant_isolation_knowledge_categories ON knowledge_categories
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -791,6 +801,8 @@ ALTER TABLE business_calendars FORCE ROW LEVEL SECURITY;
 ALTER TABLE business_hours FORCE ROW LEVEL SECURITY;
 ALTER TABLE holidays FORCE ROW LEVEL SECURITY;
 ALTER TABLE tenant_settings FORCE ROW LEVEL SECURITY;
+ALTER TABLE incident_categories FORCE ROW LEVEL SECURITY;
+ALTER TABLE incident_resolution_codes FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_categories FORCE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_articles FORCE ROW LEVEL SECURITY;
 ALTER TABLE incident_kb_resolutions FORCE ROW LEVEL SECURITY;
