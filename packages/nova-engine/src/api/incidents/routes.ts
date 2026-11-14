@@ -1735,7 +1735,12 @@ router.patch(
           res.status(400).json({ error: 'Resolution notes are required when setting status to resolved' });
           return;
         }
-        if (current.status !== 'resolved') {
+      }
+
+      // Keep required checklists complete while resolved/closed (including later saves).
+      {
+        const nextStatus = String(updates.status ?? current.status);
+        if (nextStatus === 'resolved' || nextStatus === 'closed') {
           await assertRequiredChecklistsComplete(client, 'incident', String(incidentId));
         }
       }

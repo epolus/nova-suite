@@ -70,7 +70,7 @@ export function useIncidentDetailActions({
       }
     }
     try {
-      if (fields.status === 'resolved' && fields.status !== inc.status) {
+      if (fields.status === 'resolved' || fields.status === 'closed') {
         await assertIncidentChecklistsComplete(id);
       }
 

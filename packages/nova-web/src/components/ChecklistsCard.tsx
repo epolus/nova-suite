@@ -25,7 +25,8 @@ export default function ChecklistsCard({ entityType, entityId, readonly = false 
   const t = useTranslations('components.checklists');
   const tActions = useTranslations('common.actions');
   const { user } = useAuth();
-  const canEdit = !readonly && isAgentRole(user?.roles);
+  const isAgent = isAgentRole(user?.roles);
+  const canEdit = !readonly && isAgent;
   const queryClient = useQueryClient();
   const instancesKey = ['checklists', entityType, entityId] as const;
   const templatesKey = ['checklist-templates', entityType] as const;
@@ -151,9 +152,11 @@ export default function ChecklistsCard({ entityType, entityId, readonly = false 
       <div id="entity-checklists" className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">{t('title')}</h3>
-          {instances.some((i) => i.open_required_count > 0) && (
+          {readonly && isAgent ? (
+            <p className="mt-1 text-xs text-gray-500">{t('lockedHint')}</p>
+          ) : instances.some((i) => i.open_required_count > 0) ? (
             <p className="mt-1 text-xs text-amber-700">{t('requiredOpenHint')}</p>
-          )}
+          ) : null}
         </div>
         {canEdit && (
           <Button type="button" variant="outline" size="sm" onClick={() => setApplyOpen((v) => !v)}>

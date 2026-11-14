@@ -3908,6 +3908,7 @@
       "noTemplates": "No unused templates available for this record type.",
       "required": "required",
       "requiredOpenHint": "Required items must be completed before resolve / implement.",
+      "lockedHint": "Checklists are locked while this record is resolved or implemented. Reopen to make changes.",
       "openRequired": "{count} required open",
       "doneBy": "{name} · {when}",
       "unknownUser": "Someone",

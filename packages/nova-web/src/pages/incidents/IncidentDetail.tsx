@@ -124,7 +124,13 @@ export default function IncidentDetail() {
 
               {id && <WorkLogsCard entityType="incident" entityId={id} readonly={readonly} />}
 
-              {id && <ChecklistsCard entityType="incident" entityId={id} readonly={readonly} />}
+              {id && (
+                <ChecklistsCard
+                  entityType="incident"
+                  entityId={id}
+                  readonly={readonly || inc.status === 'resolved' || inc.status === 'closed'}
+                />
+              )}
 
               {id && (inc.status === 'resolved' || inc.status === 'closed') && (
                 <SatisfactionCard incidentId={id} />

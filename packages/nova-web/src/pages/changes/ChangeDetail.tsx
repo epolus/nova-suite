@@ -412,7 +412,11 @@ export default function ChangeDetailPage() {
         <div className="mt-6 space-y-6">
           <RelatedRecordsCard entityType="change" entityId={id} />
           <WorkLogsCard entityType="change" entityId={id} />
-          <ChecklistsCard entityType="change" entityId={id} />
+          <ChecklistsCard
+            entityType="change"
+            entityId={id}
+            readonly={change?.status === 'implemented' || change?.status === 'closed'}
+          />
         </div>
       )}
 

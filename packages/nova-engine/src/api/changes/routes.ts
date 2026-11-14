@@ -1438,11 +1438,11 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
       const ok = await isChangeEnabledGroup(client, updates.assignment_group_id);
       if (!ok) throw new AppError(400, 'Assignment group is not enabled for Change Management');
     }
-    if (
-      updates.status === 'implemented'
-      && String(current.status) !== 'implemented'
-    ) {
-      await assertRequiredChecklistsComplete(client, 'change', String(req.params.id));
+    {
+      const nextStatus = String(updates.status ?? current.status);
+      if (nextStatus === 'implemented' || nextStatus === 'closed') {
+        await assertRequiredChecklistsComplete(client, 'change', String(req.params.id));
+      }
     }
     const sets: string[] = [];
     const vals: unknown[] = [];

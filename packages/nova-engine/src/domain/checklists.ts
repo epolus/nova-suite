@@ -66,6 +66,12 @@ const ENTITY_TABLE: Record<ChecklistEntityType, string> = {
   change: 'changes',
 };
 
+/** Statuses where required checklists must stay complete — edits are locked. */
+const CHECKLIST_LOCKED_STATUSES: Record<ChecklistEntityType, readonly string[]> = {
+  incident: ['resolved', 'closed'],
+  change: ['implemented', 'closed'],
+};
+
 export async function assertChecklistEntityExists(
   client: PoolClient,
   entityType: ChecklistEntityType,
@@ -77,6 +83,30 @@ export async function assertChecklistEntityExists(
     [entityId],
   );
   if (r.rowCount === 0) throw new AppError(404, `${entityType} not found`);
+}
+
+export async function assertEntityChecklistsEditable(
+  client: PoolClient,
+  entityType: ChecklistEntityType,
+  entityId: string,
+): Promise<void> {
+  const table = ENTITY_TABLE[entityType];
+  const r = await client.query(
+    `SELECT status::text AS status
+     FROM ${table}
+     WHERE id = $1 AND tenant_id = current_tenant_id()
+     LIMIT 1`,
+    [entityId],
+  );
+  if (r.rowCount === 0) throw new AppError(404, `${entityType} not found`);
+  const status = String(r.rows[0].status);
+  if (CHECKLIST_LOCKED_STATUSES[entityType].includes(status)) {
+    throw new AppError(
+      409,
+      `Checklists cannot be changed while this ${entityType} is ${status}`,
+      'CHECKLIST_LOCKED',
+    );
+  }
 }
 
 async function loadTemplateItems(
@@ -303,6 +333,7 @@ export async function applyChecklistTemplate(
   },
 ): Promise<ChecklistInstance> {
   await assertChecklistEntityExists(client, input.entityType, input.entityId);
+  await assertEntityChecklistsEditable(client, input.entityType, input.entityId);
   const template = await getChecklistTemplate(client, input.templateId);
   if (!template || !template.is_active) throw new AppError(404, 'Checklist template not found');
   if (template.entity_type !== input.entityType) {
@@ -353,6 +384,25 @@ export async function setChecklistItemDone(
   userId: string,
 ): Promise<ChecklistInstanceItem> {
   try {
+    const meta = await client.query<{
+      instance_id: string;
+      entity_type: ChecklistEntityType;
+      entity_id: string;
+    }>(
+      `SELECT ci.id AS instance_id, ci.entity_type, ci.entity_id
+       FROM checklist_instance_items cii
+       JOIN checklist_instances ci ON ci.id = cii.instance_id
+       WHERE cii.id = $1::uuid
+       LIMIT 1`,
+      [itemId],
+    );
+    if (meta.rowCount === 0) throw new AppError(404, 'Checklist item not found');
+    const { instance_id: instanceId, entity_type: entityType, entity_id: entityId } = meta.rows[0];
+    if (!isChecklistEntityType(String(entityType))) {
+      throw new AppError(500, 'Invalid checklist entity type');
+    }
+    await assertEntityChecklistsEditable(client, entityType, String(entityId));
+
     const r = await client.query<{ id: string; instance_id: string }>(
       `UPDATE checklist_instance_items
        SET is_done = $2,
@@ -368,7 +418,7 @@ export async function setChecklistItemDone(
       ],
     );
     if (r.rowCount === 0) throw new AppError(404, 'Checklist item not found');
-    const items = await loadInstanceItems(client, String(r.rows[0].instance_id));
+    const items = await loadInstanceItems(client, String(instanceId));
     const item = items.find((i) => i.id === itemId);
     if (!item) throw new AppError(404, 'Checklist item not found');
     return item;
@@ -389,6 +439,20 @@ export async function removeChecklistInstance(
   client: PoolClient,
   instanceId: string,
 ): Promise<void> {
+  const meta = await client.query<{
+    entity_type: ChecklistEntityType;
+    entity_id: string;
+  }>(
+    `SELECT entity_type, entity_id FROM checklist_instances WHERE id = $1 LIMIT 1`,
+    [instanceId],
+  );
+  if (meta.rowCount === 0) throw new AppError(404, 'Checklist instance not found');
+  const entityType = meta.rows[0].entity_type;
+  if (!isChecklistEntityType(String(entityType))) {
+    throw new AppError(500, 'Invalid checklist entity type');
+  }
+  await assertEntityChecklistsEditable(client, entityType, String(meta.rows[0].entity_id));
+
   const r = await client.query(
     `DELETE FROM checklist_instances WHERE id = $1 RETURNING id`,
     [instanceId],
