@@ -375,9 +375,6 @@ export async function setChecklistItemDone(
   } catch (err) {
     if (err instanceof AppError) throw err;
     const code = (err as { code?: string })?.code;
-    if (code === '23514') {
-      throw new AppError(400, 'Checklist item state is invalid', 'CHECKLIST_ITEM_STATE');
-    }
     if (code === '23503') {
       throw new AppError(400, 'Invalid user for checklist completion', 'CHECKLIST_ITEM_USER');
     }

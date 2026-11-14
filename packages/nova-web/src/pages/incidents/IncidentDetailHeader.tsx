@@ -58,11 +58,10 @@ export function IncidentDetailHeader({ d }: { d: IncidentDetailState }) {
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 truncate">{`${inc.number} — ${inc.title}`}</h1>
-      </div>
+      <h1 className="mb-3 text-2xl font-bold text-gray-900 truncate">
+        {inc.number} — {inc.title}
+      </h1>
 
-      {/* Full-width toolbar so alerts below never sit on top of the action buttons */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {showPromoteButton && (
           <Button

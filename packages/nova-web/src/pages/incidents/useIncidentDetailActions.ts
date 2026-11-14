@@ -22,6 +22,19 @@ type ActionParams = {
   withSave: (fn: () => Promise<void>) => Promise<void>;
 };
 
+async function assertIncidentChecklistsComplete(incidentId: string): Promise<void> {
+  const { checklist_instances } = await checklistsApi.listInstances('incident', incidentId);
+  const openRequired = checklist_instances.reduce(
+    (sum, instance) => sum + instance.open_required_count,
+    0,
+  );
+  if (openRequired > 0) {
+    throw new Error(
+      `Complete ${openRequired} required checklist item${openRequired === 1 ? '' : 's'} before resolving`,
+    );
+  }
+}
+
 export function useIncidentDetailActions({
   id,
   inc,
@@ -58,17 +71,7 @@ export function useIncidentDetailActions({
     }
     try {
       if (fields.status === 'resolved' && fields.status !== inc.status) {
-        const { checklist_instances } = await checklistsApi.listInstances('incident', id);
-        const openRequired = checklist_instances.reduce(
-          (sum, instance) => sum + instance.open_required_count,
-          0,
-        );
-        if (openRequired > 0) {
-          setFormError(
-            `Complete ${openRequired} required checklist item${openRequired === 1 ? '' : 's'} before resolving`,
-          );
-          return false;
-        }
+        await assertIncidentChecklistsComplete(id);
       }
 
       await withSave(async () => {
@@ -124,17 +127,23 @@ export function useIncidentDetailActions({
   const handleResolveWithKb = useCallback(
     async (kbId: string, resolutionNotes: string) => {
       if (!id || !inc) return;
-      await withSave(async () => {
-        await knowledgeApi.linkIncidentResolution(id, kbId);
-        await incidentsApi.update(id, {
-          status: 'resolved',
-          resolution_notes: resolutionNotes || null,
-        } as Partial<Incident>);
-        await refresh();
-      });
-      setKbResolveOpen(false);
+      setFormError(null);
+      try {
+        await assertIncidentChecklistsComplete(id);
+        await withSave(async () => {
+          await knowledgeApi.linkIncidentResolution(id, kbId);
+          await incidentsApi.update(id, {
+            status: 'resolved',
+            resolution_notes: resolutionNotes || null,
+          } as Partial<Incident>);
+          await refresh();
+        });
+        setKbResolveOpen(false);
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : 'Failed to resolve incident');
+      }
     },
-    [id, inc, refresh, setKbResolveOpen, withSave],
+    [id, inc, refresh, setFormError, setKbResolveOpen, withSave],
   );
 
   const handleAddJournal = useCallback(

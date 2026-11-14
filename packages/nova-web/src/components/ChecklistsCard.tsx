@@ -97,7 +97,6 @@ export default function ChecklistsCard({ entityType, entityId, readonly = false 
     try {
       const updated = await checklistsApi.setItemDone(itemId, next);
       patchItemInCache(itemId, updated);
-      await refresh();
     } catch (err) {
       if (previous) {
         patchItemInCache(itemId, {
@@ -243,7 +242,6 @@ export default function ChecklistsCard({ entityType, entityId, readonly = false 
                       <Checkbox
                         checked={item.is_done}
                         disabled={!canEdit || busyId === item.id}
-                        // Visual only — the row button owns the click to avoid form/label side effects.
                         tabIndex={-1}
                         className="mt-0.5 pointer-events-none"
                       />
