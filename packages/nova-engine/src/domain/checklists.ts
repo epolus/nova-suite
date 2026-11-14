@@ -9,6 +9,18 @@ export function isChecklistEntityType(value: string): value is ChecklistEntityTy
   return (CHECKLIST_ENTITY_TYPES as readonly string[]).includes(value);
 }
 
+function throwDuplicateTemplateName(err: unknown): never {
+  const code = (err as { code?: string })?.code;
+  if (code === '23505') {
+    throw new AppError(
+      409,
+      'A checklist template with this name already exists for this record type',
+      'CHECKLIST_TEMPLATE_EXISTS',
+    );
+  }
+  throw err;
+}
+
 export type ChecklistTemplateItem = {
   id: string;
   label: string;
@@ -135,12 +147,17 @@ export async function createChecklistTemplate(
   if (!name) throw new AppError(400, 'name is required');
   if (input.items.length === 0) throw new AppError(400, 'At least one checklist item is required');
 
-  const inserted = await client.query(
-    `INSERT INTO checklist_templates (tenant_id, name, entity_type, description, is_active)
-     VALUES (current_tenant_id(), $1, $2, $3, $4)
-     RETURNING id, name, entity_type, description, is_active, created_at, updated_at`,
-    [name, input.entityType, input.description?.trim() || null, input.isActive !== false],
-  );
+  let inserted;
+  try {
+    inserted = await client.query(
+      `INSERT INTO checklist_templates (tenant_id, name, entity_type, description, is_active)
+       VALUES (current_tenant_id(), $1, $2, $3, $4)
+       RETURNING id, name, entity_type, description, is_active, created_at, updated_at`,
+      [name, input.entityType, input.description?.trim() || null, input.isActive !== false],
+    );
+  } catch (err) {
+    throwDuplicateTemplateName(err);
+  }
   const templateId = String(inserted.rows[0].id);
   let order = 0;
   for (const item of input.items) {
@@ -175,20 +192,24 @@ export async function updateChecklistTemplate(
   const name = input.name !== undefined ? input.name.trim() : existing.name;
   if (!name) throw new AppError(400, 'name is required');
 
-  await client.query(
-    `UPDATE checklist_templates
-     SET name = $2,
-         description = CASE WHEN $3::boolean THEN $4 ELSE description END,
-         is_active = COALESCE($5, is_active)
-     WHERE id = $1`,
-    [
-      templateId,
-      name,
-      input.description !== undefined,
-      input.description === undefined ? null : (input.description?.trim() || null),
-      input.isActive === undefined ? null : input.isActive,
-    ],
-  );
+  try {
+    await client.query(
+      `UPDATE checklist_templates
+       SET name = $2,
+           description = CASE WHEN $3::boolean THEN $4 ELSE description END,
+           is_active = COALESCE($5, is_active)
+       WHERE id = $1`,
+      [
+        templateId,
+        name,
+        input.description !== undefined,
+        input.description === undefined ? null : (input.description?.trim() || null),
+        input.isActive === undefined ? null : input.isActive,
+      ],
+    );
+  } catch (err) {
+    throwDuplicateTemplateName(err);
+  }
 
   if (input.items) {
     if (input.items.length === 0) throw new AppError(400, 'At least one checklist item is required');

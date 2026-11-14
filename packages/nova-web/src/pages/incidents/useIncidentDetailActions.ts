@@ -83,7 +83,8 @@ export function useIncidentDetailActions({
         }
       });
       return true;
-    } catch {
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to save incident');
       return false;
     }
   }, [customFields, fields, id, inc, linkedProblemIds, readonly, refresh, setFormError, withSave]);
