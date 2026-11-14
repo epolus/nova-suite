@@ -11,6 +11,7 @@ import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import { formatDateTime } from '../../utils/dateTime';
 import RequestTaskCancelDialog from '../../components/RequestTaskCancelDialog';
+import WorkLogsCard from '../../components/WorkLogsCard';
 
 const TYPE_BADGE: Record<string, string> = {
   approval: 'bg-amber-100 text-amber-700 border border-amber-200',
@@ -275,6 +276,12 @@ export default function RequestTaskDetailPage() {
           />
         </Card>
       </div>
+
+      {taskId && (
+        <div className="mt-6">
+          <WorkLogsCard entityType="request_task" entityId={taskId} />
+        </div>
+      )}
     </>
   );
 }

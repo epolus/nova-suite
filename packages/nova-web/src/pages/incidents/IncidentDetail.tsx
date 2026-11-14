@@ -4,6 +4,7 @@ import { AttachmentCard } from '../../components/AttachmentCard';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import RelatedRecordsCard from '../../components/RelatedRecordsCard';
+import WorkLogsCard from '../../components/WorkLogsCard';
 import Spinner from '../../components/Spinner';
 import { Button } from '../../components/ui/button';
 import { useIncidentDetail } from './useIncidentDetail';
@@ -115,6 +116,8 @@ export default function IncidentDetail() {
                   readonly={readonly}
                 />
               )}
+
+              {id && <WorkLogsCard entityType="incident" entityId={id} readonly={readonly} />}
 
               <IncidentJournalCard d={d} />
             </div>
