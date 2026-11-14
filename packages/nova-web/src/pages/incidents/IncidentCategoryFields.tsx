@@ -20,7 +20,7 @@ type Props = {
   incidentCategories: IncidentCategory[];
   inputCls: string;
   selectCls: string;
-  setField: (key: string, val: string) => void;
+  setField: (key: 'category' | 'subcategory' | 'categoryId', val: string) => void;
 };
 
 export function IncidentCategoryFields({

@@ -2505,10 +2505,14 @@ router.post('/incident-categories', async (req: Request, res: Response, next: Ne
     if (!name || typeof name !== 'string' || !name.trim()) {
       throw new AppError(400, 'name is required');
     }
-    if (parent_id) {
+    const parentId = typeof parent_id === 'string' && parent_id.trim() ? parent_id.trim() : null;
+    if (parentId) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parentId)) {
+        throw new AppError(400, 'parent_id must be a valid category id');
+      }
       const parent = await client.query(
         `SELECT id FROM incident_categories WHERE id = $1 AND tenant_id = current_tenant_id()`,
-        [parent_id],
+        [parentId],
       );
       if (parent.rows.length === 0) throw new AppError(400, 'parent_id not found');
     }
@@ -2516,7 +2520,7 @@ router.post('/incident-categories', async (req: Request, res: Response, next: Ne
       `INSERT INTO incident_categories (tenant_id, name, description, parent_id, is_active)
        VALUES (current_tenant_id(), $1, $2, $3, COALESCE($4, true))
        RETURNING id`,
-      [name.trim(), description || null, parent_id || null, is_active],
+      [name.trim(), description || null, parentId, is_active],
     );
     res.status(201).json({ id: row.rows[0].id });
   } catch (err) { next(err); }
@@ -2527,13 +2531,20 @@ router.patch('/incident-categories/:id', async (req: Request, res: Response, nex
     const client = getRequestClient(req);
     const id = String(req.params.id);
     const { name, description, parent_id, is_active } = req.body || {};
-    if (parent_id === id) throw new AppError(400, 'Category cannot be its own parent');
-    if (parent_id) {
-      const parent = await client.query(
-        `SELECT id FROM incident_categories WHERE id = $1 AND tenant_id = current_tenant_id()`,
-        [parent_id],
-      );
-      if (parent.rows.length === 0) throw new AppError(400, 'parent_id not found');
+    let nextParentId: string | null | undefined = undefined;
+    if (parent_id !== undefined) {
+      nextParentId = typeof parent_id === 'string' && parent_id.trim() ? parent_id.trim() : null;
+      if (nextParentId === id) throw new AppError(400, 'Category cannot be its own parent');
+      if (nextParentId) {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nextParentId)) {
+          throw new AppError(400, 'parent_id must be a valid category id');
+        }
+        const parent = await client.query(
+          `SELECT id FROM incident_categories WHERE id = $1 AND tenant_id = current_tenant_id()`,
+          [nextParentId],
+        );
+        if (parent.rows.length === 0) throw new AppError(400, 'parent_id not found');
+      }
     }
     const sets: string[] = [];
     const vals: unknown[] = [];
@@ -2546,7 +2557,7 @@ router.patch('/incident-categories/:id', async (req: Request, res: Response, nex
       vals.push(String(name).trim());
     }
     if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description || null); }
-    if (parent_id !== undefined) { sets.push(`parent_id = $${i++}`); vals.push(parent_id || null); }
+    if (nextParentId !== undefined) { sets.push(`parent_id = $${i++}`); vals.push(nextParentId); }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
     if (sets.length === 0) return void res.json({ success: true });
     vals.push(id);

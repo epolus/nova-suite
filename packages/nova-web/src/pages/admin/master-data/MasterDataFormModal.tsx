@@ -137,6 +137,19 @@ export default function MasterDataFormModal<T extends { id: string; is_active: b
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden resize-none"
                   />
+                ) : field.type === 'select' ? (
+                  <select
+                    required={field.required}
+                    value={form[field.key] || ''}
+                    onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden bg-white"
+                  >
+                    {(field.options ?? []).map((opt) => (
+                      <option key={`${field.key}-${opt.value}`} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 ) : (
                   <input
                     type="text"
