@@ -19,17 +19,23 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-export function formatDate(value: string | Date | null | undefined): string {
-  if (!value) return '—';
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  const dd = pad2(d.getDate());
-  const mm = pad2(d.getMonth() + 1);
-  const yyyy = String(d.getFullYear());
+function formatParts(yyyy: string, mm: string, dd: string): string {
   const fmt = getDateFormat();
   if (fmt === 'DD.MM.YYYY') return `${dd}.${mm}.${yyyy}`;
   if (fmt === 'MM/DD/YYYY') return `${mm}/${dd}/${yyyy}`;
   return `${yyyy}-${mm}-${dd}`;
+}
+
+export function formatDate(value: string | Date | null | undefined): string {
+  if (!value) return '—';
+  // Date-only ISO must not go through Date() (UTC midnight shifts the calendar day).
+  if (typeof value === 'string') {
+    const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T00:00:00(?:\.0+)?(?:Z)?$)/);
+    if (dateOnly) return formatParts(dateOnly[1], dateOnly[2], dateOnly[3]);
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return formatParts(String(d.getFullYear()), pad2(d.getMonth() + 1), pad2(d.getDate()));
 }
 
 export function formatDateTime(value: string | Date | null | undefined): string {
