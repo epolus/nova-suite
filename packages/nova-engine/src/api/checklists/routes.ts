@@ -80,15 +80,15 @@ adminRouter.use(authenticate, requireRole('admin', 'checklist_admin'), setTenant
 adminRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
-    const entityType = req.query.entity_type
+    const rawEntityType = req.query.entity_type
       ? String(req.query.entity_type)
       : undefined;
-    if (entityType && !isChecklistEntityType(entityType)) {
+    if (rawEntityType !== undefined && !isChecklistEntityType(rawEntityType)) {
       throw new AppError(400, 'Invalid entity_type');
     }
     const includeInactive = String(req.query.include_inactive || '') === 'true';
     const templates = await listChecklistTemplates(client, {
-      entityType,
+      entityType: rawEntityType && isChecklistEntityType(rawEntityType) ? rawEntityType : undefined,
       includeInactive,
     });
     res.json({ checklist_templates: templates });
@@ -169,11 +169,11 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const client = getRequestClient(req);
-      const entityType = req.query.entity_type
+      const rawEntityType = req.query.entity_type
         ? String(req.query.entity_type)
         : undefined;
       const templates = await listChecklistTemplates(client, {
-        entityType: entityType as 'incident' | 'change' | undefined,
+        entityType: rawEntityType && isChecklistEntityType(rawEntityType) ? rawEntityType : undefined,
         includeInactive: false,
       });
       res.json({ checklist_templates: templates });
