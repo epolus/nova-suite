@@ -11,8 +11,6 @@ import {
 import { db } from '../../data/db';
 import { config } from '../../config';
 
-const router = Router();
-
 const MAILBOX_COLUMNS = `
   id, name, address, credential_slug, protocol, config,
   assignment_group_id, default_service_id, poll_interval_seconds,
