@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 export * from './common';
 export * from './admin';
+export * from './inboundEmail';
 export * from './catalog';
 export * from './incidents';
 export * from './problems';

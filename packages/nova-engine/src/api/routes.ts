@@ -39,6 +39,11 @@ import inboundWebhookRoutes from './webhooks/inbound';
 import alertRoutes from './alerts/routes';
 import internalEventRoutes from './internal/events';
 import dataManagementRoutes from './data-management/routes';
+import {
+  inboundEmailInternalRoutes,
+  inboundEmailMailboxesRoutes,
+  inboundEmailRulesRoutes,
+} from './inbound-email/routes';
 
 const router = Router();
 
@@ -49,6 +54,8 @@ router.use('/auth/sso', ssoRoutes);
 router.use('/auth', authRoutes);
 router.use('/admin/config-packages', configPackageRoutes);
 router.use('/admin/migrations/servicenow', serviceNowMigrationRoutes);
+router.use('/admin/mailboxes', inboundEmailMailboxesRoutes);
+router.use('/admin/inbound-email-rules', inboundEmailRulesRoutes);
 router.use('/admin', adminRoutes);
 router.use('/custom-fields', customFieldRoutes);
 router.use('/record-links', recordLinkRoutes);
@@ -79,6 +86,7 @@ router.use('/ai', aiRoutes);
 router.use('/webhooks', inboundWebhookRoutes);
 router.use('/alerts', alertRoutes);
 router.use('/data-management', dataManagementRoutes);
+router.use('/internal', inboundEmailInternalRoutes);
 router.use('/internal', internalEventRoutes);
 
 export default router;

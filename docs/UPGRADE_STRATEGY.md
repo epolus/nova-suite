@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.33`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.34`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
@@ -192,6 +192,10 @@ Apply `infra/postgres/migrations/v00.01.32__custom_fields.sql` before using Admi
 ## Record links (`v00.01.33`)
 
 Apply `infra/postgres/migrations/v00.01.33__record_links.sql` before using Related records on entity detail pages. Adds `record_links` with undirected unique pairs and `link_type` in related/parent/duplicate.
+
+## Inbound email (`v00.01.34`)
+
+Apply `infra/postgres/migrations/v00.01.34__inbound_email.sql` before using IMAP mailboxes and inbound rules. Adds `mailboxes`, `email_messages`, and ordered `inbound_email_rules` (create/update/ignore with stop-on-match). Updates only apply while the incident is open.
 
 ## Pre-Deploy Checklist
 

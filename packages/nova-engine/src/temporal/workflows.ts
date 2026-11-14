@@ -491,6 +491,30 @@ export async function startProblemRecurrenceScanSchedule(cronSchedule = '15 2 * 
   }
 }
 
+/** Poll IMAP mailboxes; default every minute (each mailbox has its own poll_interval_seconds). */
+export async function startInboundEmailPollSchedule(cronSchedule = '* * * * *'): Promise<string> {
+  const workflowId = 'inbound-email-poll-schedule';
+  try {
+    const cl = await getClient();
+    const handle = await cl.workflow.start('inboundEmailPoll', {
+      taskQueue: TASK_QUEUE,
+      workflowId,
+      args: [],
+      cronSchedule,
+      workflowExecutionTimeout: '365 days',
+    });
+    logger.info({ workflowId: handle.workflowId, cronSchedule }, 'Started inbound email poll schedule');
+    return handle.workflowId;
+  } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, cronSchedule }, 'Inbound email poll schedule already running');
+      return workflowId;
+    }
+    logger.warn({ err, workflowId }, 'Failed to start inbound email poll schedule');
+    throw err;
+  }
+}
+
 export async function startMajorIncidentWorkflow(params: {
   majorIncidentId: string;
   tenantId: string;

@@ -20,7 +20,13 @@ import {
   startWorkflowStartQueueDispatcher,
   stopWorkflowStartQueueDispatcher,
 } from './temporal/workflow-start-queue';
-import { checkTemporalHealth, startDbSizeSnapshotSchedule, startMetricSnapshotSchedule, startProblemRecurrenceScanSchedule } from './temporal/workflows';
+import {
+  checkTemporalHealth,
+  startDbSizeSnapshotSchedule,
+  startInboundEmailPollSchedule,
+  startMetricSnapshotSchedule,
+  startProblemRecurrenceScanSchedule,
+} from './temporal/workflows';
 import { metricsHandler, metricsMiddleware } from './observability/metrics';
 
 type SchemaRuntimeStatus = {
@@ -39,6 +45,7 @@ const schemaRuntimeStatus: SchemaRuntimeStatus = {
 let dbSizeSnapshotScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
 let metricSnapshotScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
 let recurrenceScanScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
+let inboundEmailPollScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
 let snapshotScheduleRetryTimer: NodeJS.Timeout | null = null;
 let workflowDispatcherStarted = false;
 let server: ReturnType<typeof app.listen> | null = null;
@@ -180,17 +187,29 @@ async function ensureRecurrenceScanScheduleStarted(): Promise<void> {
   }
 }
 
+async function ensureInboundEmailPollScheduleStarted(): Promise<void> {
+  try {
+    await startInboundEmailPollSchedule();
+    inboundEmailPollScheduleStatus = 'running';
+  } catch (err) {
+    inboundEmailPollScheduleStatus = 'failed';
+    logger.warn({ err }, 'Inbound email poll schedule startup failed; will retry in background');
+  }
+}
+
 async function ensureSnapshotSchedulesStarted(): Promise<void> {
   await Promise.all([
     ensureDbSizeSnapshotScheduleStarted(),
     ensureMetricSnapshotScheduleStarted(),
     ensureRecurrenceScanScheduleStarted(),
+    ensureInboundEmailPollScheduleStarted(),
   ]);
 
   if (
     dbSizeSnapshotScheduleStatus === 'running'
     && metricSnapshotScheduleStatus === 'running'
     && recurrenceScanScheduleStatus === 'running'
+    && inboundEmailPollScheduleStatus === 'running'
   ) {
     if (snapshotScheduleRetryTimer) {
       clearInterval(snapshotScheduleRetryTimer);

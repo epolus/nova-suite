@@ -200,6 +200,7 @@
       "customFields": "Champs personnalisés",
       "slaConfiguration": "Configuration du SLA",
       "notificationWorkflows": "Flux de travail de notification",
+      "inboundEmail": "E-mail entrant",
       "notificationDeliveries": "Livraisons de notifications",
       "changeManagement": "Gestion du changement",
       "knowledgeWorkflows": "Flux de travail de connaissances",
