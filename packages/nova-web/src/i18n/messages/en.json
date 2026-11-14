@@ -3791,6 +3791,24 @@
           "knowledge_review": "Knowledge Review"
         }
       }
+    },
+    "csat": {
+      "brand": "Nova Suite",
+      "title": "How was your support experience?",
+      "aboutIncident": "{number} — {title}",
+      "scoreLabel": "Your rating",
+      "scoreHint": "1 = poor, 5 = excellent",
+      "scoreOption": "Rate {score} out of 5",
+      "scoreRequired": "Please select a score",
+      "commentLabel": "Comments (optional)",
+      "commentPlaceholder": "Tell us what went well or what we could improve…",
+      "submit": "Submit feedback",
+      "submitting": "Submitting…",
+      "submitFailed": "Failed to submit feedback",
+      "thanks": "Thank you for your feedback!",
+      "yourScore": "You rated this {score} out of 5.",
+      "notFoundTitle": "Survey not found",
+      "notFoundMessage": "This satisfaction survey link is invalid or has expired."
     }
   },
   "components": {
@@ -3840,6 +3858,16 @@
       "loadFailed": "Failed to load work logs",
       "saveFailed": "Failed to save work log",
       "deleteFailed": "Failed to delete work log"
+    },
+    "satisfaction": {
+      "title": "Customer satisfaction",
+      "loading": "Loading satisfaction…",
+      "pendingResolve": "Available after the incident is resolved.",
+      "awaiting": "Survey sent — waiting for the customer response.",
+      "scoreValue": "{score} / 5",
+      "submittedAt": "Submitted {when}",
+      "copyLink": "Copy survey link",
+      "copied": "Copied"
     },
     "relatedRecords": {
       "title": "Related records",

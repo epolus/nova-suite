@@ -6,6 +6,7 @@ import {
 } from '@nova-suite/shared';
 import { db } from '../data/db';
 import { resolveSlaDueAt, startOlaClock } from './sla';
+import { ensureSatisfactionResponse } from './satisfaction';
 import { enqueueIncidentEscalationStartJob, enqueueNotificationDispatchStartJob } from '../temporal/workflow-start-queue';
 
 type CiMatch = { id: string; supported_by: string | null };
@@ -445,6 +446,7 @@ async function clearIncident(alertNumber: string, incidentId: string, authorId: 
      WHERE id = $1 AND status = 'new'`,
     [incidentId, `Alert ${alertNumber} cleared before anyone worked the incident.`],
   );
+  await ensureSatisfactionResponse(db, incidentId);
   return incidentId;
 }
 

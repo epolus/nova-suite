@@ -44,6 +44,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/csat/:token" element={<Lazy><Pages.CsatSurveyPage /></Lazy>} />
       <Route
         element={
           <RequireAuth>

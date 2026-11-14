@@ -39,3 +39,5 @@ export { recordLinks } from './domains/recordLinks';
 export { inboundEmail } from './domains/inboundEmail';
 export { emailTemplates, emailSignatures } from './domains/emailTemplates';
 export { workLogs } from './domains/workLogs';
+export { csat } from './domains/csat';
+export type { CsatPublicView, CsatIncidentView } from './domains/csat';

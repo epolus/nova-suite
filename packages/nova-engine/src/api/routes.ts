@@ -50,6 +50,7 @@ import {
   emailTemplatesAgentRoutes,
 } from './email-templates/routes';
 import workLogRoutes from './work-logs/routes';
+import csatRoutes from './csat/routes';
 
 const router = Router();
 
@@ -67,6 +68,7 @@ router.use('/admin', adminRoutes);
 router.use('/email-templates', emailTemplatesAgentRoutes);
 router.use('/email-signatures', emailSignatureRoutes);
 router.use('/work-logs', workLogRoutes);
+router.use('/csat', csatRoutes);
 router.use('/custom-fields', customFieldRoutes);
 router.use('/record-links', recordLinkRoutes);
 router.use('/catalog', catalogRoutes);
