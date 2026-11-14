@@ -51,6 +51,9 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
 
   // Known application errors
   if (err instanceof AppError) {
+    if (err.statusCode >= 500) {
+      logger.error({ err, code: err.code }, 'Application server error');
+    }
     res.status(err.statusCode).json({
       error: err.message,
       code: err.code,

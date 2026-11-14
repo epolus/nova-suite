@@ -1189,7 +1189,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.35', 'email_templates_signatures'),
   ('v00.01.36', 'work_logs'),
   ('v00.01.37', 'satisfaction_responses'),
-  ('v00.01.38', 'checklists');
+  ('v00.01.38', 'checklists'),
+  ('v00.01.39', 'checklist_item_done_fix');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1618,11 +1619,7 @@ CREATE TABLE checklist_instance_items (
   done_by           uuid REFERENCES users(id) ON DELETE SET NULL,
   done_at           timestamptz,
   created_at        timestamptz NOT NULL DEFAULT now(),
-  updated_at        timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT checklist_instance_items_done_chk CHECK (
-    (is_done = false AND done_at IS NULL)
-    OR (is_done = true AND done_at IS NOT NULL)
-  )
+  updated_at        timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_checklist_instance_items_instance

@@ -86,11 +86,7 @@ CREATE TABLE IF NOT EXISTS checklist_instance_items (
   done_by           uuid REFERENCES users(id) ON DELETE SET NULL,
   done_at           timestamptz,
   created_at        timestamptz NOT NULL DEFAULT now(),
-  updated_at        timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT checklist_instance_items_done_chk CHECK (
-    (is_done = false AND done_at IS NULL)
-    OR (is_done = true AND done_at IS NOT NULL)
-  )
+  updated_at        timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_checklist_instance_items_instance

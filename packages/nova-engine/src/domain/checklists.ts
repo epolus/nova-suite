@@ -352,20 +352,40 @@ export async function setChecklistItemDone(
   isDone: boolean,
   userId: string,
 ): Promise<ChecklistInstanceItem> {
-  const r = await client.query(
-    `UPDATE checklist_instance_items
-     SET is_done = $2,
-         done_by = CASE WHEN $2 THEN $3 ELSE NULL END,
-         done_at = CASE WHEN $2 THEN now() ELSE NULL END
-     WHERE id = $1
-     RETURNING id, instance_id`,
-    [itemId, isDone, userId],
-  );
-  if (r.rowCount === 0) throw new AppError(404, 'Checklist item not found');
-  const items = await loadInstanceItems(client, String(r.rows[0].instance_id));
-  const item = items.find((i) => i.id === itemId);
-  if (!item) throw new AppError(404, 'Checklist item not found');
-  return item;
+  try {
+    const r = await client.query<{ id: string; instance_id: string }>(
+      `UPDATE checklist_instance_items
+       SET is_done = $2,
+           done_by = $3,
+           done_at = $4
+       WHERE id = $1::uuid
+       RETURNING id, instance_id`,
+      [
+        itemId,
+        isDone,
+        isDone ? userId : null,
+        isDone ? new Date().toISOString() : null,
+      ],
+    );
+    if (r.rowCount === 0) throw new AppError(404, 'Checklist item not found');
+    const items = await loadInstanceItems(client, String(r.rows[0].instance_id));
+    const item = items.find((i) => i.id === itemId);
+    if (!item) throw new AppError(404, 'Checklist item not found');
+    return item;
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    const code = (err as { code?: string })?.code;
+    if (code === '23514') {
+      throw new AppError(400, 'Checklist item state is invalid', 'CHECKLIST_ITEM_STATE');
+    }
+    if (code === '23503') {
+      throw new AppError(400, 'Invalid user for checklist completion', 'CHECKLIST_ITEM_USER');
+    }
+    if (code === '22P02') {
+      throw new AppError(400, 'Invalid checklist item id', 'CHECKLIST_ITEM_ID');
+    }
+    throw err;
+  }
 }
 
 export async function removeChecklistInstance(
