@@ -1185,7 +1185,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.31', 'incident_classification'),
   ('v00.01.32', 'custom_fields'),
   ('v00.01.33', 'record_links'),
-  ('v00.01.34', 'inbound_email');
+  ('v00.01.34', 'inbound_email'),
+  ('v00.01.35', 'email_templates_signatures');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1462,6 +1463,42 @@ CREATE INDEX idx_email_messages_mailbox
 CREATE INDEX idx_email_messages_incident
   ON email_messages(tenant_id, incident_id)
   WHERE incident_id IS NOT NULL;
+
+CREATE TABLE email_templates (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name        text NOT NULL,
+  subject     text NOT NULL DEFAULT '',
+  body        text NOT NULL DEFAULT '',
+  locale      text NOT NULL DEFAULT 'en',
+  sort_order  integer NOT NULL DEFAULT 100,
+  is_active   boolean NOT NULL DEFAULT true,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, name, locale)
+);
+
+CREATE INDEX idx_email_templates_tenant_active
+  ON email_templates(tenant_id, is_active, sort_order);
+CREATE TRIGGER trg_email_templates_updated_at
+  BEFORE UPDATE ON email_templates
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE user_email_signatures (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body        text NOT NULL DEFAULT '',
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, user_id)
+);
+
+CREATE INDEX idx_user_email_signatures_user
+  ON user_email_signatures(tenant_id, user_id);
+CREATE TRIGGER trg_user_email_signatures_updated_at
+  BEFORE UPDATE ON user_email_signatures
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 ALTER TABLE requests
   ADD COLUMN provisioned_ci_id uuid REFERENCES configuration_items(id) ON DELETE SET NULL,

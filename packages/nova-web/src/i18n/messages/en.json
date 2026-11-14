@@ -368,6 +368,7 @@
       "notificationWorkflows": "Notification Workflows",
       "alertDefinitions": "Alert Definitions",
       "inboundEmail": "Inbound Email",
+      "emailTemplates": "Email Templates",
       "notificationDeliveries": "Notification Deliveries",
       "changeManagement": "Change Management",
       "knowledgeWorkflows": "Knowledge Workflows",
@@ -670,7 +671,11 @@
         "workNote": "Work Note",
         "customerVisible": "Customer visible",
         "post": "Post",
-        "internal": "Internal"
+        "internal": "Internal",
+        "insertTemplate": "Insert template",
+        "appendSignature": "Append signature",
+        "noTemplates": "No templates",
+        "noSignature": "No signature saved"
       },
       "kbResolve": {
         "title": "Resolve with KB Article",
@@ -1466,7 +1471,13 @@
       "timeFormat12h": "12-hour",
       "languageHint": "This updates your interface language across devices.",
       "updateTimeFormatFailed": "Failed to update time format",
-      "updateDateFormatFailed": "Failed to update date format"
+      "updateDateFormatFailed": "Failed to update date format",
+      "emailSignature": "Email signature",
+      "emailSignatureHint": "Appended when you insert your signature into incident comments.",
+      "emailSignaturePlaceholder": "Best regards,\nYour Name",
+      "saveSignature": "Save signature",
+      "signatureSaved": "Signature saved",
+      "updateSignatureFailed": "Failed to save signature"
     },
     "search": {
       "title": "Search Results",
@@ -1777,6 +1788,25 @@
           "modelSummaryAsset": "Then create an asset and assign it to the requester",
           "openFulfillmentModels": "Edit fulfillment models"
         }
+      },
+      "emailTemplates": {
+        "title": "Email Templates",
+        "description": "Reusable reply templates agents can insert into incident comments. Not used for automated notification rules.",
+        "newTemplate": "New template",
+        "editTemplate": "Edit template",
+        "createTemplate": "Create template",
+        "saveTemplate": "Save template",
+        "name": "Name",
+        "subject": "Subject (optional)",
+        "body": "Body",
+        "locale": "Locale",
+        "sortOrder": "Sort order",
+        "active": "Active",
+        "activate": "Activate",
+        "deactivate": "Deactivate",
+        "empty": "No email templates yet.",
+        "loadFailed": "Failed to load email templates",
+        "saveFailed": "Save failed"
       },
       "inboundEmail": {
         "title": "Inbound Email",

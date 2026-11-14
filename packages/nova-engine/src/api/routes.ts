@@ -44,6 +44,11 @@ import {
   inboundEmailMailboxesRoutes,
   inboundEmailRulesRoutes,
 } from './inbound-email/routes';
+import {
+  emailSignatureRoutes,
+  emailTemplatesAdminRoutes,
+  emailTemplatesAgentRoutes,
+} from './email-templates/routes';
 
 const router = Router();
 
@@ -56,7 +61,10 @@ router.use('/admin/config-packages', configPackageRoutes);
 router.use('/admin/migrations/servicenow', serviceNowMigrationRoutes);
 router.use('/admin/mailboxes', inboundEmailMailboxesRoutes);
 router.use('/admin/inbound-email-rules', inboundEmailRulesRoutes);
+router.use('/admin/email-templates', emailTemplatesAdminRoutes);
 router.use('/admin', adminRoutes);
+router.use('/email-templates', emailTemplatesAgentRoutes);
+router.use('/email-signatures', emailSignatureRoutes);
 router.use('/custom-fields', customFieldRoutes);
 router.use('/record-links', recordLinkRoutes);
 router.use('/catalog', catalogRoutes);

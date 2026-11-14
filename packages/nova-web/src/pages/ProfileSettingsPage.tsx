@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'use-intl';
+import { emailSignatures } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/Card';
@@ -10,12 +12,21 @@ import { formatDateTime } from '../utils/dateTime';
 export default function ProfileSettingsPage() {
   const { user, setTimeFormat, setDateFormat } = useAuth();
   const tProfile = useTranslations('pages.profile');
+  const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [signatureBody, setSignatureBody] = useState<string | null>(null);
+  const [signatureStatus, setSignatureStatus] = useState('');
+
+  const signatureQuery = useQuery({
+    queryKey: ['email-signature', 'me'],
+    queryFn: () => emailSignatures.me().then((r) => r.signature),
+  });
 
   if (!user) return null;
 
   const nowSample = formatDateTime(new Date());
+  const signatureValue = signatureBody ?? signatureQuery.data?.body ?? '';
 
   const onChangeTime = async (value: '12h' | '24h') => {
     setError('');
@@ -36,6 +47,22 @@ export default function ProfileSettingsPage() {
       await setDateFormat(value);
     } catch (err) {
       setError(err instanceof Error ? err.message : tProfile('updateDateFormatFailed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onSaveSignature = async () => {
+    setError('');
+    setSignatureStatus('');
+    setSaving(true);
+    try {
+      await emailSignatures.saveMe(signatureValue);
+      setSignatureBody(null);
+      await queryClient.invalidateQueries({ queryKey: ['email-signature', 'me'] });
+      setSignatureStatus(tProfile('signatureSaved'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tProfile('updateSignatureFailed'));
     } finally {
       setSaving(false);
     }
@@ -93,6 +120,36 @@ export default function ProfileSettingsPage() {
             <p className="mt-1 text-xs text-gray-500">
               {tProfile('languageHint')}
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email-signature">
+              {tProfile('emailSignature')}
+            </label>
+            <textarea
+              id="email-signature"
+              value={signatureValue}
+              onChange={(e) => {
+                setSignatureBody(e.target.value);
+                setSignatureStatus('');
+              }}
+              rows={4}
+              placeholder={tProfile('emailSignaturePlaceholder')}
+              disabled={saving || signatureQuery.isLoading}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+            />
+            <p className="mt-1 text-xs text-gray-500">{tProfile('emailSignatureHint')}</p>
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void onSaveSignature()}
+                disabled={saving}
+                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {tProfile('saveSignature')}
+              </button>
+              {signatureStatus && <span className="text-xs text-green-700">{signatureStatus}</span>}
+            </div>
           </div>
 
           <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">

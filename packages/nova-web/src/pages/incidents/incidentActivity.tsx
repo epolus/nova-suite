@@ -7,6 +7,7 @@ import Badge from '../../components/Badge';
 import { formatDateTime } from '../../utils/dateTime';
 import { useFieldLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
+import JournalTemplateInsert from '@/components/JournalTemplateInsert';
 import { FieldCaption, getInputCls, INCIDENT_FIELD, type IncidentDetailState } from './incidentDetailShared';
 
 export function IncidentDetailsCard({ d }: { d: IncidentDetailState }) {
@@ -157,6 +158,9 @@ function JournalForm({
         rows={2}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden resize-none"
       />
+      {isFulfiller && (
+        <JournalTemplateInsert content={content} onContentChange={onContentChange} />
+      )}
       <div className="flex items-center gap-3 mt-2">
         {isFulfiller ? (
           <>

@@ -2,6 +2,7 @@
 export * from './common';
 export * from './admin';
 export * from './inboundEmail';
+export * from './emailTemplates';
 export * from './catalog';
 export * from './incidents';
 export * from './problems';
