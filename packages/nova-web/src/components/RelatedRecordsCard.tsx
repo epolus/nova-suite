@@ -26,6 +26,16 @@ const ENTITY_TYPES: RecordLinkEntityType[] = [
 
 const LINK_TYPES: RecordLinkType[] = ['related', 'parent', 'duplicate'];
 
+/** Incidents already have a dedicated configuration_item field. */
+function isDisallowedPair(a: RecordLinkEntityType, b: RecordLinkEntityType): boolean {
+  return (a === 'incident' && b === 'configuration_item')
+    || (a === 'configuration_item' && b === 'incident');
+}
+
+function targetTypesFor(entityType: RecordLinkEntityType): RecordLinkEntityType[] {
+  return ENTITY_TYPES.filter((x) => x !== entityType && !isDisallowedPair(entityType, x));
+}
+
 type Props = {
   entityType: RecordLinkEntityType;
   entityId: string;
@@ -40,7 +50,7 @@ export default function RelatedRecordsCard({ entityType, entityId, readonly = fa
 
   const [actionError, setActionError] = useState('');
   const [targetType, setTargetType] = useState<RecordLinkEntityType>(
-    ENTITY_TYPES.find((x) => x !== entityType) || 'incident',
+    () => targetTypesFor(entityType)[0] || 'request',
   );
   const [linkType, setLinkType] = useState<RecordLinkType>('related');
   const [query, setQuery] = useState('');
@@ -70,7 +80,7 @@ export default function RelatedRecordsCard({ entityType, entityId, readonly = fa
   });
 
   const targetOptions = useMemo(
-    () => ENTITY_TYPES.filter((x) => x !== entityType),
+    () => targetTypesFor(entityType),
     [entityType],
   );
 

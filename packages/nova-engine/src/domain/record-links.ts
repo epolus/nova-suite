@@ -66,6 +66,15 @@ export function isRecordLinkType(value: unknown): value is RecordLinkType {
     && (RECORD_LINK_TYPES as readonly string[]).includes(value);
 }
 
+/** Incidents already have a dedicated configuration_item_id field. */
+export function isDisallowedRecordLinkPair(
+  a: RecordLinkEntityType,
+  b: RecordLinkEntityType,
+): boolean {
+  return (a === 'incident' && b === 'configuration_item')
+    || (a === 'configuration_item' && b === 'incident');
+}
+
 async function assertEntityExists(
   client: PoolClient,
   entityType: RecordLinkEntityType,
@@ -195,6 +204,12 @@ export async function createRecordLink(
   if (input.source_type === input.target_type && input.source_id === input.target_id) {
     throw new AppError(400, 'Cannot link a record to itself');
   }
+  if (isDisallowedRecordLinkPair(input.source_type, input.target_type)) {
+    throw new AppError(
+      400,
+      'Link incidents to configuration items with the incident Configuration Item field',
+    );
+  }
 
   await assertEntityExists(client, input.source_type, input.source_id);
   await assertEntityExists(client, input.target_type, input.target_id);
@@ -258,7 +273,7 @@ export async function searchRecordLinkTargets(
   const like = `%${term}%`;
   const capped = Math.min(Math.max(limit, 1), 30);
 
-  let rows: Array<{ id: string; identifier: string; title: string; status: string | null }> = [];
+  let rows: Array<{ id: string; identifier: string; title: string; status: string | null }>;
 
   switch (entityType) {
     case 'incident': {
