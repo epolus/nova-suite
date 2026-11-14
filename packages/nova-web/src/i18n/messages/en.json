@@ -3739,6 +3739,37 @@
       "yes": "Yes",
       "no": "No"
     },
+    "relatedRecords": {
+      "title": "Related records",
+      "loading": "Loading links…",
+      "empty": "No related records yet.",
+      "add": "Add link",
+      "targetType": "Record type",
+      "linkType": "Link type",
+      "search": "Search record",
+      "searchPlaceholder": "Number or title…",
+      "searching": "Searching…",
+      "noResults": "No matching records",
+      "remove": "Remove",
+      "loadFailed": "Failed to load related records",
+      "saveFailed": "Failed to create link",
+      "deleteFailed": "Failed to remove link",
+      "parentHint": "The selected record will be set as the parent of this record.",
+      "entities": {
+        "incident": "Incident",
+        "request": "Request",
+        "problem": "Problem",
+        "change": "Change",
+        "configuration_item": "Configuration item",
+        "asset": "Asset"
+      },
+      "linkTypes": {
+        "related": "Related",
+        "parent": "Parent",
+        "child": "Child",
+        "duplicate": "Duplicate"
+      }
+    },
     "dynamicFormField": {
       "select": "Select...",
       "emailPlaceholder": "user@example.com",

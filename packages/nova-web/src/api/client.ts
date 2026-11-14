@@ -35,3 +35,4 @@ export { cart } from './domains/cart';
 export { dashboards } from './domains/dashboards';
 export { analytics } from './domains/analytics';
 export { customFields } from './domains/customFields';
+export { recordLinks } from './domains/recordLinks';

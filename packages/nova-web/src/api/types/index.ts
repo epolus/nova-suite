@@ -24,3 +24,4 @@ export * from './improvements';
 export * from './alerts';
 export * from './dataManagement';
 export * from './customFields';
+export * from './recordLinks';

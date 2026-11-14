@@ -6,6 +6,7 @@ import type { ServiceRequest, RequestTask, FormField } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
+import RelatedRecordsCard from '../../components/RelatedRecordsCard';
 import Spinner from '../../components/Spinner';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
@@ -247,6 +248,8 @@ export default function RequestDetail() {
         {/* Main details */}
         <div className="lg:col-span-2 space-y-6">
           <RequestDetailsCard req={req} />
+
+          {id && <RelatedRecordsCard entityType="request" entityId={id} />}
 
           {/* Form data */}
           {req.form_data && Object.keys(req.form_data).length > 0 && (
