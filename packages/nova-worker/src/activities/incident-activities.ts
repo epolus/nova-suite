@@ -357,3 +357,41 @@ export async function autoCloseIncident(
     return true;
   });
 }
+
+export type SlaNotificationTarget = 'response' | 'resolution';
+export type SlaNotificationTrigger = 'warning' | 'breach';
+
+/**
+ * Claim a durable once-send slot for an SLA warning/breach notification.
+ * Returns true when this caller owns the send; false if already sent.
+ */
+export async function claimSlaNotification(
+  tenantId: string,
+  entityType: string,
+  entityId: string,
+  target: SlaNotificationTarget,
+  trigger: SlaNotificationTrigger,
+): Promise<boolean> {
+  return withTenantContext(tenantId, async (client) => {
+    const inserted = await client.query(
+      `INSERT INTO sla_notifications_sent (
+         tenant_id, entity_type, entity_id, target, "trigger"
+       ) VALUES (
+         current_tenant_id(), $1, $2, $3, $4
+       )
+       ON CONFLICT (tenant_id, entity_type, entity_id, target, "trigger")
+       DO NOTHING
+       RETURNING id`,
+      [entityType, entityId, target, trigger],
+    );
+    const claimed = (inserted.rowCount ?? 0) > 0;
+    log.info('SLA notification ledger claim', {
+      entityType,
+      entityId,
+      target,
+      trigger,
+      claimed,
+    });
+    return claimed;
+  });
+}

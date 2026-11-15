@@ -1191,7 +1191,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.37', 'satisfaction_responses'),
   ('v00.01.38', 'checklists'),
   ('v00.01.39', 'checklist_item_done_fix'),
-  ('v00.01.40', 'change_collaboration');
+  ('v00.01.40', 'change_collaboration'),
+  ('v00.01.41', 'sla_notification_ledger');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2613,6 +2614,23 @@ CREATE INDEX idx_incidents_sla_definition ON incidents(sla_definition_id);
 CREATE TRIGGER trg_sla_definitions_updated_at
   BEFORE UPDATE ON sla_definitions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Durable once-send ledger for SLA warning / breach notifications
+CREATE TABLE sla_notifications_sent (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  entity_type  text NOT NULL,
+  entity_id    uuid NOT NULL,
+  target       text NOT NULL CHECK (target IN ('response', 'resolution')),
+  "trigger"    text NOT NULL CHECK ("trigger" IN ('warning', 'breach')),
+  sent_at      timestamptz NOT NULL DEFAULT now(),
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT sla_notifications_sent_once_unique
+    UNIQUE (tenant_id, entity_type, entity_id, target, "trigger")
+);
+
+CREATE INDEX idx_sla_notifications_sent_entity
+  ON sla_notifications_sent(tenant_id, entity_type, entity_id, sent_at DESC);
 
 -- ============================================================
 -- BUSINESS CALENDARS (SLA business-hours clock)

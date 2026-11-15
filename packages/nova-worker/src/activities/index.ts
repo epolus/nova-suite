@@ -8,6 +8,7 @@ export {
   autoCloseIncident,
   sendNotification,
   applySlaActions,
+  claimSlaNotification,
 } from './incident-activities';
 
 export {

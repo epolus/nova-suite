@@ -74,6 +74,7 @@ ALTER TABLE report_exports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sla_notifications_sent ENABLE ROW LEVEL SECURITY;
 ALTER TABLE business_calendars ENABLE ROW LEVEL SECURITY;
 ALTER TABLE business_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE holidays ENABLE ROW LEVEL SECURITY;
@@ -556,6 +557,9 @@ CREATE POLICY tenant_isolation_report_activity_events ON report_activity_events
 CREATE POLICY tenant_isolation_sla_definitions ON sla_definitions
   FOR ALL USING (tenant_id = current_tenant_id());
 
+CREATE POLICY tenant_isolation_sla_notifications_sent ON sla_notifications_sent
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Business Calendars ───
 CREATE POLICY tenant_isolation_business_calendars ON business_calendars
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -871,6 +875,7 @@ ALTER TABLE report_exports FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_definitions FORCE ROW LEVEL SECURITY;
 ALTER TABLE report_activity_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE sla_definitions FORCE ROW LEVEL SECURITY;
+ALTER TABLE sla_notifications_sent FORCE ROW LEVEL SECURITY;
 ALTER TABLE business_calendars FORCE ROW LEVEL SECURITY;
 ALTER TABLE business_hours FORCE ROW LEVEL SECURITY;
 ALTER TABLE holidays FORCE ROW LEVEL SECURITY;
