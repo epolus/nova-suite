@@ -1,17 +1,20 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { writeFile } from 'node:fs/promises';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import * as activities from './activities';
 import { config } from './config';
 import { assertRuntimeRoleCannotBypassRls, checkSchemaCompatibility, heartbeat, shutdown as dbShutdown } from './db';
 
+// Read by the Dockerfile HEALTHCHECK; keep the path in sync.
+const HEALTH_FILE = '/tmp/nova-worker-healthy';
+
 async function run() {
   await assertRuntimeRoleCannotBypassRls();
   const schemaCheck = await checkSchemaCompatibility(config.db.expectedSchemaVersion);
   if (!schemaCheck.ok) {
-    console.warn(
-      `[nova-worker] Schema mismatch (expected=${schemaCheck.expectedVersion}, actual=${schemaCheck.actualVersion}, reason=${schemaCheck.reason}). Worker execution disabled.`,
+    throw new Error(
+      `Schema mismatch (expected=${schemaCheck.expectedVersion}, actual=${schemaCheck.actualVersion}, reason=${schemaCheck.reason}). Worker execution disabled.`,
     );
-    return;
   }
 
   console.log(`[nova-worker] Connecting to Temporal at ${config.temporal.address}...`);
@@ -35,6 +38,7 @@ async function run() {
   const pulse = async () => {
     try {
       await heartbeat(workerName);
+      await writeFile(HEALTH_FILE, String(Date.now()));
     } catch (err) {
       console.warn('[nova-worker] failed to write heartbeat', err);
     }

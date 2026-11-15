@@ -155,6 +155,9 @@ services:
     environment:
       TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
       TEMPORAL_CORS_ORIGINS: ${TEMPORAL_CORS_ORIGINS:-http://localhost:3000}
+    # Loopback only: the UI has no authentication. Use an SSH tunnel to reach it.
+    ports:
+      - "127.0.0.1:${TEMPORAL_UI_PORT:-8080}:8080"
 
   # ─── Nova Worker (Temporal Workflows) ───
   nova-worker:

@@ -18,11 +18,8 @@
 		reverse_proxy nova-engine:4000
 	}
 
-	# Temporal UI (optional – remove in production)
-	handle /temporal/* {
-		uri strip_prefix /temporal
-		reverse_proxy temporal-ui:8080
-	}
+	# Temporal UI is intentionally not routed here: it has no authentication.
+	# Reach it via the loopback port published in docker-compose (e.g. SSH tunnel).
 
 	# Frontend – serve the React admin dashboard
 	handle {

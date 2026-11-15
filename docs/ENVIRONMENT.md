@@ -76,6 +76,7 @@ See `.env.deploy.example` for the annotated baseline.
 | `NOVA_TAG` | `latest` | Version applied to every component. Tags are prefixed per component (`engine-0.1.5`, `web-0.1.5`, …), so this value is the part after the prefix. Pin a release in production. |
 | `NOVA_LOAD_DEMO_DATA` | `false` | Loads the bulk demo dataset (~500 incidents, ~200 requests, ~80 CIs) during **database initialization only**. Ignored on an existing volume. |
 | `HTTP_PORT` / `HTTPS_PORT` | `80` / `443` | Host ports published by the edge proxy. |
+| `TEMPORAL_UI_PORT` | `8080` | Temporal UI, published on `127.0.0.1` only (no auth). Reach it with `ssh -L 8080:127.0.0.1:8080 <host>`. |
 
 `POSTGRES_PASSWORD`, `CREDENTIALS_MASTER_KEY` and `CATALOG_AUTOMATION_SHARED_KEY` are declared
 required in that file, so Compose fails with a named error rather than starting on a placeholder.
