@@ -1192,7 +1192,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.38', 'checklists'),
   ('v00.01.39', 'checklist_item_done_fix'),
   ('v00.01.40', 'change_collaboration'),
-  ('v00.01.41', 'sla_notification_ledger');
+  ('v00.01.41', 'sla_notification_ledger'),
+  ('v00.01.42', 'asset_assignment_history');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1272,6 +1273,30 @@ CREATE UNIQUE INDEX uq_assets_tenant_external_id_2
   WHERE external_id_2 IS NOT NULL;
 CREATE TRIGGER trg_assets_updated_at
   BEFORE UPDATE ON assets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TABLE asset_assignments (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  asset_id      uuid NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+  user_id       uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  assigned_by   uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  assigned_at   timestamptz NOT NULL DEFAULT now(),
+  returned_at   timestamptz,
+  notes         text,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_asset_assignments_asset
+  ON asset_assignments(tenant_id, asset_id, assigned_at DESC);
+
+CREATE UNIQUE INDEX uq_asset_assignments_open
+  ON asset_assignments(tenant_id, asset_id)
+  WHERE returned_at IS NULL;
+
+CREATE TRIGGER trg_asset_assignments_updated_at
+  BEFORE UPDATE ON asset_assignments
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================

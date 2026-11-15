@@ -738,8 +738,17 @@ export const createAssetSchema = z.object({
 
 export const updateAssetSchema = createAssetSchema.partial();
 export const ASSET_UPDATE_COLUMNS = Object.keys(updateAssetSchema.shape).filter(
-  (key) => key !== 'custom_fields',
+  (key) => key !== 'custom_fields' && key !== 'owner_user_id',
 );
+
+export const assignAssetSchema = z.object({
+  user_id: uuidSchema,
+  notes: z.string().max(5000).nullable().optional(),
+});
+
+export const returnAssetSchema = z.object({
+  notes: z.string().max(5000).nullable().optional(),
+});
 
 // ─── Releases ───
 const releaseStatusSchema = z.enum(['planned', 'in_progress', 'deployed', 'cancelled']);

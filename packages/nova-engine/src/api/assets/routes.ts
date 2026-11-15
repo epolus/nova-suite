@@ -3,10 +3,21 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { authenticate, getRequestClient, releaseTenantClient, setTenantRLS } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
-import { ASSET_UPDATE_COLUMNS, createAssetSchema, updateAssetSchema } from '../../domain/schemas';
+import {
+  ASSET_UPDATE_COLUMNS,
+  assignAssetSchema,
+  createAssetSchema,
+  returnAssetSchema,
+  updateAssetSchema,
+} from '../../domain/schemas';
 import { parameterizedSet } from '../../data/parameterized-set';
 import { hasChangeRole, hasProblemRole, isAdminRole } from '../roles';
 import { loadCustomFieldsMap, upsertCustomFields } from '../../domain/custom-fields';
+import {
+  assignAsset,
+  listAssetAssignments,
+  returnAsset,
+} from '../../domain/asset-assignments';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -59,7 +70,7 @@ router.post('/', validateBody(createAssetSchema), async (req: Request, res: Resp
         b.name,
         b.category || null,
         b.status || null,
-        b.owner_user_id || null,
+        null, // owner set via assignAsset below when provided
         b.linked_ci_id || null,
         b.vendor_name || null,
         b.purchase_cost ?? null,
@@ -73,9 +84,24 @@ router.post('/', validateBody(createAssetSchema), async (req: Request, res: Resp
         b.external_id_2 || null,
       ],
     );
+    if (b.owner_user_id) {
+      await assignAsset(client, {
+        assetId: String(created.rows[0].id),
+        userId: String(b.owner_user_id),
+        assignedBy: req.user!.id,
+        notes: 'Initial assignment on create',
+      });
+    }
     await upsertCustomFields(client, 'asset', created.rows[0].id, b.custom_fields ?? {}, 'create');
     const custom_fields = await loadCustomFieldsMap(client, 'asset', created.rows[0].id);
-    res.status(201).json({ ...created.rows[0], custom_fields });
+    const refreshed = await client.query(
+      `SELECT a.*, u.display_name AS owner_name
+       FROM assets a
+       LEFT JOIN users u ON u.id = a.owner_user_id
+       WHERE a.id = $1`,
+      [created.rows[0].id],
+    );
+    res.status(201).json({ ...refreshed.rows[0], custom_fields });
   } catch (err) {
     next(err);
   }
@@ -105,7 +131,9 @@ router.patch('/:id', validateBody(updateAssetSchema), async (req: Request, res: 
     if (!canManageAssets(req)) throw new AppError(403, 'Insufficient permissions');
     const body = req.body || {};
     const customFieldsPayload = body.custom_fields as Record<string, unknown> | undefined;
-    const patch = parameterizedSet(ASSET_UPDATE_COLUMNS, body);
+    // owner_user_id is managed by assign/return endpoints (and create).
+    const { owner_user_id: _ignoredOwner, ...patchBody } = body;
+    const patch = parameterizedSet(ASSET_UPDATE_COLUMNS, patchBody);
     const client = getRequestClient(req);
     let updated = null as Record<string, unknown> | null;
     if (patch) {
@@ -137,5 +165,67 @@ router.patch('/:id', validateBody(updateAssetSchema), async (req: Request, res: 
     next(err);
   }
 });
+
+router.get('/:id/assignments', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const assignments = await listAssetAssignments(client, String(req.params.id));
+    res.json({ assignments });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/:id/assign',
+  validateBody(assignAssetSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!canManageAssets(req)) throw new AppError(403, 'Insufficient permissions');
+      const client = getRequestClient(req);
+      const assignment = await assignAsset(client, {
+        assetId: String(req.params.id),
+        userId: String(req.body.user_id),
+        assignedBy: req.user!.id,
+        notes: req.body.notes,
+      });
+      const asset = await client.query(
+        `SELECT a.*, u.display_name AS owner_name
+         FROM assets a
+         LEFT JOIN users u ON u.id = a.owner_user_id
+         WHERE a.id = $1`,
+        [req.params.id],
+      );
+      res.status(201).json({ assignment, asset: asset.rows[0] });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/:id/return',
+  validateBody(returnAssetSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!canManageAssets(req)) throw new AppError(403, 'Insufficient permissions');
+      const client = getRequestClient(req);
+      const assignment = await returnAsset(client, {
+        assetId: String(req.params.id),
+        notes: req.body.notes,
+      });
+      const asset = await client.query(
+        `SELECT a.*, u.display_name AS owner_name
+         FROM assets a
+         LEFT JOIN users u ON u.id = a.owner_user_id
+         WHERE a.id = $1`,
+        [req.params.id],
+      );
+      res.json({ assignment, asset: asset.rows[0] });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 export default router;

@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useStatusLabel } from '@/i18n/hooks';
 import UserDateInput from '@/components/UserDateInput';
+import AssetAssignmentCard from './AssetAssignmentCard';
+import type { Asset } from '@/api/client';
 
 const ASSET_STATUSES = ['ordered', 'received', 'in_stock', 'in_use', 'maintenance', 'retired', 'disposed'] as const;
 
@@ -73,6 +75,8 @@ export default function AssetDetailPage() {
   const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [baselineCustomFields, setBaselineCustomFields] = useState<Record<string, unknown>>({});
   const [linkedCi, setLinkedCi] = useState<{ id: string; name: string } | null>(null);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [ownerName, setOwnerName] = useState<string | null>(null);
   const [prevId, setPrevId] = useState(id);
 
   if (id !== prevId) {
@@ -85,6 +89,8 @@ export default function AssetDetailPage() {
       setCustomFields({});
       setBaselineCustomFields({});
       setLinkedCi(null);
+      setOwnerUserId(null);
+      setOwnerName(null);
     }
   }
 
@@ -116,6 +122,8 @@ export default function AssetDetailPage() {
         setLinkedCi(asset.linked_ci_id
           ? { id: asset.linked_ci_id, name: asset.linked_ci_name || asset.linked_ci_id }
           : null);
+        setOwnerUserId(asset.owner_user_id);
+        setOwnerName(asset.owner_name || null);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
@@ -328,7 +336,16 @@ export default function AssetDetailPage() {
         </div>
       </Card>
       {!isNew && id && (
-        <div className="mt-6 max-w-2xl">
+        <div className="mt-6 max-w-2xl space-y-6">
+          <AssetAssignmentCard
+            assetId={id}
+            ownerUserId={ownerUserId}
+            ownerName={ownerName}
+            onOwnerChange={(asset: Asset) => {
+              setOwnerUserId(asset.owner_user_id);
+              setOwnerName(asset.owner_name || null);
+            }}
+          />
           <RelatedRecordsCard entityType="asset" entityId={id} />
         </div>
       )}

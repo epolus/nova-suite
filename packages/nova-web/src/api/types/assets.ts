@@ -22,6 +22,20 @@ export interface Asset {
   custom_fields?: Record<string, unknown>;
 }
 
+export interface AssetAssignment {
+  id: string;
+  asset_id: string;
+  user_id: string;
+  assigned_by: string;
+  assigned_at: string;
+  returned_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  user_name?: string;
+  assigned_by_name?: string;
+}
+
 export interface Release {
   id: string;
   number: string;
