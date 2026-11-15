@@ -2,3 +2,7 @@
 export * from './common';
 export * from './auth';
 export * from './incidents';
+export * from './requests';
+export * from './problems';
+export * from './changes';
+export * from './major-incidents';

@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useEffect, useState } from 'react';
+import type { ChangeTransitionInput } from '@nova-suite/shared/schemas';
 import { changes } from '@/api/client';
 import type { Change } from '@/api/client';
 import { useAuth } from '../../context/AuthContext';
 import { hasRole } from '../../utils/roles';
-import { useChangeDetail } from './useChangeDetail';
+import { pirFailureCategory, useChangeDetail } from './useChangeDetail';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import CustomFieldsSection from '../../components/CustomFieldsSection';
@@ -107,7 +108,7 @@ export default function ChangeDetailPage() {
     }));
   };
 
-  const runTransition = async (action: string) => {
+  const runTransition = async (action: ChangeTransitionInput['action']) => {
     if (!id || isNew) return;
     if ((action === 'schedule' || action === 'request_approval' || action === 'approve')
       && hasInvalidScheduleRange(form.scheduled_start, form.scheduled_end)) {
@@ -138,7 +139,7 @@ export default function ChangeDetailPage() {
         override_blocking_conflicts: overrideBlocking && (action === 'schedule' || action === 'request_approval'),
         ...(action === 'close' ? {
           success: form.success === 'true',
-          failure_category: form.success === 'false' ? form.failure_category : null,
+          failure_category: form.success === 'false' ? pirFailureCategory(form.failure_category) : null,
           planned_downtime_minutes: plannedMinutes,
           actual_downtime_minutes: actualMinutes,
           review_notes: form.review_notes || null,
@@ -232,15 +233,16 @@ export default function ChangeDetailPage() {
                 {tChanges('overrideBlockingConflicts')}
               </label>
             )}
-            {!isNew && allowedActions.map((action: string) => {
-              const meta = actionMeta[action];
+            {!isNew && allowedActions.map((action) => {
+              const typedAction = action as ChangeTransitionInput['action'];
+              const meta = actionMeta[typedAction];
               if (!meta) return null;
               return (
                 <Button
-                  key={action}
+                  key={typedAction}
                   variant={meta.variant || 'outline'}
                   size="sm"
-                  onClick={() => runTransition(action)}
+                  onClick={() => runTransition(typedAction)}
                 >
                   {meta.label}
                 </Button>

@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type { CreateProblemInput, UpdateProblemInput } from '@nova-suite/shared/schemas';
 import { request } from '../http';
 import type {
   AssignmentGroupItem,
@@ -16,9 +17,9 @@ export const problems = {
     return request<{ problems: Problem[]; pagination: Pagination }>(`/problems?${qs}`);
   },
   get: (id: string) => request<Problem>(`/problems/${id}`),
-  create: (data: Partial<Problem>) =>
+  create: (data: CreateProblemInput) =>
     request<Problem>('/problems', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<Problem>) =>
+  update: (id: string, data: UpdateProblemInput) =>
     request<Problem>(`/problems/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   nav: (currentId: string, params: Record<string, string> = {}) => {
     const qs = new URLSearchParams({ current: currentId, ...params });

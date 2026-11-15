@@ -23,7 +23,7 @@ import { EMPTY_CHANGE_FORM, formFromDetail, type ChangeFormState } from './chang
 
 const PIR_FAILURE_CATEGORIES = ['incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other'] as const;
 
-function pirFailureCategory(value: string): (typeof PIR_FAILURE_CATEGORIES)[number] | null {
+export function pirFailureCategory(value: string): (typeof PIR_FAILURE_CATEGORIES)[number] | null {
   return (PIR_FAILURE_CATEGORIES as readonly string[]).includes(value)
     ? value as (typeof PIR_FAILURE_CATEGORIES)[number]
     : null;

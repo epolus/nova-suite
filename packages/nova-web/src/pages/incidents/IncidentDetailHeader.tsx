@@ -32,7 +32,7 @@ export function IncidentDetailHeader({ d }: { d: IncidentDetailState }) {
       const res = await majorIncidentsApi.create({
         title: inc.title,
         description: inc.description ?? undefined,
-        priority: inc.priority <= 2 ? inc.priority : 2,
+        priority: (inc.priority <= 2 ? inc.priority : 2) as 1 | 2,
         impact: inc.impact as 'low' | 'medium' | 'high',
         urgency: inc.urgency as 'low' | 'medium' | 'high',
         primary_incident_id: inc.id,
