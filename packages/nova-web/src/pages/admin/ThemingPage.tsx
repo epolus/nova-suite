@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'use-intl';
 import { settings as settingsApi, type ThemeSettings } from '../../api/client';
-import { useTheme } from '../../context/ThemeContext';
+import { DEFAULT_THEME, useTheme } from '../../context/ThemeContext';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
 import Spinner from '../../components/Spinner';
@@ -11,6 +11,16 @@ import { ColorInput } from './ThemingColorInput';
 import { COLOR_FIELDS, DARK_COLOR_FIELDS } from './themingFields';
 
 const DEFAULT_LOGO_SRC = '/default-logo.svg';
+const EDITABLE_THEME_KEYS = Object.keys(DEFAULT_THEME).filter((key) => key !== 'logo_url');
+
+function pickThemeFields(form: Partial<ThemeSettings>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of EDITABLE_THEME_KEYS) {
+    const value = form[key];
+    if (typeof value === 'string') out[key] = value;
+  }
+  return out;
+}
 
 export default function ThemingPage() {
   const t = useTranslations('pages.admin.theming');
@@ -46,7 +56,7 @@ export default function ThemingPage() {
     setSaving(true);
     setSaved(false);
     try {
-      await settingsApi.update(form);
+      await settingsApi.update(pickThemeFields(form));
       reload();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
