@@ -2,12 +2,13 @@
 // ─── Inbound webhooks (phase-2 bi-directional stub) ───
 // POST /api/webhooks/inbound/journal – add an incident journal comment
 // Auth: X-Nova-Webhook-Secret matching tenant_settings.inbound_webhook_secret
-//       (or NOVA_INBOUND_WEBHOOK_SECRET env fallback)
+//       (or NOVA_INBOUND_WEBHOOK_SECRET, which only authenticates the primary tenant)
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { timingSafeEqual } from 'node:crypto';
 import { parseChatInbound, parseInboundAlerts } from '@nova-suite/shared';
 import { db } from '../../data/db';
+import { config } from '../../config';
+import { secretsEqual } from '../../auth/secrets';
 import { AppError } from '../../middleware/errorHandler';
 import { recordChatInbound, replyIncidentStatus } from '../../notifications/chat-threads';
 import { logger } from '../../logger';
@@ -18,11 +19,18 @@ import { cancelIncidentAutoClose, signalIncidentResolved } from '../../temporal/
 const router = Router();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
-function secretsEqual(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+async function expectedWebhookSecret(tenantId: string): Promise<string> {
+  const setting = await db.getOne<{ value: string }>(
+    `SELECT value FROM tenant_settings
+     WHERE tenant_id = $1 AND key = 'inbound_webhook_secret'
+     LIMIT 1`,
+    [tenantId],
+  );
+  const tenantSecret = (setting?.value || '').trim();
+  if (tenantSecret) return tenantSecret;
+  return tenantId.toLowerCase() === config.tenancy.primaryTenantId
+    ? (process.env.NOVA_INBOUND_WEBHOOK_SECRET || '').trim()
+    : '';
 }
 
 router.post('/inbound/journal', async (req: Request, res: Response, next: NextFunction) => {
@@ -41,16 +49,8 @@ router.post('/inbound/journal', async (req: Request, res: Response, next: NextFu
     if (!text) throw new AppError(400, 'text is required');
     if (!providedSecret) throw new AppError(401, 'webhook secret is required');
 
-    const envSecret = process.env.NOVA_INBOUND_WEBHOOK_SECRET || '';
-
     await db.withTenantContext(tenantId, SYSTEM_USER_ID, 'system', async () => {
-      const setting = await db.getOne<{ value: string }>(
-        `SELECT value FROM tenant_settings
-         WHERE tenant_id = $1 AND key = 'inbound_webhook_secret'
-         LIMIT 1`,
-        [tenantId],
-      );
-      const expected = (setting?.value || envSecret).trim();
+      const expected = await expectedWebhookSecret(tenantId);
       if (!expected) {
         throw new AppError(503, 'Inbound webhook secret is not configured for this tenant');
       }
@@ -106,7 +106,7 @@ function readTenantId(req: Request): string {
   return String(req.body?.tenant_id || fromQuery || req.headers['x-nova-tenant-id'] || '').trim();
 }
 
-async function chatRequestAuthorized(req: Request): Promise<boolean> {
+async function chatRequestAuthorized(req: Request, tenantId: string): Promise<boolean> {
   const raw = (req as Request & { rawBody?: Buffer }).rawBody?.toString('utf8') || '';
   const signature = String(req.headers['x-slack-signature'] || '');
   const timestamp = String(req.headers['x-slack-request-timestamp'] || '');
@@ -126,17 +126,10 @@ async function chatRequestAuthorized(req: Request): Promise<boolean> {
 
   const provided = String(req.body?.secret || req.headers['x-nova-webhook-secret'] || '').trim();
   if (!provided) return false;
-  const setting = await db.getOne<{ value: string }>(
-    `SELECT value FROM tenant_settings
-     WHERE tenant_id = current_tenant_id() AND key = 'inbound_webhook_secret'
-     LIMIT 1`,
-  );
-  const expected = (setting?.value || process.env.NOVA_INBOUND_WEBHOOK_SECRET || '').trim();
-  if (!expected) return false;
-  return secretsEqual(provided, expected);
+  return secretsEqual(provided, await expectedWebhookSecret(tenantId));
 }
 
-async function sharedSecretAuthorized(req: Request): Promise<boolean> {
+async function sharedSecretAuthorized(req: Request, tenantId: string): Promise<boolean> {
   const provided = String(
     req.body?.secret
     || req.headers['x-nova-webhook-secret']
@@ -146,14 +139,7 @@ async function sharedSecretAuthorized(req: Request): Promise<boolean> {
     || '',
   ).trim();
   if (!provided) return false;
-  const setting = await db.getOne<{ value: string }>(
-    `SELECT value FROM tenant_settings
-     WHERE tenant_id = current_tenant_id() AND key = 'inbound_webhook_secret'
-     LIMIT 1`,
-  );
-  const expected = (setting?.value || process.env.NOVA_INBOUND_WEBHOOK_SECRET || '').trim();
-  if (!expected) return false;
-  return secretsEqual(provided, expected);
+  return secretsEqual(provided, await expectedWebhookSecret(tenantId));
 }
 
 router.post('/inbound/events', async (req: Request, res: Response, next: NextFunction) => {
@@ -162,7 +148,7 @@ router.post('/inbound/events', async (req: Request, res: Response, next: NextFun
     if (!alerts) throw new AppError(400, 'Unrecognized alert payload');
     const tenantId = readTenantId(req);
     if (!tenantId) throw new AppError(400, 'tenant_id is required');
-    const allowed = await db.withTenantContext(tenantId, SYSTEM_USER_ID, 'system', () => sharedSecretAuthorized(req));
+    const allowed = await db.withTenantContext(tenantId, SYSTEM_USER_ID, 'system', () => sharedSecretAuthorized(req, tenantId));
     if (!allowed) throw new AppError(401, 'Invalid webhook secret');
     const results = await ingestAlerts(tenantId, alerts);
     for (const row of results) {
@@ -191,7 +177,7 @@ router.post('/inbound/chat', async (req: Request, res: Response, next: NextFunct
     if (!tenantId) throw new AppError(400, 'tenant_id is required');
 
     const outcome = await db.withTenantTransaction(tenantId, SYSTEM_USER_ID, 'system', async () => {
-      if (!(await chatRequestAuthorized(req))) {
+      if (!(await chatRequestAuthorized(req, tenantId))) {
         throw new AppError(401, 'Invalid webhook signature or secret');
       }
       if ('challenge' in parsed) return { kind: 'challenge' as const, challenge: parsed.challenge };

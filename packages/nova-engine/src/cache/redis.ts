@@ -108,6 +108,37 @@ export async function cacheDel(key: string): Promise<void> {
   }
 }
 
+/** Store a value for single use. Returns false when Redis is unavailable so callers can fall back. */
+export async function cachePutOnce(key: string, value: unknown, ttlSeconds: number): Promise<boolean> {
+  try {
+    const c = await getClient();
+    if (!c) return false;
+    metrics.setOps += 1;
+    await c.set(key, JSON.stringify(value), { EX: ttlSeconds });
+    return true;
+  } catch (err) {
+    metrics.setErrors += 1;
+    markError(err);
+    logger.warn({ err, key }, 'Redis SET (one-time) failed');
+    return false;
+  }
+}
+
+/** Atomically read and delete a value stored with cachePutOnce. */
+export async function cacheTakeJson<T>(key: string): Promise<T | null> {
+  try {
+    const c = await getClient();
+    if (!c) return null;
+    const raw = await c.getDel(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch (err) {
+    metrics.getErrors += 1;
+    markError(err);
+    logger.warn({ err, key }, 'Redis GETDEL failed');
+    return null;
+  }
+}
+
 export function cacheMetrics(): Record<string, unknown> {
   const totalGets = metrics.getHits + metrics.getMisses;
   const hitRatio = totalGets > 0 ? metrics.getHits / totalGets : null;

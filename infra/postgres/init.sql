@@ -415,10 +415,6 @@ CREATE INDEX idx_rota_shifts_group_window
 CREATE INDEX idx_rota_shifts_user_window
   ON rota_shifts(tenant_id, user_id, starts_at, ends_at);
 
-CREATE TRIGGER trg_rota_shifts_updated_at
-  BEFORE UPDATE ON rota_shifts
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
 -- ============================================================
 -- ASSIGNMENT GROUP PROCESSES
 -- ============================================================
@@ -1221,7 +1217,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.41', 'sla_notification_ledger'),
   ('v00.01.42', 'asset_assignment_history'),
   ('v00.01.43', 'on_call_rota'),
-  ('v00.01.44', 'integrity_constraints');
+  ('v00.01.44', 'integrity_constraints'),
+  ('v00.01.45', 'tenant_scoped_auth_and_kb_numbers');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1236,6 +1233,10 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_incident_categories_updated_at
   BEFORE UPDATE ON incident_categories
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_rota_shifts_updated_at
+  BEFORE UPDATE ON rota_shifts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER trg_incident_resolution_codes_updated_at
@@ -3055,10 +3056,12 @@ CREATE TABLE knowledge_categories (
   UNIQUE (tenant_id, parent_id, name)
 );
 
+CREATE SEQUENCE kb_number_seq START 1000;
+
 CREATE TABLE knowledge_articles (
   id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  number        text UNIQUE NOT NULL,
+  number        text NOT NULL,
   title         text NOT NULL,
   content       text NOT NULL,
   category_id   uuid REFERENCES knowledge_categories(id) ON DELETE SET NULL,
@@ -3072,7 +3075,8 @@ CREATE TABLE knowledge_articles (
   view_count    integer NOT NULL DEFAULT 0,
   meta_data     jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now()
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT knowledge_articles_tenant_number_key UNIQUE (tenant_id, number)
 );
 
 CREATE INDEX idx_kb_articles_tenant_status ON knowledge_articles(tenant_id, status, updated_at DESC);
@@ -3839,15 +3843,15 @@ INSERT INTO knowledge_categories (tenant_id, name, description) VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Services', 'Service-specific procedures and FAQs');
 
 INSERT INTO incident_categories (id, tenant_id, name, description) VALUES
-  ('ic000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Hardware', 'Hardware and peripherals'),
-  ('ic000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Software', 'Applications and OS'),
-  ('ic000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'Network', 'Connectivity and network services');
+  ('1c000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Hardware', 'Hardware and peripherals'),
+  ('1c000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Software', 'Applications and OS'),
+  ('1c000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'Network', 'Connectivity and network services');
 
 INSERT INTO incident_categories (tenant_id, name, description, parent_id) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'Laptop', 'Laptop hardware', 'ic000000-0000-0000-0000-000000000001'),
-  ('a0000000-0000-0000-0000-000000000001', 'Desktop', 'Desktop hardware', 'ic000000-0000-0000-0000-000000000001'),
-  ('a0000000-0000-0000-0000-000000000001', 'Email', 'Email client or mailbox', 'ic000000-0000-0000-0000-000000000002'),
-  ('a0000000-0000-0000-0000-000000000001', 'VPN', 'VPN access issues', 'ic000000-0000-0000-0000-000000000003');
+  ('a0000000-0000-0000-0000-000000000001', 'Laptop', 'Laptop hardware', '1c000000-0000-0000-0000-000000000001'),
+  ('a0000000-0000-0000-0000-000000000001', 'Desktop', 'Desktop hardware', '1c000000-0000-0000-0000-000000000001'),
+  ('a0000000-0000-0000-0000-000000000001', 'Email', 'Email client or mailbox', '1c000000-0000-0000-0000-000000000002'),
+  ('a0000000-0000-0000-0000-000000000001', 'VPN', 'VPN access issues', '1c000000-0000-0000-0000-000000000003');
 
 INSERT INTO incident_resolution_codes (tenant_id, code, label) VALUES
   ('a0000000-0000-0000-0000-000000000001', 'solved_permanently', 'Solved permanently'),

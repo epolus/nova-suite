@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.44`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.45`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
@@ -240,3 +240,14 @@ Apply `infra/postgres/migrations/v00.01.43__on_call_rota.sql` before using the o
 ## Integrity constraints (`v00.01.44`)
 
 Apply `infra/postgres/migrations/v00.01.44__integrity_constraints.sql`. Adds `field_values` shape trigger (entity type must match definition; exactly one typed value column), incident category/resolution FKs `ON DELETE RESTRICT`, per-mailbox `email_messages` uniqueness plus `in_reply_to` index, `sla_notifications_sent.entity_type` check aligned with SLA process types, checklist done-state check and template `ON DELETE RESTRICT`, and `asset_assignments.returned_at >= assigned_at`.
+
+## Tenant-scoped auth and KB numbers (`v00.01.45`)
+
+Apply `infra/postgres/migrations/v00.01.45__tenant_scoped_auth_and_kb_numbers.sql` before rolling out the engine. Adds `lookup_user_for_login(email, tenant_id)` (case-insensitive) and `lookup_user_for_sso(subject, tenant_id)`; the one-argument versions stay for older engines during a rolling deploy. Adds `kb_number_seq` (starts above the highest existing `KBnnnn`) and replaces the global `knowledge_articles.number` unique key with `(tenant_id, number)`.
+
+Behavior changes in the matching engine release:
+
+- SSO no longer auto-provisions or links unknown users unless `OIDC_ALLOWED_EMAIL_DOMAINS` is set. Set it **before** upgrading if you rely on just-in-time provisioning.
+- `NOVA_INBOUND_WEBHOOK_SECRET` is only accepted for `NOVA_PRIMARY_TENANT_ID`.
+- Attachments are authorized against their parent record; attachments on unknown entity types are readable by admins only.
+- Bulk-imported users without a password get a random one; they sign in via SSO or an admin password reset.

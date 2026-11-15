@@ -9,7 +9,7 @@ For the complete baseline list, see `.env.example`.
 |----------|-------------|--------|
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Postgres image init, Temporal auto-setup, `nova-migrate`, backups | Bootstrap **superuser**. Never point the API or worker at this role. |
 | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | `nova-engine`, `nova-worker` | Default `nova_runtime`. Must be `NOSUPERUSER NOBYPASSRLS`. Created by `infra/postgres/00-runtime-role.sh`. |
-| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.44`). Mismatch puts the API in degraded mode and stops the worker. |
+| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.45`). Mismatch puts the API in degraded mode and stops the worker. |
 | `NOVA_MIGRATIONS_DIR` | `nova-migrate` | Directory of `vNN.NN.NN__slug.sql` files. Defaults to `/app/infra/postgres/migrations` in the engine image. |
 
 ## Core Variables
@@ -26,6 +26,11 @@ CREDENTIALS_MASTER_KEY=
 
 # Shared key for internal catalog automation endpoints (must match between nova-engine and nova-worker)
 CATALOG_AUTOMATION_SHARED_KEY=
+
+# Identity
+NOVA_PRIMARY_TENANT_ID=a0000000-0000-0000-0000-000000000001
+BCRYPT_ROUNDS=12
+OIDC_ALLOWED_EMAIL_DOMAINS=
 
 # API uploads
 UPLOAD_MAX_FILE_SIZE_MB=20
@@ -108,5 +113,8 @@ required in that file, so Compose fails with a named error rather than starting 
 - `VITE_*` values are injected at frontend build time; rebuild `nova-web` after changing them.
 - **`VITE_HIDE_DEMO_LOGIN_CREDENTIALS`** — when `true`, hides the demo quick-login buttons (Admin / Fulfiller / User) on the login page. Default is `false` (shown). Set to `true` in production deployments.
 - **AI assistant** — see [AI_ASSISTANT.md](./AI_ASSISTANT.md). Set `AI_ENABLED=true` and configure `OPENAI_*`, Azure OpenAI, or `OLLAMA_*`. ESS/agent toggles: `AI_ESS_ENABLED`, `AI_AGENT_ENABLED`.
-- **Slack and Teams** — see [SLACK_TEAMS.md](./SLACK_TEAMS.md). `NOVA_INBOUND_WEBHOOK_SECRET` authenticates non-Slack callers of `POST /api/webhooks/inbound/chat` and alert ingest at `POST /api/webhooks/inbound/events`. Leave it empty until you connect a channel. Do not store that secret in tenant settings.
+- **Slack and Teams** — see [SLACK_TEAMS.md](./SLACK_TEAMS.md). `NOVA_INBOUND_WEBHOOK_SECRET` authenticates non-Slack callers of `POST /api/webhooks/inbound/chat` and alert ingest at `POST /api/webhooks/inbound/events` for the **primary tenant only**; other tenants must configure their own secret. Leave it empty until you connect a channel. Do not store that secret in tenant settings.
+- **`NOVA_PRIMARY_TENANT_ID`** — the tenant this install serves. Password login and SSO only resolve users in this tenant, and the public theme endpoint reads its branding. Defaults to the seeded tenant `a0000000-0000-0000-0000-000000000001`; must be a UUID.
+- **`OIDC_ALLOWED_EMAIL_DOMAINS`** — comma-separated, exact-match email domains (e.g. `example.com,example.ch`). An SSO login that is not yet linked to a user is accepted only when the IdP email is in one of these domains and `email_verified` is not `false`; it then links to the existing user with that email (only if that user has no other SSO link) or provisions a new one. **Empty means no new SSO users or links** — already-linked users keep working. Subdomains must be listed explicitly.
+- **`BCRYPT_ROUNDS`** — bcrypt cost for password hashes (default `12`). Existing hashes with a lower cost are re-hashed on the next successful login. Higher values slow down login and bulk user import.
 - **Event management** — see [EVENT_MANAGEMENT.md](./EVENT_MANAGEMENT.md).

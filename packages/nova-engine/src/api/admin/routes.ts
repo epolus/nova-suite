@@ -1013,7 +1013,7 @@ router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Requ
     }
 
     if (password) {
-      const hash = await bcrypt.hash(password, 10);
+      const hash = await bcrypt.hash(password, config.auth.bcryptRounds);
       sets.push(`password_hash = $${idx++}`);
       values.push(hash);
     }
@@ -1062,7 +1062,7 @@ router.post('/users', validateBody(adminCreateUserSchema), async (req: Request, 
     const existing = await db.getOne('SELECT id FROM users WHERE tenant_id = $1 AND email = $2', [tenantId, email]);
     if (existing) throw new AppError(409, 'A user with this email already exists');
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, config.auth.bcryptRounds);
 
     const newUser = await db.getOne<{ id: string }>(
       `INSERT INTO users (

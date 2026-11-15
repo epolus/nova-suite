@@ -9,7 +9,7 @@ import {
   ingestAndProcessInboundEmail,
 } from '../../domain/inbound-email';
 import { db } from '../../data/db';
-import { config } from '../../config';
+import { requireAutomationSharedKey } from '../../middleware/automation-key';
 
 const MAILBOX_COLUMNS = `
   id, name, address, credential_slug, protocol, config,
@@ -75,24 +75,6 @@ function parseConfig(raw: unknown): Record<string, unknown> {
     return raw as Record<string, unknown>;
   }
   throw new AppError(400, 'config must be a JSON object');
-}
-
-function requireAutomationSharedKey(req: Request, _res: Response, next: NextFunction): void {
-  const configured = config.catalogAutomation.sharedKey;
-  if (!configured) {
-    next(new AppError(503, 'Catalog automation key is not configured'));
-    return;
-  }
-  const provided = req.headers['x-automation-key'];
-  const headerKey = typeof provided === 'string' ? provided.trim() : Array.isArray(provided) ? provided[0]?.trim() : '';
-  const authHeader = req.headers.authorization;
-  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  const key = headerKey || bearer;
-  if (!key || key !== configured) {
-    next(new AppError(401, 'Invalid automation key'));
-    return;
-  }
-  next();
 }
 
 // ─── Admin CRUD (mounted under /api/admin/mailboxes and /api/admin/inbound-email-rules) ───

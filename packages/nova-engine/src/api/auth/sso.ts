@@ -15,8 +15,14 @@ import { AuthUser } from '../../middleware/auth';
 import { signAccessToken } from '../../auth/jwt';
 import { recordAuditEvent } from '../../audit/events';
 import { getClientIp } from '../../middleware/client-ip';
+import { evaluateSsoEmail } from './sso-policy';
+import { OneTimeStore } from '../../auth/one-time-store';
 
 const router = Router();
+
+if (config.oidc.enabled && config.oidc.allowedEmailDomains.length === 0) {
+  logger.warn('OIDC_ALLOWED_EMAIL_DOMAINS is empty: only users already linked to SSO can sign in; new SSO users are refused');
+}
 
 // ─── OIDC Discovery Cache ───
 interface OidcMetadata {
@@ -36,6 +42,7 @@ type OidcClaims = JWTPayload & {
   preferred_username?: string;
   upn?: string;
   unique_name?: string;
+  email_verified?: boolean | string;
   nonce?: string;
 };
 
@@ -106,28 +113,10 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
   return hash.toString('base64url');
 }
 
-// ─── In-memory state store (short-lived) ───
-const pendingStates = new Map<string, { codeVerifier: string; nonce: string; createdAt: number }>();
-const STATE_TTL = 600_000; // 10 min
-const pendingSsoCodes = new Map<string, { token: string; user: AuthUser; createdAt: number }>();
-const SSO_CODE_TTL = 120_000; // 2 min
+// ─── Pending OIDC state and one-time exchange codes ───
+const pendingStates = new OneTimeStore<{ codeVerifier: string; nonce: string }>('sso:state', 600_000);
+const pendingSsoCodes = new OneTimeStore<{ token: string; user: AuthUser }>('sso:code', 120_000);
 
-function cleanupStates() {
-  const now = Date.now();
-  for (const [key, val] of pendingStates) {
-    if (now - val.createdAt > STATE_TTL) pendingStates.delete(key);
-  }
-}
-
-function cleanupSsoCodes() {
-  const now = Date.now();
-  for (const [key, val] of pendingSsoCodes) {
-    if (now - val.createdAt > SSO_CODE_TTL) pendingSsoCodes.delete(key);
-  }
-}
-
-// ─── Default tenant for auto-provisioned users ───
-const DEFAULT_TENANT = 'a0000000-0000-0000-0000-000000000001';
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 // ─── GET /sso/config ───
@@ -153,8 +142,7 @@ router.get('/authorize', async (_req: Request, res: ExpressResponse, next: NextF
     const nonce = crypto.randomBytes(16).toString('hex');
     const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-    cleanupStates();
-    pendingStates.set(state, { codeVerifier, nonce, createdAt: Date.now() });
+    await pendingStates.put(state, { codeVerifier, nonce });
 
     const params = new URLSearchParams({
       response_type: 'code',
@@ -191,12 +179,11 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       return;
     }
 
-    const pending = pendingStates.get(state);
+    const pending = await pendingStates.take(state);
     if (!pending) {
       res.redirect('/login?sso_error=Invalid+or+expired+state');
       return;
     }
-    pendingStates.delete(state);
 
     const metadata = await getOidcMetadata();
 
@@ -276,29 +263,48 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
     const ssoUserColumns = 'id, tenant_id, email, display_name, time_format, date_format, is_active, locked_out';
 
     // Pre-auth subject lookup must bypass RLS (no tenant context yet).
+    const tenantId = config.tenancy.primaryTenantId;
     let user = await db.getOne<SsoUser>(
-      `SELECT ${ssoUserColumns} FROM lookup_user_for_sso($1)`,
-      [ssoSubject],
+      `SELECT ${ssoUserColumns} FROM lookup_user_for_sso($1, $2)`,
+      [ssoSubject, tenantId],
     );
 
     if (!user) {
-      user = await db.withTenantContext(DEFAULT_TENANT, SYSTEM_USER_ID, 'admin', async () => {
+      const decision = evaluateSsoEmail(ssoEmail, claims.email_verified, config.oidc.allowedEmailDomains);
+      if (!decision.allowed) {
+        logger.warn({ sub: ssoSubject, email: ssoEmail, reason: decision.reason }, 'SSO link/provision refused');
+        res.redirect('/login?sso_error=Your+account+is+not+enabled+for+SSO.+Contact+your+administrator.');
+        return;
+      }
+      const linkEmail = decision.email;
+      let linkConflict = false;
+      user = await db.withTenantContext(tenantId, SYSTEM_USER_ID, 'admin', async () => {
         const matched = await db.getOne<SsoUser>(
-          `SELECT ${ssoUserColumns} FROM users WHERE email = $1 AND tenant_id = $2`,
-          [ssoEmail, DEFAULT_TENANT],
+          `SELECT ${ssoUserColumns} FROM users
+           WHERE lower(email) = $1 AND tenant_id = $2
+           ORDER BY created_at
+           LIMIT 1`,
+          [linkEmail, tenantId],
         );
 
         if (matched) {
-          await db.query(
-            'UPDATE users SET sso_provider_id = $1 WHERE id = $2',
+          const linked = await db.getOne<{ id: string }>(
+            `UPDATE users SET sso_provider_id = $1
+             WHERE id = $2 AND sso_provider_id IS NULL
+             RETURNING id`,
             [ssoSubject, matched.id],
           );
+          if (!linked) {
+            logger.warn({ userId: matched.id, sub: ssoSubject }, 'SSO link refused: account already linked to another identity');
+            linkConflict = true;
+            return null;
+          }
           logger.info({ userId: matched.id, sub: ssoSubject }, 'Linked SSO to existing user');
           return matched;
         }
 
         const displayName = claims.name || ssoEmail.split('@')[0];
-        const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), config.auth.bcryptRounds);
         const newUser = await db.getOne<{ id: string }>(
           `INSERT INTO users (
             tenant_id, email, password_hash, display_name,
@@ -306,7 +312,7 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, '24h', 'YYYY-MM-DD', true, 'sso')
           RETURNING id`,
           [
-            DEFAULT_TENANT,
+            tenantId,
             ssoEmail,
             randomHash,
             displayName,
@@ -318,12 +324,12 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
 
         const userRole = await db.getOne<{ id: string }>(
           "SELECT id FROM roles WHERE tenant_id = $1 AND name = 'user'",
-          [DEFAULT_TENANT],
+          [tenantId],
         );
         if (userRole && newUser) {
           await db.query(
             'INSERT INTO user_roles (tenant_id, user_id, role_id) VALUES ($1, $2, $3)',
-            [DEFAULT_TENANT, newUser.id, userRole.id],
+            [tenantId, newUser.id, userRole.id],
           );
         }
 
@@ -334,6 +340,10 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
         logger.info({ userId: created!.id, email: ssoEmail }, 'Auto-provisioned SSO user');
         return created;
       });
+      if (linkConflict) {
+        res.redirect('/login?sso_error=Your+account+is+not+enabled+for+SSO.+Contact+your+administrator.');
+        return;
+      }
     }
 
     if (!user || !user.is_active) {
@@ -386,9 +396,8 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
     }));
 
     // Redirect via one-time code (avoid token in URL/query logs).
-    cleanupSsoCodes();
     const ssoCode = crypto.randomBytes(24).toString('hex');
-    pendingSsoCodes.set(ssoCode, { token, user: payload, createdAt: Date.now() });
+    await pendingSsoCodes.put(ssoCode, { token, user: payload });
     res.redirect(`/login?sso_code=${encodeURIComponent(ssoCode)}`);
   } catch (err) {
     logger.error({ err }, 'SSO callback error');
@@ -403,13 +412,11 @@ router.post('/exchange', async (req: Request, res: ExpressResponse) => {
     return;
   }
 
-  cleanupSsoCodes();
-  const pending = pendingSsoCodes.get(code);
+  const pending = await pendingSsoCodes.take(code);
   if (!pending) {
     res.status(400).json({ error: 'invalid or expired SSO code' });
     return;
   }
-  pendingSsoCodes.delete(code);
   res.json({ token: pending.token, user: pending.user });
 });
 

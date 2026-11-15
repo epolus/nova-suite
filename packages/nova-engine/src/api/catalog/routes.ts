@@ -24,6 +24,7 @@ import {
 } from './automation-config';
 import { assertItemHasNoFulfillmentModel, assertServiceItemFulfillment } from './item-fulfillment';
 import fulfillmentModelRoutes from './fulfillment-model-routes';
+import { requireAutomationSharedKey } from '../../middleware/automation-key';
 
 const router = Router();
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
@@ -46,27 +47,6 @@ async function withAutomationTenantClient<T>(
     await db.clearTenantContext(client).catch(() => undefined);
     client.release();
   }
-}
-
-function requireAutomationSharedKey(req: Request, res: Response, next: NextFunction): void {
-  const configured = config.catalogAutomation.sharedKey;
-  if (!configured) {
-    res.status(503).json({
-      error: 'Catalog automation key is not configured',
-      hint: 'Set CATALOG_AUTOMATION_SHARED_KEY on the API server and restart.',
-    });
-    return;
-  }
-  const provided = req.headers['x-automation-key'];
-  const headerKey = typeof provided === 'string' ? provided.trim() : Array.isArray(provided) ? provided[0]?.trim() : '';
-  const authHeader = req.headers.authorization;
-  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  const key = headerKey || bearer;
-  if (!key || key !== configured) {
-    res.status(401).json({ error: 'Invalid automation key' });
-    return;
-  }
-  next();
 }
 
 // ─── POST /api/catalog/automation/add-support-group-member ───
