@@ -6,61 +6,20 @@ import type { AssignmentGroupItem, UserListItem } from '../../api/client';
 import type { RotaBusinessCalendar, RotaShift } from '../../api/domains/rota';
 import PageHeader from '../../components/PageHeader';
 import Spinner from '../../components/Spinner';
-import { SearchableDropdown } from '../../components/SearchableDropdown';
-import UserDateTimeInput from '../../components/UserDateTimeInput';
-import { formatDate, formatDateTime, toDatetimeLocalValue } from '../../utils/dateTime';
+import { toDatetimeLocalValue } from '../../utils/dateTime';
 import { canManageOnCallRota } from '../../utils/roles';
 import { useAuth } from '../../context/AuthContext';
 import { outsideWorkingHoursWindow } from './outsideWorkingHours';
-
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-
-function toDateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function dayStart(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function addDays(d: Date, n: number) {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-
-function buildGrid(year: number, month: number): Date[] {
-  const first = new Date(year, month, 1);
-  const startDow = (first.getDay() + 6) % 7;
-  const start = addDays(first, -startDow);
-  const grid: Date[] = [];
-  for (let i = 0; i < 42; i++) grid.push(addDays(start, i));
-  return grid;
-}
-
-type ShiftForm = {
-  id?: string;
-  assignment_group_id: string;
-  user_id: string;
-  starts_at: string;
-  ends_at: string;
-  notes: string;
-  business_calendar_id: string;
-};
-
-const emptyForm = (): ShiftForm => {
-  const start = new Date();
-  start.setMinutes(0, 0, 0);
-  const end = addDays(start, 1);
-  return {
-    assignment_group_id: '',
-    user_id: '',
-    starts_at: toDatetimeLocalValue(start),
-    ends_at: toDatetimeLocalValue(end),
-    notes: '',
-    business_calendar_id: '',
-  };
-};
+import {
+  buildGrid,
+  emptyShiftForm,
+  groupShiftsByDay,
+  toDateKey,
+  type ShiftForm,
+} from './rotaCalendarUtils';
+import RotaDayPanel from './RotaDayPanel';
+import RotaMonthGrid from './RotaMonthGrid';
+import RotaShiftForm from './RotaShiftForm';
 
 export default function OnCallRotaPage() {
   const t = useTranslations('pages.onCallRota');
@@ -122,29 +81,14 @@ export default function OnCallRotaPage() {
     return () => { cancelled = true; };
   }, [viewYear, viewMonth, groupFilter]);
 
-  const shiftsByDay = useMemo(() => {
-    const map = new Map<string, RotaShift[]>();
-    for (const s of shifts) {
-      const start = dayStart(new Date(s.starts_at));
-      const end = dayStart(new Date(s.ends_at));
-      // ends_at exclusive for covering; still show on the end calendar day if any overlap
-      const last = new Date(s.ends_at).getTime() === dayStart(new Date(s.ends_at)).getTime()
-        ? addDays(end, -1)
-        : end;
-      let cursor = start;
-      while (cursor <= last) {
-        const key = toDateKey(cursor);
-        if (!map.has(key)) map.set(key, []);
-        map.get(key)!.push(s);
-        cursor = addDays(cursor, 1);
-      }
-    }
-    return map;
-  }, [shifts]);
-
+  const shiftsByDay = useMemo(() => groupShiftsByDay(shifts), [shifts]);
   const grid = useMemo(() => buildGrid(viewYear, viewMonth), [viewYear, viewMonth]);
   const todayKey = toDateKey(now);
   const selectedShifts = selectedKey ? (shiftsByDay.get(selectedKey) ?? []) : [];
+  const defaultCalendarId = useMemo(
+    () => calendars.find((c) => c.is_default)?.id || calendars[0]?.id || '',
+    [calendars],
+  );
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear((y) => y - 1); setViewMonth(11); }
@@ -160,26 +104,17 @@ export default function OnCallRotaPage() {
     setSelectedKey(todayKey);
   };
 
-  const defaultCalendarId = useMemo(
-    () => calendars.find((c) => c.is_default)?.id || calendars[0]?.id || '',
-    [calendars],
-  );
-
   const openCreate = () => {
-    const base = emptyForm();
+    const base = emptyShiftForm();
     base.business_calendar_id = defaultCalendarId;
     if (selectedKey) {
-      const day = new Date(`${selectedKey}T09:00:00`);
-      const end = new Date(`${selectedKey}T17:00:00`);
-      base.starts_at = toDatetimeLocalValue(day);
-      base.ends_at = toDatetimeLocalValue(end);
+      base.starts_at = toDatetimeLocalValue(new Date(`${selectedKey}T09:00:00`));
+      base.ends_at = toDatetimeLocalValue(new Date(`${selectedKey}T17:00:00`));
       const cal = calendars.find((c) => c.id === base.business_calendar_id);
-      if (cal) {
-        const ooh = outsideWorkingHoursWindow(selectedKey, cal);
-        if (ooh) {
-          base.starts_at = ooh.starts_at;
-          base.ends_at = ooh.ends_at;
-        }
+      const ooh = cal ? outsideWorkingHoursWindow(selectedKey, cal) : null;
+      if (ooh) {
+        base.starts_at = ooh.starts_at;
+        base.ends_at = ooh.ends_at;
       }
     }
     if (groupFilter) base.assignment_group_id = groupFilter;
@@ -207,8 +142,7 @@ export default function OnCallRotaPage() {
       setError(t('selectCalendar'));
       return;
     }
-    const dayKey = selectedKey
-      || (form.starts_at ? form.starts_at.slice(0, 10) : toDateKey(now));
+    const dayKey = selectedKey || (form.starts_at ? form.starts_at.slice(0, 10) : toDateKey(now));
     const ooh = outsideWorkingHoursWindow(dayKey, cal);
     if (!ooh) {
       setError(t('oohUnavailable'));
@@ -333,226 +267,40 @@ export default function OnCallRotaPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-gray-100">
-              {DAY_KEYS.map((d) => (
-                <div key={d} className="py-2 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  {tChanges(`days.${d}` as 'days.mon')}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7">
-              {grid.map((day, i) => {
-                const key = toDateKey(day);
-                const isCurrentMonth = day.getMonth() === viewMonth;
-                const isToday = key === todayKey;
-                const isSelected = key === selectedKey;
-                const dayShifts = shiftsByDay.get(key) ?? [];
-                const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-
-                return (
-                  <div
-                    key={key}
-                    onClick={() => setSelectedKey(key)}
-                    className={[
-                      'min-h-[90px] p-1.5 border-b border-r border-gray-100 cursor-pointer transition-colors',
-                      i % 7 === 6 ? 'border-r-0' : '',
-                      i >= 35 ? 'border-b-0' : '',
-                      isSelected ? 'bg-indigo-50/70' : isWeekend ? 'bg-gray-50/50' : 'bg-white',
-                      !isSelected && 'hover:bg-gray-50',
-                    ].filter(Boolean).join(' ')}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span
-                        className={[
-                          'w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium',
-                          isToday ? 'text-white font-bold' : isCurrentMonth ? 'text-gray-800' : 'text-gray-300',
-                        ].join(' ')}
-                        style={isToday ? { backgroundColor: 'var(--color-primary)' } : {}}
-                      >
-                        {day.getDate()}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {dayShifts.slice(0, 3).map((s) => (
-                        <div
-                          key={s.id}
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-medium truncate border bg-sky-50 border-sky-200 text-sky-800"
-                          title={`${s.user_name} — ${s.assignment_group_name}`}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-sky-500" />
-                          <span className="truncate">{s.user_name}</span>
-                        </div>
-                      ))}
-                      {dayShifts.length > 3 && (
-                        <p className="text-[10px] text-gray-400 pl-1">{t('moreShifts', { count: dayShifts.length - 3 })}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <RotaMonthGrid
+            grid={grid}
+            viewMonth={viewMonth}
+            todayKey={todayKey}
+            selectedKey={selectedKey}
+            shiftsByDay={shiftsByDay}
+            onSelectDay={setSelectedKey}
+          />
         </div>
 
         <div className="w-80 shrink-0 space-y-4">
           {selectedKey && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {formatDate(new Date(`${selectedKey}T12:00:00`))}
-                </p>
-                {canManage && (
-                  <button type="button" onClick={openCreate} className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                    {t('addShift')}
-                  </button>
-                )}
-              </div>
-              {selectedShifts.length === 0 ? (
-                <div className="px-4 py-8 text-center">
-                  <p className="text-sm text-gray-400">{t('noShifts')}</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
-                  {selectedShifts.map((s) => (
-                    <div key={s.id} className="px-4 py-3">
-                      <p className="text-sm font-medium text-gray-900">{s.user_name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{s.assignment_group_name}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {formatDateTime(s.starts_at)} → {formatDateTime(s.ends_at)}
-                      </p>
-                      {s.notes && <p className="text-xs text-gray-500 mt-1">{s.notes}</p>}
-                      {canManage && (
-                        <div className="flex gap-3 mt-2">
-                          <button type="button" onClick={() => openEdit(s)} className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                            {t('edit')}
-                          </button>
-                          <button type="button" onClick={() => removeShift(s.id)} className="text-xs font-medium text-red-600 hover:text-red-800">
-                            {t('delete')}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <RotaDayPanel
+              selectedKey={selectedKey}
+              shifts={selectedShifts}
+              canManage={canManage}
+              onAdd={openCreate}
+              onEdit={openEdit}
+              onDelete={removeShift}
+            />
           )}
-
           {form && canManage && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {form.id ? t('editShift') : t('addShift')}
-                </p>
-              </div>
-              <div className="p-4 space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('group')}</label>
-                  <select
-                    value={form.assignment_group_id}
-                    onChange={(e) => setForm({ ...form, assignment_group_id: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-                  >
-                    <option value="">{t('selectGroup')}</option>
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('user')}</label>
-                  <SearchableDropdown<UserListItem>
-                    items={users}
-                    selectedId={form.user_id}
-                    onSelect={(id) => setForm({ ...form, user_id: id })}
-                    onClear={() => setForm({ ...form, user_id: '' })}
-                    getItemId={(u) => u.id}
-                    getDisplayText={(u) => u.display_name}
-                    filterFn={(u, q) => {
-                      const s = q.toLowerCase();
-                      return u.display_name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s);
-                    }}
-                    placeholder={t('searchUser')}
-                    renderItem={(u) => (
-                      <>
-                        <span className="font-medium">{u.display_name}</span>
-                        <span className="text-gray-400 ml-2">{u.email}</span>
-                      </>
-                    )}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('businessCalendar')}</label>
-                  <select
-                    value={form.business_calendar_id}
-                    onChange={(e) => setForm({ ...form, business_calendar_id: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-                  >
-                    <option value="">{t('selectCalendar')}</option>
-                    {calendars.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}{c.is_default ? ` (${t('defaultCalendar')})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={applyOutsideHours}
-                    className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
-                  >
-                    {t('fillOutsideHours')}
-                  </button>
-                  <p className="mt-1 text-[11px] text-gray-400">{t('fillOutsideHoursHint')}</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('startsAt')}</label>
-                  <UserDateTimeInput
-                    value={form.starts_at}
-                    onChange={(v) => setForm({ ...form, starts_at: v })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-                    ariaLabel={t('startsAt')}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('endsAt')}</label>
-                  <UserDateTimeInput
-                    value={form.ends_at}
-                    onChange={(v) => setForm({ ...form, ends_at: v })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-                    ariaLabel={t('endsAt')}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('notes')}</label>
-                  <textarea
-                    value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    rows={2}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
-                  />
-                </div>
-                {error && <p className="text-xs text-red-600">{error}</p>}
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={saveForm}
-                    className="px-3 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
-                    style={{ backgroundColor: 'var(--color-primary)' }}
-                  >
-                    {saving ? t('saving') : t('save')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setForm(null)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    {t('cancel')}
-                  </button>
-                </div>
-              </div>
-            </div>
+            <RotaShiftForm
+              form={form}
+              groups={groups}
+              users={users}
+              calendars={calendars}
+              saving={saving}
+              error={error}
+              onChange={setForm}
+              onApplyOutsideHours={applyOutsideHours}
+              onSave={saveForm}
+              onCancel={() => setForm(null)}
+            />
           )}
         </div>
       </div>
