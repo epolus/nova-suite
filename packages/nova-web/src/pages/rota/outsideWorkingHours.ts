@@ -42,7 +42,8 @@ function hoursForDay(calendar: RotaBusinessCalendar, dateKey: string): RotaBusin
 
 function latestEnd(hours: RotaBusinessHour[]): string | null {
   if (hours.length === 0) return null;
-  return hours.map((h) => String(h.end_time).slice(0, 5)).sort().at(-1) ?? null;
+  const ends = hours.map((h) => String(h.end_time).slice(0, 5)).sort();
+  return ends.length > 0 ? ends[ends.length - 1]! : null;
 }
 
 function earliestStart(hours: RotaBusinessHour[]): string | null {
