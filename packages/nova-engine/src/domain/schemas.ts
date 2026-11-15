@@ -573,6 +573,12 @@ export const addJournalEntrySchema = z.object({
   is_customer_visible: z.boolean().default(true),
 });
 
+export const addChangeJournalEntrySchema = z.object({
+  entry_type: z.enum(['comment', 'work_note', 'state_change', 'assignment']).default('comment'),
+  content: z.string().min(1).max(10000),
+  is_customer_visible: z.boolean().default(false),
+});
+
 // ─── CMDB ───
 export const createCIClassSchema = z.object({
   name: z

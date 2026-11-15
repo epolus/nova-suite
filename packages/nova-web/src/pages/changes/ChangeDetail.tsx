@@ -11,6 +11,7 @@ import CustomFieldsSection from '../../components/CustomFieldsSection';
 import RelatedRecordsCard from '../../components/RelatedRecordsCard';
 import WorkLogsCard from '../../components/WorkLogsCard';
 import ChecklistsCard from '../../components/ChecklistsCard';
+import ChangeActivityCard from './ChangeActivityCard';
 import Badge from '../../components/Badge';
 import Spinner from '../../components/Spinner';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
@@ -405,11 +406,8 @@ export default function ChangeDetailPage() {
         <div className="mt-6 space-y-6">
           <RelatedRecordsCard entityType="change" entityId={id} />
           <WorkLogsCard entityType="change" entityId={id} />
-          <ChecklistsCard
-            entityType="change"
-            entityId={id}
-            readonly={change?.status === 'implemented' || change?.status === 'closed'}
-          />
+          <ChecklistsCard entityType="change" entityId={id} readonly={change?.status === 'implemented' || change?.status === 'closed'} />
+          <ChangeActivityCard key={change?.updated_at || id} changeId={id} readonly={change?.status === 'closed' || change?.status === 'cancelled'} />
         </div>
       )}
 

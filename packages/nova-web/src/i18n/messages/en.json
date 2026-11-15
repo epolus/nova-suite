@@ -892,6 +892,20 @@
         "implementation": "Implementation",
         "review": "Review"
       },
+      "activity": {
+        "title": "Activity",
+        "journalTab": "Journal",
+        "auditTab": "Audit",
+        "composePlaceholder": "Add a comment or work note…",
+        "comment": "Comment",
+        "workNote": "Work note",
+        "post": "Post",
+        "loading": "Loading activity…",
+        "journalEmpty": "No journal entries yet.",
+        "auditEmpty": "No audited field changes yet.",
+        "loadFailed": "Failed to load activity",
+        "postFailed": "Failed to post journal entry"
+      },
       "scheduling": "Scheduling",
       "scheduledStart": "Scheduled Start",
       "scheduledEnd": "Scheduled End",

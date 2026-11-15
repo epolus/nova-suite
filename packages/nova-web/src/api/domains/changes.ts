@@ -4,9 +4,11 @@ import type {
   AssignmentGroupItem,
   CabMeeting,
   Change,
+  ChangeAuditEntry,
   ChangeBlackout,
   ChangeConflict,
   ChangeDetail,
+  ChangeJournalEntry,
   ChangeRiskAnswer,
   ChangeRiskQuestion,
   ChangeStats,
@@ -106,4 +108,16 @@ export const changes = {
       body: JSON.stringify({ decision, notes }),
     }),
   stats: () => request<ChangeStats>('/changes/stats'),
+  journal: (id: string) =>
+    request<{ entries: ChangeJournalEntry[] }>(`/changes/${id}/journal`),
+  addJournal: (
+    id: string,
+    data: { entry_type: string; content: string; is_customer_visible?: boolean },
+  ) =>
+    request<ChangeJournalEntry>(`/changes/${id}/journal`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  audit: (id: string) =>
+    request<{ entries: ChangeAuditEntry[] }>(`/changes/${id}/audit`),
 };
