@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.47`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.48`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
@@ -279,9 +279,13 @@ Apply `infra/postgres/migrations/v00.01.47__user_sessions.sql` before rolling ou
 
 - Every login (password or SSO) creates a `user_sessions` row, and the access token carries its id (`sid`). `resolve_session_access(session_id, user_id, tenant_id)` checks the session on every request, so **logout, deactivation, an admin lock and an admin password reset end that user's sessions immediately**.
 - **Everyone has to sign in once after the upgrade**: tokens issued before `v00.01.47` have no session id and are rejected.
-- The web app no longer keeps the token in `localStorage`. The API sets it as the httpOnly cookie `nova_session` (`Path=/api`, `SameSite=Lax`, `Secure` on HTTPS). API scripts are unchanged: `POST /api/auth/login` still returns `token` for `Authorization: Bearer`, and `POST /api/auth/logout` revokes it.
+- The web app no longer keeps the token in `localStorage`. The API sets the httpOnly cookie `nova_session` (`Path=/api`, `SameSite=Lax`, `Secure` on HTTPS) to the **session id**, not the access token. API scripts are unchanged: `POST /api/auth/login` still returns `token` for `Authorization: Bearer`, and `POST /api/auth/logout` revokes whichever credential was presented.
 - Cookie-authenticated writes (`POST/PUT/PATCH/DELETE`) must come from the API's own host or an origin in `TRUSTED_ORIGINS`; anything else gets `403`. Behind a TLS-terminating proxy keep `TRUST_PROXY` correct so the cookie is marked `Secure`, or force it with `SESSION_COOKIE_SECURE=true`.
 - The web container now sends a strict Content-Security-Policy (no inline scripts) plus `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` and `Permissions-Policy`. If you serve the built SPA from your own web server, copy the headers from `packages/nova-web/Caddyfile`.
+
+## Session cookie lookup (`v00.01.48`)
+
+Apply `infra/postgres/migrations/v00.01.48__session_cookie_lookup.sql` with the engine that reads browser sessions. `lookup_session_user(session_id)` loads the user for the `nova_session` cookie. A cookie left over from a build that stored the access token in `nova_session` no longer authenticates; those browsers sign in again. Bearer tokens are unchanged.
 
 ## Temporal Workflow Versioning
 

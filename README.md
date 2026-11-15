@@ -373,7 +373,7 @@ All endpoints are prefixed with `/api`. Full interactive documentation is availa
 
 | Endpoint                            | Method          | Auth              | Description                            |
 |-------------------------------------|-----------------|-------------------|----------------------------------------|
-| `/api/auth/login`                   | POST            | None              | Start session (cookie) + get JWT token |
+| `/api/auth/login`                   | POST            | None              | Start session (cookie holds the session id) + JWT for API clients |
 | `/api/auth/logout`                  | POST            | Cookie / Bearer   | Revoke the current session             |
 | `/api/auth/sso/authorize`           | GET             | None              | Initiate SSO login via OIDC            |
 | `/api/auth/me`                      | GET             | Any               | Current user info                      |

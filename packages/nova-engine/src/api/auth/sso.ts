@@ -12,7 +12,7 @@ import { config } from '../../config';
 import { db } from '../../data/db';
 import { logger } from '../../logger';
 import { AuthUser } from '../../middleware/auth';
-import { issueSession, setSessionCookie } from '../../auth/session';
+import { issueSession, newSessionId, setSessionCookie } from '../../auth/session';
 import { recordAuditEvent } from '../../audit/events';
 import { getClientIp } from '../../middleware/client-ip';
 import { evaluateSsoEmail } from './sso-policy';
@@ -115,7 +115,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 
 // ─── Pending OIDC state and one-time exchange codes ───
 const pendingStates = new OneTimeStore<{ codeVerifier: string; nonce: string }>('sso:state', 600_000);
-const pendingSsoCodes = new OneTimeStore<{ token: string; expiresAt: string; user: AuthUser }>('sso:code', 120_000);
+const pendingSsoCodes = new OneTimeStore<{ sessionId: string; expiresAt: string; user: AuthUser }>('sso:code', 120_000);
 
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -377,7 +377,8 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       roles: roles.length > 0 ? roles : ['user'],
     };
 
-    const session = await issueSession(req, payload, 'sso');
+    const sessionId = newSessionId();
+    const session = await issueSession(req, payload, 'sso', sessionId);
 
     logger.info({ userId: user.id, roles }, 'SSO login successful');
     void db.withTenantContext(user.tenant_id, user.id, roles.join(',') || 'user', () => recordAuditEvent({
@@ -392,7 +393,7 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
     // Redirect via one-time code (avoid token in URL/query logs).
     const ssoCode = crypto.randomBytes(24).toString('hex');
     await pendingSsoCodes.put(ssoCode, {
-      token: session.token,
+      sessionId,
       expiresAt: session.expiresAt.toISOString(),
       user: payload,
     });
@@ -415,7 +416,7 @@ router.post('/exchange', async (req: Request, res: ExpressResponse) => {
     res.status(400).json({ error: 'invalid or expired SSO code' });
     return;
   }
-  setSessionCookie(req, res, { token: pending.token, expiresAt: new Date(pending.expiresAt) });
+  setSessionCookie(req, res, pending.sessionId, new Date(pending.expiresAt));
   res.json({ user: pending.user });
 });
 

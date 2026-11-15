@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 // ─── Nova Suite – Login sessions ───
 // Access tokens are bound to a `user_sessions` row via the `sid` claim. The web
-// app receives the token as an httpOnly cookie; API clients may still send it
-// as a Bearer header.
+// app's cookie holds only that session id; the token itself is returned in the
+// login body for API clients (Authorization: Bearer) and is never stored in the cookie.
 
 import { randomUUID } from 'node:crypto';
 import type { Request, Response, CookieOptions } from 'express';
@@ -15,6 +15,7 @@ import type { AuthUser } from './types';
 
 export const SESSION_COOKIE = 'nova_session';
 const SESSION_COOKIE_PATH = '/api';
+const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type AuthMethod = 'password' | 'sso';
 
@@ -24,9 +25,21 @@ export type IssuedSession = {
   expiresAt: Date;
 };
 
+export function newSessionId(): string {
+  return randomUUID();
+}
+
+export function isSessionId(value: string): boolean {
+  return SESSION_ID_PATTERN.test(value);
+}
+
 /** Create a session row and sign an access token bound to it. */
-export async function issueSession(req: Request, user: AuthUser, authMethod: AuthMethod): Promise<IssuedSession> {
-  const sessionId = randomUUID();
+export async function issueSession(
+  req: Request,
+  user: AuthUser,
+  authMethod: AuthMethod,
+  sessionId: string,
+): Promise<IssuedSession> {
   const token = signAccessToken({ ...user, sid: sessionId });
   const { exp } = jwt.decode(token) as { exp: number };
   const expiresAt = new Date(exp * 1000);
@@ -81,8 +94,9 @@ function cookieOptions(req: Request): CookieOptions {
   };
 }
 
-export function setSessionCookie(req: Request, res: Response, session: Pick<IssuedSession, 'token' | 'expiresAt'>): void {
-  res.cookie(SESSION_COOKIE, session.token, { ...cookieOptions(req), expires: session.expiresAt });
+/** Store the opaque session id. Callers must pass that id, not the access token. */
+export function setSessionCookie(req: Request, res: Response, sessionId: string, expiresAt: Date): void {
+  res.cookie(SESSION_COOKIE, sessionId, { ...cookieOptions(req), expires: expiresAt });
 }
 
 export function clearSessionCookie(req: Request, res: Response): void {
@@ -107,15 +121,17 @@ export function readSessionCookie(req: Request): string | undefined {
   return undefined;
 }
 
-export type TokenSource = 'bearer' | 'cookie';
+export type Credential =
+  | { source: 'bearer'; token: string }
+  | { source: 'cookie'; sessionId: string };
 
 /** Bearer header wins over the cookie so API clients are unaffected by a stray browser cookie. */
-export function readAccessToken(req: Request): { token: string; source: TokenSource } | null {
+export function readCredential(req: Request): Credential | null {
   const header = req.headers.authorization;
   if (header?.startsWith('Bearer ')) {
     const token = header.slice(7).trim();
-    return token ? { token, source: 'bearer' } : null;
+    return token ? { source: 'bearer', token } : null;
   }
-  const cookie = readSessionCookie(req);
-  return cookie ? { token: cookie, source: 'cookie' } : null;
+  const sessionId = readSessionCookie(req);
+  return sessionId ? { source: 'cookie', sessionId } : null;
 }

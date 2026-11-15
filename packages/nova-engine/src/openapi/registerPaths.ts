@@ -97,8 +97,9 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
     tags: ['Auth'],
     summary: 'Login',
     description:
-      'Authenticate with email and password. Starts a server-side session, sets the httpOnly `nova_session` '
-      + 'cookie (used by the web app) and returns the same token for API clients to send as `Authorization: Bearer`.',
+      'Authenticate with email and password. Starts a server-side session and sets the httpOnly `nova_session` '
+      + 'cookie to the session id (used by the web app). The access token is returned in the body for API clients '
+      + 'to send as `Authorization: Bearer`; it is not stored in the cookie.',
     security: [],
     request: {
       body: {

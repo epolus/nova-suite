@@ -1239,7 +1239,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.44', 'integrity_constraints'),
   ('v00.01.45', 'tenant_scoped_auth_and_kb_numbers'),
   ('v00.01.46', 'resumable_imports_and_migration_checksums'),
-  ('v00.01.47', 'user_sessions');
+  ('v00.01.47', 'user_sessions'),
+  ('v00.01.48', 'session_cookie_lookup');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT

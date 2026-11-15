@@ -13,7 +13,7 @@ import { validateBody } from '../../middleware/validate';
 import { authenticate, requireRole, setTenantRLS, releaseTenantClient, AuthUser } from '../../middleware/auth';
 import { verifyAccessToken } from '../../auth/jwt';
 import {
-  clearSessionCookie, issueSession, readAccessToken, revokeSession, setSessionCookie,
+  clearSessionCookie, isSessionId, issueSession, newSessionId, readCredential, revokeSession, setSessionCookie,
 } from '../../auth/session';
 import { AppError } from '../../middleware/errorHandler';
 import { recordAuditEvent } from '../../audit/events';
@@ -129,8 +129,10 @@ router.post(
         roles: roles.length > 0 ? roles : ['user'],
       };
 
-      const session = await issueSession(req, payload, 'password');
-      setSessionCookie(req, res, session);
+      // Cookie value is `sessionId` from newSessionId(), not the access token issueSession returns.
+      const sessionId = newSessionId();
+      const session = await issueSession(req, payload, 'password', sessionId);
+      setSessionCookie(req, res, sessionId, session.expiresAt);
 
       // The browser app relies on the httpOnly cookie; the body token is for API clients (Bearer).
       res.json({
@@ -154,31 +156,45 @@ router.post(
 
 const requireAuth = [authenticate, setTenantRLS, releaseTenantClient] as const;
 
+async function endPresentedSession(
+  req: Request,
+  tenantId: string,
+  userId: string,
+  sessionId: string,
+  source: 'bearer' | 'cookie',
+): Promise<void> {
+  const revoked = await db.withTenantContext(tenantId, userId, 'user', (client) => revokeSession(client, sessionId));
+  if (!revoked) return;
+  void db.withTenantContext(tenantId, userId, 'user', () => recordAuditEvent({
+    tenantId,
+    actorUserId: userId,
+    category: 'auth',
+    action: 'auth.logout',
+    clientIp: getClientIp(req),
+    metadata: { source },
+  }));
+}
+
 // ─── POST /api/auth/logout ───
-// Always clears the cookie; revokes the session when the token is still verifiable.
+// Always clears the cookie. Revokes the session when the Bearer token still verifies,
+// or when the cookie carries a session id we can find.
 router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const credential = readAccessToken(req);
-    let user: AuthUser | null = null;
-    if (credential) {
+    const credential = readCredential(req);
+    if (credential?.source === 'bearer') {
+      let user: AuthUser | null = null;
       try {
         user = verifyAccessToken(credential.token);
       } catch {
         user = null;
       }
-    }
-    if (user?.sid) {
-      const { sid } = user;
-      const revoked = await db.withTenantContext(user.tenant_id, user.id, 'user', (client) => revokeSession(client, sid));
-      if (revoked) {
-        void db.withTenantContext(user.tenant_id, user.id, 'user', () => recordAuditEvent({
-          tenantId: user.tenant_id,
-          actorUserId: user.id,
-          category: 'auth',
-          action: 'auth.logout',
-          clientIp: getClientIp(req),
-          metadata: { source: credential?.source },
-        }));
+      if (user?.sid) {
+        await endPresentedSession(req, user.tenant_id, user.id, user.sid, 'bearer');
+      }
+    } else if (credential?.source === 'cookie' && isSessionId(credential.sessionId)) {
+      const session = await db.lookupSessionUser(credential.sessionId);
+      if (session) {
+        await endPresentedSession(req, session.tenant_id, session.id, credential.sessionId, 'cookie');
       }
     }
     clearSessionCookie(req, res);

@@ -133,6 +133,29 @@ export async function resolveSessionAccess(
   return result.rows[0] ?? null;
 }
 
+export type SessionUser = {
+  id: string;
+  tenant_id: string;
+  email: string;
+  display_name: string;
+  time_format: '12h' | '24h';
+  date_format: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
+  is_active: boolean;
+  roles: string[];
+  session_valid: boolean;
+};
+
+/** User behind a browser session cookie. The cookie carries the session id only. */
+export async function lookupSessionUser(sessionId: string): Promise<SessionUser | null> {
+  const result = await pool.query<SessionUser>(
+    `SELECT id, tenant_id, email, display_name, time_format, date_format,
+            is_active, roles, session_valid
+     FROM lookup_session_user($1)`,
+    [sessionId],
+  );
+  return result.rows[0] ?? null;
+}
+
 /** Bind a checked-out client to async continuation (Express next()). */
 export function bindRequestClient(client: PoolClient, next: () => void): void {
   tenantAls.run({ client }, next);
@@ -227,6 +250,7 @@ export const db = {
   releaseTenantClient,
   resolveUserAccess,
   resolveSessionAccess,
+  lookupSessionUser,
   bindRequestClient,
   withTenantContext,
   withTenantTransaction,

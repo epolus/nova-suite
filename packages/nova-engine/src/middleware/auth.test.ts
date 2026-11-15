@@ -2,13 +2,14 @@
 import type { NextFunction, Request, Response } from 'express';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { verifyAccessToken, resolveSessionAccess } = vi.hoisted(() => ({
+const { verifyAccessToken, resolveSessionAccess, lookupSessionUser } = vi.hoisted(() => ({
   verifyAccessToken: vi.fn(),
   resolveSessionAccess: vi.fn(),
+  lookupSessionUser: vi.fn(),
 }));
 
 vi.mock('../auth/jwt', () => ({ verifyAccessToken }));
-vi.mock('../data/db', () => ({ db: { resolveSessionAccess } }));
+vi.mock('../data/db', () => ({ db: { resolveSessionAccess, lookupSessionUser } }));
 
 import { authenticate } from './auth';
 
@@ -32,11 +33,22 @@ const TOKEN_PAYLOAD = {
 };
 
 const LIVE = { is_active: true, roles: ['fulfiller'], session_valid: true };
+const SESSION_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+const COOKIE_USER = {
+  id: 'u1',
+  tenant_id: 't1',
+  email: 'a@example.com',
+  display_name: 'A',
+  time_format: '24h' as const,
+  date_format: 'YYYY-MM-DD' as const,
+  ...LIVE,
+};
 
 describe('authenticate', () => {
   beforeEach(() => {
     verifyAccessToken.mockReset().mockReturnValue({ ...TOKEN_PAYLOAD });
     resolveSessionAccess.mockReset();
+    lookupSessionUser.mockReset();
   });
 
   it('uses roles from the database, not the token', async () => {
@@ -55,19 +67,57 @@ describe('authenticate', () => {
     expect(ctx.req.user?.roles).toEqual(['user']);
   });
 
-  it('accepts the session cookie when there is no Bearer header', async () => {
-    resolveSessionAccess.mockResolvedValue(LIVE);
-    const ctx = call({ cookie: 'other=1; nova_session=cookie-token' });
+  it('loads the user from the session id in the cookie and does not treat it as a token', async () => {
+    lookupSessionUser.mockResolvedValue(COOKIE_USER);
+    const ctx = call({ cookie: `other=1; nova_session=${SESSION_ID}` });
     await ctx.run();
-    expect(verifyAccessToken).toHaveBeenCalledWith('cookie-token');
+    expect(verifyAccessToken).not.toHaveBeenCalled();
+    expect(lookupSessionUser).toHaveBeenCalledWith(SESSION_ID);
+    expect(resolveSessionAccess).not.toHaveBeenCalled();
     expect(ctx.next).toHaveBeenCalledWith();
+    expect(ctx.req.user).toMatchObject({ id: 'u1', sid: SESSION_ID, roles: ['fulfiller'] });
+  });
+
+  it('rejects a cookie that is not a session id', async () => {
+    const ctx = call({ cookie: 'nova_session=eyJhbGciOiJSUzI1NiJ9.payload.sig' });
+    await ctx.run();
+    expect(ctx.res.status).toHaveBeenCalledWith(401);
+    expect(verifyAccessToken).not.toHaveBeenCalled();
+    expect(lookupSessionUser).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown, revoked or inactive cookie session', async () => {
+    lookupSessionUser.mockResolvedValueOnce(null);
+    const missing = call({ cookie: `nova_session=${SESSION_ID}` });
+    await missing.run();
+    expect(missing.json).toHaveBeenCalledWith({ error: 'Session expired, please sign in again' });
+
+    lookupSessionUser.mockResolvedValueOnce({ ...COOKIE_USER, session_valid: false });
+    const revoked = call({ cookie: `nova_session=${SESSION_ID}` });
+    await revoked.run();
+    expect(revoked.json).toHaveBeenCalledWith({ error: 'Session expired, please sign in again' });
+
+    lookupSessionUser.mockResolvedValueOnce({ ...COOKIE_USER, is_active: false });
+    const inactive = call({ cookie: `nova_session=${SESSION_ID}` });
+    await inactive.run();
+    expect(inactive.json).toHaveBeenCalledWith({ error: 'Account is inactive' });
+  });
+
+  it('passes cookie lookup errors on instead of logging the user out', async () => {
+    const dbError = new Error('connection refused');
+    lookupSessionUser.mockRejectedValue(dbError);
+    const ctx = call({ cookie: `nova_session=${SESSION_ID}` });
+    await ctx.run();
+    expect(ctx.next).toHaveBeenCalledWith(dbError);
+    expect(ctx.res.status).not.toHaveBeenCalled();
   });
 
   it('prefers the Bearer header over the cookie', async () => {
     resolveSessionAccess.mockResolvedValue(LIVE);
-    const ctx = call({ authorization: 'Bearer header-token', cookie: 'nova_session=cookie-token' });
+    const ctx = call({ authorization: 'Bearer header-token', cookie: `nova_session=${SESSION_ID}` });
     await ctx.run();
     expect(verifyAccessToken).toHaveBeenCalledWith('header-token');
+    expect(lookupSessionUser).not.toHaveBeenCalled();
   });
 
   it('rejects requests without any credential', async () => {

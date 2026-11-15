@@ -4,7 +4,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../auth/jwt';
-import { readAccessToken } from '../auth/session';
+import { isSessionId, readCredential } from '../auth/session';
 import type { AuthUser } from '../auth/types';
 import { db } from '../data/db';
 import { logger } from '../logger';
@@ -20,12 +20,59 @@ declare global {
   }
 }
 
-/** Verify the access token (Bearer header or session cookie) and attach the user to the request. */
+const DATE_FORMATS = ['DD.MM.YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'] as const;
+
+/** The cookie is a session id. Load the user from that row; there is no token to verify. */
+async function authenticateCookie(req: Request, res: Response, next: NextFunction, sessionId: string): Promise<void> {
+  if (!isSessionId(sessionId)) {
+    res.status(401).json({ error: 'Session expired, please sign in again' });
+    return;
+  }
+
+  let access: Awaited<ReturnType<typeof db.lookupSessionUser>>;
+  try {
+    access = await db.lookupSessionUser(sessionId);
+  } catch (err) {
+    next(err);
+    return;
+  }
+  if (!access) {
+    res.status(401).json({ error: 'Session expired, please sign in again' });
+    return;
+  }
+  if (!access.is_active) {
+    res.status(401).json({ error: 'Account is inactive' });
+    return;
+  }
+  if (!access.session_valid) {
+    res.status(401).json({ error: 'Session expired, please sign in again' });
+    return;
+  }
+
+  const dateFormat = DATE_FORMATS.find((format) => format === access.date_format) ?? 'YYYY-MM-DD';
+  req.user = {
+    id: access.id,
+    tenant_id: access.tenant_id,
+    email: access.email,
+    display_name: access.display_name,
+    time_format: access.time_format === '12h' ? '12h' : '24h',
+    date_format: dateFormat,
+    roles: access.roles.length > 0 ? access.roles : ['user'],
+    sid: sessionId,
+  };
+  next();
+}
+
+/** Verify the session cookie or Bearer token and attach the user to the request. */
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   (req as { _requestStartedAt?: number })._requestStartedAt = Date.now();
-  const credential = readAccessToken(req);
+  const credential = readCredential(req);
   if (!credential) {
     res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+  if (credential.source === 'cookie') {
+    await authenticateCookie(req, res, next, credential.sessionId);
     return;
   }
 
