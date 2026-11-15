@@ -24,36 +24,36 @@ export default function RotaDayPanel({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
           {formatDate(new Date(`${selectedKey}T12:00:00`))}
         </p>
         {canManage && (
-          <button type="button" onClick={onAdd} className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+          <button type="button" onClick={onAdd} className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
             {t('addShift')}
           </button>
         )}
       </div>
       {shifts.length === 0 ? (
         <div className="px-4 py-8 text-center">
-          <p className="text-sm text-gray-400">{t('noShifts')}</p>
+          <p className="text-sm text-gray-500">{t('noShifts')}</p>
         </div>
       ) : (
-        <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+        <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
           {shifts.map((s) => (
             <div key={s.id} className="px-4 py-3">
               <p className="text-sm font-medium text-gray-900">{s.user_name}</p>
               <p className="text-xs text-gray-500 mt-0.5">{s.assignment_group_name}</p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 {formatDateTime(s.starts_at)} → {formatDateTime(s.ends_at)}
               </p>
               {s.notes && <p className="text-xs text-gray-500 mt-1">{s.notes}</p>}
               {canManage && (
                 <div className="flex gap-3 mt-2">
-                  <button type="button" onClick={() => onEdit(s)} className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                  <button type="button" onClick={() => onEdit(s)} className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
                     {t('edit')}
                   </button>
-                  <button type="button" onClick={() => onDelete(s.id)} className="text-xs font-medium text-red-600 hover:text-red-800">
+                  <button type="button" onClick={() => onDelete(s.id)} className="text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
                     {t('delete')}
                   </button>
                 </div>

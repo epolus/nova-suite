@@ -35,8 +35,8 @@ export default function RotaShiftForm({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
           {form.id ? t('editShift') : t('addShift')}
         </p>
       </div>
@@ -93,11 +93,11 @@ export default function RotaShiftForm({
           <button
             type="button"
             onClick={onApplyOutsideHours}
-            className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+            className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700"
           >
             {t('fillOutsideHours')}
           </button>
-          <p className="mt-1 text-[11px] text-gray-400">{t('fillOutsideHoursHint')}</p>
+          <p className="mt-1 text-[11px] text-gray-500">{t('fillOutsideHoursHint')}</p>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">{t('startsAt')}</label>

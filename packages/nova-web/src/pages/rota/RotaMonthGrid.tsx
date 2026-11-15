@@ -27,7 +27,7 @@ export default function RotaMonthGrid({
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="grid grid-cols-7 border-b border-gray-100">
         {DAY_KEYS.map((d) => (
-          <div key={d} className="py-2 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <div key={d} className="py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
             {tChanges(`days.${d}` as 'days.mon')}
           </div>
         ))}
@@ -49,7 +49,7 @@ export default function RotaMonthGrid({
                 'min-h-[90px] p-1.5 border-b border-r border-gray-100 cursor-pointer transition-colors',
                 i % 7 === 6 ? 'border-r-0' : '',
                 i >= 35 ? 'border-b-0' : '',
-                isSelected ? 'bg-indigo-50/70' : isWeekend ? 'bg-gray-50/50' : 'bg-white',
+                isSelected ? 'bg-indigo-50' : isWeekend ? 'bg-gray-50' : 'bg-white',
                 !isSelected && 'hover:bg-gray-50',
               ].filter(Boolean).join(' ')}
             >
@@ -57,7 +57,7 @@ export default function RotaMonthGrid({
                 <span
                   className={[
                     'w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium',
-                    isToday ? 'text-white font-bold' : isCurrentMonth ? 'text-gray-800' : 'text-gray-300',
+                    isToday ? 'text-white font-bold' : isCurrentMonth ? 'text-gray-800' : 'text-gray-500',
                   ].join(' ')}
                   style={isToday ? { backgroundColor: 'var(--color-primary)' } : {}}
                 >
@@ -68,7 +68,7 @@ export default function RotaMonthGrid({
                 {dayShifts.slice(0, 3).map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-medium truncate border bg-sky-50 border-sky-200 text-sky-800"
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-medium truncate border bg-sky-50 border-sky-200 text-sky-800 dark:bg-sky-950/50 dark:border-sky-700 dark:text-sky-200"
                     title={`${s.user_name} — ${s.assignment_group_name}`}
                   >
                     <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-sky-500" />
@@ -76,7 +76,7 @@ export default function RotaMonthGrid({
                   </div>
                 ))}
                 {dayShifts.length > 3 && (
-                  <p className="text-[10px] text-gray-400 pl-1">{t('moreShifts', { count: dayShifts.length - 3 })}</p>
+                  <p className="text-[10px] text-gray-500 pl-1">{t('moreShifts', { count: dayShifts.length - 3 })}</p>
                 )}
               </div>
             </div>
