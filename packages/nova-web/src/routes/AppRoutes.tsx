@@ -83,6 +83,7 @@ export default function AppRoutes() {
         <Route path="/assets/:id" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
         <Route path="/alerts" element={<Lazy><Pages.AlertsPage /></Lazy>} />
         <Route path="/alerts/:id" element={<Lazy><Pages.AlertDetailPage /></Lazy>} />
+        <Route path="/on-call" element={<Lazy><Pages.OnCallRotaPage /></Lazy>} />
         <Route path="/improvements" element={<ImprovementAccess />}>
           <Route index element={<Lazy><Pages.ImprovementsPage /></Lazy>} />
           <Route path="new" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />

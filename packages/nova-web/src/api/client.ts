@@ -49,3 +49,5 @@ export type {
   ChecklistTemplate,
   ChecklistTemplatePayload,
 } from './domains/checklists';
+export { rota } from './domains/rota';
+export type { RotaShift, OnCallCovering } from './domains/rota';

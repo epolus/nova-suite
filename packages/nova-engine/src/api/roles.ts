@@ -67,6 +67,16 @@ export function canManageChecklistTemplates(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'checklist_admin']);
 }
 
+/** View on-call rota calendar. */
+export function canViewOnCallRota(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'fulfiller', 'on_call_admin', 'on_call', 'event_manager', 'event_operator']);
+}
+
+/** Create / edit / delete on-call rota shifts. */
+export function canManageOnCallRota(req: Request): boolean {
+  return hasAnyRole(req, ['admin', 'on_call_admin']);
+}
+
 /** Accept, war room actions, postmortem edits, standalone major incident create. */
 export function canManageMajorIncidents(req: Request): boolean {
   return hasAnyRole(req, ['admin', 'major_incident_manager']);

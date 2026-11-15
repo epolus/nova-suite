@@ -7,6 +7,7 @@ import {
 import { db } from '../data/db';
 import { resolveSlaDueAt, startOlaClock } from './sla';
 import { ensureSatisfactionResponse } from './satisfaction';
+import { getOnCallUserForGroup } from './rota';
 import { enqueueIncidentEscalationStartJob, enqueueNotificationDispatchStartJob } from '../temporal/workflow-start-queue';
 
 type CiMatch = { id: string; supported_by: string | null };
@@ -172,6 +173,7 @@ async function createIncident(input: {
     serviceId: null,
   });
   const ola = await startOlaClock(sql, groupId);
+  const onCall = await getOnCallUserForGroup(db, groupId);
   const description = [
     input.alert.title,
     '',
@@ -182,13 +184,13 @@ async function createIncident(input: {
   const incident = await db.getOne<{ id: string; number: string }>(
     `INSERT INTO incidents (
        tenant_id, number, title, description, status, impact, urgency, priority,
-       assignment_group_id, configuration_item_id, category,
+       assigned_to, assignment_group_id, configuration_item_id, category,
        sla_due_at, response_due_at, sla_definition_id,
        ola_group_id, ola_response_due_at, ola_resolution_due_at, ola_responded_at, ola_paused_at, ola_paused_ms
      ) VALUES (
        current_tenant_id(), $1, $2, $3, 'new', $4, $5, $6,
-       $7, $8, 'event',
-       $9, $10, $11, $12, $13, $14, $15, $16, $17
+       $7, $8, $9, 'event',
+       $10, $11, $12, $13, $14, $15, $16, $17, $18
      ) RETURNING id, number`,
     [
       number,
@@ -197,6 +199,7 @@ async function createIncident(input: {
       impact,
       urgency,
       priority,
+      onCall?.user_id ?? null,
       groupId,
       input.ci.id,
       sla.resolutionDueAt,

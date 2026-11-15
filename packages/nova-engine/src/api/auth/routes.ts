@@ -348,7 +348,7 @@ router.put('/me/preferences/:scope', ...requireAuth, async (req: Request, res: R
 router.get(
   '/users',
   ...requireAuth,
-  requireRole('admin', 'fulfiller', 'user'),
+  requireRole('admin', 'fulfiller', 'user', 'on_call_admin', 'on_call'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = req.user!.tenant_id;

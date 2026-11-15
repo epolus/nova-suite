@@ -52,6 +52,7 @@ import {
 import workLogRoutes from './work-logs/routes';
 import csatRoutes from './csat/routes';
 import checklistRoutes, { checklistTemplatesAdminRoutes } from './checklists/routes';
+import rotaRoutes from './rota/routes';
 
 const router = Router();
 
@@ -72,6 +73,7 @@ router.use('/email-signatures', emailSignatureRoutes);
 router.use('/work-logs', workLogRoutes);
 router.use('/csat', csatRoutes);
 router.use('/checklists', checklistRoutes);
+router.use('/rota', rotaRoutes);
 router.use('/custom-fields', customFieldRoutes);
 router.use('/record-links', recordLinkRoutes);
 router.use('/catalog', catalogRoutes);

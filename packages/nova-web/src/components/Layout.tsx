@@ -18,7 +18,7 @@ import {
 } from './layout/agentNavConfig';
 import DarkModeToggle from './DarkModeToggle';
 import { AppIcon } from './globalSearchIcons';
-import { canAccessImprovements, canViewAlerts, hasReportingViewRole, isAdminRole } from '../utils/roles';
+import { canAccessImprovements, canViewAlerts, canViewOnCallRota, hasReportingViewRole, isAdminRole } from '../utils/roles';
 import { canAccessAdminRoute } from '../utils/adminRouteAccess';
 import { useUserPreferenceState } from '../hooks/useUserPreferenceState';
 import { useTranslations } from 'use-intl';
@@ -174,6 +174,7 @@ export default function Layout() {
       if (item.to === '/reports') return hasReportingViewRole(user?.roles);
       if (item.to === '/improvements') return canAccessImprovements(user?.roles);
       if (item.to === '/alerts') return canViewAlerts(user?.roles);
+      if (item.to === '/on-call') return canViewOnCallRota(user?.roles);
       return true;
     })
     .map((item) => ({

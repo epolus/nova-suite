@@ -56,7 +56,9 @@
     "roles": {
       "admin": "Admin",
       "fulfiller": "Fulfiller",
-      "user": "User"
+      "user": "User",
+      "on_call_admin": "On-call admin",
+      "on_call": "On-call"
     },
     "fields": {
       "name": "Name",
@@ -319,6 +321,7 @@
       "requestTasks": "Request Tasks",
       "incidents": "Incidents",
       "alerts": "Alerts",
+      "onCall": "On-call",
       "majorIncidents": "Major incidents",
       "problems": "Problems",
       "changes": "Changes",
@@ -1239,6 +1242,31 @@
         "change": "Change",
         "problem": "Problem"
       }
+    },
+    "onCallRota": {
+      "title": "On-call rota",
+      "description": "Schedule who is on call for each assignment group. Alert-created incidents assign to the covering shift when one exists.",
+      "addShift": "Add shift",
+      "editShift": "Edit shift",
+      "allGroups": "All groups",
+      "noShifts": "No shifts on this day.",
+      "moreShifts": "+{count} more",
+      "group": "Assignment group",
+      "user": "On-call user",
+      "selectGroup": "Select group…",
+      "searchUser": "Search user…",
+      "startsAt": "Starts",
+      "endsAt": "Ends",
+      "notes": "Notes",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete",
+      "confirmDelete": "Delete this shift?",
+      "formRequired": "Group, user, start, and end are required.",
+      "saveFailed": "Failed to save shift",
+      "deleteFailed": "Failed to delete shift"
     },
     "alerts": {
       "title": "Alerts",

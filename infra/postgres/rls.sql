@@ -16,6 +16,7 @@ ALTER TABLE processes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assignment_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rota_shifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_processes ENABLE ROW LEVEL SECURITY;
@@ -164,6 +165,9 @@ CREATE POLICY tenant_isolation_locations ON locations
   FOR ALL USING (tenant_id = current_tenant_id());
 
 -- ─── Assignment Groups ───
+CREATE POLICY tenant_isolation_rota_shifts ON rota_shifts
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 CREATE POLICY tenant_isolation_assignment_groups ON assignment_groups
   FOR ALL USING (tenant_id = current_tenant_id());
 
@@ -821,6 +825,7 @@ ALTER TABLE processes FORCE ROW LEVEL SECURITY;
 ALTER TABLE companies FORCE ROW LEVEL SECURITY;
 ALTER TABLE locations FORCE ROW LEVEL SECURITY;
 ALTER TABLE assignment_groups FORCE ROW LEVEL SECURITY;
+ALTER TABLE rota_shifts FORCE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_members FORCE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_roles FORCE ROW LEVEL SECURITY;
 ALTER TABLE assignment_group_processes FORCE ROW LEVEL SECURITY;

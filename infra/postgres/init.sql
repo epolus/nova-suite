@@ -394,6 +394,32 @@ CREATE INDEX idx_agr_group ON assignment_group_roles(group_id);
 CREATE INDEX idx_agr_role ON assignment_group_roles(role_id);
 
 -- ============================================================
+-- ON-CALL ROTA SHIFTS
+-- ============================================================
+CREATE TABLE rota_shifts (
+  id                   uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id            uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  assignment_group_id  uuid NOT NULL REFERENCES assignment_groups(id) ON DELETE CASCADE,
+  user_id              uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  starts_at            timestamptz NOT NULL,
+  ends_at              timestamptz NOT NULL,
+  notes                text,
+  created_by           uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_at           timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT rota_shifts_range_chk CHECK (ends_at > starts_at)
+);
+
+CREATE INDEX idx_rota_shifts_group_window
+  ON rota_shifts(tenant_id, assignment_group_id, starts_at, ends_at);
+CREATE INDEX idx_rota_shifts_user_window
+  ON rota_shifts(tenant_id, user_id, starts_at, ends_at);
+
+CREATE TRIGGER trg_rota_shifts_updated_at
+  BEFORE UPDATE ON rota_shifts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
 -- ASSIGNMENT GROUP PROCESSES
 -- ============================================================
 CREATE TABLE assignment_group_processes (
@@ -1193,7 +1219,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.39', 'checklist_item_done_fix'),
   ('v00.01.40', 'change_collaboration'),
   ('v00.01.41', 'sla_notification_ledger'),
-  ('v00.01.42', 'asset_assignment_history');
+  ('v00.01.42', 'asset_assignment_history'),
+  ('v00.01.43', 'on_call_rota');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1816,7 +1843,13 @@ INSERT INTO roles (id, tenant_id, name, description) VALUES
    'data_manager', 'Can run retention jobs on allowlisted records'),
   ('a3000000-0000-0000-0000-000000000019',
    'a0000000-0000-0000-0000-000000000001',
-   'checklist_admin', 'Can manage checklist templates for incidents and changes');
+   'checklist_admin', 'Can manage checklist templates for incidents and changes'),
+  ('a3000000-0000-0000-0000-00000000001a',
+   'a0000000-0000-0000-0000-000000000001',
+   'on_call_admin', 'Can manage on-call rota shifts for assignment groups'),
+  ('a3000000-0000-0000-0000-00000000001b',
+   'a0000000-0000-0000-0000-000000000001',
+   'on_call', 'Can view the on-call rota and be scheduled for shifts');
 
 -- Demo company
 INSERT INTO companies (
@@ -1983,13 +2016,19 @@ INSERT INTO user_roles (tenant_id, user_id, role_id, granted_by) VALUES
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000001',
    'a3000000-0000-0000-0000-000000000015', NULL),
-  -- Fulfiller gets fulfiller + user
+  ('a0000000-0000-0000-0000-000000000001',
+   'b0000000-0000-0000-0000-000000000001',
+   'a3000000-0000-0000-0000-00000000001a', NULL),
+  -- Fulfiller gets fulfiller + user + on_call
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000002',
    'a3000000-0000-0000-0000-000000000002', NULL),
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000002',
    'a3000000-0000-0000-0000-000000000003', NULL),
+  ('a0000000-0000-0000-0000-000000000001',
+   'b0000000-0000-0000-0000-000000000002',
+   'a3000000-0000-0000-0000-00000000001b', NULL),
   -- Jane Employee gets user
   ('a0000000-0000-0000-0000-000000000001',
    'b0000000-0000-0000-0000-000000000003',

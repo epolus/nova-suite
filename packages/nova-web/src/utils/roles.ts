@@ -15,6 +15,8 @@ const AGENT_ROLES = new Set([
   'event_manager',
   'data_manager',
   'checklist_admin',
+  'on_call_admin',
+  'on_call',
 ]);
 
 type RoleList = string[] | undefined;
@@ -85,6 +87,16 @@ export function canManageData(roles: RoleList): boolean {
 /** Checklist templates under Admin → Checklists. */
 export function canManageChecklistTemplates(roles: RoleList): boolean {
   return hasAnyRole(roles, ['admin', 'checklist_admin']);
+}
+
+/** View on-call rota calendar. */
+export function canViewOnCallRota(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'fulfiller', 'on_call_admin', 'on_call', 'event_manager', 'event_operator']);
+}
+
+/** Create / edit / delete on-call rota shifts. */
+export function canManageOnCallRota(roles: RoleList): boolean {
+  return hasAnyRole(roles, ['admin', 'on_call_admin']);
 }
 
 /** War room / postmortem edits (not read-only fulfiller). */
