@@ -15,7 +15,6 @@ import { resolveUploadPath, safeImageExtension, UnsafeUploadPathError } from '..
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.uploads.maxFileSize } });
 
-const DEFAULT_TENANT = 'a0000000-0000-0000-0000-000000000001';
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 const settingsCacheKey = (tenantId: string) => `tenant-settings:${tenantId}`;
 const themeCacheKey = (tenantId: string) => `tenant-theme:${tenantId}`;
@@ -67,16 +66,16 @@ async function invalidateSettingsCache(tenantId: string): Promise<void> {
 // ─── GET /api/settings/theme (public – no auth, used on login page) ───
 router.get('/theme', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const cacheKey = themeCacheKey(DEFAULT_TENANT);
+    const cacheKey = themeCacheKey(config.tenancy.primaryTenantId);
     const cached = await cacheGetJson<Record<string, string>>(cacheKey);
     if (cached) {
       res.json({ settings: cached });
       return;
     }
 
-    const rows = await db.withTenantContext(DEFAULT_TENANT, SYSTEM_USER_ID, 'user', () => db.getMany<{ key: string; value: string }>(
+    const rows = await db.withTenantContext(config.tenancy.primaryTenantId, SYSTEM_USER_ID, 'user', () => db.getMany<{ key: string; value: string }>(
       `SELECT key, value FROM tenant_settings WHERE tenant_id = $1 AND key = ANY($2::text[])`,
-      [DEFAULT_TENANT, PUBLIC_THEME_KEYS],
+      [config.tenancy.primaryTenantId, PUBLIC_THEME_KEYS],
     ));
     const settings: Record<string, string> = {};
     rows.forEach((r) => { settings[r.key] = r.value; });
@@ -90,9 +89,9 @@ router.get('/theme', async (_req: Request, res: Response, next: NextFunction) =>
 // ─── GET /api/settings/logo (public – serves logo image) ───
 router.get('/logo', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const row = await db.withTenantContext(DEFAULT_TENANT, SYSTEM_USER_ID, 'user', () => db.getOne<{ value: string }>(
+    const row = await db.withTenantContext(config.tenancy.primaryTenantId, SYSTEM_USER_ID, 'user', () => db.getOne<{ value: string }>(
       `SELECT value FROM tenant_settings WHERE tenant_id = $1 AND key = 'logo_url'`,
-      [DEFAULT_TENANT],
+      [config.tenancy.primaryTenantId],
     ));
     if (!row || !row.value) { res.status(204).end(); return; }
 

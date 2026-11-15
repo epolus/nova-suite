@@ -24,6 +24,23 @@ function envTrustProxy(name: string, fallback: number | boolean): number | boole
   return fallback;
 }
 
+function envList(name: string): string[] {
+  return (process.env[name] || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function envUuid(name: string, fallback: string): string {
+  const value = env(name, fallback);
+  if (!UUID_RE.test(value)) {
+    throw new Error(`${name} must be a UUID`);
+  }
+  return value.toLowerCase();
+}
+
 function hasJwtKeyConfig(): boolean {
   const hasInline = !!(process.env.JWT_PRIVATE_KEY && process.env.JWT_PUBLIC_KEY);
   const hasPaths = !!(process.env.JWT_PRIVATE_KEY_PATH && process.env.JWT_PUBLIC_KEY_PATH);
@@ -55,15 +72,21 @@ export const config = {
     database: env('POSTGRES_DB', 'nova'),
     user: env('POSTGRES_APP_USER', 'nova_runtime'),
     password: env('POSTGRES_APP_PASSWORD', env('POSTGRES_PASSWORD', 'changeme')),
-    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.44'),
+    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.45'),
   },
 
   jwt: {
     expiresIn: env('JWT_EXPIRES_IN', '8h'),
   },
 
+  /** One tenant per install: login, SSO, public branding and the env webhook secret all resolve to it. */
+  tenancy: {
+    primaryTenantId: envUuid('NOVA_PRIMARY_TENANT_ID', 'a0000000-0000-0000-0000-000000000001'),
+  },
+
   auth: {
     localLoginEnabled: process.env.AUTH_LOCAL_LOGIN_ENABLED !== 'false',
+    bcryptRounds: envInt('BCRYPT_ROUNDS', 12),
   },
 
   cors: {
@@ -98,6 +121,8 @@ export const config = {
     redirectUri: env('OIDC_REDIRECT_URI', 'http://localhost/api/auth/sso/callback'),
     providerName: env('OIDC_PROVIDER_NAME', 'OpenID'),
     scope: env('OIDC_SCOPE', 'openid email profile'),
+    /** Email domains allowed to auto-provision or link to an existing account. Empty = neither. */
+    allowedEmailDomains: envList('OIDC_ALLOWED_EMAIL_DOMAINS'),
     get enabled() { return !!(this.issuer && this.clientId); },
   },
 

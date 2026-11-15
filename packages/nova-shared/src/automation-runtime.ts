@@ -423,6 +423,34 @@ export function collectCredSlugsFromAutomation(cfg: AutomationConfig): string[] 
   return [...slugs];
 }
 
+const DEFAULT_ENGINE_URL = 'http://nova-engine:4000';
+const LOCAL_ENGINE_ORIGINS = ['http://localhost:4000', 'http://127.0.0.1:4000'];
+
+function originOf(raw: string): string | null {
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The shared automation key is only sent to the Nova engine itself; a step
+ * pointing at any other host with the same path must not receive it.
+ */
+export function shouldInjectAutomationKey(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (!parsed.pathname.startsWith('/api/catalog/automation/')) return false;
+  const engineOrigin = originOf(process.env.NOVA_ENGINE_URL?.trim() || DEFAULT_ENGINE_URL);
+  const trusted = new Set([...LOCAL_ENGINE_ORIGINS, ...(engineOrigin ? [engineOrigin] : [])]);
+  return trusted.has(parsed.origin);
+}
+
 async function runHttpStep(
   state: AutomationActivityState,
   ctxBeforeRequest: Record<string, unknown>,
@@ -437,13 +465,7 @@ async function runHttpStep(
       : interpolateString(state.body, ctxBeforeRequest);
   const timeoutMs = Math.min(Math.max((state.timeoutSeconds ?? 30) * 1000, 1000), 120_000);
   const automationKey = (automationSharedKey ?? process.env.CATALOG_AUTOMATION_SHARED_KEY)?.trim();
-  let injectAutomationKey = false;
-  try {
-    const parsedUrl = new URL(url);
-    injectAutomationKey = parsedUrl.pathname.startsWith('/api/catalog/automation/');
-  } catch {
-    injectAutomationKey = false;
-  }
+  const injectAutomationKey = shouldInjectAutomationKey(url);
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);

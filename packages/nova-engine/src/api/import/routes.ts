@@ -4,6 +4,8 @@ import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { config } from '../../config';
 import { authenticate, requireRole, setTenantRLS, releaseTenantClient, getRequestClient } from '../../middleware/auth';
 import { ENTITY_DEFS, suggestMapping } from './entity-defs';
 import type { FieldDef } from './entity-defs';
@@ -473,8 +475,9 @@ async function commitRow(
       break;
 
     case 'users': {
-      const password = (data.password as string) || 'TempPass123!';
-      const passwordHash = await bcrypt.hash(password, 10);
+      // No password column: random and unknown, so the account needs SSO or an admin reset.
+      const password = (data.password as string) || crypto.randomBytes(32).toString('base64url');
+      const passwordHash = await bcrypt.hash(password, config.auth.bcryptRounds);
       let companyId: string | null = null;
       const companyRef = typeof data.company === 'string' ? data.company.trim() : '';
       if (companyRef) {

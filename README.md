@@ -193,9 +193,12 @@ OIDC_CLIENT_SECRET=<google-oauth-client-secret>
 OIDC_REDIRECT_URI=http://localhost/api/auth/sso/callback
 OIDC_PROVIDER_NAME=Google
 OIDC_SCOPE=openid email profile
+OIDC_ALLOWED_EMAIL_DOMAINS=example.com
 ```
 
 Google OAuth redirect URI must exactly match `OIDC_REDIRECT_URI`.
+
+`OIDC_ALLOWED_EMAIL_DOMAINS` controls who may sign in without an existing SSO link: users whose verified email is in a listed domain are linked to the matching account or provisioned. Leave it empty to allow only already-linked users. See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
 
 ### SSO-only mode (disable local password login)
 
@@ -222,6 +225,7 @@ OIDC_CLIENT_SECRET=<entra-app-client-secret>
 OIDC_REDIRECT_URI=http://localhost/api/auth/sso/callback
 OIDC_PROVIDER_NAME=Microsoft Entra ID
 OIDC_SCOPE=openid profile email
+OIDC_ALLOWED_EMAIL_DOMAINS=contoso.com
 ```
 
 In Entra app registration, add a Web redirect URI that exactly matches `OIDC_REDIRECT_URI`.

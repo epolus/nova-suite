@@ -14,6 +14,7 @@ import {
   safeAttachmentExtension,
   UnsafeUploadPathError,
 } from '../../data/upload-path';
+import { assertAttachmentAccess, canDeleteAttachment } from './access';
 
 const router = Router();
 router.use(authenticate);
@@ -22,6 +23,11 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: config.uploads.maxFileSize },
 });
+
+function contentDisposition(fileName: string): string {
+  const asciiFallback = fileName.replace(/[^\x20-\x7e]|["\\]/g, '_');
+  return `inline; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+}
 
 function ensureDir(dir: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -41,6 +47,7 @@ router.post('/upload', upload.single('file'), setTenantRLS, releaseTenantClient,
 
       const safeType = assertPathSegment(entityType, 'entity_type');
       const safeId = assertUuidParam(entityId);
+      await assertAttachmentAccess(client, req, safeType, safeId, 'write');
       const ext = safeAttachmentExtension(file.originalname);
       const storageKey = `${safeType}/${safeId}/${crypto.randomUUID()}${ext}`;
       const fullPath = resolveUploadPath(config.uploads.dir, storageKey);
@@ -78,6 +85,7 @@ router.get('/', setTenantRLS, releaseTenantClient,
       const entityId = req.query.entity_id as string;
 
       if (!entityType || !entityId) { res.status(400).json({ error: 'entity_type and entity_id are required' }); return; }
+      await assertAttachmentAccess(client, req, entityType, assertUuidParam(entityId), 'read');
 
       const queryStart = Date.now();
       const result = await client.query(
@@ -130,6 +138,7 @@ router.get('/:id/download', setTenantRLS, releaseTenantClient,
       if (result.rows.length === 0) { res.status(404).json({ error: 'Attachment not found' }); return; }
 
       const att = result.rows[0];
+      await assertAttachmentAccess(client, req, att.entity_type as string, att.entity_id as string, 'read');
       let fullPath: string;
       try {
         fullPath = resolveUploadPath(config.uploads.dir, att.storage_key as string);
@@ -143,7 +152,7 @@ router.get('/:id/download', setTenantRLS, releaseTenantClient,
       if (!fs.existsSync(fullPath)) { res.status(404).json({ error: 'File not found on disk' }); return; }
 
       res.setHeader('Content-Type', att.mime_type as string);
-      res.setHeader('Content-Disposition', `inline; filename="${att.file_name}"`);
+      res.setHeader('Content-Disposition', contentDisposition(att.file_name as string));
       res.setHeader('Content-Length', String(att.size_bytes));
       fs.createReadStream(fullPath).pipe(res);
     } catch (err) {
@@ -162,6 +171,10 @@ router.delete('/:id', setTenantRLS, releaseTenantClient,
       if (result.rows.length === 0) { res.status(404).json({ error: 'Attachment not found' }); return; }
 
       const att = result.rows[0];
+      await assertAttachmentAccess(client, req, att.entity_type as string, att.entity_id as string, 'write');
+      if (!canDeleteAttachment(req, att.entity_type as string, att.uploaded_by as string)) {
+        res.status(403).json({ error: 'Only the uploader or staff can delete this attachment' }); return;
+      }
       let fullPath: string | null = null;
       try {
         fullPath = resolveUploadPath(config.uploads.dir, att.storage_key as string);

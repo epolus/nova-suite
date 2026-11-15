@@ -45,8 +45,8 @@ router.post(
         is_active: boolean;
         locked_out: boolean;
       }>(
-        'SELECT id, tenant_id, email, password_hash, display_name, time_format, date_format, is_active, locked_out FROM lookup_user_for_login($1)',
-        [email],
+        'SELECT id, tenant_id, email, password_hash, display_name, time_format, date_format, is_active, locked_out FROM lookup_user_for_login($1, $2)',
+        [email, config.tenancy.primaryTenantId],
       );
 
       if (!user || !user.is_active || user.locked_out) {
@@ -102,12 +102,16 @@ router.post(
         throw new AppError(401, 'Invalid email or password');
       }
 
+      const upgradedHash = bcrypt.getRounds(user.password_hash) < config.auth.bcryptRounds
+        ? await bcrypt.hash(password, config.auth.bcryptRounds)
+        : null;
       await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.query(
         `UPDATE users
          SET last_login_at = now(),
-             failed_login_count = 0
+             failed_login_count = 0,
+             password_hash = COALESCE($2, password_hash)
          WHERE id = $1`,
-        [user.id],
+        [user.id, upgradedHash],
       ));
 
       // Fetch roles for this user
@@ -190,7 +194,7 @@ router.post(
         throw new AppError(409, 'A user with this email already exists');
       }
 
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, config.auth.bcryptRounds);
 
       const newUser = await db.getOne<{ id: string }>(
         `INSERT INTO users (

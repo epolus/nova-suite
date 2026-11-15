@@ -359,7 +359,7 @@ router.post('/articles', async (req: Request, res: Response, next: NextFunction)
     const client = getRequestClient(req);
     const { title, content, category_id, assignment_group_id, meta_data } = req.body || {};
     if (!title || !content) throw new AppError(400, 'title and content are required');
-    const seq = await client.query(`SELECT nextval('incident_number_seq') AS n`);
+    const seq = await client.query(`SELECT nextval('kb_number_seq') AS n`);
     const number = `KB${String(seq.rows[0].n).padStart(7, '0')}`;
     const row = await client.query(
       `INSERT INTO knowledge_articles

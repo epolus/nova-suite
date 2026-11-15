@@ -91,6 +91,57 @@ AS $$
   LIMIT 1;
 $$;
 
+CREATE OR REPLACE FUNCTION lookup_user_for_login(p_email text, p_tenant_id uuid)
+RETURNS TABLE (
+  id uuid,
+  tenant_id uuid,
+  email text,
+  password_hash text,
+  display_name text,
+  time_format text,
+  date_format text,
+  is_active boolean,
+  locked_out boolean
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT u.id, u.tenant_id, u.email, u.password_hash, u.display_name,
+         u.time_format, u.date_format, u.is_active, u.locked_out
+  FROM users u
+  WHERE lower(u.email) = lower(p_email)
+    AND u.tenant_id = p_tenant_id
+  ORDER BY u.created_at
+  LIMIT 1;
+$$;
+
+CREATE OR REPLACE FUNCTION lookup_user_for_sso(p_subject text, p_tenant_id uuid)
+RETURNS TABLE (
+  id uuid,
+  tenant_id uuid,
+  email text,
+  display_name text,
+  time_format text,
+  date_format text,
+  is_active boolean,
+  locked_out boolean
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT u.id, u.tenant_id, u.email, u.display_name,
+         u.time_format, u.date_format, u.is_active, u.locked_out
+  FROM users u
+  WHERE u.sso_provider_id = p_subject
+    AND u.tenant_id = p_tenant_id
+  ORDER BY u.created_at
+  LIMIT 1;
+$$;
+
 CREATE OR REPLACE FUNCTION lookup_request_tenant(p_request_id uuid)
 RETURNS uuid
 LANGUAGE sql
@@ -134,6 +185,10 @@ $$;
 
 REVOKE ALL ON FUNCTION lookup_user_for_login(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION lookup_user_for_sso(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION lookup_user_for_login(text, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION lookup_user_for_sso(text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION lookup_user_for_login(text, uuid) TO nova_runtime;
+GRANT EXECUTE ON FUNCTION lookup_user_for_sso(text, uuid) TO nova_runtime;
 REVOKE ALL ON FUNCTION lookup_request_tenant(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION lookup_satisfaction_by_token(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION lookup_user_for_login(text) TO nova_runtime;
