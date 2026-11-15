@@ -99,7 +99,7 @@ export default function AssetDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    cmdb.items({}, 1, 200)
+    cmdb.items({}, 1, 100)
       .then((res) => {
         if (!cancelled) setCiOptions(res.items);
       })
