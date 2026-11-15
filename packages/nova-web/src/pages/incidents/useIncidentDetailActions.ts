@@ -83,7 +83,7 @@ export function useIncidentDetailActions({
         }
 
         if (Object.keys(updates).length > 0) {
-          await incidentsApi.update(id, updates as Partial<Incident>);
+          await incidentsApi.update(id, updates);
         }
 
         const currentPrimaryProblemId = linkedProblemIds[0] || '';
@@ -109,7 +109,7 @@ export function useIncidentDetailActions({
   const handleReopen = useCallback(
     () =>
       withSave(async () => {
-        await incidentsApi.update(id!, { status: 'in_progress' } as Partial<Incident>);
+        await incidentsApi.update(id!, { status: 'in_progress' });
         await refresh();
       }),
     [id, refresh, withSave],
@@ -118,7 +118,7 @@ export function useIncidentDetailActions({
   const handleCancel = useCallback(
     () =>
       withSave(async () => {
-        await incidentsApi.update(id!, { status: 'cancelled' } as Partial<Incident>);
+        await incidentsApi.update(id!, { status: 'cancelled' });
         await refresh();
       }),
     [id, refresh, withSave],
@@ -135,7 +135,7 @@ export function useIncidentDetailActions({
           await incidentsApi.update(id, {
             status: 'resolved',
             resolution_notes: resolutionNotes || null,
-          } as Partial<Incident>);
+          });
           await refresh();
         });
         setKbResolveOpen(false);
@@ -151,7 +151,7 @@ export function useIncidentDetailActions({
       e.preventDefault();
       if (!id || !journalContent.trim()) return;
       const entry = await incidentsApi.addJournal(id, {
-        entry_type: journalType,
+        entry_type: journalType as 'comment' | 'work_note' | 'state_change' | 'assignment',
         content: journalContent,
         is_customer_visible: journalVisible,
       });

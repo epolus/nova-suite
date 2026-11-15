@@ -1,13 +1,16 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type { LoginInput } from '@nova-suite/shared/schemas';
 import { request } from '../http';
 import type { User, UserListItem } from '../types';
 
 export const auth = {
-  login: (email: string, password: string) =>
-    request<{ user: User }>('/auth/login', {
+  login: (email: string, password: string) => {
+    const body: LoginInput = { email, password };
+    return request<{ user: User }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
-    }),
+      body: JSON.stringify(body),
+    });
+  },
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
   me: () => request<{ user: User }>('/auth/me'),
   updateTimeFormat: (time_format: '12h' | '24h') =>

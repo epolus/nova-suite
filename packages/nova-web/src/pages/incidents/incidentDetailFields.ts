@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type { UpdateIncidentInput } from '@nova-suite/shared/schemas';
 import type { Incident } from '../../api/client';
 
 export const SIDEBAR_STORAGE_KEY = 'incident_detail_intelligence_sidebar_open';
@@ -49,11 +50,17 @@ export function buildFieldsFromIncident(i: Incident): IncidentFields {
   };
 }
 
-export function buildIncidentUpdates(fields: IncidentFields, inc: Incident): Record<string, unknown> {
-  const updates: Record<string, unknown> = {};
-  if (fields.impact !== inc.impact) updates.impact = fields.impact;
-  if (fields.urgency !== inc.urgency) updates.urgency = fields.urgency;
-  if (fields.status !== inc.status) updates.status = fields.status;
+export function buildIncidentUpdates(fields: IncidentFields, inc: Incident): UpdateIncidentInput {
+  const updates: UpdateIncidentInput = {};
+  if (fields.impact !== inc.impact) {
+    updates.impact = fields.impact as NonNullable<UpdateIncidentInput['impact']>;
+  }
+  if (fields.urgency !== inc.urgency) {
+    updates.urgency = fields.urgency as NonNullable<UpdateIncidentInput['urgency']>;
+  }
+  if (fields.status !== inc.status) {
+    updates.status = fields.status as NonNullable<UpdateIncidentInput['status']>;
+  }
   if (fields.title !== inc.title) updates.title = fields.title;
   if (fields.description !== (inc.description || '')) updates.description = fields.description || null;
   const nextCategoryId = fields.categoryId || null;

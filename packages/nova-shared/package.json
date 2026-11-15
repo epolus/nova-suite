@@ -21,6 +21,11 @@
       "types": "./dist/esm/migrators/servicenow/index.d.ts",
       "import": "./dist/esm/migrators/servicenow/index.js",
       "require": "./dist/cjs/migrators/servicenow/index.js"
+    },
+    "./schemas": {
+      "types": "./dist/esm/schemas/index.d.ts",
+      "import": "./dist/esm/schemas/index.js",
+      "require": "./dist/cjs/schemas/index.js"
     }
   },
   "typesVersions": {
@@ -30,6 +35,9 @@
       ],
       "migrators/servicenow": [
         "dist/esm/migrators/servicenow/index.d.ts"
+      ],
+      "schemas": [
+        "dist/esm/schemas/index.d.ts"
       ]
     }
   },

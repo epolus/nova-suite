@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 // ─── Nova Suite – Zod Validation Schemas ───
-// Central definition of all request/response shapes.
+// Shared request schemas live in `@nova-suite/shared/schemas`. This module
+// extends Zod for OpenAPI, re-exports those schemas, and keeps engine-only ones.
 
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
@@ -9,56 +10,34 @@ import { serviceNowExtractOptionsSchema } from '@nova-suite/shared/migrators/ser
 
 extendZodWithOpenApi(z);
 
-// ─── Common ───
-export const uuidSchema = z.guid();
-export const paginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-}).loose();
+export {
+  uuidSchema,
+  paginationSchema,
+  rankedSuggestionsQuerySchema,
+  e164PhoneSchema,
+  loginSchema,
+  registerSchema,
+  createIncidentSchema,
+  updateIncidentSchema,
+  incidentLinkMajorIncidentSchema,
+  addJournalEntrySchema,
+} from '@nova-suite/shared/schemas';
+export type {
+  LoginInput,
+  RegisterInput,
+  CreateIncidentInput,
+  CreateIncident,
+  UpdateIncidentInput,
+  UpdateIncident,
+  AddJournalEntryInput,
+  AddJournalEntry,
+} from '@nova-suite/shared/schemas';
 
-export const rankedSuggestionsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(20).default(5),
-}).loose();
-
-const e164PhoneSchema = z.preprocess(
-  (value) => {
-    if (typeof value !== 'string') return value;
-    // Normalize common user formatting before E.164 validation.
-    return value.trim().replace(/[()\-\s]/g, '');
-  },
-  z.string().regex(/^\+[1-9]\d{1,14}$/, 'Must be a valid E.164 phone number'),
-);
-
-// ─── Auth ───
-export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
-
-export const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8).max(128),
-  first_name: z.string().max(255).optional(),
-  last_name: z.string().max(255).optional(),
-  display_name: z.string().min(1).max(255),
-  title: z.string().max(255).optional(),
-  phone: e164PhoneSchema.optional(),
-  mobile: e164PhoneSchema.optional(),
-  location: z.string().max(255).default('Zurich'),
-  timezone: z.string().max(100).default('UTC'),
-  time_format: z.enum(['12h', '24h']).default('24h'),
-  date_format: z.enum(['DD.MM.YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']).default('YYYY-MM-DD'),
-  employee_type: z.enum(['employee', 'contractor', 'vendor', 'intern']).default('employee'),
-  company: uuidSchema.optional(),
-  preferred_language: z.string().max(10).default('en'),
-  start_date: z.string().optional(),
-  last_working_date: z.string().optional(),
-  user_id: z.string().max(100).optional(),
-  manager_id: uuidSchema.optional(),
-  department_id: uuidSchema.optional(),
-  cost_center_id: uuidSchema.optional(),
-  role_ids: z.array(uuidSchema).min(1).default([]),
-});
+import {
+  e164PhoneSchema,
+  paginationSchema,
+  uuidSchema,
+} from '@nova-suite/shared/schemas';
 
 // ─── Service Catalog ───
 export const createCategorySchema = z.object({
@@ -343,50 +322,6 @@ export const approveRequestSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
-// ─── Incidents (Fulfiller) ───
-export const createIncidentSchema = z.object({
-  title: z.string().min(1).max(500),
-  description: z.string().max(10000).optional(),
-  impact: z.enum(['low', 'medium', 'high']).default('medium'),
-  urgency: z.enum(['low', 'medium', 'high']).default('medium'),
-  assigned_to: uuidSchema.optional(),
-  assignment_group_id: uuidSchema.optional(),
-  caller_id: uuidSchema.optional(),
-  contact_info: z.string().max(1000).optional(),
-  service_id: uuidSchema.optional(),
-  configuration_item_id: uuidSchema.optional(),
-  category: z.string().max(255).optional(),
-  subcategory: z.string().max(255).optional(),
-  category_id: uuidSchema.optional(),
-  request_id: uuidSchema.optional(),
-  custom_fields: z.record(z.string(), z.unknown()).optional(),
-});
-
-export const updateIncidentSchema = z.object({
-  title: z.string().min(1).max(500).optional(),
-  description: z.string().max(10000).optional(),
-  status: z
-    .enum(['new', 'assigned', 'in_progress', 'pending', 'resolved', 'closed', 'cancelled'])
-    .optional(),
-  impact: z.enum(['low', 'medium', 'high']).optional(),
-  urgency: z.enum(['low', 'medium', 'high']).optional(),
-  assigned_to: uuidSchema.nullable().optional(),
-  assignment_group_id: uuidSchema.nullable().optional(),
-  caller_id: uuidSchema.nullable().optional(),
-  contact_info: z.string().max(1000).nullable().optional(),
-  service_id: uuidSchema.nullable().optional(),
-  configuration_item_id: uuidSchema.nullable().optional(),
-  category: z.string().max(255).nullable().optional(),
-  subcategory: z.string().max(255).nullable().optional(),
-  category_id: uuidSchema.nullable().optional(),
-  closure_category_id: uuidSchema.nullable().optional(),
-  resolution_code: z.string().max(255).nullable().optional(),
-  resolution_code_id: uuidSchema.nullable().optional(),
-  pending_reason: z.string().max(255).nullable().optional(),
-  resolution_notes: z.string().max(10000).nullable().optional(),
-  custom_fields: z.record(z.string(), z.unknown()).optional(),
-});
-
 // ─── Problems ───
 export const createProblemSchema = z.object({
   title: z.string().min(1).max(500),
@@ -561,16 +496,6 @@ export const submitChangeRiskAssessmentSchema = z.object({
     answer_text: z.string().max(2000).optional().nullable(),
   })).min(1),
   apply_suggested_risk_level: z.boolean().optional().default(true),
-});
-
-export const incidentLinkMajorIncidentSchema = z.object({
-  major_incident_id: uuidSchema,
-});
-
-export const addJournalEntrySchema = z.object({
-  entry_type: z.enum(['comment', 'work_note', 'state_change', 'assignment']).default('comment'),
-  content: z.string().min(1).max(10000),
-  is_customer_visible: z.boolean().default(true),
 });
 
 export const addChangeJournalEntrySchema = z.object({
@@ -810,5 +735,4 @@ export const addImprovementJournalSchema = z.object({
 
 export const updateCIClassSchema = createCIClassSchema.partial();
 
-export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
 export type CreateMajorIncidentInput = z.infer<typeof createMajorIncidentSchema>;
