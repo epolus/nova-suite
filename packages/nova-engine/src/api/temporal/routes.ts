@@ -1,26 +1,17 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Router, Request, Response, NextFunction } from 'express';
-import { Connection, Client } from '@temporalio/client';
+import type { Client } from '@temporalio/client';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { config } from '../../config';
+import { getTemporalClient } from '../../temporal/workflows';
 
 const router = Router();
 
 router.use(authenticate, requireRole('admin'));
 
-// ─── Lazy Temporal client ───
-
-let connection: Connection | null = null;
-let client: Client | null = null;
-
-async function getTemporal(): Promise<{ connection: Connection; client: Client }> {
-  if (!connection) {
-    connection = await Connection.connect({ address: config.temporal.address });
-  }
-  if (!client) {
-    client = new Client({ connection, namespace: config.temporal.namespace });
-  }
-  return { connection, client };
+async function getTemporal(): Promise<{ connection: Client['connection']; client: Client }> {
+  const client = await getTemporalClient();
+  return { connection: client.connection, client };
 }
 
 // Temporal status enum to human-readable name

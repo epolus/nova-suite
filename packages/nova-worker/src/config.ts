@@ -18,13 +18,17 @@ export const config = {
     database: env('POSTGRES_DB', 'nova'),
     user: env('POSTGRES_APP_USER', 'nova_runtime'),
     password: env('POSTGRES_APP_PASSWORD', env('POSTGRES_PASSWORD', 'changeme')),
-    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.45'),
+    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.46'),
+    poolMax: envInt('DB_POOL_MAX', 5),
+    statementTimeoutMs: envInt('DB_STATEMENT_TIMEOUT_MS', 120_000),
   },
   temporal: {
     address: env('TEMPORAL_ADDRESS', 'localhost:7233'),
     namespace: env('TEMPORAL_NAMESPACE', 'default'),
     taskQueue: env('TEMPORAL_TASK_QUEUE', 'nova-itsm'),
     retentionDays: envInt('TEMPORAL_RETENTION_DAYS', 30),
+    /** In-flight activities get this long to finish after SIGTERM before they are cancelled. */
+    shutdownGraceMs: envInt('WORKER_SHUTDOWN_GRACE_MS', 20_000),
   },
   /** Must match nova-engine CREDENTIALS_MASTER_KEY for pgp_sym_decrypt. */
   credentials: {

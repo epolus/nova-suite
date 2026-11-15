@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.45`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.46`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
@@ -21,15 +21,26 @@ Later schema changes for **existing** volumes are numbered SQL files under `infr
 CREATE TABLE schema_migrations (
   version     text PRIMARY KEY,
   name        text NOT NULL,
-  applied_at  timestamptz NOT NULL DEFAULT now()
+  applied_at  timestamptz NOT NULL DEFAULT now(),
+  checksum    text
 );
 ```
 
 - Filename pattern: `vNN.NN.NN__slug.sql` (example: `v00.01.01__add_request_due_date.sql`).
 - One file per version. Duplicate versions fail the job.
-- Each successful file inserts exactly one ledger row. SQL error rolls back that file and exits non-zero.
+- Each successful file inserts exactly one ledger row, with the sha256 of the file (line endings normalized). SQL error rolls back that file and exits non-zero.
 - API and worker compare `MAX(version)` with `DB_SCHEMA_VERSION`. Mismatch → degraded health; worker will not poll workflows.
 - If `schema_migrations` is missing, the job fails. It does not repair an unknown database.
+
+### Forward-Only Repair Policy
+
+Applied migrations are immutable. There are no down migrations.
+
+- On every run, `nova-migrate` compares each applied version's recorded checksum with the file on disk. A changed file stops the job before anything is applied, naming the versions.
+- Fix a bad migration with a **new** migration that corrects the schema, then restore the edited file to what was applied.
+- Rows without a checksum (installs older than `v00.01.46`, and fresh installs seeded by `init.sql`) get one recorded from the current file on the first run.
+- For a harmless edit (comment, whitespace), confirm the diff and run once with `NOVA_MIGRATE_ACCEPT_CHECKSUMS=v00.01.40,v00.01.41` to re-record those checksums. Remove the variable afterwards.
+- To roll back a release, restore from the pre-migration backup; do not hand-edit the ledger.
 
 ### Version Bump Workflow
 
@@ -251,3 +262,21 @@ Behavior changes in the matching engine release:
 - `NOVA_INBOUND_WEBHOOK_SECRET` is only accepted for `NOVA_PRIMARY_TENANT_ID`.
 - Attachments are authorized against their parent record; attachments on unknown entity types are readable by admins only.
 - Bulk-imported users without a password get a random one; they sign in via SSO or an admin password reset.
+
+## Resumable imports and migration checksums (`v00.01.46`)
+
+Apply `infra/postgres/migrations/v00.01.46__resumable_imports_and_migration_checksums.sql` before rolling out the engine and worker.
+
+- `data_source_runs` gains `execution_key`, `attempt` and `next_row` with a unique `(data_source_id, execution_key)`. The worker now imports in transactions of 50 rows; a retried activity resumes the same run at its last committed chunk instead of inserting every row again. Resuming assumes the source returns rows in the same order; upsert mode is unaffected by order.
+- `resolve_user_access(user_id, tenant_id)` returns `is_active` and all roles (direct and assignment-group). The engine calls it once per authenticated request, for password login and for SSO login. **Deactivated users are rejected immediately**, without waiting for their token to expire; lockout from failed logins still only blocks new logins.
+- `schema_migrations.checksum` (see the forward-only repair policy above).
+
+Engine environment values are validated at startup: a malformed value (for example `REDIS_ENABLED=True` or `API_PORT=40OO`) now stops the engine with a list of every invalid variable, instead of silently using the default.
+
+## Temporal Workflow Versioning
+
+Workflow code is replayed from history, so any change to the commands a workflow issues (activities, timers, child workflows, or their order) breaks executions that are already running. Activity bodies and activity options (timeouts, retry policy) may change freely.
+
+- Gate workflow changes with `patched(WORKFLOW_PATCHES.x)` from `packages/nova-worker/src/workflows/patches.ts`. Each ID is used once and never reused.
+- Once no execution started before the change is still open (check Admin → Workflows, or the longest workflow lifetime: SLA escalation lives as long as the incident), replace `patched(id)` with `deprecatePatch(id)` and keep only the new branch. Remove the call one release later.
+- The worker drains for `WORKER_SHUTDOWN_GRACE_MS` on SIGTERM; compose gives it `stop_grace_period: 40s`.

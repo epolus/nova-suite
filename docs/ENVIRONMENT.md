@@ -9,8 +9,12 @@ For the complete baseline list, see `.env.example`.
 |----------|-------------|--------|
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Postgres image init, Temporal auto-setup, `nova-migrate`, backups | Bootstrap **superuser**. Never point the API or worker at this role. |
 | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | `nova-engine`, `nova-worker` | Default `nova_runtime`. Must be `NOSUPERUSER NOBYPASSRLS`. Created by `infra/postgres/00-runtime-role.sh`. |
-| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.45`). Mismatch puts the API in degraded mode and stops the worker. |
+| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.46`). Mismatch puts the API in degraded mode and stops the worker. |
 | `NOVA_MIGRATIONS_DIR` | `nova-migrate` | Directory of `vNN.NN.NN__slug.sql` files. Defaults to `/app/infra/postgres/migrations` in the engine image. |
+| `NOVA_MIGRATE_ACCEPT_CHECKSUMS` | `nova-migrate` | Comma-separated versions whose edited file should be re-recorded instead of stopping the job. One-off repair only; see the forward-only policy in [UPGRADE_STRATEGY.md](./UPGRADE_STRATEGY.md). |
+| `DB_POOL_MAX` | `nova-engine` (`nova-worker` outside compose) | Connection pool size per process. Defaults: engine `20`, worker `5`. Keep the sum across all replicas below Postgres `max_connections`. |
+| `DB_STATEMENT_TIMEOUT_MS` | `nova-engine`, `nova-worker` | Server-side cap per statement. Defaults: engine `60000`, worker `120000`. `0` disables. In compose the worker's value comes from `WORKER_DB_STATEMENT_TIMEOUT_MS`, so the two can differ. |
+| `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` | `nova-engine` | Closes sessions left idle inside a transaction. Default `300000`. |
 
 ## Core Variables
 
@@ -20,6 +24,7 @@ TEMPORAL_ADDRESS=temporal:7233
 TEMPORAL_NAMESPACE=default
 TEMPORAL_TASK_QUEUE=nova-itsm
 TEMPORAL_RETENTION_DAYS=30
+WORKER_SHUTDOWN_GRACE_MS=20000
 
 # Encrypted tenant credentials (must match between nova-engine and nova-worker)
 CREDENTIALS_MASTER_KEY=
@@ -87,6 +92,9 @@ See `.env.deploy.example` for the annotated baseline.
 required in that file, so Compose fails with a named error rather than starting on a placeholder.
 
 ## Behavior Notes
+
+- **Startup validation (engine)** — numbers, `true`/`false` flags, enums (`NODE_ENV`, `LOG_LEVEL`, `AI_DEFAULT_PROVIDER`), URLs, `NOVA_PRIMARY_TENANT_ID`, `DB_SCHEMA_VERSION`, OIDC client settings and `CREDENTIALS_MASTER_KEY` length are checked when `nova-engine` starts. Any invalid value stops startup with a list of every problem. Empty values count as unset and use the default.
+- **`WORKER_SHUTDOWN_GRACE_MS`** — on SIGTERM the worker stops polling and gives in-flight activities this long (default `20000`) to finish before cancelling them. Keep the container stop timeout above this value plus 10 seconds (compose sets `stop_grace_period: 40s`). Data source imports cancelled this way resume at their last committed chunk on retry.
 
 - **JWT keys in the deployment stack** — the `nova-keygen` one-shot service runs
   `node packages/nova-engine/dist/ensure-jwt-keys.js` before the API starts and writes an RS256

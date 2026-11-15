@@ -22,6 +22,7 @@ import {
 } from './temporal/workflow-start-queue';
 import {
   checkTemporalHealth,
+  closeTemporalClient,
   startDbSizeSnapshotSchedule,
   startInboundEmailPollSchedule,
   startMetricSnapshotSchedule,
@@ -275,30 +276,55 @@ async function bootstrap(): Promise<void> {
 }
 
 // ─── Graceful Shutdown ───
-async function shutdown(signal: string) {
-  logger.info({ signal }, 'Shutting down...');
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+let shuttingDown = false;
+
+async function shutdown(reason: string, exitCode = 0): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Shutting down...');
+  setTimeout(() => {
+    logger.error({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, 'Graceful shutdown timed out; forcing exit');
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS).unref();
+
   if (snapshotScheduleRetryTimer) {
     clearInterval(snapshotScheduleRetryTimer);
     snapshotScheduleRetryTimer = null;
   }
   if (workflowDispatcherStarted) stopWorkflowStartQueueDispatcher();
   if (server) {
-    server.close(async () => {
-      await cacheShutdown();
-      await db.shutdown();
-      process.exit(0);
+    const closing = server;
+    // Stop accepting connections and finish in-flight requests; idle keep-alive sockets would block close().
+    await new Promise<void>((resolve) => {
+      closing.close(() => resolve());
+      closing.closeIdleConnections();
     });
-  } else {
-    await cacheShutdown();
-    await db.shutdown();
-    process.exit(0);
   }
-  // Force exit after 10s
-  setTimeout(() => process.exit(1), 10_000);
+  const steps: Array<[string, () => Promise<void>]> = [
+    ['temporal', closeTemporalClient],
+    ['cache', cacheShutdown],
+    ['database', () => db.shutdown()],
+  ];
+  for (const [name, close] of steps) {
+    try {
+      await close();
+    } catch (err) {
+      logger.warn({ err, resource: name }, 'Error while closing resource during shutdown');
+    }
+  }
+  process.exit(exitCode);
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'Unhandled promise rejection');
+});
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'Uncaught exception; shutting down');
+  void shutdown('uncaughtException', 1);
+});
 
 void bootstrap().catch((err) => {
   logger.error({ err }, 'Fatal startup error');

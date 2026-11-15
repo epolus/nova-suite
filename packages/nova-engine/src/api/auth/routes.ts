@@ -114,28 +114,7 @@ router.post(
         [user.id, upgradedHash],
       ));
 
-      // Fetch roles for this user
-      const roleRows = await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.getMany<{ name: string }>(
-        `SELECT DISTINCT r.name
-         FROM roles r
-         JOIN (
-           SELECT ur.role_id
-           FROM user_roles ur
-           WHERE ur.user_id = $1
-             AND ur.tenant_id = $2
-           UNION
-           SELECT agr.role_id
-           FROM assignment_group_members agm
-           JOIN assignment_group_roles agr ON agr.group_id = agm.group_id
-           WHERE agm.user_id = $1
-             AND agm.tenant_id = $2
-             AND agr.tenant_id = $2
-         ) src ON src.role_id = r.id
-         WHERE r.tenant_id = $2
-         ORDER BY r.name`,
-        [user.id, user.tenant_id],
-      ));
-      const roles = roleRows.map((r) => r.name);
+      const roles = (await db.resolveUserAccess(user.id, user.tenant_id))?.roles ?? [];
 
       const payload: AuthUser = {
         id: user.id,

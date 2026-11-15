@@ -4,6 +4,7 @@ import type * as activities from '../activities';
 
 const { runDataManagementJob } = proxyActivities<typeof activities>({
   startToCloseTimeout: '4 hours',
+  heartbeatTimeout: '5 minutes',
   retry: { maximumAttempts: 2, initialInterval: '30 seconds' },
 });
 

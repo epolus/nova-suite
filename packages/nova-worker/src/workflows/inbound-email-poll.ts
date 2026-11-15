@@ -4,6 +4,7 @@ import type * as activities from '../activities';
 
 const { pollInboundEmailMailboxes } = proxyActivities<typeof activities>({
   startToCloseTimeout: '10 minutes',
+  heartbeatTimeout: '2 minutes',
   retry: { maximumAttempts: 2, initialInterval: '15 seconds' },
 });
 

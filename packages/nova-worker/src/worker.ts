@@ -29,6 +29,8 @@ async function run() {
     taskQueue: config.temporal.taskQueue,
     workflowsPath: require.resolve('./workflows'),
     activities,
+    shutdownGraceTime: config.temporal.shutdownGraceMs,
+    shutdownForceTime: config.temporal.shutdownGraceMs + 10_000,
   });
 
   console.log(`[nova-worker] Worker started on task queue "${config.temporal.taskQueue}"`);
@@ -46,21 +48,33 @@ async function run() {
   await pulse();
   const heartbeatTimer = setInterval(() => void pulse(), 30_000);
 
-  // Graceful shutdown
-  const shutdown = async () => {
-    console.log('[nova-worker] Shutting down...');
-    clearInterval(heartbeatTimer);
+  // worker.run() resolves once in-flight tasks have drained (or the grace time expired).
+  const requestShutdown = (signal: string) => {
+    if (worker.getState() !== 'RUNNING') return;
+    console.log(`[nova-worker] ${signal} received, draining (grace ${config.temporal.shutdownGraceMs}ms)...`);
     worker.shutdown();
-    await dbShutdown();
-    process.exit(0);
   };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => requestShutdown('SIGINT'));
+  process.on('SIGTERM', () => requestShutdown('SIGTERM'));
 
-  await worker.run();
+  try {
+    await worker.run();
+  } finally {
+    clearInterval(heartbeatTimer);
+    await connection.close().catch((err) => console.warn('[nova-worker] closing Temporal connection failed', err));
+    await dbShutdown().catch((err) => console.warn('[nova-worker] closing DB pool failed', err));
+  }
+  console.log('[nova-worker] Stopped');
 }
 
-run().catch((err) => {
-  console.error('[nova-worker] Fatal error:', err);
-  process.exit(1);
+process.on('unhandledRejection', (reason) => {
+  console.error('[nova-worker] Unhandled promise rejection:', reason);
 });
+
+run().then(
+  () => process.exit(0),
+  (err) => {
+    console.error('[nova-worker] Fatal error:', err);
+    process.exit(1);
+  },
+);

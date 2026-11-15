@@ -1,6 +1,54 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { describe, expect, it } from 'vitest';
-import { listMigrationFiles, parseMigrationFilename, pendingMigrations } from './files';
+import {
+  auditChecksums,
+  listMigrationFiles,
+  migrationChecksum,
+  parseMigrationFilename,
+  pendingMigrations,
+} from './files';
+
+describe('migrationChecksum', () => {
+  it('ignores CRLF vs LF line endings', () => {
+    expect(migrationChecksum('SELECT 1;\r\nSELECT 2;\r\n')).toBe(migrationChecksum('SELECT 1;\nSELECT 2;\n'));
+  });
+
+  it('changes when content changes', () => {
+    expect(migrationChecksum('SELECT 1;')).not.toBe(migrationChecksum('SELECT 2;'));
+  });
+});
+
+describe('auditChecksums', () => {
+  const files = new Map([['v00.01.01', 'aaa'], ['v00.01.02', 'bbb']]);
+
+  it('passes when recorded checksums match', () => {
+    const audit = auditChecksums(
+      [{ version: 'v00.01.01', checksum: 'aaa' }, { version: 'v00.01.02', checksum: 'bbb' }],
+      files,
+    );
+    expect(audit).toEqual({ mismatched: [], unrecorded: [] });
+  });
+
+  it('reports edited files', () => {
+    const audit = auditChecksums([{ version: 'v00.01.01', checksum: 'old' }], files);
+    expect(audit.mismatched).toEqual(['v00.01.01']);
+  });
+
+  it('records missing checksums instead of failing', () => {
+    const audit = auditChecksums([{ version: 'v00.01.02', checksum: null }], files);
+    expect(audit).toEqual({ mismatched: [], unrecorded: ['v00.01.02'] });
+  });
+
+  it('re-records explicitly accepted versions', () => {
+    const audit = auditChecksums([{ version: 'v00.01.01', checksum: 'old' }], files, new Set(['v00.01.01']));
+    expect(audit).toEqual({ mismatched: [], unrecorded: ['v00.01.01'] });
+  });
+
+  it('ignores ledger rows without a file (pre-ledger history)', () => {
+    const audit = auditChecksums([{ version: 'v00.01.00', checksum: null }], files);
+    expect(audit).toEqual({ mismatched: [], unrecorded: [] });
+  });
+});
 
 describe('parseMigrationFilename', () => {
   it('parses a valid versioned filename', () => {

@@ -11,6 +11,7 @@ import {
 } from '@nova-suite/shared';
 import { config } from '../config';
 import { withTenantContext } from '../db';
+import { activityHeartbeat, throwIfActivityCancelled } from './activity-context';
 
 type JobRow = {
   id: string;
@@ -64,6 +65,7 @@ export async function runDataManagementJob(jobId: string, tenantId: string): Pro
     let finished = false;
 
     for (let step = 0; step < 20_000 && !finished; step += 1) {
+      throwIfActivityCancelled();
       const chunk = await withTenantContext(tenantId, async (client) => {
         await client.query('BEGIN');
         try {
@@ -150,6 +152,7 @@ export async function runDataManagementJob(jobId: string, tenantId: string): Pro
       }
       cursor = nextCursor;
       for (const key of chunk.keys) unlinkStorageKey(config.uploads.dir, key);
+      activityHeartbeat({ jobId, step });
     }
 
     if (!finished) throw new Error('Retention job exceeded the chunk limit');

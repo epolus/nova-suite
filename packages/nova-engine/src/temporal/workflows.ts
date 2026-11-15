@@ -13,11 +13,22 @@ import { logger } from '../logger';
 const TASK_QUEUE = config.temporal.taskQueue;
 
 let connection: Connection | null = null;
-let client: Client | null = null;
+let clientPromise: Promise<Client> | null = null;
 
 function resetTemporalClientCache(): void {
+  const stale = connection;
   connection = null;
-  client = null;
+  clientPromise = null;
+  if (stale) {
+    void stale.close().catch((err) => logger.debug({ err }, 'Closing stale Temporal connection failed'));
+  }
+}
+
+export async function closeTemporalClient(): Promise<void> {
+  const current = connection;
+  connection = null;
+  clientPromise = null;
+  if (current) await current.close();
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -34,17 +45,24 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
   }
 }
 
-async function getClient(): Promise<Client> {
-  if (!client) {
-    connection = await Connection.connect({ address: config.temporal.address });
-    client = new Client({ connection, namespace: config.temporal.namespace });
+/** Shared lazily-connected client; concurrent callers reuse one connection attempt. */
+export function getTemporalClient(): Promise<Client> {
+  if (!clientPromise) {
+    const pending = Connection.connect({ address: config.temporal.address }).then((conn) => {
+      connection = conn;
+      return new Client({ connection: conn, namespace: config.temporal.namespace });
+    });
+    clientPromise = pending;
+    pending.catch(() => {
+      if (clientPromise === pending) clientPromise = null;
+    });
   }
-  return client;
+  return clientPromise;
 }
 
 export async function checkTemporalHealth(timeoutMs = 2000): Promise<boolean> {
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     await withTimeout(
       cl.connection.workflowService.describeNamespace({ namespace: config.temporal.namespace }),
       timeoutMs,
@@ -65,7 +83,7 @@ export async function startIncidentEscalation(params: {
 }): Promise<string> {
   const workflowId = `incident-escalation-${params.incidentId}`;
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('incidentEscalation', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -91,7 +109,7 @@ export async function startCatalogFulfillment(params: {
 }): Promise<string> {
   const workflowId = `catalog-fulfillment-${params.requestId}`;
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('catalogFulfillment', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -116,7 +134,7 @@ export async function startServiceNowMigration(params: {
 }): Promise<string> {
   const workflowId = `servicenow-migration-${params.runId}`;
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('serviceNowCatalogMigration', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -140,7 +158,7 @@ export async function signalTaskCompleted(
   userId: string,
 ): Promise<void> {
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = cl.workflow.getHandle(`catalog-fulfillment-${requestId}`);
     await handle.signal('taskCompleted', { taskId, outcome, notes, userId });
     logger.info({ requestId, taskId, outcome }, 'Sent taskCompleted signal');
@@ -193,7 +211,7 @@ async function ensureDataSourceSchedule(params: {
 }): Promise<string> {
   const cronSchedule = params.cronSchedule?.trim() || '0 2 * * *';
   const scheduleId = dataSourceScheduleId(params.dataSourceId);
-  const cl = await getClient();
+  const cl = await getTemporalClient();
   await terminateLegacyDataSourceCron(cl, params.dataSourceId);
 
   const action = dataSourceScheduleAction(params);
@@ -249,7 +267,7 @@ export async function startDataSourceSync(params: {
 
   const workflowId = `datasource-run-${params.dataSourceId}-${Date.now()}`;
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('dataSourceSync', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -275,7 +293,7 @@ export async function startDataSourceSync(params: {
 export async function cancelDataSourceSchedule(dataSourceId: string): Promise<void> {
   const scheduleId = dataSourceScheduleId(dataSourceId);
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     try {
       await cl.schedule.getHandle(scheduleId).delete();
       logger.info({ dataSourceId, scheduleId }, 'Deleted data source schedule');
@@ -292,7 +310,7 @@ export async function cancelDataSourceSchedule(dataSourceId: string): Promise<vo
 
 export async function signalIncidentResolved(incidentId: string): Promise<void> {
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = cl.workflow.getHandle(`incident-escalation-${incidentId}`);
     await handle.signal('incidentResolved');
     logger.info({ incidentId }, 'Sent resolved signal to escalation workflow');
@@ -310,7 +328,7 @@ export async function startIncidentAutoClose(params: {
   const workflowId = `incident-autoclose-${params.incidentId}`;
   const autoCloseAfterDays = params.autoCloseAfterDays ?? 7;
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('incidentAutoClose', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -335,7 +353,7 @@ export async function startIncidentAutoClose(params: {
 
 export async function cancelIncidentAutoClose(incidentId: string): Promise<void> {
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = cl.workflow.getHandle(`incident-autoclose-${incidentId}`);
     await handle.cancel();
     logger.info({ incidentId }, 'Cancelled incident auto-close workflow');
@@ -352,7 +370,7 @@ export async function startKnowledgeApproval(params: {
 }): Promise<string> {
   const workflowId = `kb-approval-${params.articleId}`;
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('knowledgeApproval', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -377,7 +395,7 @@ export async function signalKnowledgeApprovalDecision(
   decision: 'approved' | 'rejected',
 ): Promise<void> {
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = cl.workflow.getHandle(`kb-approval-${articleId}`);
     await handle.signal('kbApprovalDecision', { stepOrder, decision });
     logger.info({ articleId, stepOrder, decision }, 'Sent KB approval decision signal');
@@ -397,7 +415,7 @@ export async function startNotificationDispatch(params: {
   const workflowId = params.workflowId
     || `notification-dispatch-${params.entityType}-${params.entityId}-${params.triggerKey}-${Date.now()}`;
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('notificationDispatch', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -423,7 +441,7 @@ export async function startNotificationDispatch(params: {
 export async function startMetricSnapshotSchedule(cronSchedule = '0 2 * * *'): Promise<string> {
   const workflowId = 'metric-snapshots-daily-schedule';
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('metricSnapshotsDaily', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -447,7 +465,7 @@ export async function startMetricSnapshotSchedule(cronSchedule = '0 2 * * *'): P
 export async function startDbSizeSnapshotSchedule(cronSchedule = '0 2 * * *'): Promise<string> {
   const workflowId = 'system-metrics-db-size-snapshot-schedule';
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('systemMetricsDbSizeSnapshot', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -471,7 +489,7 @@ export async function startDbSizeSnapshotSchedule(cronSchedule = '0 2 * * *'): P
 export async function startProblemRecurrenceScanSchedule(cronSchedule = '15 2 * * *'): Promise<string> {
   const workflowId = 'problem-recurrence-scan-schedule';
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('problemRecurrenceScan', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -495,7 +513,7 @@ export async function startProblemRecurrenceScanSchedule(cronSchedule = '15 2 * 
 export async function startInboundEmailPollSchedule(cronSchedule = '* * * * *'): Promise<string> {
   const workflowId = 'inbound-email-poll-schedule';
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('inboundEmailPoll', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -522,7 +540,7 @@ export async function startMajorIncidentWorkflow(params: {
 }): Promise<string> {
   const workflowId = `major-incident-${params.majorIncidentId}`;
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('majorIncidentWorkflow', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -543,7 +561,7 @@ export async function startMajorIncidentWorkflow(params: {
 
 export async function signalMajorIncidentDeclareResolved(majorIncidentId: string): Promise<void> {
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = cl.workflow.getHandle(`major-incident-${majorIncidentId}`);
     await handle.signal('declareResolved');
     logger.info({ majorIncidentId }, 'Sent declareResolved to major incident workflow');
@@ -554,7 +572,7 @@ export async function signalMajorIncidentDeclareResolved(majorIncidentId: string
 
 export async function signalMajorIncidentStakeholderUpdate(majorIncidentId: string): Promise<void> {
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = cl.workflow.getHandle(`major-incident-${majorIncidentId}`);
     await handle.signal('stakeholderUpdatePosted');
     logger.info({ majorIncidentId }, 'Sent stakeholderUpdatePosted to major incident workflow');
@@ -568,7 +586,7 @@ export async function queryMajorIncidentWorkflowStatus(majorIncidentId: string):
   majorIncidentId: string;
 } | null> {
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = cl.workflow.getHandle(`major-incident-${majorIncidentId}`);
     return await handle.query('getMajorIncidentStatus');
   } catch (err) {
@@ -583,7 +601,7 @@ export async function startDataManagementJob(params: {
 }): Promise<string> {
   const workflowId = `data-management-${params.jobId}`;
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = await cl.workflow.start('dataManagementJob', {
       taskQueue: TASK_QUEUE,
       workflowId,
@@ -604,7 +622,7 @@ export async function startDataManagementJob(params: {
 
 export async function signalPostmortemPublished(postmortemId: string): Promise<void> {
   try {
-    const cl = await getClient();
+    const cl = await getTemporalClient();
     const handle = cl.workflow.getHandle(`postmortem-${postmortemId}`);
     await handle.signal('postmortemPublished');
     logger.info({ postmortemId }, 'Sent postmortemPublished signal');

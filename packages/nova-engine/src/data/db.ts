@@ -25,9 +25,11 @@ const pool = new Pool({
   database: config.db.database,
   user: config.db.user,
   password: config.db.password,
-  max: 20,
+  max: config.db.poolMax,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
+  statement_timeout: config.db.statementTimeoutMs,
+  idle_in_transaction_session_timeout: config.db.idleInTransactionTimeoutMs,
 });
 
 pool.on('error', (err) => {
@@ -91,6 +93,31 @@ export async function clearTenantContext(client: PoolClient): Promise<void> {
   await client.query(CLEAR_TENANT_CONTEXT_SQL);
 }
 
+/**
+ * Clear tenant context and return the client to the pool. If clearing fails the
+ * connection is destroyed instead, so no later borrower inherits this tenant's GUCs.
+ */
+export async function releaseTenantClient(client: PoolClient): Promise<void> {
+  try {
+    await clearTenantContext(client);
+    client.release();
+  } catch (err) {
+    logger.warn({ err }, 'Failed to clear tenant context; discarding connection');
+    client.release(err instanceof Error ? err : new Error(String(err)));
+  }
+}
+
+export type UserAccess = { is_active: boolean; roles: string[] };
+
+/** Active flag plus direct and assignment-group roles, in one pooled statement. */
+export async function resolveUserAccess(userId: string, tenantId: string): Promise<UserAccess | null> {
+  const result = await pool.query<UserAccess>(
+    'SELECT is_active, roles FROM resolve_user_access($1, $2)',
+    [userId, tenantId],
+  );
+  return result.rows[0] ?? null;
+}
+
 /** Bind a checked-out client to async continuation (Express next()). */
 export function bindRequestClient(client: PoolClient, next: () => void): void {
   tenantAls.run({ client }, next);
@@ -120,12 +147,7 @@ async function withScopedClient<T>(
     }
     throw err;
   } finally {
-    try {
-      await clearTenantContext(client);
-    } catch {
-      // ignore – connection may already be broken
-    }
-    client.release();
+    await releaseTenantClient(client);
   }
 }
 
@@ -187,6 +209,8 @@ export const db = {
   getClient,
   setTenantContext,
   clearTenantContext,
+  releaseTenantClient,
+  resolveUserAccess,
   bindRequestClient,
   withTenantContext,
   withTenantTransaction,
