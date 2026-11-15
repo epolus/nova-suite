@@ -46,6 +46,7 @@ Nova Suite provides a complete service management solution — service catalog, 
 - Response and resolution SLA clocks with pause/resume, bound definitions, and breach actions
 - Priority matrix with impact/urgency calculation
 - Assignment to users and groups, plus OLA handoff clocks on assignment groups
+- On-call rota calendar for assignment groups; alert-created incidents assign to the covering shift when one exists
 - Journal / activity log with comments and work notes
 - Known-error suggestions from the same CI or service
 - Default "active" filter (excludes closed) for efficient triage
@@ -63,10 +64,11 @@ Nova Suite provides a complete service management solution — service catalog, 
 - Relationship management (depends_on, used_by, runs_on, connected_to, part_of, manages)
 - Recursive impact analysis (blast radius) and CI history
 - Microsoft Intune discovery with optional full-sync retire-missing
-- IT assets linked to CIs, including purchase, warranty, and contract reference
+- IT assets linked to CIs, including purchase, warranty, contract reference, and assign/return history
 
 ### Events, Chat, and Improvement
 - Alertmanager and generic event ingest into alert episodes (`docs/EVENT_MANAGEMENT.md`)
+- On-call rota month grid (`/on-call`) with outside-hours fill from business calendars
 - Slack and Teams incident threads with journal replies (`docs/SLACK_TEAMS.md`)
 - Continual improvement register with an activity journal
 
@@ -91,7 +93,7 @@ Nova Suite provides a complete service management solution — service catalog, 
 - Multi-tenant architecture with PostgreSQL Row-Level Security
 - JWT-based authentication
 - SSO via OpenID Connect providers (Google-first) with auto-provisioning
-- Role-based access control (admin, fulfiller, user, plus practice roles such as change_manager, event_operator, and event_manager)
+- Role-based access control (admin, fulfiller, user, plus practice roles such as change_manager, event_operator, event_manager, on_call_admin, and on_call)
 
 ## Tech Stack
 
@@ -403,10 +405,12 @@ All endpoints are prefixed with `/api`. Full interactive documentation is availa
 | `/api/admin/assignment-groups`      | GET/POST        | Admin             | Assignment group management            |
 | `/api/admin/services`               | GET/POST        | Admin             | Service management                     |
 | `/api/admin/processes`              | GET/POST        | Admin             | Process management                     |
+| `/api/rota/shifts`                  | GET/POST/PATCH/DELETE | View / manage | On-call shift calendar (CRUD)     |
+| `/api/rota/on-call`                 | GET             | View              | Covering shift for a group at a time   |
 | `/api/settings/theme`               | GET             | None              | Public theming (e.g. login page)       |
 | `/api/settings`                     | GET/PUT         | Admin             | List / bulk-update tenant settings     |
 
-**Roles:** Admin = full access, Fulfiller (FF) = incident/request management, Configuration Manager (CM) = CMDB editing, User = self-service only. Practice roles such as `change_manager`, `event_operator`, and `event_manager` gate those queues. The table is a **sample**; use `/docs` for every route (changes, problems, knowledge, major incidents, alerts, assets, improvements, cart, search, …).
+**Roles:** Admin = full access, Fulfiller (FF) = incident/request management, Configuration Manager (CM) = CMDB editing, User = self-service only. Practice roles such as `change_manager`, `event_operator`, `event_manager`, `on_call_admin`, and `on_call` gate those queues. The table is a **sample**; use `/docs` for every route (changes, problems, knowledge, major incidents, alerts, assets, improvements, cart, search, …).
 
 ## Documentation
 

@@ -2,7 +2,7 @@
 
 ## Vision
 
-Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.36`.
+Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.43`.
 
 ## Implemented Modules
 
@@ -13,12 +13,13 @@ Nova Suite is a production-ready, open-source ITSM Suite for internal IT, manage
 - **Problem Management**: Problem records, linked incidents, a daily recurrence scan, known-error control (symptoms and workaround to enter, permanent fix or a linked change to close), and task tracking.
 - **Knowledge Management**: Article authoring, versioning, review, and publishing, approval workflows, ratings, suggestions, and markdown with attachments.
 - **CMDB**: CI classes, relationship mapping, impact traversal, relationship graph, audit history, and Microsoft Intune discovery. A full sync retires Intune devices missing from a non-empty feed.
-- **IT Asset Management**: Asset records linked to configuration items, lifecycle through received, in stock, in use, maintenance, retired, and disposed, plus purchase cost, warranty, contract reference, and depreciation.
+- **IT Asset Management**: Asset records linked to configuration items, lifecycle through received, in stock, in use, maintenance, retired, and disposed, plus purchase cost, warranty, contract reference, depreciation, and assign/return history.
+- **On-call rota**: Assignment-group shift calendar (`rota_shifts`); alert-created incidents assign to the user covering `now()` when a shift exists. Roles: `on_call_admin` (manage), `on_call` (view / be scheduled).
 - **Continual Improvement**: A register of improvements created by hand, from a postmortem action item, from an unsuccessful change, or from a problem’s permanent fix, with an activity journal of comments, work notes, and status or owner changes.
 - **Service Level Management**: SLA definitions, business calendars, warning and breach actions on a bound definition, an attainment report with pause-adjusted MTTR, and OLA targets on assignment groups that start a handoff clock on the incident.
 - **Reports**: Saved reports and an SLA attainment card on the reports library.
 - **Notifications**: In-app, email, and Slack and Teams messages that stay on the incident thread. A reply that names the incident, or that arrives on a known thread, is added to the journal. Status changes are posted back. Slack learns the thread id when a bot token is set; Teams follow-ups are another card on the same webhook. Setup is in `docs/SLACK_TEAMS.md`.
-- **Event management**: Alertmanager and generic events roll up into alert episodes. A definition opens an incident or starts an `alert.firing` notification. A planned change on the CI suppresses that action. A cleared alert resolves the incident only when nobody has worked it. `event_operator` works the queue. `event_manager` owns the definitions. Setup is in `docs/EVENT_MANAGEMENT.md`.
+- **Event management**: Alertmanager and generic events roll up into alert episodes. A definition opens an incident or starts an `alert.firing` notification. When opening an incident, Nova Suite sets `assigned_to` from the covering on-call shift for that group if one exists. A planned change on the CI suppresses that action. A cleared alert resolves the incident only when nobody has worked it. `event_operator` works the queue. `event_manager` owns the definitions. Setup is in `docs/EVENT_MANAGEMENT.md`.
 - **AI Assist**: Optional agent and employee copilots, plus create-time triage suggestions. Priority auto-apply stays off unless enabled.
 - **Admin Platform**: Users, roles, groups, departments, cost centers, locations, companies, services, branding, workflows, credentials, config packages, and data-source imports.
 
@@ -35,7 +36,7 @@ Nova Suite is a production-ready, open-source ITSM Suite for internal IT, manage
 - Incident lifecycle: new → assigned → in progress → pending → resolved → closed
 - Priority from the impact × urgency matrix
 - Response and resolution SLA clocks, pause and resume, and breach detection
-- Assignment and routing to individuals or groups
+- Assignment and routing to individuals or groups, including on-call coverage for alert-created incidents
 - Activity journal with customer-visible notes and internal work notes
 - Known errors suggested from the same CI or service
 
@@ -51,6 +52,7 @@ Nova Suite is a production-ready, open-source ITSM Suite for internal IT, manage
 - Hardware, software, license, and consumable records
 - Lifecycle from ordered and received through disposal
 - Purchase, warranty, and contract reference on the asset form, using the user’s date format
+- Assign to a user and return, with assignment history on the asset
 - Optional link to a configuration item
 
 ## Architecture Highlights

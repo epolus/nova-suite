@@ -77,9 +77,10 @@ CREATE POLICY tenant_isolation_requests ON requests
 | `major_incidents`      | Declared major incidents and war-room data |
 | `changes` / `standard_changes` | Change records and reusable templates |
 | `problems` / `known_errors` | Problem records and the known-error store |
-| `assets`               | IT asset records, often linked to a CI     |
+| `assets` / `asset_assignments` | IT assets, CI link, assign/return history |
 | `improvements`         | Continual improvement register             |
 | `events` / `alerts` / `alert_definitions` | Monitoring ingest and alert episodes |
+| `rota_shifts`          | On-call coverage windows per assignment group |
 | `ci_classes`           | Extensible CI type definitions             |
 | `configuration_items`  | Actual infrastructure items                |
 | `ci_relationships`     | Dependency graph between CIs               |
@@ -126,7 +127,7 @@ This supports Google and Microsoft Entra ID without code-path changes.
 | `admin` | Everything: users, catalog, CMDB, all practice queues |
 | `fulfiller` | Incidents, CMDB, request approval, journal entries |
 | `user` | Browse catalog, submit requests, view own requests |
-| Practice roles | Examples: `change_manager`, `problem`, `major_incident_manager`, `configuration_manager`, `event_operator` (alert queue), `event_manager` (alert definitions), `data_manager` (retention jobs). Assign under Admin → Roles. |
+| Practice roles | Examples: `change_manager`, `problem`, `major_incident_manager`, `configuration_manager`, `event_operator` (alert queue), `event_manager` (alert definitions), `data_manager` (retention jobs), `on_call_admin` (manage rota shifts), `on_call` (view rota / be scheduled). Assign under Admin → Roles. |
 
 ## API Design Principles
 
