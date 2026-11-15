@@ -118,10 +118,20 @@ export function buildListSearchParams(
   return next;
 }
 
+/** Keep array identity stable when callers pass inline literals like `['status']`. */
+function useStableStringArray(value: string[]): string[] {
+  const key = value.join('\0');
+  // Intentionally keyed by content so a new `['status']` each render does not churn.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the content fingerprint
+  return useMemo(() => value, [key]);
+}
+
 export function useListParams({ defaultCols, filterKeys = [], prefix = '', storageKey }: UseListParamsOptions) {
   const [searchParams, setSearchParams] = useSearchParams();
   const p = useCallback((key: string) => `${prefix}${key}`, [prefix]);
   const [savedPrefs, setSavedPrefs] = useState<SavedPrefs | null>(() => loadPrefs(storageKey));
+  const stableDefaultCols = useStableStringArray(defaultCols);
+  const stableFilterKeys = useStableStringArray(filterKeys);
 
   useEffect(() => {
     if (!storageKey) return;
@@ -151,7 +161,7 @@ export function useListParams({ defaultCols, filterKeys = [], prefix = '', stora
     } else if (saved?.cols) {
       cols = saved.cols;
     } else {
-      cols = defaultCols;
+      cols = stableDefaultCols;
     }
 
     let sort = '';
@@ -178,14 +188,14 @@ export function useListParams({ defaultCols, filterKeys = [], prefix = '', stora
       dir,
       cols,
       page: Math.max(1, parseInt(searchParams.get(p('page')) || '1', 10) || 1),
-      filters: filterKeys.reduce<Record<string, string>>((acc, key) => {
+      filters: stableFilterKeys.reduce<Record<string, string>>((acc, key) => {
         const val = searchParams.get(p(key));
         if (val) acc[key] = val;
         return acc;
       }, {}),
       columnFilters,
     };
-  }, [searchParams, defaultCols, filterKeys, prefix, savedPrefs, p]);
+  }, [searchParams, stableDefaultCols, stableFilterKeys, prefix, savedPrefs, p]);
 
   const update = useCallback(
     (patch: Partial<ListParams>) => {
@@ -208,7 +218,7 @@ export function useListParams({ defaultCols, filterKeys = [], prefix = '', stora
 
         if (patch.cols !== undefined) {
           const colStr = patch.cols.join(',');
-          const defaultStr = defaultCols.join(',');
+          const defaultStr = stableDefaultCols.join(',');
           if (colStr === defaultStr) next.delete(p('cols'));
           else next.set(p('cols'), colStr);
         }
@@ -219,7 +229,7 @@ export function useListParams({ defaultCols, filterKeys = [], prefix = '', stora
         }
 
         if (patch.filters !== undefined) {
-          for (const key of filterKeys) {
+          for (const key of stableFilterKeys) {
             const val = patch.filters[key];
             if (val) next.set(p(key), val);
             else next.delete(p(key));
@@ -254,7 +264,7 @@ export function useListParams({ defaultCols, filterKeys = [], prefix = '', stora
         });
       }
     },
-    [setSearchParams, defaultCols, filterKeys, prefix, storageKey, p],
+    [setSearchParams, stableDefaultCols, stableFilterKeys, prefix, storageKey, p],
   );
 
   const setSearch = useCallback(
