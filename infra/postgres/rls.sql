@@ -67,6 +67,7 @@ ALTER TABLE config_deployment_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_metrics_db_size_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metric_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE asset_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE improvements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE improvement_journal ENABLE ROW LEVEL SECURITY;
@@ -530,6 +531,9 @@ CREATE POLICY tenant_isolation_metric_snapshots ON metric_snapshots
 CREATE POLICY tenant_isolation_assets ON assets
   FOR ALL USING (tenant_id = current_tenant_id());
 
+CREATE POLICY tenant_isolation_asset_assignments ON asset_assignments
+  FOR ALL USING (tenant_id = current_tenant_id());
+
 -- ─── Releases ───
 CREATE POLICY tenant_isolation_releases ON releases
   FOR ALL USING (tenant_id = current_tenant_id());
@@ -868,6 +872,7 @@ ALTER TABLE config_deployment_runs FORCE ROW LEVEL SECURITY;
 ALTER TABLE system_metrics_db_size_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE metric_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE assets FORCE ROW LEVEL SECURITY;
+ALTER TABLE asset_assignments FORCE ROW LEVEL SECURITY;
 ALTER TABLE releases FORCE ROW LEVEL SECURITY;
 ALTER TABLE improvements FORCE ROW LEVEL SECURITY;
 ALTER TABLE improvement_journal FORCE ROW LEVEL SECURITY;

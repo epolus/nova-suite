@@ -2,17 +2,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useTranslations } from 'use-intl';
-import { assets } from '@/api/client';
+import { assets, cmdb } from '@/api/client';
+import type { Asset, CI } from '@/api/client';
 import PageHeader from '@/components/PageHeader';
 import Card from '@/components/Card';
 import CustomFieldsSection from '@/components/CustomFieldsSection';
 import RelatedRecordsCard from '@/components/RelatedRecordsCard';
+import { SearchableDropdown } from '@/components/SearchableDropdown';
 import Spinner from '@/components/Spinner';
 import UnsavedChangesDialog from '@/components/ui/UnsavedChangesDialog';
 import { Button } from '@/components/ui/button';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useStatusLabel } from '@/i18n/hooks';
 import UserDateInput from '@/components/UserDateInput';
+import AssetAssignmentCard from './AssetAssignmentCard';
 
 const ASSET_STATUSES = ['ordered', 'received', 'in_stock', 'in_use', 'maintenance', 'retired', 'disposed'] as const;
 
@@ -21,6 +24,7 @@ interface AssetForm {
   name: string;
   category: string;
   status: string;
+  linked_ci_id: string;
   vendor_name: string;
   purchase_cost: string;
   purchase_currency: string;
@@ -36,6 +40,7 @@ const EMPTY_FORM: AssetForm = {
   name: '',
   category: 'hardware',
   status: 'in_use',
+  linked_ci_id: '',
   vendor_name: '',
   purchase_cost: '',
   purchase_currency: 'USD',
@@ -62,7 +67,6 @@ export default function AssetDetailPage() {
   const navigate = useNavigate();
   const t = useTranslations('pages.assets');
   const tActions = useTranslations('common.actions');
-  const tTable = useTranslations('common.table');
   const statusLabel = useStatusLabel();
 
   const [loading, setLoading] = useState(!isNew);
@@ -72,7 +76,10 @@ export default function AssetDetailPage() {
   const [baseline, setBaseline] = useState(EMPTY_FORM);
   const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [baselineCustomFields, setBaselineCustomFields] = useState<Record<string, unknown>>({});
-  const [linkedCi, setLinkedCi] = useState<{ id: string; name: string } | null>(null);
+  const [linkedCiName, setLinkedCiName] = useState('');
+  const [ciOptions, setCiOptions] = useState<CI[]>([]);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [ownerName, setOwnerName] = useState<string | null>(null);
   const [prevId, setPrevId] = useState(id);
 
   if (id !== prevId) {
@@ -84,9 +91,23 @@ export default function AssetDetailPage() {
       setBaseline(EMPTY_FORM);
       setCustomFields({});
       setBaselineCustomFields({});
-      setLinkedCi(null);
+      setLinkedCiName('');
+      setOwnerUserId(null);
+      setOwnerName(null);
     }
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    cmdb.items({}, 1, 100)
+      .then((res) => {
+        if (!cancelled) setCiOptions(res.items);
+      })
+      .catch(() => {
+        if (!cancelled) setCiOptions([]);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (isNew || !id) return;
@@ -99,6 +120,7 @@ export default function AssetDetailPage() {
           name: asset.name,
           category: asset.category,
           status: asset.status,
+          linked_ci_id: asset.linked_ci_id || '',
           vendor_name: asset.vendor_name || '',
           purchase_cost: textInput(asset.purchase_cost),
           purchase_currency: asset.purchase_currency || 'USD',
@@ -113,9 +135,9 @@ export default function AssetDetailPage() {
         setBaseline(next);
         setCustomFields(nextCustom);
         setBaselineCustomFields(nextCustom);
-        setLinkedCi(asset.linked_ci_id
-          ? { id: asset.linked_ci_id, name: asset.linked_ci_name || asset.linked_ci_id }
-          : null);
+        setLinkedCiName(asset.linked_ci_name || '');
+        setOwnerUserId(asset.owner_user_id);
+        setOwnerName(asset.owner_name || null);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed'));
@@ -172,6 +194,7 @@ export default function AssetDetailPage() {
         name: form.name.trim(),
         category: form.category,
         status: form.status,
+        linked_ci_id: form.linked_ci_id || null,
         vendor_name: form.vendor_name || null,
         purchase_cost: purchaseCost,
         purchase_currency: form.purchase_currency.trim() || 'USD',
@@ -239,12 +262,28 @@ export default function AssetDetailPage() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">{t('configurationItem')}</label>
-            {linkedCi ? (
-              <Link to={`/cmdb/${linkedCi.id}`} className="text-sm text-indigo-700 hover:underline">
-                {linkedCi.name}
+            <SearchableDropdown<CI>
+              items={ciOptions}
+              selectedId={form.linked_ci_id}
+              onSelect={(ciId) => {
+                const selected = ciOptions.find((ci) => ci.id === ciId);
+                setForm((p) => ({ ...p, linked_ci_id: ciId }));
+                setLinkedCiName(selected?.display_name || selected?.name || '');
+              }}
+              onClear={() => {
+                setForm((p) => ({ ...p, linked_ci_id: '' }));
+                setLinkedCiName('');
+              }}
+              getItemId={(ci) => ci.id}
+              getDisplayText={(ci) => ci.display_name || ci.name}
+              fallbackDisplayText={linkedCiName}
+              placeholder={t('searchCi')}
+              renderItem={(ci) => ci.display_name || ci.name}
+            />
+            {form.linked_ci_id && (
+              <Link to={`/cmdb/${form.linked_ci_id}`} className="mt-1 inline-block text-xs text-indigo-700 hover:underline">
+                {t('openCi')}
               </Link>
-            ) : (
-              <p className="text-sm text-gray-400">{tTable('emDash')}</p>
             )}
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -328,7 +367,16 @@ export default function AssetDetailPage() {
         </div>
       </Card>
       {!isNew && id && (
-        <div className="mt-6 max-w-2xl">
+        <div className="mt-6 max-w-2xl space-y-6">
+          <AssetAssignmentCard
+            assetId={id}
+            ownerUserId={ownerUserId}
+            ownerName={ownerName}
+            onOwnerChange={(asset: Asset) => {
+              setOwnerUserId(asset.owner_user_id);
+              setOwnerName(asset.owner_name || null);
+            }}
+          />
           <RelatedRecordsCard entityType="asset" entityId={id} />
         </div>
       )}
