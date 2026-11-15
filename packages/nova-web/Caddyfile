@@ -14,9 +14,12 @@
 	# Security headers for the SPA only; /api and /docs get theirs from the engine (helmet).
 	# style-src needs 'unsafe-inline' for React style props rendered as HTML and the chart theme <style>.
 	# img-src allows https: because knowledge articles may embed external images.
+	# script-src includes a per-request nonce so Cloudflare Bot/JS Detection can attach the
+	# same nonce to the inline bootstrap it injects (hashing that script is impossible —
+	# the body changes every request). Our own scripts stay external under 'self'.
 	@spa not path /api/* /docs*
 	header @spa {
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'nonce-{http.request.uuid}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
