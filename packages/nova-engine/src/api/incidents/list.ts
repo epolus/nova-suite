@@ -2,6 +2,7 @@
 // ─── Nova Suite – Incident list / nav / lookup services ───
 // Plain-argument services (PoolClient + args). No Request/Response.
 import type { PoolClient } from 'pg';
+import { appendPrefixColumnFilters, paginationMeta, sqlSortDirection } from '../../domain/list-query';
 import { endUserIncidentVisibilityCondition } from './sla-helpers';
 
 /** Per-column "starts with" filters (cf.column=value). */
@@ -133,21 +134,12 @@ export function buildIncidentListFilters(
 
   // Per-column "starts with" filters (cf.column=value)
   const cfMap = INCIDENT_CF_MAP;
-  for (const [qKey, qVal] of Object.entries(query)) {
-    if (typeof qKey === 'string' && qKey.startsWith('cf.') && typeof qVal === 'string' && qVal) {
-      const col = cfMap[qKey.slice(3)];
-      if (col) {
-        paramIdx++;
-        conditions.push(`${col} ILIKE $${paramIdx}`);
-        params.push(`${qVal}%`);
-      }
-    }
-  }
+  paramIdx = appendPrefixColumnFilters(query, cfMap, conditions, params, paramIdx + 1) - 1;
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const sortCol = ALLOWED_SORT_COLS[query.sort_by as string];
-  const sortDir = query.sort_dir === 'desc' ? 'DESC' : 'ASC';
+  const sortDir = sqlSortDirection(query.sort_dir);
   let sortClause: string;
   if (opts.sort === 'nav') {
     sortClause = sortCol
@@ -215,7 +207,7 @@ export async function listIncidents(
 
   return {
     incidents: result.rows,
-    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    pagination: paginationMeta(page, limit, total),
   };
 }
 

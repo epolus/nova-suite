@@ -14,6 +14,12 @@ import { enqueueNotificationDispatchStartJob } from '../../temporal/workflow-sta
 import { resolveSlaDueAt } from '../../domain/sla';
 import { canRetireKnownError, hasKnownErrorContent } from '../../domain/known-errors';
 import { usesStoredRecurrenceScan } from '../../domain/problem-recurrence';
+import { appendPrefixColumnFilters, paginationMeta, sqlSortDirection } from '../../domain/list-query';
+import {
+  canWorkOnProblem,
+  isProblemEnabledGroup,
+  listProblemAssignmentGroups,
+} from './permissions';
 import {
   DEFAULT_RECURRENCE_THRESHOLD,
   DEFAULT_TITLE_SIMILARITY,
@@ -23,10 +29,16 @@ import {
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
 
-const PROBLEM_PROCESS_NAME = 'Problem Management';
-
 function hasElevatedProblemRole(req: Request): boolean {
   return hasProblemRole(req);
+}
+
+function problemActorFrom(req: Request) {
+  return {
+    id: req.user!.id,
+    isAdmin: isAdminRole(req),
+    hasElevatedProblemRole: hasElevatedProblemRole(req),
+  };
 }
 
 async function linkedChangeCount(client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: Array<{ c?: number }> }> }, problemId: string): Promise<number> {
@@ -76,95 +88,11 @@ async function upsertKnownErrorForProblem(
   );
 }
 
-async function canWorkOnProblem(client: any, req: Request, problem: any): Promise<boolean> {
-  const isAdmin = isAdminRole(req);
-  if (isAdmin) return true;
-
-  if (problem.assignment_group_id) {
-    const m = await client.query(
-      `SELECT 1 FROM assignment_group_members
-       WHERE tenant_id = current_tenant_id()
-         AND group_id = $1
-         AND user_id = $2
-       LIMIT 1`,
-      [problem.assignment_group_id, req.user!.id],
-    );
-    if (m.rows.length > 0) return true;
-    return false;
-  }
-
-  if (problem.reported_by === req.user!.id) return true;
-  return hasElevatedProblemRole(req);
-}
-
-async function isProblemEnabledGroup(client: any, groupId: string): Promise<boolean> {
-  const r = await client.query(
-    `SELECT 1
-     FROM assignment_groups ag
-     WHERE ag.tenant_id = current_tenant_id()
-       AND ag.id = $1
-       AND (
-         EXISTS (
-           SELECT 1
-           FROM assignment_group_processes agp
-           JOIN processes p ON p.id = agp.process_id
-           WHERE agp.tenant_id = current_tenant_id()
-             AND agp.group_id = ag.id
-             AND p.tenant_id = current_tenant_id()
-             AND p.is_active = true
-             AND p.name = $2
-         )
-         OR EXISTS (
-           SELECT 1
-           FROM assignment_group_members agm
-           JOIN user_roles ur ON ur.user_id = agm.user_id AND ur.tenant_id = current_tenant_id()
-           JOIN roles r ON r.id = ur.role_id AND r.tenant_id = current_tenant_id()
-           WHERE agm.tenant_id = current_tenant_id()
-             AND agm.group_id = ag.id
-             AND r.name = 'problem'
-             AND r.is_active = true
-         )
-       )
-     LIMIT 1`,
-    [groupId, PROBLEM_PROCESS_NAME],
-  );
-  return r.rows.length > 0;
-}
-
 router.get('/assignment-groups', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
-    const rows = await client.query(
-      `SELECT ag.id, ag.name, ag.description, ag.is_active
-       FROM assignment_groups ag
-       WHERE ag.tenant_id = current_tenant_id()
-         AND ag.is_active = true
-         AND (
-           EXISTS (
-             SELECT 1
-             FROM assignment_group_processes agp
-             JOIN processes p ON p.id = agp.process_id
-             WHERE agp.tenant_id = current_tenant_id()
-               AND agp.group_id = ag.id
-               AND p.tenant_id = current_tenant_id()
-               AND p.is_active = true
-               AND p.name = $1
-           )
-           OR EXISTS (
-             SELECT 1
-             FROM assignment_group_members agm
-             JOIN user_roles ur ON ur.user_id = agm.user_id AND ur.tenant_id = current_tenant_id()
-             JOIN roles r ON r.id = ur.role_id AND r.tenant_id = current_tenant_id()
-             WHERE agm.tenant_id = current_tenant_id()
-               AND agm.group_id = ag.id
-               AND r.name = 'problem'
-               AND r.is_active = true
-           )
-         )
-       ORDER BY ag.name`,
-      [PROBLEM_PROCESS_NAME],
-    );
-    res.json({ assignment_groups: rows.rows });
+    const assignment_groups = await listProblemAssignmentGroups(client);
+    res.json({ assignment_groups });
   } catch (err) {
     next(err);
   }
@@ -413,15 +341,7 @@ router.get(
         assigned_to_name: 'u.display_name',
         reported_by_name: 'r.display_name',
       };
-      for (const [qKey, qVal] of Object.entries(req.query)) {
-        if (qKey.startsWith('cf.') && typeof qVal === 'string' && qVal) {
-          const col = cfMap[qKey.slice(3)];
-          if (col) {
-            conditions.push(`${col} ILIKE $${idx++}`);
-            params.push(`${qVal}%`);
-          }
-        }
-      }
+      idx = appendPrefixColumnFilters(req.query as Record<string, unknown>, cfMap, conditions, params, idx);
 
       const where = `WHERE ${conditions.join(' AND ')}`;
 
@@ -437,7 +357,7 @@ router.get(
         updated_at: 'p.updated_at',
       };
       const sortCol = allowedSortCols[String(req.query.sort_by || '')];
-      const sortDir = req.query.sort_dir === 'desc' ? 'DESC' : 'ASC';
+      const sortDir = sqlSortDirection(req.query.sort_dir);
       const orderClause = sortCol ? `ORDER BY ${sortCol} ${sortDir}` : 'ORDER BY p.created_at DESC';
 
       const count = await client.query(
@@ -482,7 +402,7 @@ router.get(
 
       res.json({
         problems: list.rows,
-        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+        pagination: paginationMeta(page, limit, total),
       });
     } catch (err) {
       next(err);
@@ -528,7 +448,7 @@ router.get('/nav', async (req: Request, res: Response, next: NextFunction) => {
       updated_at: 'p.updated_at',
     };
     const sortCol = allowedSortCols[String(req.query.sort_by || '')];
-    const sortDir = req.query.sort_dir === 'desc' ? 'DESC' : 'ASC';
+    const sortDir = sqlSortDirection(req.query.sort_dir);
     const orderClause = sortCol ? `ORDER BY ${sortCol} ${sortDir}` : 'ORDER BY p.created_at DESC';
 
     const rows = await client.query(
@@ -682,7 +602,7 @@ router.patch('/:id', validateBody(updateProblemSchema), async (req: Request, res
     if (currentRes.rows.length === 0) throw NotFound('Problem not found');
     const current = currentRes.rows[0];
 
-    const canWork = await canWorkOnProblem(client, req, current);
+    const canWork = await canWorkOnProblem(client, problemActorFrom(req), current);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
 
     const updates = req.body || {};
@@ -866,7 +786,7 @@ router.post('/:id/tasks', async (req: Request, res: Response, next: NextFunction
       [req.params.id],
     );
     if (problemRes.rows.length === 0) throw NotFound('Problem not found');
-    const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
+    const canWork = await canWorkOnProblem(client, problemActorFrom(req), problemRes.rows[0]);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
 
     const { title, description, task_type, status, assigned_to, due_date } = req.body || {};
@@ -892,7 +812,7 @@ router.patch('/:id/tasks/:taskId', async (req: Request, res: Response, next: Nex
       [req.params.id],
     );
     if (problemRes.rows.length === 0) throw NotFound('Problem not found');
-    const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
+    const canWork = await canWorkOnProblem(client, problemActorFrom(req), problemRes.rows[0]);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
 
     const sets: string[] = [];
@@ -929,7 +849,7 @@ router.delete('/:id/tasks/:taskId', async (req: Request, res: Response, next: Ne
       [req.params.id],
     );
     if (problemRes.rows.length === 0) throw NotFound('Problem not found');
-    const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
+    const canWork = await canWorkOnProblem(client, problemActorFrom(req), problemRes.rows[0]);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
     await client.query(
       `DELETE FROM problem_tasks
@@ -989,7 +909,7 @@ router.post('/:id/known-errors', async (req: Request, res: Response, next: NextF
       [req.params.id],
     );
     if (problemRes.rows.length === 0) throw NotFound('Problem not found');
-    const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
+    const canWork = await canWorkOnProblem(client, problemActorFrom(req), problemRes.rows[0]);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
     const { title, symptoms, workaround, permanent_fix_eta, tags, severity, is_active, kb_article_id } = req.body || {};
     if (!title || !symptoms || !workaround) throw new AppError(400, 'title, symptoms and workaround are required');
@@ -1020,7 +940,7 @@ router.patch('/:id/known-errors/:knownErrorId', async (req: Request, res: Respon
       [req.params.id],
     );
     if (problemRes.rows.length === 0) throw NotFound('Problem not found');
-    const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
+    const canWork = await canWorkOnProblem(client, problemActorFrom(req), problemRes.rows[0]);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
 
     const allowed = new Set([
@@ -1077,7 +997,7 @@ router.post('/:id/known-errors/:knownErrorId/kb-article', async (req: Request, r
       [req.params.id],
     );
     if (problemRes.rows.length === 0) throw NotFound('Problem not found');
-    const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
+    const canWork = await canWorkOnProblem(client, problemActorFrom(req), problemRes.rows[0]);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
 
     const kbArticleId = await resolveKbArticleId(client, req.body?.kb_article_id);
@@ -1112,7 +1032,7 @@ router.delete('/:id/known-errors/:knownErrorId/kb-article', async (req: Request,
       [req.params.id],
     );
     if (problemRes.rows.length === 0) throw NotFound('Problem not found');
-    const canWork = await canWorkOnProblem(client, req, problemRes.rows[0]);
+    const canWork = await canWorkOnProblem(client, problemActorFrom(req), problemRes.rows[0]);
     if (!canWork) throw new AppError(403, 'Only assigned problem group members or admins can work on this problem');
 
     const updated = await client.query(

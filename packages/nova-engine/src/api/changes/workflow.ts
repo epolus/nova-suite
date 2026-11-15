@@ -11,6 +11,7 @@ import {
   writeChangeAuditDiff,
   writeChangeStateJournal,
 } from '../../domain/change-collaboration';
+import { isUserMemberOfAssignmentGroup } from '../../domain/assignment-groups';
 import { canWorkOnChange } from './permissions';
 import { refreshChangeConflicts } from './conflicts';
 import type { ChangeActor, ChangeTransitionAction } from './types';
@@ -388,18 +389,9 @@ export async function decideApproval(
   const approval = approvalRes.rows[0];
 
   const isDirectApprover = approval.approver_user_id && approval.approver_user_id === actor.id;
-  let isGroupApprover = false;
-  if (approval.approver_group_id) {
-    const m = await client.query(
-      `SELECT 1 FROM assignment_group_members
-         WHERE tenant_id = current_tenant_id()
-           AND group_id = $1
-           AND user_id = $2
-         LIMIT 1`,
-      [approval.approver_group_id, actor.id],
-    );
-    isGroupApprover = m.rows.length > 0;
-  }
+  const isGroupApprover = approval.approver_group_id
+    ? await isUserMemberOfAssignmentGroup(client, approval.approver_group_id, actor.id)
+    : false;
   if (!actor.isAdmin && !isDirectApprover && !isGroupApprover && !actor.hasChangeRole) {
     throw new AppError(403, 'Insufficient permissions');
   }
