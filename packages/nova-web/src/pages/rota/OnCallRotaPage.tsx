@@ -3,13 +3,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import { auth, incidents, rota } from '../../api/client';
 import type { AssignmentGroupItem, UserListItem } from '../../api/client';
-import type { RotaShift } from '../../api/domains/rota';
+import type { RotaBusinessCalendar, RotaShift } from '../../api/domains/rota';
 import PageHeader from '../../components/PageHeader';
 import Spinner from '../../components/Spinner';
 import { SearchableDropdown } from '../../components/SearchableDropdown';
-import { formatDate, formatDateTime } from '../../utils/dateTime';
+import UserDateTimeInput from '../../components/UserDateTimeInput';
+import { formatDate, formatDateTime, toDatetimeLocalValue } from '../../utils/dateTime';
 import { canManageOnCallRota } from '../../utils/roles';
 import { useAuth } from '../../context/AuthContext';
+import { outsideWorkingHoursWindow } from './outsideWorkingHours';
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
@@ -36,16 +38,6 @@ function buildGrid(year: number, month: number): Date[] {
   return grid;
 }
 
-function toLocalInputValue(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function fromLocalInputValue(value: string) {
-  return new Date(value).toISOString();
-}
-
 type ShiftForm = {
   id?: string;
   assignment_group_id: string;
@@ -53,6 +45,7 @@ type ShiftForm = {
   starts_at: string;
   ends_at: string;
   notes: string;
+  business_calendar_id: string;
 };
 
 const emptyForm = (): ShiftForm => {
@@ -62,9 +55,10 @@ const emptyForm = (): ShiftForm => {
   return {
     assignment_group_id: '',
     user_id: '',
-    starts_at: toLocalInputValue(start.toISOString()),
-    ends_at: toLocalInputValue(end.toISOString()),
+    starts_at: toDatetimeLocalValue(start),
+    ends_at: toDatetimeLocalValue(end),
     notes: '',
+    business_calendar_id: '',
   };
 };
 
@@ -81,6 +75,7 @@ export default function OnCallRotaPage() {
   const [shifts, setShifts] = useState<RotaShift[]>([]);
   const [groups, setGroups] = useState<AssignmentGroupItem[]>([]);
   const [users, setUsers] = useState<UserListItem[]>([]);
+  const [calendars, setCalendars] = useState<RotaBusinessCalendar[]>([]);
   const [groupFilter, setGroupFilter] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(toDateKey(now));
   const [form, setForm] = useState<ShiftForm | null>(null);
@@ -99,10 +94,12 @@ export default function OnCallRotaPage() {
     Promise.all([
       incidents.assignmentGroups().catch(() => ({ assignment_groups: [] as AssignmentGroupItem[] })),
       auth.users().catch(() => ({ users: [] as UserListItem[] })),
-    ]).then(([g, u]) => {
+      rota.businessCalendars().catch(() => ({ business_calendars: [] as RotaBusinessCalendar[] })),
+    ]).then(([g, u, c]) => {
       if (cancelled) return;
       setGroups(g.assignment_groups);
       setUsers(u.users);
+      setCalendars(c.business_calendars);
     });
     return () => { cancelled = true; };
   }, []);
@@ -163,13 +160,27 @@ export default function OnCallRotaPage() {
     setSelectedKey(todayKey);
   };
 
+  const defaultCalendarId = useMemo(
+    () => calendars.find((c) => c.is_default)?.id || calendars[0]?.id || '',
+    [calendars],
+  );
+
   const openCreate = () => {
     const base = emptyForm();
+    base.business_calendar_id = defaultCalendarId;
     if (selectedKey) {
       const day = new Date(`${selectedKey}T09:00:00`);
       const end = new Date(`${selectedKey}T17:00:00`);
-      base.starts_at = toLocalInputValue(day.toISOString());
-      base.ends_at = toLocalInputValue(end.toISOString());
+      base.starts_at = toDatetimeLocalValue(day);
+      base.ends_at = toDatetimeLocalValue(end);
+      const cal = calendars.find((c) => c.id === base.business_calendar_id);
+      if (cal) {
+        const ooh = outsideWorkingHoursWindow(selectedKey, cal);
+        if (ooh) {
+          base.starts_at = ooh.starts_at;
+          base.ends_at = ooh.ends_at;
+        }
+      }
     }
     if (groupFilter) base.assignment_group_id = groupFilter;
     setForm(base);
@@ -181,10 +192,29 @@ export default function OnCallRotaPage() {
       id: shift.id,
       assignment_group_id: shift.assignment_group_id,
       user_id: shift.user_id,
-      starts_at: toLocalInputValue(shift.starts_at),
-      ends_at: toLocalInputValue(shift.ends_at),
+      starts_at: toDatetimeLocalValue(shift.starts_at),
+      ends_at: toDatetimeLocalValue(shift.ends_at),
       notes: shift.notes || '',
+      business_calendar_id: defaultCalendarId,
     });
+    setError(null);
+  };
+
+  const applyOutsideHours = () => {
+    if (!form) return;
+    const cal = calendars.find((c) => c.id === form.business_calendar_id);
+    if (!cal) {
+      setError(t('selectCalendar'));
+      return;
+    }
+    const dayKey = selectedKey
+      || (form.starts_at ? form.starts_at.slice(0, 10) : toDateKey(now));
+    const ooh = outsideWorkingHoursWindow(dayKey, cal);
+    if (!ooh) {
+      setError(t('oohUnavailable'));
+      return;
+    }
+    setForm({ ...form, starts_at: ooh.starts_at, ends_at: ooh.ends_at });
     setError(null);
   };
 
@@ -211,8 +241,8 @@ export default function OnCallRotaPage() {
       const payload = {
         assignment_group_id: form.assignment_group_id,
         user_id: form.user_id,
-        starts_at: fromLocalInputValue(form.starts_at),
-        ends_at: fromLocalInputValue(form.ends_at),
+        starts_at: new Date(form.starts_at).toISOString(),
+        ends_at: new Date(form.ends_at).toISOString(),
         notes: form.notes.trim() || null,
       };
       if (form.id) await rota.updateShift(form.id, payload);
@@ -453,21 +483,44 @@ export default function OnCallRotaPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('startsAt')}</label>
-                  <input
-                    type="datetime-local"
-                    value={form.starts_at}
-                    onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('businessCalendar')}</label>
+                  <select
+                    value={form.business_calendar_id}
+                    onChange={(e) => setForm({ ...form, business_calendar_id: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                  >
+                    <option value="">{t('selectCalendar')}</option>
+                    {calendars.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.is_default ? ` (${t('defaultCalendar')})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={applyOutsideHours}
+                    className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                  >
+                    {t('fillOutsideHours')}
+                  </button>
+                  <p className="mt-1 text-[11px] text-gray-400">{t('fillOutsideHoursHint')}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('startsAt')}</label>
+                  <UserDateTimeInput
+                    value={form.starts_at}
+                    onChange={(v) => setForm({ ...form, starts_at: v })}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                    ariaLabel={t('startsAt')}
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">{t('endsAt')}</label>
-                  <input
-                    type="datetime-local"
+                  <UserDateTimeInput
                     value={form.ends_at}
-                    onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
+                    onChange={(v) => setForm({ ...form, ends_at: v })}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                    ariaLabel={t('endsAt')}
                   />
                 </div>
                 <div>

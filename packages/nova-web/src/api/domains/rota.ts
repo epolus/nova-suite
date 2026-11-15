@@ -22,7 +22,18 @@ export type OnCallCovering = {
   shift_id: string;
 };
 
+export type RotaBusinessCalendar = {
+  id: string;
+  name: string;
+  timezone: string;
+  is_default: boolean;
+  hours: Array<{ day_of_week: number; start_time: string; end_time: string }>;
+  holidays: string[];
+};
+
 export const rota = {
+  businessCalendars: () =>
+    request<{ business_calendars: RotaBusinessCalendar[] }>('/rota/business-calendars'),
   listShifts: (params: { from: string; to: string; assignment_group_id?: string }) => {
     const qs = new URLSearchParams({ from: params.from, to: params.to });
     if (params.assignment_group_id) qs.set('assignment_group_id', params.assignment_group_id);
