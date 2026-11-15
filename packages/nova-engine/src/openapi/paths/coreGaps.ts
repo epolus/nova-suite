@@ -3,19 +3,15 @@ import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import {
   batchRequestSchema,
-  createServiceItemSchema,
   fulfillmentModelUpdateSchema,
   fulfillmentModelWriteSchema,
   incidentLinkMajorIncidentSchema,
   paginationSchema,
   rankedSuggestionsQuerySchema,
+  updateServiceItemSchema,
   uuidSchema,
 } from '../../domain/schemas';
 import { jsonBody, registerOp, uuidParam } from '../helpers';
-
-const updateServiceItemSchema = createServiceItemSchema.partial().extend({
-  is_active: z.boolean().optional(),
-});
 
 const catalogTaskSchema = z.object({
   name: z.string().min(1).max(255),

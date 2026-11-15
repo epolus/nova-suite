@@ -1,4 +1,12 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type {
+  CreateCategoryInput,
+  CreateServiceItemInput,
+  FulfillmentModelUpdateInput,
+  FulfillmentModelWriteInput,
+  UpdateCategoryInput,
+  UpdateServiceItemInput,
+} from '@nova-suite/shared/schemas';
 import { request, uploadFile, BASE } from '../http';
 import type { AllCatalogTask, CatalogTask, Category, FulfillmentModel, ServiceItem } from '../types';
 
@@ -7,20 +15,18 @@ export const catalog = {
     request<{ categories: Category[] }>(
       `/catalog/categories${options?.includeInactive ? '?include_inactive=true' : ''}`,
     ),
-  createCategory: (data: { name: string; description?: string; icon?: string; sort_order?: number }) =>
+  createCategory: (data: CreateCategoryInput) =>
     request<Category>('/catalog/categories', { method: 'POST', body: JSON.stringify(data) }),
-  updateCategory: (
-    id: string,
-    data: { name?: string; description?: string | null; icon?: string; sort_order?: number; is_active?: boolean },
-  ) => request<Category>(`/catalog/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  updateCategory: (id: string, data: UpdateCategoryInput) =>
+    request<Category>(`/catalog/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   items: (categoryId?: string) =>
     request<{ items: ServiceItem[] }>(
       `/catalog/items${categoryId ? `?category_id=${categoryId}` : ''}`,
     ),
   item: (id: string) => request<ServiceItem>(`/catalog/items/${id}`),
-  createItem: (data: Partial<ServiceItem>) =>
+  createItem: (data: CreateServiceItemInput) =>
     request<ServiceItem>('/catalog/items', { method: 'POST', body: JSON.stringify(data) }),
-  updateItem: (id: string, data: Partial<ServiceItem>) =>
+  updateItem: (id: string, data: UpdateServiceItemInput) =>
     request<ServiceItem>(`/catalog/items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteItem: (id: string, options?: { permanent?: boolean }) =>
     request<{ success: boolean; deleted_tasks?: number; error?: string }>(
@@ -48,9 +54,9 @@ export const catalog = {
     request<{ success: boolean }>(`/catalog/items/${itemId}/tasks/${taskId}`, { method: 'DELETE' }),
   fulfillmentModels: () => request<{ fulfillment_models: FulfillmentModel[] }>('/catalog/fulfillment-models'),
   fulfillmentModel: (id: string) => request<FulfillmentModel>(`/catalog/fulfillment-models/${id}`),
-  createFulfillmentModel: (data: { name: string; description?: string | null; is_active?: boolean; config: FulfillmentModel['config'] }) =>
+  createFulfillmentModel: (data: FulfillmentModelWriteInput) =>
     request<FulfillmentModel>('/catalog/fulfillment-models', { method: 'POST', body: JSON.stringify(data) }),
-  updateFulfillmentModel: (id: string, data: { name?: string; description?: string | null; is_active?: boolean; config?: FulfillmentModel['config'] }) =>
+  updateFulfillmentModel: (id: string, data: FulfillmentModelUpdateInput) =>
     request<FulfillmentModel>(`/catalog/fulfillment-models/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteFulfillmentModel: (id: string) =>
     request<{ success: boolean }>(`/catalog/fulfillment-models/${id}`, { method: 'DELETE' }),

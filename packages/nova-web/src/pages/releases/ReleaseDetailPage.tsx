@@ -116,11 +116,11 @@ export default function ReleaseDetailPage() {
         rollback_plan: form.rollback_plan || null,
       };
       if (isNew) {
-        const created = await releases.create(payload);
+        const created = await releases.create(payload as Parameters<typeof releases.create>[0]);
         allowNextNavigation();
         navigate(`/releases/${created.id}`);
       } else if (id) {
-        await releases.update(id, payload);
+        await releases.update(id, payload as Parameters<typeof releases.update>[1]);
         setBaseline(form);
       }
       return true;

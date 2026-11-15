@@ -5,7 +5,6 @@
 
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
-import { fulfillmentModelConfigErrors } from '@nova-suite/shared';
 import { serviceNowExtractOptionsSchema } from '@nova-suite/shared/migrators/servicenow';
 
 extendZodWithOpenApi(z);
@@ -51,6 +50,31 @@ export {
   postmortemUpsertSchema,
   publishPostmortemSchema,
   majorIncidentListQuerySchema,
+  createCategorySchema,
+  updateCategorySchema,
+  createServiceItemSchema,
+  updateServiceItemSchema,
+  fulfillmentModelWriteSchema,
+  fulfillmentModelUpdateSchema,
+  adminCreateUserSchema,
+  adminUpdateUserSchema,
+  createCIClassSchema,
+  updateCIClassSchema,
+  createCISchema,
+  updateCISchema,
+  createCIRelationshipSchema,
+  createAssetSchema,
+  updateAssetSchema,
+  assignAssetSchema,
+  returnAssetSchema,
+  createReleaseSchema,
+  updateReleaseSchema,
+  createImprovementSchema,
+  updateImprovementSchema,
+  improvementFromPostmortemSchema,
+  improvementFromChangeSchema,
+  improvementFromProblemSchema,
+  addImprovementJournalSchema,
 } from '@nova-suite/shared/schemas';
 export type {
   LoginInput,
@@ -91,69 +115,46 @@ export type {
   PostmortemFollowUpInput,
   PostmortemUpsertInput,
   PublishPostmortemInput,
+  CreateCategoryInput,
+  UpdateCategoryInput,
+  CreateServiceItemInput,
+  UpdateServiceItemInput,
+  FulfillmentModelWriteInput,
+  FulfillmentModelUpdateInput,
+  AdminCreateUserInput,
+  AdminUpdateUserInput,
+  CreateCIClassInput,
+  UpdateCIClassInput,
+  CreateCIInput,
+  UpdateCIInput,
+  CreateCIRelationshipInput,
+  CreateAssetInput,
+  UpdateAssetInput,
+  AssignAssetInput,
+  ReturnAssetInput,
+  CreateReleaseInput,
+  UpdateReleaseInput,
+  CreateImprovementInput,
+  UpdateImprovementInput,
+  ImprovementFromPostmortemInput,
+  ImprovementFromChangeInput,
+  ImprovementFromProblemInput,
+  AddImprovementJournalInput,
 } from '@nova-suite/shared/schemas';
 
 import {
-  e164PhoneSchema,
+  updateAssetSchema,
+  updateImprovementSchema,
+  updateReleaseSchema,
   uuidSchema,
 } from '@nova-suite/shared/schemas';
 
-// ─── Service Catalog ───
-export const createCategorySchema = z.object({
-  name: z.string().min(1).max(255),
-  description: z.string().max(2000).optional(),
-  icon: z.string().max(50).optional(),
-  sort_order: z.number().int().min(0).optional(),
-});
-
-export const updateCategorySchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  description: z.string().max(2000).nullable().optional(),
-  icon: z.string().max(50).optional(),
-  sort_order: z.number().int().min(0).optional(),
-  is_active: z.boolean().optional(),
-});
-
-export const createServiceItemSchema = z.object({
-  category_id: uuidSchema,
-  name: z.string().min(1).max(255),
-  short_description: z.string().max(500).nullable().optional(),
-  description: z.string().max(5000).nullable().optional(),
-  icon: z.string().max(50).optional(),
-  price: z.number().min(0).optional().nullable(),
-  custom_attributes: z.record(z.string(), z.unknown()).default({}),
-  form_schema: z
-    .object({ fields: z.array(z.record(z.string(), z.unknown())) })
-    .default({ fields: [] }),
-  approval_required: z.boolean().default(false),
-  sla_hours: z.number().int().min(1).optional(),
-  fulfillment_model_id: uuidSchema.nullable().optional(),
-});
-
-export const fulfillmentModelWriteSchema = z.object({
-  name: z.string().min(1).max(255),
-  description: z.string().max(2000).nullable().optional(),
-  is_active: z.boolean().optional(),
-  config: z.unknown(),
-}).superRefine((body, ctx) => {
-  const errors = fulfillmentModelConfigErrors(body.config);
-  if (errors.length > 0) {
-    ctx.addIssue({ code: 'custom', message: errors.join('; '), path: ['config'] });
-  }
-});
-
-export const fulfillmentModelUpdateSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  description: z.string().max(2000).nullable().optional(),
-  is_active: z.boolean().optional(),
-  config: z.unknown().optional(),
-}).superRefine((body, ctx) => {
-  if (body.config === undefined) return;
-  const errors = fulfillmentModelConfigErrors(body.config);
-  if (errors.length > 0) {
-    ctx.addIssue({ code: 'custom', message: errors.join('; '), path: ['config'] });
-  }
-});
+// Engine SQL patch allow-lists (derived from shared update schemas).
+export const ASSET_UPDATE_COLUMNS = Object.keys(updateAssetSchema.shape).filter(
+  (key) => key !== 'custom_fields' && key !== 'owner_user_id',
+);
+export const RELEASE_UPDATE_COLUMNS = Object.keys(updateReleaseSchema.shape);
+export const IMPROVEMENT_UPDATE_COLUMNS = Object.keys(updateImprovementSchema.shape);
 
 // ─── Configuration Packages ───
 export const configExternalKeySchema = z
@@ -345,179 +346,3 @@ export const serviceNowApplySchema = z.object({
   /** Create assignment groups referenced by tasks that do not exist yet; otherwise tasks are left unassigned. */
   create_missing_groups: z.boolean().default(false),
 });
-
-// ─── Admin users ───
-export const adminCreateUserSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8).max(128),
-  display_name: z.string().min(1).max(255),
-  phone: e164PhoneSchema.optional().nullable(),
-  mobile: e164PhoneSchema.optional().nullable(),
-  vip: z.boolean().optional(),
-  employee_number: z.string().max(100).optional().nullable(),
-  locked_out: z.boolean().optional(),
-  lock_reason: z.string().max(200).optional().nullable(),
-}).loose();
-
-export const adminUpdateUserSchema = z.object({
-  phone: e164PhoneSchema.optional().nullable(),
-  mobile: e164PhoneSchema.optional().nullable(),
-  vip: z.boolean().optional(),
-  employee_number: z.string().max(100).optional().nullable(),
-  locked_out: z.boolean().optional(),
-  lock_reason: z.string().max(200).optional().nullable(),
-}).loose();
-
-// ─── CMDB ───
-export const createCIClassSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(100)
-    .regex(/^[a-z_]+$/, 'Must be lowercase with underscores only'),
-  display_name: z.string().min(1).max(255),
-  description: z.string().max(2000).optional(),
-  parent_class: uuidSchema.optional(),
-  attributes: z.record(z.string(), z.unknown()).default({}),
-  icon: z.string().max(50).optional(),
-  is_active: z.boolean().optional().default(true),
-});
-
-export const createCISchema = z.object({
-  class_id: uuidSchema,
-  name: z.string().min(1).max(255),
-  display_name: z.string().max(255).optional().nullable(),
-  status: z.enum(['installed', 'in_stock', 'maintenance', 'retired', 'planned']).default('installed'),
-  environment: z.enum(['production', 'staging', 'development', 'test']).default('production'),
-  attributes: z.record(z.string(), z.unknown()).default({}),
-  managed_by: uuidSchema.optional().nullable(),
-  assigned_to: uuidSchema.optional().nullable(),
-  supported_by: uuidSchema.optional().nullable(),
-  location_id: uuidSchema.optional().nullable(),
-  notes: z.string().max(5000).optional().nullable(),
-  external_id_1: z.string().max(255).optional().nullable(),
-  external_id_2: z.string().max(255).optional().nullable(),
-  is_active: z.boolean().optional().default(true),
-});
-
-export const updateCISchema = createCISchema.partial();
-
-export const createCIRelationshipSchema = z.object({
-  source_ci_id: uuidSchema,
-  target_ci_id: uuidSchema,
-  relationship_type: z.enum([
-    'depends_on',
-    'used_by',
-    'runs_on',
-    'connected_to',
-    'part_of',
-    'manages',
-  ]),
-  notes: z.string().max(2000).optional(),
-});
-
-// ─── Assets ───
-const assetCategorySchema = z.enum(['hardware', 'software', 'license', 'consumable']);
-const assetStatusSchema = z.enum([
-  'ordered',
-  'received',
-  'in_stock',
-  'in_use',
-  'maintenance',
-  'retired',
-  'disposed',
-]);
-
-export const createAssetSchema = z.object({
-  asset_tag: z.string().min(1).max(255),
-  name: z.string().min(1).max(255),
-  category: assetCategorySchema.optional(),
-  status: assetStatusSchema.optional(),
-  owner_user_id: uuidSchema.nullable().optional(),
-  linked_ci_id: uuidSchema.nullable().optional(),
-  vendor_name: z.string().max(255).nullable().optional(),
-  purchase_cost: z.number().nullable().optional(),
-  purchase_currency: z.string().max(8).nullable().optional(),
-  purchase_date: z.string().max(32).nullable().optional(),
-  warranty_expires_at: z.string().max(32).nullable().optional(),
-  contract_ref: z.string().max(255).nullable().optional(),
-  depreciation_months: z.number().int().nullable().optional(),
-  notes: z.string().max(10000).nullable().optional(),
-  external_id_1: z.string().max(255).nullable().optional(),
-  external_id_2: z.string().max(255).nullable().optional(),
-  custom_fields: z.record(z.string(), z.unknown()).optional(),
-});
-
-export const updateAssetSchema = createAssetSchema.partial();
-export const ASSET_UPDATE_COLUMNS = Object.keys(updateAssetSchema.shape).filter(
-  (key) => key !== 'custom_fields' && key !== 'owner_user_id',
-);
-
-export const assignAssetSchema = z.object({
-  user_id: uuidSchema,
-  notes: z.string().max(5000).nullable().optional(),
-});
-
-export const returnAssetSchema = z.object({
-  notes: z.string().max(5000).nullable().optional(),
-});
-
-// ─── Releases ───
-const releaseStatusSchema = z.enum(['planned', 'in_progress', 'deployed', 'cancelled']);
-const releaseTypeSchema = z.enum(['major', 'minor', 'emergency']);
-const releaseRiskSchema = z.enum(['low', 'medium', 'high']);
-
-export const createReleaseSchema = z.object({
-  number: z.string().min(1).max(64).optional(),
-  title: z.string().min(1).max(500),
-  description: z.string().max(10000).nullable().optional(),
-  status: releaseStatusSchema.optional(),
-  release_type: releaseTypeSchema.optional(),
-  risk_level: releaseRiskSchema.optional(),
-  planned_start: z.string().max(64).nullable().optional(),
-  planned_end: z.string().max(64).nullable().optional(),
-  deployed_at: z.string().max(64).nullable().optional(),
-  owner_user_id: uuidSchema.nullable().optional(),
-  change_id: uuidSchema.nullable().optional(),
-  validation_notes: z.string().max(10000).nullable().optional(),
-  rollback_plan: z.string().max(10000).nullable().optional(),
-});
-
-export const updateReleaseSchema = createReleaseSchema.partial();
-export const RELEASE_UPDATE_COLUMNS = Object.keys(updateReleaseSchema.shape);
-
-// ─── Continual improvement ───
-const improvementStatusSchema = z.enum(['registered', 'in_progress', 'done', 'cancelled']);
-
-export const createImprovementSchema = z.object({
-  title: z.string().min(1).max(500),
-  description: z.string().max(10000).nullable().optional(),
-});
-
-export const updateImprovementSchema = z.object({
-  title: z.string().min(1).max(500).optional(),
-  description: z.string().max(10000).nullable().optional(),
-  status: improvementStatusSchema.optional(),
-  owner_user_id: uuidSchema.nullable().optional(),
-});
-export const IMPROVEMENT_UPDATE_COLUMNS = Object.keys(updateImprovementSchema.shape);
-
-export const improvementFromPostmortemSchema = z.object({
-  major_incident_id: uuidSchema,
-  action_item_id: uuidSchema,
-});
-
-export const improvementFromChangeSchema = z.object({
-  change_id: uuidSchema,
-});
-
-export const improvementFromProblemSchema = z.object({
-  problem_id: uuidSchema,
-});
-
-export const addImprovementJournalSchema = z.object({
-  entry_type: z.enum(['comment', 'work_note']).default('comment'),
-  content: z.string().min(1).max(10000),
-});
-
-export const updateCIClassSchema = createCIClassSchema.partial();

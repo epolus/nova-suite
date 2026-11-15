@@ -100,9 +100,9 @@ export default function CIClassesPage() {
 
     try {
       if (editing.id) {
-        await cmdb.updateClass(editing.id, payload as Partial<CIClass>);
+        await cmdb.updateClass(editing.id, payload);
       } else {
-        await cmdb.createClass(payload as Partial<CIClass>);
+        await cmdb.createClass(payload);
       }
       setEditing(null);
       load();

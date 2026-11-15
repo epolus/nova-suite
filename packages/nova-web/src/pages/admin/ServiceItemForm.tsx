@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'use-intl';
+import type { CreateServiceItemInput, UpdateServiceItemInput } from '@nova-suite/shared/schemas';
 import { catalog, cmdb } from '../../api/client';
 import { requestBlob } from '../../api/http';
 import type { ServiceItem, Category, FormField, CIClass, FulfillmentModel } from '../../api/client';
@@ -186,9 +187,9 @@ export default function ServiceItemForm({
 
       let saved: ServiceItem;
       if (isNew) {
-        saved = await catalog.createItem(payload as Partial<ServiceItem>);
+        saved = await catalog.createItem(payload as CreateServiceItemInput);
       } else {
-        saved = await catalog.updateItem(item!.id, payload as Partial<ServiceItem>);
+        saved = await catalog.updateItem(item!.id, payload as UpdateServiceItemInput);
       }
 
       const rejected = softSaveFailure(saved);

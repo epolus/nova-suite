@@ -1,4 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type {
+  AssignAssetInput,
+  CreateAssetInput,
+  ReturnAssetInput,
+  UpdateAssetInput,
+} from '@nova-suite/shared/schemas';
 import { request } from '../http';
 import type { Asset, AssetAssignment } from '../types';
 
@@ -9,18 +15,18 @@ export const assets = {
     return request<{ assets: Asset[] }>(`/assets${suffix}`);
   },
   get: (id: string) => request<Asset>(`/assets/${id}`),
-  create: (data: Partial<Asset>) =>
+  create: (data: CreateAssetInput) =>
     request<Asset>('/assets', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<Asset>) =>
+  update: (id: string, data: UpdateAssetInput) =>
     request<Asset>(`/assets/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   assignments: (id: string) =>
     request<{ assignments: AssetAssignment[] }>(`/assets/${id}/assignments`),
-  assign: (id: string, data: { user_id: string; notes?: string | null }) =>
+  assign: (id: string, data: AssignAssetInput) =>
     request<{ assignment: AssetAssignment; asset: Asset }>(`/assets/${id}/assign`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  returnAssignment: (id: string, data: { notes?: string | null } = {}) =>
+  returnAssignment: (id: string, data: ReturnAssetInput = {}) =>
     request<{ assignment: AssetAssignment; asset: Asset }>(`/assets/${id}/return`, {
       method: 'POST',
       body: JSON.stringify(data),

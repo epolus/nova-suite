@@ -116,7 +116,7 @@ export default function ImprovementDetailPage() {
       const updated = await improvements.update(id, {
         title: form.title.trim(),
         description: form.description || null,
-        status: form.status,
+        status: form.status as Parameters<typeof improvements.update>[1]['status'],
         owner_user_id: form.owner_user_id || null,
       });
       const next = {
