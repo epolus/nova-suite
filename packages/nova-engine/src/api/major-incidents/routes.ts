@@ -26,6 +26,7 @@ import type { CreateMajorIncidentInput } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { resolveSlaDueAt } from '../../domain/sla';
 import { canStartInvestigation, existingFollowUpId } from '../../domain/major-incident-follow-up';
+import { assignmentGroupServesProcess } from '../../domain/assignment-groups';
 import {
   signalMajorIncidentDeclareResolved,
   signalMajorIncidentStakeholderUpdate,
@@ -614,46 +615,6 @@ router.post(
   },
 );
 
-async function assignmentGroupServesProcess(
-  client: PgClient,
-  groupId: string,
-  processName: string,
-  memberRole: string,
-): Promise<boolean> {
-  const row = await client.query(
-    `SELECT 1
-     FROM assignment_groups ag
-     WHERE ag.tenant_id = current_tenant_id()
-       AND ag.id = $1
-       AND ag.is_active = true
-       AND (
-         EXISTS (
-           SELECT 1
-           FROM assignment_group_processes agp
-           JOIN processes p ON p.id = agp.process_id
-           WHERE agp.tenant_id = current_tenant_id()
-             AND agp.group_id = ag.id
-             AND p.tenant_id = current_tenant_id()
-             AND p.is_active = true
-             AND p.name = $2
-         )
-         OR EXISTS (
-           SELECT 1
-           FROM assignment_group_members agm
-           JOIN user_roles ur ON ur.user_id = agm.user_id AND ur.tenant_id = current_tenant_id()
-           JOIN roles r ON r.id = ur.role_id AND r.tenant_id = current_tenant_id()
-           WHERE agm.tenant_id = current_tenant_id()
-             AND agm.group_id = ag.id
-             AND r.name = $3
-             AND r.is_active = true
-         )
-       )
-     LIMIT 1`,
-    [groupId, processName, memberRole],
-  );
-  return row.rows.length > 0;
-}
-
 type PostmortemActionItem = {
   id?: string;
   title: string;
@@ -1068,7 +1029,9 @@ router.post(
       let recordNumber = '';
 
       if (body.kind === 'problem') {
-        const allowed = await assignmentGroupServesProcess(client, body.assignment_group_id, 'Problem Management', 'problem');
+        const allowed = await assignmentGroupServesProcess(client, body.assignment_group_id, 'Problem Management', 'problem', {
+          requireActiveGroup: true,
+        });
         if (!allowed) throw new AppError(400, 'Assignment group is not enabled for Problem Management');
         const seq = await client.query(`SELECT nextval('problem_number_seq') AS n`);
         recordNumber = `PRB${String(seq.rows[0].n).padStart(7, '0')}`;
@@ -1108,7 +1071,9 @@ router.post(
         }).catch(() => {});
       } else {
         if (!body.change_type_id) throw new AppError(400, 'change_type_id is required');
-        const allowed = await assignmentGroupServesProcess(client, body.assignment_group_id, 'Change Management', 'change_manager');
+        const allowed = await assignmentGroupServesProcess(client, body.assignment_group_id, 'Change Management', 'change_manager', {
+          requireActiveGroup: true,
+        });
         if (!allowed) throw new AppError(400, 'Assignment group is not enabled for Change Management');
         const typeRes = await client.query(
           `SELECT id, default_risk_level

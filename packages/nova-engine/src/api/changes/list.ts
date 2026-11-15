@@ -2,6 +2,7 @@
 // ─── Nova Suite – Change list / nav / stats / calendar services ───
 // Plain-argument services (PoolClient + args). No Request/Response.
 import type { PoolClient } from 'pg';
+import { appendPrefixColumnFilters, paginationMeta, sqlSortDirection } from '../../domain/list-query';
 import type { ChangeListUser } from './types';
 
 /** Per-column "starts with" filters (cf.column=value) for list/nav queries. */
@@ -44,17 +45,7 @@ export function appendChangeColumnFilters(
   params: unknown[],
   idx: number,
 ): number {
-  for (const [qKey, qVal] of Object.entries(query)) {
-    if (typeof qKey === 'string' && qKey.startsWith('cf.') && typeof qVal === 'string' && qVal) {
-      const col = CHANGE_CF_MAP[qKey.slice(3)];
-      if (col) {
-        conditions.push(`${col} ILIKE $${idx}`);
-        params.push(`${qVal}%`);
-        idx++;
-      }
-    }
-  }
-  return idx;
+  return appendPrefixColumnFilters(query, CHANGE_CF_MAP, conditions, params, idx);
 }
 
 export interface ChangeListFilters {
@@ -101,7 +92,7 @@ export function buildChangeListFilters(
 
   const whereClause = `WHERE ${conditions.join(' AND ')}`;
   const sortCol = CHANGE_SORT_COLS[String(query.sort_by || '')];
-  const sortDir = query.sort_dir === 'desc' ? 'DESC' : 'ASC';
+  const sortDir = sqlSortDirection(query.sort_dir);
   const orderClause = sortCol ? `ORDER BY ${sortCol} ${sortDir}` : 'ORDER BY c.updated_at DESC';
 
   return { conditions, params, paramIdx: idx, whereClause, orderClause };
@@ -166,7 +157,7 @@ export async function listChanges(
   );
   return {
     changes: list.rows,
-    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    pagination: paginationMeta(page, limit, total),
   };
 }
 
