@@ -1,5 +1,5 @@
 # ─── Nova Worker – Multi-stage Docker Build ───
-# Uses node:24-slim (Debian) because @temporalio/worker requires glibc
+# Uses node:26-slim (Debian) because @temporalio/worker requires glibc
 FROM node:26-slim AS base
 WORKDIR /app
 
@@ -33,5 +33,9 @@ COPY --from=build /app/packages/nova-shared /app/packages/nova-shared
 RUN groupadd -g 1001 nodejs && \
     useradd -u 1001 -g nodejs -s /bin/sh nova
 USER nova
+
+# The worker touches this file after each successful DB heartbeat (every 30s).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD node -e "const fs=require('fs');const t=Number(fs.readFileSync('/tmp/nova-worker-healthy','utf8'));process.exit(Date.now()-t<90000?0:1)" || exit 1
 
 CMD ["node", "packages/nova-worker/dist/worker.js"]

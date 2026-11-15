@@ -5,6 +5,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireRole, getRequestClient, setTenantRLS, releaseTenantClient } from '../../middleware/auth';
 import { NotFound, BadRequest } from '../../middleware/errorHandler';
 import { config } from '../../config';
+import { fetchPublicHttp, UnsafeHttpUrlError } from '@nova-suite/shared/node';
 
 const router = Router();
 
@@ -328,11 +329,20 @@ router.post(
       if (oauth.scope) form.set('scope', oauth.scope);
       if (oauth.audience) form.set('audience', oauth.audience);
 
-      const tokenRes = await fetch(oauth.token_url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: form.toString(),
-      });
+      let tokenRes: globalThis.Response;
+      try {
+        tokenRes = await fetchPublicHttp(oauth.token_url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form.toString(),
+        });
+      } catch (err) {
+        if (err instanceof UnsafeHttpUrlError) {
+          res.json({ ok: false, error: `token_url rejected: ${err.message}` });
+          return;
+        }
+        throw err;
+      }
       const raw = await tokenRes.text();
       if (!tokenRes.ok) {
         const preview = raw.slice(0, 300).replace(/\s+/g, ' ').trim();

@@ -177,10 +177,12 @@ router.use((req: Request, res: Response, next: NextFunction) => {
     return;
   }
   const startedAt = Date.now();
+  // The request-scoped client is released on 'finish', so the insert needs its own connection.
   res.on('finish', () => {
-    void recordAuditEvent({
-      tenantId: req.user!.tenant_id,
-      actorUserId: req.user!.id,
+    const user = req.user!;
+    void db.withTenantContext(user.tenant_id, user.id, user.roles.join(',') || 'user', () => recordAuditEvent({
+      tenantId: user.tenant_id,
+      actorUserId: user.id,
       category: 'admin',
       action: `${req.method} ${req.baseUrl}${req.path}`,
       level: res.statusCode >= 400 ? 'warning' : 'info',
@@ -189,6 +191,8 @@ router.use((req: Request, res: Response, next: NextFunction) => {
         status: res.statusCode,
         duration_ms: Date.now() - startedAt,
       },
+    })).catch((err) => {
+      logger.warn({ err }, 'Failed to record admin audit event');
     });
   });
   next();
