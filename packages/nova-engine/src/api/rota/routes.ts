@@ -47,13 +47,23 @@ router.get('/business-calendars', async (req: Request, res: Response, next: Next
   try {
     if (!canViewOnCallRota(req)) throw new AppError(403, 'Insufficient permissions');
     const client = getRequestClient(req);
-    const calendars = await client.query(
+    const calendars = await client.query<{
+      id: string;
+      name: string;
+      timezone: string;
+      is_default: boolean;
+    }>(
       `SELECT id, name, timezone, is_default
        FROM business_calendars
        WHERE tenant_id = current_tenant_id()
        ORDER BY is_default DESC, name ASC`,
     );
-    const hours = await client.query(
+    const hours = await client.query<{
+      calendar_id: string;
+      day_of_week: number;
+      start_time: string;
+      end_time: string;
+    }>(
       `SELECT h.calendar_id, h.day_of_week,
               h.start_time::text AS start_time,
               h.end_time::text AS end_time
@@ -62,14 +72,18 @@ router.get('/business-calendars', async (req: Request, res: Response, next: Next
        WHERE c.tenant_id = current_tenant_id()
        ORDER BY h.day_of_week, h.start_time`,
     );
-    const holidays = await client.query(
+    const holidays = await client.query<{
+      calendar_id: string;
+      holiday_date: string;
+      name: string;
+    }>(
       `SELECT hol.calendar_id, hol.holiday_date::text AS holiday_date, hol.name
        FROM holidays hol
        JOIN business_calendars c ON c.id = hol.calendar_id
        WHERE c.tenant_id = current_tenant_id()
        ORDER BY hol.holiday_date`,
     );
-    const hoursByCal = new Map<string, unknown[]>();
+    const hoursByCal = new Map<string, Array<{ day_of_week: number; start_time: string; end_time: string }>>();
     for (const row of hours.rows) {
       const id = String(row.calendar_id);
       if (!hoursByCal.has(id)) hoursByCal.set(id, []);
