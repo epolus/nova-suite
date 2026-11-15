@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import './setupZodCsp';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ensureCryptoRandomUUID } from './utils/ensureCryptoRandomUUID';
