@@ -12,6 +12,7 @@ const {
   autoAssignIncident,
   sendNotification,
   applySlaActions,
+  claimSlaNotification,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: '30 seconds',
   retry: { maximumAttempts: 3, initialInterval: '2 seconds' },
@@ -170,6 +171,15 @@ async function handleWarning(
   incident: NonNullable<Awaited<ReturnType<typeof getIncident>>>,
   kind: TimerKind,
 ): Promise<void> {
+  const claimed = await claimSlaNotification(
+    input.tenantId,
+    'incident',
+    input.incidentId,
+    kind,
+    'warning',
+  );
+  if (!claimed) return;
+
   const label = kind === 'response' ? 'Response' : 'Resolution';
   const message = `${label} SLA warning: ${incident.number} "${incident.title}" is approaching its ${kind} due time.`;
 
@@ -197,10 +207,25 @@ async function handleBreach(
   incident: NonNullable<Awaited<ReturnType<typeof getIncident>>>,
   kind: TimerKind,
 ): Promise<void> {
+  // Breach flags stay durable on the incident; the ledger only gates notification side effects.
   if (kind === 'response') {
     if (!incident.responseBreached) {
       await markResponseBreached(input.incidentId, input.tenantId);
     }
+  } else if (!incident.slaBreached) {
+    await markSlaBreached(input.incidentId, input.tenantId);
+  }
+
+  const claimed = await claimSlaNotification(
+    input.tenantId,
+    'incident',
+    input.incidentId,
+    kind,
+    'breach',
+  );
+  if (!claimed) return;
+
+  if (kind === 'response') {
     const message = `Response SLA BREACHED: ${incident.number} "${incident.title}".`;
     if (incident.slaDefinitionId) {
       await applyConfiguredBreach(input, incident, message);
@@ -208,10 +233,6 @@ async function handleBreach(
     }
     await sendNotification(input.incidentId, input.tenantId, message);
     return;
-  }
-
-  if (!incident.slaBreached) {
-    await markSlaBreached(input.incidentId, input.tenantId);
   }
 
   const message = `Resolution SLA BREACHED: ${incident.number} "${incident.title}".`;
