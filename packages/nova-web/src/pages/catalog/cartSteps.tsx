@@ -8,6 +8,7 @@ import type { FormField, UserListItem, ServiceRequest } from '../../api/client';
 import Card from '../../components/Card';
 import UserDateInput from '../../components/UserDateInput';
 import { catalogPictureFrameBaseClass } from './catalogPictureFrame';
+import { useApiObjectUrl } from '../../hooks/useApiObjectUrl';
 import { formatCurrency } from '../../utils/currency';
 import { useStatusLabel } from '@/i18n/hooks';
 import { FormFieldValue } from '../requests/ResolvedRefs';
@@ -49,19 +50,7 @@ export function StepIndicator({ current }: { current: number }) {
 }
 
 function CartItemImage({ itemId, hasPicture }: { itemId: string; hasPicture: boolean }) {
-  const [src, setSrc] = useState<string>('');
-  useEffect(() => {
-    if (!hasPicture) return;
-    let objectUrl = '';
-    const token = localStorage.getItem('nova_token');
-    fetch(`/api/catalog/items/${itemId}/picture`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((res) => { if (res.ok) return res.blob(); throw new Error(); })
-      .then((blob) => { objectUrl = URL.createObjectURL(blob); setSrc(objectUrl); })
-      .catch(() => {});
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [itemId, hasPicture]);
+  const src = useApiObjectUrl(hasPicture ? `/catalog/items/${itemId}/picture` : null);
   if (!src) return <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xl shrink-0">&#128722;</div>;
   return (
     <div className={`w-16 h-16 rounded-lg shrink-0 ${catalogPictureFrameBaseClass}`}>

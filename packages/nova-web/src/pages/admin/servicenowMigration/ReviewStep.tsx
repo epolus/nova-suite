@@ -12,14 +12,16 @@ import type {
 } from '../../../api/client';
 import { errorMessage, primaryButton, secondaryButton } from './shared';
 import { Pill } from './ui';
+import { useDialogFocus } from '../../../hooks/useDialogFocus';
 
 const UnifiedAutomationDesigner = lazy(() => import('../../../components/workflow/UnifiedAutomationDesigner'));
 
 function PreviewModal({ title, config, onClose }: { title: string; config: Record<string, unknown>; onClose: () => void }) {
   const t = useTranslations('pages.admin.serviceNowMigration.review');
   const json = useMemo(() => JSON.stringify(config), [config]);
+  const dialogRef = useDialogFocus(true, onClose);
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div ref={dialogRef} className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <div>

@@ -2,6 +2,7 @@
 import { useSearchParams } from 'react-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { auth } from '../api/client';
+import { getSessionUserId } from '../api/http';
 
 export type SortDir = 'asc' | 'desc';
 
@@ -22,14 +23,7 @@ interface SavedPrefs {
 }
 
 function prefsKey(storageKey: string): string {
-  try {
-    const raw = localStorage.getItem('nova_token');
-    if (raw) {
-      const payload = JSON.parse(atob(raw.split('.')[1]!));
-      return `nova_list_${payload.sub || payload.id || 'anon'}_${storageKey}`;
-    }
-  } catch { /* ignore */ }
-  return `nova_list_anon_${storageKey}`;
+  return `nova_list_${getSessionUserId() ?? 'anon'}_${storageKey}`;
 }
 
 function loadPrefs(storageKey: string | undefined): SavedPrefs | null {

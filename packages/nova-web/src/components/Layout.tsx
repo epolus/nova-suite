@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
+import { useApiObjectUrl } from '../hooks/useApiObjectUrl';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
 import {
@@ -140,29 +141,8 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [logoSrc, setLogoSrc] = useState(DEFAULT_LOGO_SRC);
-  const logoUrl = theme.logo_url;
-  const [prevLogoUrl, setPrevLogoUrl] = useState(logoUrl);
-  if (logoUrl !== prevLogoUrl) {
-    setPrevLogoUrl(logoUrl);
-    if (!logoUrl) setLogoSrc(DEFAULT_LOGO_SRC);
-  }
-  useEffect(() => {
-    if (!logoUrl) return;
-    const token = localStorage.getItem('nova_token');
-    let cancelled = false;
-    fetch('/api/settings/logo', {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((r) => { if (r.ok) return r.blob(); throw new Error(); })
-      .then((blob) => {
-        if (!cancelled) setLogoSrc(URL.createObjectURL(blob));
-      })
-      .catch(() => {
-        if (!cancelled) setLogoSrc(DEFAULT_LOGO_SRC);
-      });
-    return () => { cancelled = true; };
-  }, [logoUrl]);
+  const logoSrc = useApiObjectUrl(theme.logo_url ? `/settings/logo?v=${encodeURIComponent(theme.logo_url)}` : null)
+    ?? DEFAULT_LOGO_SRC;
 
   const appNameParts = (theme.app_name || 'Nova Suite').split(' ');
   const firstName = appNameParts[0];
@@ -246,8 +226,7 @@ export default function Layout() {
   };
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    void logout().then(() => navigate('/login'));
   };
 
   return (

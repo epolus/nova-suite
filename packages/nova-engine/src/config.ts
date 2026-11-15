@@ -47,7 +47,7 @@ export const config = {
     database: env('POSTGRES_DB', 'nova'),
     user: env('POSTGRES_APP_USER', 'nova_runtime'),
     password: env('POSTGRES_APP_PASSWORD', env('POSTGRES_PASSWORD', 'changeme')),
-    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.46'),
+    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.47'),
     poolMax: envInt('DB_POOL_MAX', 20),
     statementTimeoutMs: envInt('DB_STATEMENT_TIMEOUT_MS', 60_000),
     idleInTransactionTimeoutMs: envInt('DB_IDLE_IN_TRANSACTION_TIMEOUT_MS', 300_000),
@@ -69,6 +69,16 @@ export const config = {
 
   cors: {
     origin: env('CORS_ORIGIN', '*'),
+  },
+
+  session: {
+    /** `auto` marks the cookie Secure when the request arrived over HTTPS (needs TRUST_PROXY behind a proxy). */
+    cookieSecure: env('SESSION_COOKIE_SECURE', 'auto') as 'auto' | 'true' | 'false',
+    /** Extra origins allowed to make cookie-authenticated writes; the API's own host is always allowed. */
+    trustedOrigins: env('TRUSTED_ORIGINS', '')
+      .split(',')
+      .map((origin) => origin.trim().replace(/\/+$/, '').toLowerCase())
+      .filter(Boolean),
   },
 
   /** Express `trust proxy` hops (set to proxy count when behind nginx/caddy). */

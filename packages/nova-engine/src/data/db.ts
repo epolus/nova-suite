@@ -118,6 +118,21 @@ export async function resolveUserAccess(userId: string, tenantId: string): Promi
   return result.rows[0] ?? null;
 }
 
+export type SessionAccess = UserAccess & { session_valid: boolean };
+
+/** {@link resolveUserAccess} plus whether the login session is live (not revoked, not expired). */
+export async function resolveSessionAccess(
+  sessionId: string,
+  userId: string,
+  tenantId: string,
+): Promise<SessionAccess | null> {
+  const result = await pool.query<SessionAccess>(
+    'SELECT is_active, roles, session_valid FROM resolve_session_access($1, $2, $3)',
+    [sessionId, userId, tenantId],
+  );
+  return result.rows[0] ?? null;
+}
+
 /** Bind a checked-out client to async continuation (Express next()). */
 export function bindRequestClient(client: PoolClient, next: () => void): void {
   tenantAls.run({ client }, next);
@@ -211,6 +226,7 @@ export const db = {
   clearTenantContext,
   releaseTenantClient,
   resolveUserAccess,
+  resolveSessionAccess,
   bindRequestClient,
   withTenantContext,
   withTenantTransaction,

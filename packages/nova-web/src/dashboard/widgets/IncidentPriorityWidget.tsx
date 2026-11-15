@@ -4,6 +4,7 @@ import { usePriorityLabel } from '@/i18n/hooks';
 import { useIncidentStats } from '../hooks';
 import type { DashboardWidgetProps } from '../types';
 import { PRIORITY_CONFIG } from './priorityConfig';
+import { WidgetLoadError } from './shared';
 
 export default function IncidentPriorityWidget(_props: DashboardWidgetProps) {
   const priorityLabel = usePriorityLabel();
@@ -14,9 +15,7 @@ export default function IncidentPriorityWidget(_props: DashboardWidgetProps) {
   }
   if (isError || !data) {
     return (
-      <button type="button" onClick={() => void refetch()} className="text-sm text-red-600 hover:underline">
-        Failed to load
-      </button>
+      <WidgetLoadError onRetry={() => void refetch()} />
     );
   }
 

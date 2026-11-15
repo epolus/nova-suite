@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useTranslations } from 'use-intl';
 import { Button } from '@/components/ui/button';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
 
 export default function RequestTaskCancelDialog({
   open,
@@ -21,12 +22,14 @@ export default function RequestTaskCancelDialog({
 }) {
   const t = useTranslations('pages.requests');
   const tActions = useTranslations('common.actions');
+  const dialogRef = useDialogFocus(open, loading ? undefined : onClose);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="cancel-request-title"

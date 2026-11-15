@@ -347,7 +347,8 @@
             "recent_requests": "Demandes récentes"
           }
         }
-      }
+      },
+      "widgetLoadFailed": "Échec du chargement. Réessayer"
     },
     "incidents": {
       "title": "Incidents",
@@ -601,7 +602,8 @@
     "rejected": "Rejeté",
     "draft": "Brouillon",
     "published": "Publié",
-    "retired": "À la retraite"
+    "retired": "À la retraite",
+    "inactive": "Inactif"
   },
   "priority": {
     "p1": "P1 Critique",

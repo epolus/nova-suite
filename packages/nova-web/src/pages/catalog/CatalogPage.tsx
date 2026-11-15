@@ -10,22 +10,12 @@ import Spinner from '../../components/Spinner';
 import SearchBar from '../../components/SearchBar';
 import { useCart } from '../../context/CartContext';
 import { catalogPictureFrameBaseClass } from './catalogPictureFrame';
+import { useApiObjectUrl } from '../../hooks/useApiObjectUrl';
 import { useTheme } from '../../context/ThemeContext';
 import { formatCurrency } from '../../utils/currency';
 
 function CatalogImage({ itemId }: { itemId: string }) {
-  const [src, setSrc] = useState<string>('');
-  useEffect(() => {
-    let objectUrl = '';
-    const token = localStorage.getItem('nova_token');
-    fetch(`/api/catalog/items/${itemId}/picture`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((res) => { if (res.ok) return res.blob(); throw new Error(); })
-      .then((blob) => { objectUrl = URL.createObjectURL(blob); setSrc(objectUrl); })
-      .catch(() => {});
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [itemId]);
+  const src = useApiObjectUrl(`/catalog/items/${itemId}/picture`);
   if (!src) return null;
   return (
     <div className={`w-full h-36 -mx-5 -mt-5 mb-3 rounded-t-xl ${catalogPictureFrameBaseClass}`}>

@@ -4,6 +4,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
+import { useApiObjectUrl } from '../hooks/useApiObjectUrl';
 import { approvals as approvalsApi } from '../api/client';
 import { notifications as notificationsApi, type AppNotification } from '../api/client';
 import DarkModeToggle from './DarkModeToggle';
@@ -220,29 +221,8 @@ export default function ESSLayout() {
   const isFullWidthPage = useFullWidthContent(location.pathname);
   const contentContainerClass = isFullWidthPage ? 'w-full max-w-none' : 'max-w-6xl mx-auto';
 
-  const [logoSrc, setLogoSrc] = useState(DEFAULT_LOGO_SRC);
-  const logoUrl = theme.logo_url;
-  const [prevLogoUrl, setPrevLogoUrl] = useState(logoUrl);
-  if (logoUrl !== prevLogoUrl) {
-    setPrevLogoUrl(logoUrl);
-    if (!logoUrl) setLogoSrc(DEFAULT_LOGO_SRC);
-  }
-  useEffect(() => {
-    if (!logoUrl) return;
-    const token = localStorage.getItem('nova_token');
-    let cancelled = false;
-    fetch('/api/settings/logo', {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((r) => { if (r.ok) return r.blob(); throw new Error(); })
-      .then((blob) => {
-        if (!cancelled) setLogoSrc(URL.createObjectURL(blob));
-      })
-      .catch(() => {
-        if (!cancelled) setLogoSrc(DEFAULT_LOGO_SRC);
-      });
-    return () => { cancelled = true; };
-  }, [logoUrl]);
+  const logoSrc = useApiObjectUrl(theme.logo_url ? `/settings/logo?v=${encodeURIComponent(theme.logo_url)}` : null)
+    ?? DEFAULT_LOGO_SRC;
 
   // Pending approvals count (poll every 60s)
   const [pendingApprovals, setPendingApprovals] = useState(0);
@@ -270,8 +250,7 @@ export default function ESSLayout() {
   const restName = appNameParts.slice(1).join(' ');
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    void logout().then(() => navigate('/login'));
   };
 
   const navLinks = [

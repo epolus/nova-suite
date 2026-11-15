@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { IntlProvider } from 'use-intl';
 import { auth } from '../api/client';
+import { getSessionUserId } from '../api/http';
 import type { AppLocale } from '../i18n/config';
 import {
   DEFAULT_LOCALE,
@@ -44,7 +45,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     setLocaleState((prev) => {
       if (prev === next) return prev;
       try {
-        if (localStorage.getItem('nova_token')) {
+        if (getSessionUserId()) {
           void auth.setPreference(LOCALE_PREFERENCE_SCOPE, { value: next }).catch(() => {});
         }
       } catch {

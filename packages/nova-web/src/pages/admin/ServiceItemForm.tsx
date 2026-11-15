@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'use-intl';
 import { catalog, cmdb } from '../../api/client';
+import { requestBlob } from '../../api/http';
 import type { ServiceItem, Category, FormField, CIClass, FulfillmentModel } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import { normalizeCurrencyCode } from '../../utils/currency';
@@ -80,11 +81,7 @@ export default function ServiceItemForm({
   useEffect(() => {
     let objectUrl = '';
     if (item?.picture_storage_key) {
-      const token = localStorage.getItem('nova_token');
-      fetch(`/api/catalog/items/${item.id}/picture`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-        .then((res) => { if (res.ok) return res.blob(); throw new Error(); })
+      requestBlob(`/catalog/items/${item.id}/picture`)
         .then((blob) => {
           objectUrl = URL.createObjectURL(blob);
           if (objectUrl.startsWith('blob:')) setPicturePreview(objectUrl);

@@ -96,7 +96,9 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
     path: '/auth/login',
     tags: ['Auth'],
     summary: 'Login',
-    description: 'Authenticate with email and password, receive a JWT.',
+    description:
+      'Authenticate with email and password. Starts a server-side session, sets the httpOnly `nova_session` '
+      + 'cookie (used by the web app) and returns the same token for API clients to send as `Authorization: Bearer`.',
     security: [],
     request: {
       body: {
@@ -105,8 +107,20 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
       },
     },
     responses: {
-      200: { description: 'JWT token + user info' },
+      200: { description: 'JWT token, expiry + user info' },
       401: { description: 'Invalid credentials' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/auth/logout',
+    tags: ['Auth'],
+    summary: 'Logout',
+    description: 'Revokes the current session (cookie or Bearer token) and clears the session cookie.',
+    security: [],
+    responses: {
+      204: { description: 'Logged out' },
     },
   });
 

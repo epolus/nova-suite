@@ -100,12 +100,14 @@ Every table has:
 
 ### JWT Flow
 
-1. User sends `POST /api/auth/login` with email + password
-2. Server verifies against bcrypt hash
-3. Server returns an **RS256** JWT containing `{id, tenant_id, email, display_name, roles}`
-4. Client sends JWT in `Authorization: Bearer <token>` header
-5. Middleware verifies the JWT with the RSA public key, attaches user to request
-6. RLS middleware sets tenant context on the database connection
+1. User sends `POST /api/auth/login` with email + password (or completes OIDC SSO)
+2. Server verifies against bcrypt hash and creates a `user_sessions` row
+3. Server signs an **RS256** JWT containing `{id, tenant_id, email, display_name, roles, sid}`; the web app receives it as the httpOnly `nova_session` cookie, API clients take `token` from the response body
+4. Client sends the cookie automatically, or the JWT in an `Authorization: Bearer <token>` header
+5. Middleware verifies the JWT with the RSA public key, then `resolve_session_access` confirms the session is live and the user active and loads current roles
+6. Cookie-authenticated writes must pass the same-origin check (`Origin`/`Referer` against the API host and `TRUSTED_ORIGINS`)
+7. RLS middleware sets tenant context on the database connection
+8. `POST /api/auth/logout` revokes the session; deactivation, admin lock and admin password reset revoke all of the user's sessions
 
 ### OIDC Provider Config
 

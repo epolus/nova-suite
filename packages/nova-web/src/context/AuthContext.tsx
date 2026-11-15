@@ -8,7 +8,7 @@ export interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   setTimeFormat: (timeFormat: '12h' | '24h') => Promise<void>;
   setDateFormat: (dateFormat: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD') => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthState | null>(null);

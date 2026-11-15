@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 
-export { setToken, clearToken } from './http';
 export * from './types';
 
 export { settings } from './domains/settings';

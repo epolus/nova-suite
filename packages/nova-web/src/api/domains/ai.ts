@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { request, BASE, getToken } from '../http';
+import { request, apiFetch } from '../http';
 import type { AiChatMessageRow, AiConversationContext, AiPendingAction, AiPersona, AiStatus } from '../types';
 
 export const ai = {
@@ -32,12 +32,9 @@ export const ai = {
       onError: (message: string) => void;
     },
   ) => {
-    const token = getToken();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`${BASE}/ai/conversations/${conversationId}/messages`, {
+    const res = await apiFetch(`/ai/conversations/${conversationId}/messages`, {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         content,
         stream: true,

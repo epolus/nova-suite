@@ -12,7 +12,7 @@ import { config } from '../../config';
 import { db } from '../../data/db';
 import { logger } from '../../logger';
 import { AuthUser } from '../../middleware/auth';
-import { signAccessToken } from '../../auth/jwt';
+import { issueSession, setSessionCookie } from '../../auth/session';
 import { recordAuditEvent } from '../../audit/events';
 import { getClientIp } from '../../middleware/client-ip';
 import { evaluateSsoEmail } from './sso-policy';
@@ -115,7 +115,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 
 // ─── Pending OIDC state and one-time exchange codes ───
 const pendingStates = new OneTimeStore<{ codeVerifier: string; nonce: string }>('sso:state', 600_000);
-const pendingSsoCodes = new OneTimeStore<{ token: string; user: AuthUser }>('sso:code', 120_000);
+const pendingSsoCodes = new OneTimeStore<{ token: string; expiresAt: string; user: AuthUser }>('sso:code', 120_000);
 
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -377,7 +377,7 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       roles: roles.length > 0 ? roles : ['user'],
     };
 
-    const token = signAccessToken(payload);
+    const session = await issueSession(req, payload, 'sso');
 
     logger.info({ userId: user.id, roles }, 'SSO login successful');
     void db.withTenantContext(user.tenant_id, user.id, roles.join(',') || 'user', () => recordAuditEvent({
@@ -391,7 +391,11 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
 
     // Redirect via one-time code (avoid token in URL/query logs).
     const ssoCode = crypto.randomBytes(24).toString('hex');
-    await pendingSsoCodes.put(ssoCode, { token, user: payload });
+    await pendingSsoCodes.put(ssoCode, {
+      token: session.token,
+      expiresAt: session.expiresAt.toISOString(),
+      user: payload,
+    });
     res.redirect(`/login?sso_code=${encodeURIComponent(ssoCode)}`);
   } catch (err) {
     logger.error({ err }, 'SSO callback error');
@@ -411,7 +415,8 @@ router.post('/exchange', async (req: Request, res: ExpressResponse) => {
     res.status(400).json({ error: 'invalid or expired SSO code' });
     return;
   }
-  res.json({ token: pending.token, user: pending.user });
+  setSessionCookie(req, res, { token: pending.token, expiresAt: new Date(pending.expiresAt) });
+  res.json({ user: pending.user });
 });
 
 export default router;

@@ -5,6 +5,7 @@ import Badge from '@/components/Badge';
 import { useRecentRequests } from '../hooks';
 import type { DashboardWidgetProps } from '../types';
 import { getListLimit } from './listConfig';
+import { WidgetLoadError } from './shared';
 
 export default function RecentRequestsWidget({ instance }: DashboardWidgetProps) {
   const t = useTranslations('pages.dashboard.recentRequests');
@@ -16,9 +17,7 @@ export default function RecentRequestsWidget({ instance }: DashboardWidgetProps)
   }
   if (isError) {
     return (
-      <button type="button" onClick={() => void refetch()} className="text-sm text-red-600 hover:underline">
-        Failed to load
-      </button>
+      <WidgetLoadError onRetry={() => void refetch()} />
     );
   }
 

@@ -212,6 +212,30 @@ $$;
 
 REVOKE ALL ON FUNCTION resolve_user_access(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION resolve_user_access(uuid, uuid) TO nova_runtime;
+
+CREATE OR REPLACE FUNCTION resolve_session_access(p_session_id uuid, p_user_id uuid, p_tenant_id uuid)
+RETURNS TABLE (is_active boolean, roles text[], session_valid boolean)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT a.is_active,
+         a.roles,
+         EXISTS (
+           SELECT 1
+           FROM user_sessions s
+           WHERE s.id = p_session_id
+             AND s.user_id = p_user_id
+             AND s.tenant_id = p_tenant_id
+             AND s.revoked_at IS NULL
+             AND s.expires_at > now()
+         )
+  FROM resolve_user_access(p_user_id, p_tenant_id) a;
+$$;
+
+REVOKE ALL ON FUNCTION resolve_session_access(uuid, uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION resolve_session_access(uuid, uuid, uuid) TO nova_runtime;
 REVOKE ALL ON FUNCTION lookup_user_for_login(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION lookup_user_for_sso(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION lookup_user_for_login(text, uuid) FROM PUBLIC;

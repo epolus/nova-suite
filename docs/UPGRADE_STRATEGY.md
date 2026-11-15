@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.46`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.47`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
@@ -272,6 +272,16 @@ Apply `infra/postgres/migrations/v00.01.46__resumable_imports_and_migration_chec
 - `schema_migrations.checksum` (see the forward-only repair policy above).
 
 Engine environment values are validated at startup: a malformed value (for example `REDIS_ENABLED=True` or `API_PORT=40OO`) now stops the engine with a list of every invalid variable, instead of silently using the default.
+
+## Server-side sessions (`v00.01.47`)
+
+Apply `infra/postgres/migrations/v00.01.47__user_sessions.sql` before rolling out the engine and web image.
+
+- Every login (password or SSO) creates a `user_sessions` row, and the access token carries its id (`sid`). `resolve_session_access(session_id, user_id, tenant_id)` checks the session on every request, so **logout, deactivation, an admin lock and an admin password reset end that user's sessions immediately**.
+- **Everyone has to sign in once after the upgrade**: tokens issued before `v00.01.47` have no session id and are rejected.
+- The web app no longer keeps the token in `localStorage`. The API sets it as the httpOnly cookie `nova_session` (`Path=/api`, `SameSite=Lax`, `Secure` on HTTPS). API scripts are unchanged: `POST /api/auth/login` still returns `token` for `Authorization: Bearer`, and `POST /api/auth/logout` revokes it.
+- Cookie-authenticated writes (`POST/PUT/PATCH/DELETE`) must come from the API's own host or an origin in `TRUSTED_ORIGINS`; anything else gets `403`. Behind a TLS-terminating proxy keep `TRUST_PROXY` correct so the cookie is marked `Secure`, or force it with `SESSION_COOKIE_SECURE=true`.
+- The web container now sends a strict Content-Security-Policy (no inline scripts) plus `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` and `Permissions-Policy`. If you serve the built SPA from your own web server, copy the headers from `packages/nova-web/Caddyfile`.
 
 ## Temporal Workflow Versioning
 
