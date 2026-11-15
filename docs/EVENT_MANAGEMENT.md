@@ -43,7 +43,7 @@ An admin or **event manager** opens **Alert Definitions** (`/admin/alert-definit
 
 | Action | Result |
 | --- | --- |
-| Create an incident | One incident, and only when a CI matched and an assignment group is available. The definition's group wins. Otherwise Nova Suite uses the CI support group. If the CI shows up on a later firing and the alert still has no incident, Nova Suite opens it then. |
+| Create an incident | One incident, and only when a CI matched and an assignment group is available. The definition's group wins. Otherwise Nova Suite uses the CI support group. If a `rota_shifts` row covers `now()` for that group, Nova Suite sets `assigned_to` to that on-call user. If the CI shows up on a later firing and the alert still has no incident, Nova Suite opens it then. |
 | Notify on alert.firing | Starts the notification workflow for entity `alert` and trigger `alert.firing`. Add that rule under Notification Workflows. |
 | Store only | The alert stays on the Alerts list. |
 
