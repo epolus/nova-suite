@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import type { PoolClient } from 'pg';
-import type { CreateIncidentInput } from '../schemas';
+import type { CreateIncident } from '../schemas';
 import { schedulePostCreateAiAssist } from '../../ai/post-create';
 import { loadCustomFieldsMap, upsertCustomFields } from '../custom-fields';
 import { resolveSlaDueAt, startOlaClock } from '../sla';
@@ -17,7 +17,7 @@ export async function createEssIncident(
   client: PoolClient,
   userId: string,
   tenantId: string,
-  input: CreateIncidentInput,
+  input: CreateIncident,
 ): Promise<Record<string, unknown>> {
   const {
     title, description, impact, urgency,

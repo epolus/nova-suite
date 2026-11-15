@@ -1,4 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type {
+  AddJournalEntryInput,
+  CreateIncidentInput,
+  IncidentLinkMajorIncidentInput,
+  UpdateIncidentInput,
+} from '@nova-suite/shared/schemas';
 import { request } from '../http';
 import type { AssignmentGroupItem, CorrelationHint, Incident, IncidentAiSuggestion, IncidentCategory, IncidentProblemLink, IncidentResolutionCode, IncidentStats, JournalEntry, KnownErrorSuggestion, Pagination, ServiceListItem, SimilarIncident, UserListItem } from '../types';
 
@@ -8,14 +14,14 @@ export const incidents = {
     return request<{ incidents: Incident[]; pagination: Pagination }>(`/incidents?${qs}`);
   },
   get: (id: string) => request<Incident>(`/incidents/${id}`),
-  create: (data: Partial<Incident>) =>
+  create: (data: CreateIncidentInput) =>
     request<Incident>('/incidents', { method: 'POST', body: JSON.stringify(data) }),
-  createEss: (data: Partial<Incident>) =>
+  createEss: (data: CreateIncidentInput) =>
     request<Incident>('/incidents/ess', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<Incident>) =>
+  update: (id: string, data: UpdateIncidentInput) =>
     request<Incident>(`/incidents/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   journal: (id: string) => request<{ entries: JournalEntry[] }>(`/incidents/${id}/journal`),
-  addJournal: (id: string, data: { entry_type: string; content: string; is_customer_visible: boolean }) =>
+  addJournal: (id: string, data: AddJournalEntryInput) =>
     request<JournalEntry>(`/incidents/${id}/journal`, { method: 'POST', body: JSON.stringify(data) }),
   nav: (currentId: string, params: Record<string, string> = {}) => {
     const qs = new URLSearchParams({ current: currentId, ...params });
@@ -76,7 +82,7 @@ export const incidents = {
     }),
   stats: () => request<IncidentStats>('/incidents/stats'),
   byCi: (ciId: string) => request<{ incidents: Incident[] }>(`/incidents/by-ci/${ciId}`),
-  linkMajorIncident: (incidentId: string, body: { major_incident_id: string }) =>
+  linkMajorIncident: (incidentId: string, body: IncidentLinkMajorIncidentInput) =>
     request<{ success: boolean; major_incident_id: string }>(`/incidents/${incidentId}/link-major-incident`, {
       method: 'POST',
       body: JSON.stringify(body),
