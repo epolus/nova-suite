@@ -68,7 +68,8 @@ export default function AlertsPage() {
       .catch((err: unknown) => { if (!cancelled) setError(err instanceof Error ? err.message : t('loadFailed')); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [apiParams, params.page, t, user?.roles]);
+    // queryKey already covers apiParams + page + roles; avoid object/array identity churn.
+  }, [queryKey, apiParams, params.page, t, user?.roles]);
 
   const labels = useMemo<AlertListLabels>(() => ({
     number: t('number'),
