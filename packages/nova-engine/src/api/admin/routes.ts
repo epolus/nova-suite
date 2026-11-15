@@ -2596,7 +2596,14 @@ router.delete('/incident-categories/:id', async (req: Request, res: Response, ne
     );
     if (result.rows.length === 0) throw new AppError(404, 'Category not found');
     res.json({ success: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === '23503') {
+      next(new AppError(409, 'Category is still referenced; set is_active to false instead of deleting'));
+      return;
+    }
+    next(err);
+  }
 });
 
 router.get('/incident-resolution-codes', async (req: Request, res: Response, next: NextFunction) => {
@@ -2683,7 +2690,14 @@ router.delete('/incident-resolution-codes/:id', async (req: Request, res: Respon
     );
     if (result.rows.length === 0) throw new AppError(404, 'Resolution code not found');
     res.json({ success: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === '23503') {
+      next(new AppError(409, 'Resolution code is still referenced; set is_active to false instead of deleting'));
+      return;
+    }
+    next(err);
+  }
 });
 
 // ════════════════════════════════════════════

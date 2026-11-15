@@ -2,7 +2,7 @@
 
 ## Vision
 
-Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.43`.
+Nova Suite is a production-ready, open-source ITSM Suite for internal IT, managed service providers, and small enterprises. Schema version is `v00.01.44`.
 
 ## Implemented Modules
 

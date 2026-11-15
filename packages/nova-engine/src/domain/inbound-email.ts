@@ -325,8 +325,9 @@ export async function ingestAndProcessInboundEmail(
       `SELECT id, processing_status, incident_id, processing_notes
        FROM email_messages
        WHERE message_id = $1
+         AND mailbox_id IS NOT DISTINCT FROM $2
        LIMIT 1`,
-      [msg.message_id],
+      [msg.message_id, msg.mailbox_id],
     );
     if (existing.rows[0]) {
       return {
