@@ -22,72 +22,55 @@ declare global {
 
 const DATE_FORMATS = ['DD.MM.YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'] as const;
 
+type AuthLookup =
+  | { kind: 'user'; user: AuthUser }
+  | { kind: 'reject'; status: number; error: string }
+  | { kind: 'anonymous' };
+
 /** The cookie is a session id. Load the user from that row; there is no token to verify. */
-async function authenticateCookie(req: Request, res: Response, next: NextFunction, sessionId: string): Promise<void> {
+async function lookupCookieUser(sessionId: string): Promise<AuthLookup> {
   if (!isSessionId(sessionId)) {
-    res.status(401).json({ error: 'Session expired, please sign in again' });
-    return;
+    return { kind: 'reject', status: 401, error: 'Session expired, please sign in again' };
   }
 
-  let access: Awaited<ReturnType<typeof db.lookupSessionUser>>;
-  try {
-    access = await db.lookupSessionUser(sessionId);
-  } catch (err) {
-    next(err);
-    return;
-  }
+  const access = await db.lookupSessionUser(sessionId);
   if (!access) {
-    res.status(401).json({ error: 'Session expired, please sign in again' });
-    return;
+    return { kind: 'reject', status: 401, error: 'Session expired, please sign in again' };
   }
   if (!access.is_active) {
-    res.status(401).json({ error: 'Account is inactive' });
-    return;
+    return { kind: 'reject', status: 401, error: 'Account is inactive' };
   }
   if (!access.session_valid) {
-    res.status(401).json({ error: 'Session expired, please sign in again' });
-    return;
+    return { kind: 'reject', status: 401, error: 'Session expired, please sign in again' };
   }
 
   const dateFormat = DATE_FORMATS.find((format) => format === access.date_format) ?? 'YYYY-MM-DD';
-  req.user = {
-    id: access.id,
-    tenant_id: access.tenant_id,
-    email: access.email,
-    display_name: access.display_name,
-    time_format: access.time_format === '12h' ? '12h' : '24h',
-    date_format: dateFormat,
-    roles: access.roles.length > 0 ? access.roles : ['user'],
-    sid: sessionId,
+  return {
+    kind: 'user',
+    user: {
+      id: access.id,
+      tenant_id: access.tenant_id,
+      email: access.email,
+      display_name: access.display_name,
+      time_format: access.time_format === '12h' ? '12h' : '24h',
+      date_format: dateFormat,
+      roles: access.roles.length > 0 ? access.roles : ['user'],
+      sid: sessionId,
+    },
   };
-  next();
 }
 
-/** Verify the session cookie or Bearer token and attach the user to the request. */
-export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
-  (req as { _requestStartedAt?: number })._requestStartedAt = Date.now();
-  const credential = readCredential(req);
-  if (!credential) {
-    res.status(401).json({ error: 'Not authenticated' });
-    return;
-  }
-  if (credential.source === 'cookie') {
-    await authenticateCookie(req, res, next, credential.sessionId);
-    return;
-  }
-
+async function lookupBearerUser(token: string, source: string): Promise<AuthLookup> {
   let payload: ReturnType<typeof verifyAccessToken>;
   try {
-    payload = verifyAccessToken(credential.token);
+    payload = verifyAccessToken(token);
   } catch (err) {
-    logger.warn({ err, source: credential.source }, 'JWT verification failed');
-    res.status(401).json({ error: 'Invalid or expired token' });
-    return;
+    logger.warn({ err, source }, 'JWT verification failed');
+    return { kind: 'reject', status: 401, error: 'Invalid or expired token' };
   }
   // Tokens issued before server-side sessions existed cannot be revoked; make them log in again.
   if (typeof payload.sid !== 'string' || !payload.sid) {
-    res.status(401).json({ error: 'Session expired, please sign in again' });
-    return;
+    return { kind: 'reject', status: 401, error: 'Session expired, please sign in again' };
   }
 
   // Normalise legacy tokens that carry a single `role` string instead of `roles[]`
@@ -105,24 +88,70 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   // Resolve roles, the active flag and the session from the DB on every request so
   // role changes, deactivation and logout apply without waiting for the token to expire.
   // Lockout is not checked here: failed logins set it, and must not end live sessions.
-  let access: Awaited<ReturnType<typeof db.resolveSessionAccess>>;
+  const access = await db.resolveSessionAccess(payload.sid, payload.id, payload.tenant_id);
+  if (!access || !access.is_active) {
+    return { kind: 'reject', status: 401, error: 'Account is inactive' };
+  }
+  if (!access.session_valid) {
+    return { kind: 'reject', status: 401, error: 'Session expired, please sign in again' };
+  }
+  payload.roles = access.roles.length > 0 ? access.roles : ['user'];
+  return { kind: 'user', user: payload };
+}
+
+async function resolveAuth(req: Request): Promise<AuthLookup> {
+  const credential = readCredential(req);
+  if (!credential) return { kind: 'anonymous' };
+  if (credential.source === 'cookie') {
+    return lookupCookieUser(credential.sessionId);
+  }
+  return lookupBearerUser(credential.token, credential.source);
+}
+
+function markRequestStart(req: Request): void {
+  (req as { _requestStartedAt?: number })._requestStartedAt = Date.now();
+}
+
+/** Verify the session cookie or Bearer token and attach the user to the request. */
+export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  markRequestStart(req);
+  let lookup: AuthLookup;
   try {
-    access = await db.resolveSessionAccess(payload.sid, payload.id, payload.tenant_id);
+    lookup = await resolveAuth(req);
   } catch (err) {
     next(err);
     return;
   }
-  if (!access || !access.is_active) {
-    res.status(401).json({ error: 'Account is inactive' });
+  if (lookup.kind === 'user') {
+    req.user = lookup.user;
+    next();
     return;
   }
-  if (!access.session_valid) {
-    res.status(401).json({ error: 'Session expired, please sign in again' });
+  if (lookup.kind === 'anonymous') {
+    res.status(401).json({ error: 'Not authenticated' });
     return;
   }
-  payload.roles = access.roles.length > 0 ? access.roles : ['user'];
+  res.status(lookup.status).json({ error: lookup.error });
+}
 
-  req.user = payload;
+/**
+ * Like authenticate, but missing/invalid credentials continue without `req.user`
+ * instead of returning 401. Used by the session probe so anonymous page loads
+ * do not produce a console-logged failed fetch.
+ */
+export async function authenticateOptional(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  markRequestStart(req);
+  delete req.user;
+  let lookup: AuthLookup;
+  try {
+    lookup = await resolveAuth(req);
+  } catch (err) {
+    next(err);
+    return;
+  }
+  if (lookup.kind === 'user') {
+    req.user = lookup.user;
+  }
   next();
 }
 

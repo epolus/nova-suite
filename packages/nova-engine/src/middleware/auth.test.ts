@@ -11,14 +11,17 @@ const { verifyAccessToken, resolveSessionAccess, lookupSessionUser } = vi.hoiste
 vi.mock('../auth/jwt', () => ({ verifyAccessToken }));
 vi.mock('../data/db', () => ({ db: { resolveSessionAccess, lookupSessionUser } }));
 
-import { authenticate } from './auth';
+import { authenticate, authenticateOptional } from './auth';
 
-function call(headers: Record<string, string> = { authorization: 'Bearer t' }) {
+function call(
+  headers: Record<string, string> = { authorization: 'Bearer t' },
+  middleware: typeof authenticate = authenticate,
+) {
   const req = { headers } as Request;
   const json = vi.fn();
   const res = { status: vi.fn(() => ({ json })) } as unknown as Response;
   const next = vi.fn() as unknown as NextFunction & ReturnType<typeof vi.fn>;
-  return { req, res, json, next, run: () => authenticate(req, res, next) };
+  return { req, res, json, next, run: () => middleware(req, res, next) };
 }
 
 const TOKEN_PAYLOAD = {
@@ -169,5 +172,38 @@ describe('authenticate', () => {
     await ctx.run();
     expect(ctx.res.status).toHaveBeenCalledWith(401);
     expect(resolveSessionAccess).not.toHaveBeenCalled();
+  });
+});
+
+describe('authenticateOptional', () => {
+  beforeEach(() => {
+    verifyAccessToken.mockReset().mockReturnValue({ ...TOKEN_PAYLOAD });
+    resolveSessionAccess.mockReset();
+    lookupSessionUser.mockReset();
+  });
+
+  it('continues without a user when no credential is present', async () => {
+    const ctx = call({}, authenticateOptional);
+    await ctx.run();
+    expect(ctx.next).toHaveBeenCalledWith();
+    expect(ctx.req.user).toBeUndefined();
+    expect(ctx.res.status).not.toHaveBeenCalled();
+  });
+
+  it('attaches the user when the session cookie is valid', async () => {
+    lookupSessionUser.mockResolvedValue(COOKIE_USER);
+    const ctx = call({ cookie: `nova_session=${SESSION_ID}` }, authenticateOptional);
+    await ctx.run();
+    expect(ctx.next).toHaveBeenCalledWith();
+    expect(ctx.req.user).toMatchObject({ id: 'u1', sid: SESSION_ID });
+  });
+
+  it('treats an invalid cookie as anonymous instead of 401', async () => {
+    lookupSessionUser.mockResolvedValue(null);
+    const ctx = call({ cookie: `nova_session=${SESSION_ID}` }, authenticateOptional);
+    await ctx.run();
+    expect(ctx.next).toHaveBeenCalledWith();
+    expect(ctx.req.user).toBeUndefined();
+    expect(ctx.res.status).not.toHaveBeenCalled();
   });
 });

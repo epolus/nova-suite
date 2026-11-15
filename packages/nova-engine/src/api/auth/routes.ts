@@ -10,7 +10,7 @@ import { config } from '../../config';
 import { db } from '../../data/db';
 import { loginSchema, registerSchema } from '../../domain/schemas';
 import { validateBody } from '../../middleware/validate';
-import { authenticate, requireRole, setTenantRLS, releaseTenantClient, AuthUser } from '../../middleware/auth';
+import { authenticate, authenticateOptional, requireRole, setTenantRLS, releaseTenantClient, AuthUser } from '../../middleware/auth';
 import { verifyAccessToken } from '../../auth/jwt';
 import {
   clearSessionCookie, isSessionId, issueSession, newSessionId, readCredential, revokeSession, setSessionCookie,
@@ -290,9 +290,17 @@ router.post(
 );
 
 // ─── GET /api/auth/me ───
-router.get('/me', ...requireAuth, (req: Request, res: Response) => {
-  res.json({ user: req.user });
-});
+// Soft auth: anonymous visitors get 200 { user: null } so the SPA bootstrap
+// probe does not show up as a failed network request in DevTools.
+router.get(
+  '/me',
+  authenticateOptional,
+  setTenantRLS,
+  releaseTenantClient,
+  (req: Request, res: Response) => {
+    res.json({ user: req.user ?? null });
+  },
+);
 
 // ─── PATCH /api/auth/me/time-format ───
 router.patch('/me/time-format', ...requireAuth, async (req: Request, res: Response, next: NextFunction) => {

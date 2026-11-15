@@ -12,7 +12,7 @@ export const auth = {
     });
   },
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
-  me: () => request<{ user: User }>('/auth/me'),
+  me: () => request<{ user: User | null }>('/auth/me'),
   updateTimeFormat: (time_format: '12h' | '24h') =>
     request<{ user: User }>('/auth/me/time-format', {
       method: 'PATCH',

@@ -62,6 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const res = await auth.me();
+        if (!res.user) {
+          setUser(null);
+          return;
+        }
         setUser(res.user);
         cacheDateTimeFormats(res.user.time_format || '24h', res.user.date_format || 'YYYY-MM-DD');
 
