@@ -192,3 +192,25 @@ export interface ServiceListItem {
   name: string;
   description: string | null;
 }
+
+export interface ChangeJournalEntry {
+  id: string;
+  change_id: string;
+  author_id: string;
+  entry_type: string;
+  content: string;
+  is_customer_visible: boolean;
+  created_at: string;
+  author_name?: string;
+}
+
+export interface ChangeAuditEntry {
+  id: string;
+  change_id: string;
+  actor_id: string;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+  actor_name?: string;
+}

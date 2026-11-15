@@ -1190,7 +1190,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.36', 'work_logs'),
   ('v00.01.37', 'satisfaction_responses'),
   ('v00.01.38', 'checklists'),
-  ('v00.01.39', 'checklist_item_done_fix');
+  ('v00.01.39', 'checklist_item_done_fix'),
+  ('v00.01.40', 'change_collaboration');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -3386,6 +3387,38 @@ CREATE INDEX idx_change_conflicts_change ON change_conflicts(tenant_id, change_i
 CREATE INDEX idx_change_risk_questions_tenant ON change_risk_questions(tenant_id, is_active, sort_order);
 CREATE INDEX idx_change_risk_answers_change ON change_risk_answers(tenant_id, change_id);
 CREATE INDEX idx_changes_risk_score ON changes(tenant_id, risk_score);
+
+-- Change collaboration (journal + field audit)
+CREATE TABLE change_journal (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  change_id   uuid NOT NULL REFERENCES changes(id) ON DELETE CASCADE,
+  author_id   uuid NOT NULL REFERENCES users(id),
+  entry_type  text NOT NULL DEFAULT 'comment'
+              CHECK (entry_type IN ('comment', 'work_note', 'state_change', 'assignment')),
+  content     text NOT NULL,
+  is_customer_visible boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_change_journal_change
+  ON change_journal(tenant_id, change_id, created_at DESC);
+
+CREATE TABLE change_audit (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  change_id   uuid NOT NULL REFERENCES changes(id) ON DELETE CASCADE,
+  actor_id    uuid NOT NULL REFERENCES users(id),
+  field_name  text NOT NULL,
+  old_value   text,
+  new_value   text,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_change_audit_change
+  ON change_audit(tenant_id, change_id, created_at DESC);
+CREATE INDEX idx_change_audit_field
+  ON change_audit(tenant_id, change_id, field_name, created_at DESC);
 
 CREATE TRIGGER trg_change_types_updated_at
   BEFORE UPDATE ON change_types

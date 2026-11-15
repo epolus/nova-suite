@@ -8,6 +8,7 @@ import {
 } from '../../middleware/auth';
 import { validateBody, validateQuery } from '../../middleware/validate';
 import {
+  addChangeJournalEntrySchema,
   changeApprovalDecisionSchema,
   changeTransitionSchema,
   createBlackoutSchema,
@@ -30,6 +31,13 @@ import { normalizeChangePir } from '../../domain/change-pir';
 import { standardChangeSuccessRate } from '../../domain/standard-change-outcome';
 import { loadCustomFieldsMap, upsertCustomFields } from '../../domain/custom-fields';
 import { assertRequiredChecklistsComplete } from '../../domain/checklists';
+import {
+  addChangeJournalEntry,
+  listChangeAudit,
+  listChangeJournal,
+  writeChangeAuditDiff,
+  writeChangeStateJournal,
+} from '../../domain/change-collaboration';
 
 const router = Router();
 router.use(authenticate, setTenantRLS, releaseTenantClient);
@@ -1192,8 +1200,15 @@ router.post(
              END
          WHERE tenant_id = current_tenant_id()
            AND id = $4
-         RETURNING id, risk_score, risk_level`,
+         RETURNING *`,
         [riskScore, applySuggested, suggested, req.params.id],
+      );
+      await writeChangeAuditDiff(
+        client,
+        String(req.params.id),
+        req.user!.id,
+        change as Record<string, unknown>,
+        (updated.rows[0] || {}) as Record<string, unknown>,
       );
 
       res.json({
@@ -1386,6 +1401,13 @@ router.post('/', validateBody(createChangeSchema), async (req: Request, res: Res
     }
 
     await refreshChangeConflicts(client, change.id);
+    await addChangeJournalEntry(client, {
+      changeId: String(change.id),
+      authorId: req.user!.id,
+      entryType: 'state_change',
+      content: `Change created (${change.status} / ${change.stage})`,
+      isCustomerVisible: false,
+    });
     enqueueNotificationDispatchStartJob({
       tenantId: req.user!.tenant_id,
       entityType: 'change',
@@ -1518,6 +1540,19 @@ router.patch('/:id', validateBody(updateChangeSchema), async (req: Request, res:
          AND id = $1`,
       [req.params.id],
     );
+    await writeChangeAuditDiff(
+      client,
+      String(req.params.id),
+      req.user!.id,
+      current as Record<string, unknown>,
+      (updated.rows[0] || {}) as Record<string, unknown>,
+    );
+    await writeChangeStateJournal(client, {
+      changeId: String(req.params.id),
+      authorId: req.user!.id,
+      before: current,
+      after: updated.rows[0] || {},
+    });
     const templateIds = new Set<string>();
     for (const row of [current, updated.rows[0]]) {
       if (row?.status === 'closed' && row.standard_change_id) templateIds.add(String(row.standard_change_id));
@@ -1742,6 +1777,20 @@ router.post('/:id/transition', validateBody(changeTransitionSchema), async (req:
          AND id = $1`,
       [req.params.id],
     );
+    await writeChangeAuditDiff(
+      client,
+      String(req.params.id),
+      req.user!.id,
+      change as Record<string, unknown>,
+      (updated.rows[0] || {}) as Record<string, unknown>,
+    );
+    await writeChangeStateJournal(client, {
+      changeId: String(req.params.id),
+      authorId: req.user!.id,
+      before: change,
+      after: updated.rows[0] || {},
+      notes: notes || null,
+    });
     await syncRelatedRecords(client, updated.rows[0]);
     if (action === 'close' && updated.rows[0]?.standard_change_id) {
       await refreshStandardChangeOutcome(client, String(updated.rows[0].standard_change_id));
@@ -1837,6 +1886,10 @@ router.post('/:id/approvals/:approvalId/decision', validateBody(changeApprovalDe
       [decision, req.user!.id, notes || null, approval.id],
     );
 
+    const beforeChange = await client.query(
+      `SELECT * FROM changes WHERE tenant_id = current_tenant_id() AND id = $1`,
+      [req.params.id],
+    );
     if (decision === 'rejected') {
       await client.query(
         `UPDATE changes
@@ -1866,7 +1919,85 @@ router.post('/:id/approvals/:approvalId/decision', validateBody(changeApprovalDe
         );
       }
     }
+    const afterChange = await client.query(
+      `SELECT * FROM changes WHERE tenant_id = current_tenant_id() AND id = $1`,
+      [req.params.id],
+    );
+    if (beforeChange.rows[0] && afterChange.rows[0]) {
+      await writeChangeAuditDiff(
+        client,
+        String(req.params.id),
+        req.user!.id,
+        beforeChange.rows[0] as Record<string, unknown>,
+        afterChange.rows[0] as Record<string, unknown>,
+      );
+      await writeChangeStateJournal(client, {
+        changeId: String(req.params.id),
+        authorId: req.user!.id,
+        before: beforeChange.rows[0],
+        after: afterChange.rows[0],
+        notes: notes || null,
+      });
+    }
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:id/journal', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const exists = await client.query(
+      `SELECT 1 FROM changes WHERE tenant_id = current_tenant_id() AND id = $1`,
+      [req.params.id],
+    );
+    if (exists.rowCount === 0) throw NotFound('Change not found');
+    const entries = await listChangeJournal(client, String(req.params.id));
+    res.json({ entries });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/:id/journal',
+  validateBody(addChangeJournalEntrySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const client = getRequestClient(req);
+      const changeRes = await client.query(
+        `SELECT * FROM changes WHERE tenant_id = current_tenant_id() AND id = $1`,
+        [req.params.id],
+      );
+      if (changeRes.rowCount === 0) throw NotFound('Change not found');
+      const canWork = await canWorkOnChange(client, req, changeRes.rows[0]);
+      if (!canWork) throw new AppError(403, 'Insufficient permissions');
+
+      const entry = await addChangeJournalEntry(client, {
+        changeId: String(req.params.id),
+        authorId: req.user!.id,
+        entryType: req.body.entry_type,
+        content: req.body.content,
+        isCustomerVisible: Boolean(req.body.is_customer_visible),
+      });
+      res.status(201).json(entry);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.get('/:id/audit', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const exists = await client.query(
+      `SELECT 1 FROM changes WHERE tenant_id = current_tenant_id() AND id = $1`,
+      [req.params.id],
+    );
+    if (exists.rowCount === 0) throw NotFound('Change not found');
+    const entries = await listChangeAudit(client, String(req.params.id));
+    res.json({ entries });
   } catch (err) {
     next(err);
   }
