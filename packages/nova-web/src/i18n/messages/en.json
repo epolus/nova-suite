@@ -1175,6 +1175,8 @@
       "emptySearch": "No assets matching \"{query}\"",
       "count": "{count, plural, one {# asset} other {# assets}}",
       "configurationItem": "Configuration item",
+      "searchCi": "Search configuration items…",
+      "openCi": "Open configuration item",
       "loadFailed": "Failed to load assets",
       "saveFailed": "Failed to save asset",
       "requiredFields": "Asset tag and name are required.",
