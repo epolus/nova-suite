@@ -364,13 +364,7 @@ router.get('/callback', async (req: Request, res: ExpressResponse, next: NextFun
       [user!.id],
     ));
 
-    const roleRows = await db.withTenantContext(user.tenant_id, user.id, 'user', () => db.getMany<{ name: string }>(
-      `SELECT r.name FROM user_roles ur
-       JOIN roles r ON r.id = ur.role_id
-       WHERE ur.user_id = $1`,
-      [user!.id],
-    ));
-    const roles = roleRows.map((r) => r.name);
+    const roles = (await db.resolveUserAccess(user.id, user.tenant_id))?.roles ?? [];
 
     // Issue Nova JWT
     const payload: AuthUser = {

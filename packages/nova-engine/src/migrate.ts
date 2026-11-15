@@ -2,10 +2,13 @@
 import { readFileSync } from 'node:fs';
 import { Client } from 'pg';
 import {
+  auditChecksums,
   listMigrationFiles,
   loadMigrationFilenames,
+  migrationChecksum,
   migrationPath,
   pendingMigrations,
+  type AppliedMigration,
 } from './migrate/files';
 
 const ADVISORY_LOCK_KEY = 872614001;
@@ -66,6 +69,38 @@ async function latestSchemaVersion(client: Client): Promise<string | null> {
   }
 }
 
+/**
+ * Applied migrations are immutable: fix mistakes with a new migration. A file
+ * edited after it was applied stops the run. After confirming the edit is
+ * harmless (comments, formatting), re-record it via NOVA_MIGRATE_ACCEPT_CHECKSUMS.
+ */
+async function verifyAppliedChecksums(client: Client, sources: Map<string, string>): Promise<void> {
+  await client.query('ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS checksum text');
+  const applied = await client.query<AppliedMigration>('SELECT version, checksum FROM schema_migrations');
+  const fileChecksums = new Map([...sources].map(([version, sql]) => [version, migrationChecksum(sql)]));
+  const accepted = new Set(
+    (process.env.NOVA_MIGRATE_ACCEPT_CHECKSUMS ?? '').split(',').map((v) => v.trim()).filter(Boolean),
+  );
+  const audit = auditChecksums(applied.rows, fileChecksums, accepted);
+
+  if (audit.mismatched.length > 0) {
+    throw new Error(
+      `Applied migration file(s) changed since they were applied: ${audit.mismatched.join(', ')}. `
+      + 'Restore the original file and put the fix in a new migration. If the edit is cosmetic, '
+      + 'set NOVA_MIGRATE_ACCEPT_CHECKSUMS to those versions for one run.',
+    );
+  }
+  for (const version of audit.unrecorded) {
+    await client.query(
+      'UPDATE schema_migrations SET checksum = $2 WHERE version = $1',
+      [version, fileChecksums.get(version)],
+    );
+  }
+  if (audit.unrecorded.length > 0) {
+    console.log(`[nova-migrate] Recorded checksums for ${audit.unrecorded.length} applied migration(s)`);
+  }
+}
+
 export async function runMigrations(): Promise<void> {
   const user = env('POSTGRES_USER', 'nova_app');
   const migrationsDir = env('NOVA_MIGRATIONS_DIR', '/app/infra/postgres/migrations');
@@ -85,6 +120,12 @@ export async function runMigrations(): Promise<void> {
     await client.query('SELECT pg_advisory_lock($1)', [ADVISORY_LOCK_KEY]);
     try {
       const currentVersion = await latestSchemaVersion(client);
+      const sources = new Map(files.map((file) => [
+        file.version,
+        readFileSync(migrationPath(migrationsDir, file.filename), 'utf8'),
+      ]));
+      await verifyAppliedChecksums(client, sources);
+
       const pending = pendingMigrations(files, currentVersion);
       if (pending.length === 0) {
         console.log(`[nova-migrate] Schema is up to date (${currentVersion ?? 'empty ledger'})`);
@@ -92,14 +133,14 @@ export async function runMigrations(): Promise<void> {
       }
 
       for (const file of pending) {
-        const sql = readFileSync(migrationPath(migrationsDir, file.filename), 'utf8');
+        const sql = sources.get(file.version)!;
         console.log(`[nova-migrate] Applying ${file.filename}`);
         await client.query('BEGIN');
         try {
           await client.query(sql);
           await client.query(
-            'INSERT INTO schema_migrations (version, name) VALUES ($1, $2)',
-            [file.version, file.name],
+            'INSERT INTO schema_migrations (version, name, checksum) VALUES ($1, $2, $3)',
+            [file.version, file.name, migrationChecksum(sql)],
           );
           await client.query('COMMIT');
         } catch (err) {

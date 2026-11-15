@@ -1174,7 +1174,8 @@ CREATE TABLE worker_heartbeats (
 CREATE TABLE schema_migrations (
   version     text PRIMARY KEY CHECK (version ~ '^v[0-9]{2}[.][0-9]{2}[.][0-9]{2}$'),
   name        text NOT NULL,
-  applied_at  timestamptz NOT NULL DEFAULT now()
+  applied_at  timestamptz NOT NULL DEFAULT now(),
+  checksum    text
 );
 
 INSERT INTO schema_migrations (version, name) VALUES
@@ -1218,7 +1219,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.42', 'asset_assignment_history'),
   ('v00.01.43', 'on_call_rota'),
   ('v00.01.44', 'integrity_constraints'),
-  ('v00.01.45', 'tenant_scoped_auth_and_kb_numbers');
+  ('v00.01.45', 'tenant_scoped_auth_and_kb_numbers'),
+  ('v00.01.46', 'resumable_imports_and_migration_checksums');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -2925,8 +2927,12 @@ CREATE TABLE data_source_runs (
   error_message   text,
   error_samples   jsonb NOT NULL DEFAULT '[]',
   run_meta        jsonb NOT NULL DEFAULT '{}',
+  execution_key   text,
+  attempt         integer NOT NULL DEFAULT 1,
+  next_row        integer NOT NULL DEFAULT 0,
   started_at      timestamptz NOT NULL DEFAULT now(),
-  completed_at    timestamptz
+  completed_at    timestamptz,
+  CONSTRAINT data_source_runs_execution_key_key UNIQUE (data_source_id, execution_key)
 );
 
 CREATE INDEX idx_data_source_runs_ds ON data_source_runs(data_source_id);

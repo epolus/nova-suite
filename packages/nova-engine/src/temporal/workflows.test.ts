@@ -2,10 +2,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const describeNamespaceMock = vi.fn();
+const connectionCloseMock = vi.fn();
 const connectionMock = {
   workflowService: {
     describeNamespace: describeNamespaceMock,
   },
+  close: connectionCloseMock,
 };
 const connectMock = vi.fn();
 const scheduleCreateMock = vi.fn();
@@ -67,6 +69,7 @@ vi.mock('../config', () => ({
 
 vi.mock('../logger', () => ({
   logger: {
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -78,6 +81,7 @@ describe('checkTemporalHealth', () => {
     vi.resetModules();
     vi.clearAllMocks();
     connectMock.mockResolvedValue(connectionMock);
+    connectionCloseMock.mockResolvedValue(undefined);
     describeNamespaceMock.mockReset();
     scheduleCreateMock.mockResolvedValue(undefined);
     scheduleUpdateMock.mockResolvedValue(undefined);
@@ -109,6 +113,15 @@ describe('checkTemporalHealth', () => {
     // First call connects, second uses cached client, third reconnects after failure reset.
     expect(connectMock).toHaveBeenCalledTimes(2);
     expect(describeNamespaceMock).toHaveBeenCalledTimes(3);
+    expect(connectionCloseMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shares one connection attempt between concurrent callers', async () => {
+    describeNamespaceMock.mockResolvedValue({});
+    const { checkTemporalHealth } = await import('./workflows');
+
+    await Promise.all([checkTemporalHealth(), checkTemporalHealth(), checkTemporalHealth()]);
+    expect(connectMock).toHaveBeenCalledTimes(1);
   });
 });
 

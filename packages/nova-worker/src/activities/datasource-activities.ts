@@ -3,6 +3,12 @@ import { log } from '@temporalio/activity';
 import type { PoolClient } from 'pg';
 import { config } from '../config';
 import { withTenantContext } from '../db';
+import {
+  activityExecution,
+  activityHeartbeat,
+  throwIfActivityCancelled,
+  withActivityHeartbeat,
+} from './activity-context';
 import SftpClient from 'ssh2-sftp-client';
 import {
   assertPublicHttpUrl,
@@ -182,19 +188,19 @@ export async function runDataSourceImport(
     const ds: DataSourceRow = { ...row, source_config };
     const sourceName = typeof row.name === 'string' && row.name.trim() ? row.name : 'Data source';
 
-    const runRows = await client.query<{ id: string }>(
-      `INSERT INTO data_source_runs (data_source_id, tenant_id, status, trigger_type)
-       VALUES ($1, $2, 'running', $3) RETURNING id`,
-      [dataSourceId, tenantId, triggerType],
-    );
-    const runId = runRows.rows[0].id;
+    const run = await claimRun(client, dataSourceId, tenantId, triggerType);
+    if (!run) {
+      log.info('Data source run already completed by an earlier attempt', { dataSourceId });
+      return;
+    }
+    const runId = run.id;
 
     try {
-      const rawData = await fetchData(ds);
+      const rawData = await withActivityHeartbeat(() => fetchData(ds));
       log.info('Fetched data', { rows: rawData.length, dataSourceId });
 
       if (rawData.length === 0) {
-        await completeRun(client, runId, 'completed', 0, 0, 0, 0);
+        await inFencedTransaction(client, run, () => completeRun(client, runId, 'completed', 0, 0, 0, 0));
         await client.query(
           `UPDATE data_sources SET last_run_at = now(), last_run_status = 'completed' WHERE id = $1`,
           [dataSourceId],
@@ -221,10 +227,10 @@ export async function runDataSourceImport(
         }
       }
 
-      let committed = 0;
-      let errors = 0;
-      let skipped = 0;
-      const errorSamples: { row_index: number; error: string; data: Record<string, string>; mapped_data?: Record<string, unknown> }[] = [];
+      let committed = run.committed;
+      let errors = run.errors;
+      let skipped = run.skipped;
+      const errorSamples = run.errorSamples;
 
       if (rawData.length > 0) {
         const srcColumns = Object.keys(rawData[0]);
@@ -241,36 +247,66 @@ export async function runDataSourceImport(
 
       const fkCaches = await buildFkCaches(client, ds.entity_type);
 
-      for (let rowIdx = 0; rowIdx < rawData.length; rowIdx++) {
-        const rawRow = rawData[rowIdx];
-        let mappedData: Record<string, unknown> | undefined;
-        try {
-          mappedData = applyMapping(rawRow, invertedMap);
-          const resolved = resolveForeignKeys(mappedData, ds.entity_type, fkCaches);
+      if (run.nextRow > 0) {
+        log.info('Resuming data source import', { dataSourceId, runId, nextRow: run.nextRow });
+      }
 
-          if (ds.import_mode === 'upsert') {
-            const didUpsert = await upsertRow(client, ds.entity_type, resolved, tenantId, ds.upsert_key);
-            if (didUpsert) committed++;
-            else skipped++;
-          } else {
-            await insertRow(client, ds.entity_type, resolved, tenantId);
-            committed++;
-          }
+      for (let chunkStart = run.nextRow; chunkStart < rawData.length; chunkStart += IMPORT_CHUNK_SIZE) {
+        throwIfActivityCancelled();
+        const chunkEnd = Math.min(chunkStart + IMPORT_CHUNK_SIZE, rawData.length);
+        const before = { committed, errors, skipped, samples: errorSamples.length };
+        try {
+          await inFencedTransaction(client, run, async () => {
+            for (let rowIdx = chunkStart; rowIdx < chunkEnd; rowIdx++) {
+              const rawRow = rawData[rowIdx];
+              let mappedData: Record<string, unknown> | undefined;
+              await client.query('SAVEPOINT import_row');
+              try {
+                mappedData = applyMapping(rawRow, invertedMap);
+                const resolved = resolveForeignKeys(mappedData, ds.entity_type, fkCaches);
+
+                if (ds.import_mode === 'upsert') {
+                  const didUpsert = await upsertRow(client, ds.entity_type, resolved, tenantId, ds.upsert_key);
+                  if (didUpsert) committed++;
+                  else skipped++;
+                } else {
+                  await insertRow(client, ds.entity_type, resolved, tenantId);
+                  committed++;
+                }
+                await client.query('RELEASE SAVEPOINT import_row');
+              } catch (err) {
+                await client.query('ROLLBACK TO SAVEPOINT import_row');
+                errors++;
+                const errMsg = err instanceof Error ? err.message : String(err);
+                if (errorSamples.length < 10) {
+                  errorSamples.push({
+                    row_index: rowIdx + 1,
+                    error: errMsg,
+                    data: rawRow,
+                    mapped_data: mappedData,
+                  });
+                }
+                if (errors <= 5) {
+                  log.warn('Row import error', { error: errMsg, mapped: JSON.stringify(mappedData || {}).slice(0, 200) });
+                }
+              }
+            }
+            await client.query(
+              `UPDATE data_source_runs
+               SET next_row = $2, total_rows = $3, committed_rows = $4, error_rows = $5,
+                   skipped_rows = $6, error_samples = $7
+               WHERE id = $1`,
+              [runId, chunkEnd, rawData.length, committed, errors, skipped, JSON.stringify(errorSamples)],
+            );
+          });
         } catch (err) {
-          errors++;
-          const errMsg = err instanceof Error ? err.message : String(err);
-          if (errorSamples.length < 10) {
-            errorSamples.push({
-              row_index: rowIdx + 1,
-              error: errMsg,
-              data: rawRow,
-              mapped_data: mappedData,
-            });
-          }
-          if (errors <= 5) {
-            log.warn('Row import error', { error: errMsg, mapped: JSON.stringify(mappedData || {}).slice(0, 200) });
-          }
+          committed = before.committed;
+          errors = before.errors;
+          skipped = before.skipped;
+          errorSamples.length = before.samples;
+          throw err;
         }
+        activityHeartbeat({ runId, nextRow: chunkEnd });
       }
 
       const runMeta: Record<string, unknown> = {};
@@ -281,7 +317,8 @@ export async function runDataSourceImport(
       if (ds.source_config.csv_delimiter) runMeta.csv_delimiter = ds.source_config.csv_delimiter;
       if (ds.source_config.csv_has_headers === false) runMeta.csv_has_headers = false;
 
-      await completeRun(client, runId, 'completed', rawData.length, committed, errors, skipped, errorSamples, runMeta);
+      await inFencedTransaction(client, run, () =>
+        completeRun(client, runId, 'completed', rawData.length, committed, errors, skipped, errorSamples, runMeta));
       await client.query(
         `UPDATE data_sources SET last_run_at = now(), last_run_status = 'completed' WHERE id = $1`,
         [dataSourceId],
@@ -292,9 +329,13 @@ export async function runDataSourceImport(
 
       log.info('Data source import completed', { dataSourceId, total: rawData.length, committed, errors, skipped });
     } catch (err) {
+      if (err instanceof SupersededAttemptError) {
+        log.warn('Data source import attempt superseded by a retry', { dataSourceId, runId, attempt: run.attempt });
+        throw err;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       log.error('Data source import failed', { dataSourceId, error: msg });
-      await failRun(client, runId, msg);
+      await failRun(client, run, msg);
       await client.query(
         `UPDATE data_sources SET last_run_at = now(), last_run_status = 'failed' WHERE id = $1`,
         [dataSourceId],
@@ -1021,9 +1062,115 @@ async function completeRun(
   );
 }
 
-async function failRun(client: PoolClient, runId: string, errorMessage: string): Promise<void> {
+async function failRun(client: PoolClient, run: ClaimedRun, errorMessage: string): Promise<void> {
   await client.query(
-    `UPDATE data_source_runs SET status = 'failed', error_message = $1, completed_at = now() WHERE id = $2`,
-    [errorMessage.slice(0, 2000), runId],
+    `UPDATE data_source_runs SET status = 'failed', error_message = $1, completed_at = now()
+     WHERE id = $2 AND attempt = $3`,
+    [errorMessage.slice(0, 2000), run.id, run.attempt],
   );
+}
+
+/** Marks a run left `running` after the import activity exhausted its retries. */
+export async function failDataSourceRun(
+  dataSourceId: string,
+  tenantId: string,
+  executionKey: string,
+  errorMessage: string,
+): Promise<void> {
+  await withTenantContext(tenantId, async (client) => {
+    await client.query(
+      `UPDATE data_source_runs SET status = 'failed', error_message = $3, completed_at = now()
+       WHERE data_source_id = $1 AND execution_key = $2 AND status = 'running'`,
+      [dataSourceId, executionKey, errorMessage.slice(0, 2000)],
+    );
+  });
+}
+
+type ErrorSample = {
+  row_index: number;
+  error: string;
+  data: Record<string, string>;
+  mapped_data?: Record<string, unknown>;
+};
+
+type ClaimedRun = {
+  id: string;
+  attempt: number;
+  nextRow: number;
+  committed: number;
+  errors: number;
+  skipped: number;
+  errorSamples: ErrorSample[];
+};
+
+/** Rows per transaction; stays under Postgres' 64 cached subtransactions (one savepoint per row). */
+const IMPORT_CHUNK_SIZE = 50;
+
+class SupersededAttemptError extends Error {
+  constructor(runId: string, attempt: number) {
+    super(`Data source run ${runId} was taken over by a newer attempt than ${attempt}`);
+    this.name = 'SupersededAttemptError';
+  }
+}
+
+/**
+ * Creates the run for this workflow execution, or takes over the one a failed
+ * attempt left behind so the import resumes at its last committed chunk.
+ * Returns null when an earlier attempt already completed the run.
+ */
+async function claimRun(
+  client: PoolClient,
+  dataSourceId: string,
+  tenantId: string,
+  triggerType: 'manual' | 'scheduled',
+): Promise<ClaimedRun | null> {
+  const execution = activityExecution();
+  const result = await client.query<{
+    id: string;
+    status: string;
+    attempt: number;
+    next_row: number;
+    committed_rows: number;
+    error_rows: number;
+    skipped_rows: number;
+    error_samples: ErrorSample[];
+  }>(
+    `INSERT INTO data_source_runs (data_source_id, tenant_id, status, trigger_type, execution_key, attempt)
+     VALUES ($1, $2, 'running', $3, $4, $5)
+     ON CONFLICT (data_source_id, execution_key) DO UPDATE
+       SET attempt = EXCLUDED.attempt,
+           status = CASE WHEN data_source_runs.status = 'completed' THEN 'completed' ELSE 'running' END,
+           error_message = CASE WHEN data_source_runs.status = 'completed' THEN data_source_runs.error_message END,
+           completed_at = CASE WHEN data_source_runs.status = 'completed' THEN data_source_runs.completed_at END
+     RETURNING id, status, attempt, next_row, committed_rows, error_rows, skipped_rows, error_samples`,
+    [dataSourceId, tenantId, triggerType, execution?.key ?? null, execution?.attempt ?? 1],
+  );
+  const row = result.rows[0];
+  if (row.status === 'completed') return null;
+  return {
+    id: row.id,
+    attempt: row.attempt,
+    nextRow: row.next_row,
+    committed: row.committed_rows,
+    errors: row.error_rows,
+    skipped: row.skipped_rows,
+    errorSamples: Array.isArray(row.error_samples) ? row.error_samples : [],
+  };
+}
+
+/** Runs `fn` in a transaction that aborts if a newer attempt has claimed the run. */
+async function inFencedTransaction(client: PoolClient, run: ClaimedRun, fn: () => Promise<void>): Promise<void> {
+  await client.query('BEGIN');
+  try {
+    const owner = await client.query<{ attempt: number }>(
+      'SELECT attempt FROM data_source_runs WHERE id = $1 FOR UPDATE',
+      [run.id],
+    );
+    if (owner.rows[0]?.attempt !== run.attempt) throw new SupersededAttemptError(run.id, run.attempt);
+    await fn();
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  }
 }

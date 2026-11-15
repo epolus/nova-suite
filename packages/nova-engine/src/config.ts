@@ -2,6 +2,8 @@
 // ─── Nova Suite – Configuration ───
 // Reads environment variables with sensible defaults.
 
+import { assertValidEnv } from './env-schema';
+
 function env(name: string, fallback: string): string {
   const value = process.env[name];
   return value !== undefined && value !== '' ? value : fallback;
@@ -31,35 +33,8 @@ function envList(name: string): string[] {
     .filter(Boolean);
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function envUuid(name: string, fallback: string): string {
-  const value = env(name, fallback);
-  if (!UUID_RE.test(value)) {
-    throw new Error(`${name} must be a UUID`);
-  }
-  return value.toLowerCase();
-}
-
-function hasJwtKeyConfig(): boolean {
-  const hasInline = !!(process.env.JWT_PRIVATE_KEY && process.env.JWT_PUBLIC_KEY);
-  const hasPaths = !!(process.env.JWT_PRIVATE_KEY_PATH && process.env.JWT_PUBLIC_KEY_PATH);
-  return hasInline || hasPaths;
-}
-
-function assertProductionSecurityConfig(nodeEnv: string): void {
-  if (nodeEnv !== 'production') return;
-
-  if (!hasJwtKeyConfig()) {
-    throw new Error(
-      'JWT RS256 keys must be configured in production '
-      + '(JWT_PRIVATE_KEY + JWT_PUBLIC_KEY, or JWT_PRIVATE_KEY_PATH + JWT_PUBLIC_KEY_PATH)',
-    );
-  }
-}
-
+assertValidEnv();
 const nodeEnv = env('NODE_ENV', 'development');
-assertProductionSecurityConfig(nodeEnv);
 
 export const config = {
   port: envInt('API_PORT', 4000),
@@ -72,7 +47,10 @@ export const config = {
     database: env('POSTGRES_DB', 'nova'),
     user: env('POSTGRES_APP_USER', 'nova_runtime'),
     password: env('POSTGRES_APP_PASSWORD', env('POSTGRES_PASSWORD', 'changeme')),
-    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.45'),
+    expectedSchemaVersion: env('DB_SCHEMA_VERSION', 'v00.01.46'),
+    poolMax: envInt('DB_POOL_MAX', 20),
+    statementTimeoutMs: envInt('DB_STATEMENT_TIMEOUT_MS', 60_000),
+    idleInTransactionTimeoutMs: envInt('DB_IDLE_IN_TRANSACTION_TIMEOUT_MS', 300_000),
   },
 
   jwt: {
@@ -81,7 +59,7 @@ export const config = {
 
   /** One tenant per install: login, SSO, public branding and the env webhook secret all resolve to it. */
   tenancy: {
-    primaryTenantId: envUuid('NOVA_PRIMARY_TENANT_ID', 'a0000000-0000-0000-0000-000000000001'),
+    primaryTenantId: env('NOVA_PRIMARY_TENANT_ID', 'a0000000-0000-0000-0000-000000000001').toLowerCase(),
   },
 
   auth: {

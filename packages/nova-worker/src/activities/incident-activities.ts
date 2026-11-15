@@ -95,10 +95,11 @@ export async function getIncident(incidentId: string, tenantId: string): Promise
 export async function markSlaBreached(incidentId: string, tenantId: string): Promise<void> {
   log.info('Marking resolution SLA breached', { incidentId });
   await withTenantContext(tenantId, async (client) => {
-    await client.query(
-      'UPDATE incidents SET sla_breached = true WHERE id = $1',
+    const updated = await client.query(
+      'UPDATE incidents SET sla_breached = true WHERE id = $1 AND NOT sla_breached',
       [incidentId],
     );
+    if (!updated.rowCount) return;
     const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
     await insertWorkflowJournalEntry(client, {
       tenantId,
@@ -113,10 +114,11 @@ export async function markSlaBreached(incidentId: string, tenantId: string): Pro
 export async function markResponseBreached(incidentId: string, tenantId: string): Promise<void> {
   log.info('Marking response SLA breached', { incidentId });
   await withTenantContext(tenantId, async (client) => {
-    await client.query(
-      'UPDATE incidents SET response_breached = true WHERE id = $1',
+    const updated = await client.query(
+      'UPDATE incidents SET response_breached = true WHERE id = $1 AND NOT response_breached',
       [incidentId],
     );
+    if (!updated.rowCount) return;
     const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
     await insertWorkflowJournalEntry(client, {
       tenantId,
@@ -135,10 +137,11 @@ export async function escalateIncident(
 ): Promise<void> {
   log.info('Escalating incident', { incidentId, newPriority });
   await withTenantContext(tenantId, async (client) => {
-    await client.query(
+    const updated = await client.query(
       'UPDATE incidents SET priority = $1 WHERE id = $2 AND priority > $1',
       [newPriority, incidentId],
     );
+    if (!updated.rowCount) return;
     const preferredAuthorId = await getIncidentJournalAuthorHint(client, incidentId);
     await insertWorkflowJournalEntry(client, {
       tenantId,

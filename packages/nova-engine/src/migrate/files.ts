@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { createHash } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -48,6 +49,38 @@ export function pendingMigrations(
 ): MigrationFile[] {
   if (currentVersion === null) return files;
   return files.filter((file) => file.version > currentVersion);
+}
+
+/** sha256 of the file with line endings normalized, so CRLF checkouts match. */
+export function migrationChecksum(sql: string): string {
+  return createHash('sha256').update(sql.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+}
+
+export type AppliedMigration = { version: string; checksum: string | null };
+
+export type ChecksumAudit = {
+  /** Applied versions whose file changed since it was applied. */
+  mismatched: string[];
+  /** Applied versions with no recorded checksum yet (recorded from the current file). */
+  unrecorded: string[];
+};
+
+export function auditChecksums(
+  applied: AppliedMigration[],
+  fileChecksums: Map<string, string>,
+  accepted: ReadonlySet<string> = new Set(),
+): ChecksumAudit {
+  const audit: ChecksumAudit = { mismatched: [], unrecorded: [] };
+  for (const row of applied) {
+    const current = fileChecksums.get(row.version);
+    if (current === undefined) continue;
+    if (row.checksum === null || accepted.has(row.version)) {
+      if (row.checksum !== current) audit.unrecorded.push(row.version);
+    } else if (row.checksum !== current) {
+      audit.mismatched.push(row.version);
+    }
+  }
+  return audit;
 }
 
 export function loadMigrationFilenames(dir: string): string[] {

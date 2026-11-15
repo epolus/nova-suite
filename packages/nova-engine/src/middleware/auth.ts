@@ -28,59 +28,45 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     return;
   }
 
-  const token = header.slice(7);
-
+  let payload: ReturnType<typeof verifyAccessToken>;
   try {
-    const payload = verifyAccessToken(token);
-
-    // Normalise legacy tokens that carry a single `role` string instead of `roles[]`
-    if (!Array.isArray(payload.roles)) {
-      payload.roles = payload.role ? [payload.role] : ['user'];
-    }
-    if (!payload.time_format || (payload.time_format !== '12h' && payload.time_format !== '24h')) {
-      payload.time_format = '24h';
-    }
-    if (!payload.date_format || !['DD.MM.YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'].includes(payload.date_format)) {
-      payload.date_format = 'YYYY-MM-DD';
-    }
-    delete payload.role;
-
-    // Always resolve roles from DB so role changes apply immediately
-    // without requiring a new login/token issuance. Must run with tenant
-    // context: roles/user_roles are FORCE RLS and the pool has none.
-    const roleRows = await db.withTenantContext(
-      payload.tenant_id,
-      payload.id,
-      'user',
-      () => db.getMany<{ name: string }>(
-        `SELECT DISTINCT r.name
-         FROM roles r
-         JOIN (
-           SELECT ur.role_id
-           FROM user_roles ur
-           WHERE ur.user_id = $1
-             AND ur.tenant_id = $2
-           UNION
-           SELECT agr.role_id
-           FROM assignment_group_members agm
-           JOIN assignment_group_roles agr ON agr.group_id = agm.group_id
-           WHERE agm.user_id = $1
-             AND agm.tenant_id = $2
-             AND agr.tenant_id = $2
-         ) src ON src.role_id = r.id
-         WHERE r.tenant_id = $2
-         ORDER BY r.name`,
-        [payload.id, payload.tenant_id],
-      ),
-    );
-    payload.roles = roleRows.length > 0 ? roleRows.map((r) => r.name) : ['user'];
-
-    req.user = payload;
-    next();
+    payload = verifyAccessToken(header.slice(7));
   } catch (err) {
     logger.warn({ err }, 'JWT verification failed');
     res.status(401).json({ error: 'Invalid or expired token' });
+    return;
   }
+
+  // Normalise legacy tokens that carry a single `role` string instead of `roles[]`
+  if (!Array.isArray(payload.roles)) {
+    payload.roles = payload.role ? [payload.role] : ['user'];
+  }
+  if (!payload.time_format || (payload.time_format !== '12h' && payload.time_format !== '24h')) {
+    payload.time_format = '24h';
+  }
+  if (!payload.date_format || !['DD.MM.YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'].includes(payload.date_format)) {
+    payload.date_format = 'YYYY-MM-DD';
+  }
+  delete payload.role;
+
+  // Resolve roles and the active flag from the DB on every request so role
+  // changes and deactivation apply without waiting for the token to expire.
+  // Lockout is not checked here: failed logins set it, and must not end live sessions.
+  let access: Awaited<ReturnType<typeof db.resolveUserAccess>>;
+  try {
+    access = await db.resolveUserAccess(payload.id, payload.tenant_id);
+  } catch (err) {
+    next(err);
+    return;
+  }
+  if (!access || !access.is_active) {
+    res.status(401).json({ error: 'Account is inactive' });
+    return;
+  }
+  payload.roles = access.roles.length > 0 ? access.roles : ['user'];
+
+  req.user = payload;
+  next();
 }
 
 /** Require that the user has at least one of the specified roles. */
@@ -139,7 +125,7 @@ export function releaseTenantClient(req: Request, _res: Response, next: NextFunc
     const release = () => {
       if (released) return;
       released = true;
-      db.clearTenantContext(client).finally(() => client.release());
+      void db.releaseTenantClient(client);
     };
     // `close` fires on abort; `finish` does not. Guard so a normal
     // response (which emits both) only releases once.

@@ -41,6 +41,7 @@ export {
 
 export {
   runDataSourceImport,
+  failDataSourceRun,
 } from './datasource-activities';
 
 export {

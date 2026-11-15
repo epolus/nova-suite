@@ -4,6 +4,7 @@ import { simpleParser } from 'mailparser';
 import { loadCredentialSecretsBySlugs } from '@nova-suite/shared/node';
 import { config } from '../config';
 import { query, withTenantContext } from '../db';
+import { throwIfActivityCancelled, withActivityHeartbeat } from './activity-context';
 
 type MailboxPollRow = {
   id: string;
@@ -264,9 +265,10 @@ export async function pollInboundEmailMailboxes(): Promise<{
     });
 
     for (const mailbox of due) {
+      throwIfActivityCancelled();
       mailboxes += 1;
       try {
-        const result = await pollOneMailbox(tenant.id, mailbox);
+        const result = await withActivityHeartbeat(() => pollOneMailbox(tenant.id, mailbox));
         fetched += result.fetched;
         errors += result.errors;
       } catch (err) {

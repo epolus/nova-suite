@@ -13,8 +13,9 @@ const pool = new Pool({
   database: config.db.database,
   user: config.db.user,
   password: config.db.password,
-  max: 5,
+  max: config.db.poolMax,
   idleTimeoutMillis: 30_000,
+  statement_timeout: config.db.statementTimeoutMs,
 });
 
 export async function query<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -39,16 +40,18 @@ export async function withTenantContext<T>(
     );
     return await fn(client);
   } finally {
+    let resetError: Error | undefined;
     try {
       await client.query(
         `SELECT set_config('app.current_tenant_id', '', false),
                 set_config('app.current_user_id', '', false),
                 set_config('app.current_user_roles', '', false)`,
       );
-    } catch {
-      // ignore – connection may already be broken
+    } catch (err) {
+      // Never return a connection that may still carry this tenant's context.
+      resetError = err instanceof Error ? err : new Error(String(err));
     }
-    client.release();
+    client.release(resetError);
   }
 }
 
