@@ -146,8 +146,8 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
     method: 'get',
     path: '/auth/me',
     tags: ['Auth'],
-    summary: 'Get current user',
-    responses: { 200: { description: 'Current user info' } },
+    summary: 'Get current user (null when anonymous)',
+    responses: { 200: { description: 'Current user info, or { user: null } when not signed in' } },
   });
 
   registry.registerPath({

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Router, Request, Response, NextFunction } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import {
   authenticate,
@@ -26,7 +26,7 @@ const aiMessageLimiter = rateLimit({
   max: config.ai.rateLimitPerUserPerMin,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id ?? req.ip ?? 'anonymous',
+  keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip ?? 'anonymous'),
   message: { error: 'AI rate limit exceeded. Please retry in a minute.' },
 });
 
@@ -36,7 +36,7 @@ const aiCreateConversationLimiter = rateLimit({
   max: 15,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `${req.user?.id ?? req.ip ?? 'anonymous'}:create`,
+  keyGenerator: (req) => `${req.user?.id ?? ipKeyGenerator(req.ip ?? 'anonymous')}:create`,
   message: { error: 'Too many new assistant sessions. Please wait a moment.' },
 });
 
