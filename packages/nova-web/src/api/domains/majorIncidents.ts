@@ -1,5 +1,18 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type {
+  CreateMajorIncidentInput,
+  MajorIncidentRelatedInput,
+  MajorIncidentResolveInput,
+  MajorIncidentRoleInput,
+  MajorIncidentStakeholderUpdateInput,
+  PostmortemActionItemCreateInput,
+  PostmortemFollowUpInput,
+  PostmortemUpsertInput,
+  PublishPostmortemInput,
+  UpdateMajorIncidentInput,
+} from '@nova-suite/shared/schemas';
 import { request } from '../http';
+
 export const majorIncidents = {
   activeBanner: () =>
     request<{ items: Record<string, unknown>[] }>('/major-incidents/active-banner'),
@@ -20,38 +33,34 @@ export const majorIncidents = {
       suggested_runbooks: Record<string, unknown>[];
       workflow_status: { phase: string; majorIncidentId: string } | null;
     }>(`/major-incidents/${id}`),
-  create: (data: Record<string, unknown>) =>
+  create: (data: CreateMajorIncidentInput) =>
     request<{ major_incident: Record<string, unknown> }>('/major-incidents', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  update: (id: string, data: Record<string, unknown>) =>
+  update: (id: string, data: UpdateMajorIncidentInput) =>
     request<{ major_incident: Record<string, unknown> }>(`/major-incidents/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
-  addStakeholderUpdate: (id: string, data: { audience?: string; subject?: string; body: string }) =>
+  addStakeholderUpdate: (id: string, data: MajorIncidentStakeholderUpdateInput) =>
     request<{ update: Record<string, unknown> }>(`/major-incidents/${id}/stakeholder-updates`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  assignRole: (id: string, data: { role: string; user_id: string }) =>
+  assignRole: (id: string, data: MajorIncidentRoleInput) =>
     request<{ participant: Record<string, unknown> }>(`/major-incidents/${id}/roles`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   investigate: (id: string) =>
     request<{ major_incident: Record<string, unknown> }>(`/major-incidents/${id}/investigate`, { method: 'POST' }),
-  addPostmortemActionItem: (id: string, body: { title: string }) =>
+  addPostmortemActionItem: (id: string, body: PostmortemActionItemCreateInput) =>
     request<{ postmortem: Record<string, unknown> }>(`/major-incidents/${id}/postmortem/action-items`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  createPostmortemFollowUp: (id: string, actionItemId: string, body: {
-    kind: 'problem' | 'change';
-    assignment_group_id: string;
-    change_type_id?: string;
-  }) =>
+  createPostmortemFollowUp: (id: string, actionItemId: string, body: PostmortemFollowUpInput) =>
     request<{
       postmortem: Record<string, unknown>;
       already: boolean;
@@ -62,7 +71,7 @@ export const majorIncidents = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  resolve: (id: string, body: { solution: string }) =>
+  resolve: (id: string, body: MajorIncidentResolveInput) =>
     request<{ ok: boolean; major_incident?: Record<string, unknown> }>(`/major-incidents/${id}/resolve`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -74,7 +83,7 @@ export const majorIncidents = {
       method: 'POST',
       body: JSON.stringify(body ?? {}),
     }),
-  linkRelated: (id: string, data: { incident_id: string; link_reason?: string }) =>
+  linkRelated: (id: string, data: MajorIncidentRelatedInput) =>
     request<{ link: Record<string, unknown> }>(`/major-incidents/${id}/related-incidents`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -83,17 +92,17 @@ export const majorIncidents = {
     request<{ incidents: Record<string, unknown>[] }>(`/major-incidents/${id}/suggested-related`),
   getPostmortem: (id: string) =>
     request<{ postmortem: Record<string, unknown> | null }>(`/major-incidents/${id}/postmortem`),
-  createPostmortem: (id: string, data: Record<string, unknown>) =>
+  createPostmortem: (id: string, data: PostmortemUpsertInput) =>
     request<{ postmortem: Record<string, unknown> }>(`/major-incidents/${id}/postmortem`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  patchPostmortem: (id: string, data: Record<string, unknown>) =>
+  patchPostmortem: (id: string, data: PostmortemUpsertInput) =>
     request<{ postmortem: Record<string, unknown> }>(`/major-incidents/${id}/postmortem`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
-  publishPostmortem: (id: string, data: { root_causes: string[]; contributing_factors: string[] }) =>
+  publishPostmortem: (id: string, data: PublishPostmortemInput) =>
     request<{ postmortem: Record<string, unknown> }>(`/major-incidents/${id}/postmortem/publish`, {
       method: 'POST',
       body: JSON.stringify(data),

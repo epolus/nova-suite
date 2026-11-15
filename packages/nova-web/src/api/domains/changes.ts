@@ -1,4 +1,19 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type {
+  AddChangeJournalEntryInput,
+  ChangeApprovalDecisionInput,
+  ChangeTransitionInput,
+  CreateBlackoutInput,
+  CreateCabMeetingInput,
+  CreateChangeInput,
+  CreateChangeRiskQuestionInput,
+  CreateChangeTypeInput,
+  SubmitChangeRiskAssessmentInput,
+  UpdateBlackoutInput,
+  UpdateChangeInput,
+  UpdateChangeRiskQuestionInput,
+  UpdateChangeTypeInput,
+} from '@nova-suite/shared/schemas';
 import { request } from '../http';
 import type {
   AssignmentGroupItem,
@@ -23,9 +38,9 @@ export const changes = {
     return request<{ changes: Change[]; pagination: Pagination }>(`/changes?${qs}`);
   },
   get: (id: string) => request<ChangeDetail>(`/changes/${id}`),
-  create: (data: Partial<Change>) =>
+  create: (data: CreateChangeInput) =>
     request<Change>('/changes', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<Change>) =>
+  update: (id: string, data: UpdateChangeInput) =>
     request<Change>(`/changes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   nav: (currentId: string, params: Record<string, string> = {}) => {
     const qs = new URLSearchParams({ current: currentId, ...params });
@@ -33,9 +48,9 @@ export const changes = {
   },
   assignmentGroups: () => request<{ assignment_groups: AssignmentGroupItem[] }>('/changes/assignment-groups'),
   types: () => request<{ change_types: ChangeType[] }>('/changes/types'),
-  createType: (data: Partial<ChangeType>) =>
+  createType: (data: CreateChangeTypeInput) =>
     request<ChangeType>('/changes/types', { method: 'POST', body: JSON.stringify(data) }),
-  updateType: (id: string, data: Partial<ChangeType>) =>
+  updateType: (id: string, data: UpdateChangeTypeInput) =>
     request<ChangeType>(`/changes/types/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   standardTemplates: () => request<{ templates: StandardChangeTemplate[] }>('/changes/standard-templates'),
   createStandardTemplate: (data: Partial<StandardChangeTemplate>) =>
@@ -43,7 +58,7 @@ export const changes = {
   updateStandardTemplate: (id: string, data: Partial<StandardChangeTemplate>) =>
     request<StandardChangeTemplate>(`/changes/standard-templates/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   cabMeetings: () => request<{ meetings: CabMeeting[] }>('/changes/cab-meetings'),
-  createCabMeeting: (data: Partial<CabMeeting>) =>
+  createCabMeeting: (data: CreateCabMeetingInput) =>
     request<CabMeeting>('/changes/cab-meetings', { method: 'POST', body: JSON.stringify(data) }),
   addToCabMeeting: (meetingId: string, changeId: string) =>
     request<{ success: boolean }>(`/changes/cab-meetings/${meetingId}/changes/${changeId}`, { method: 'POST' }),
@@ -53,9 +68,9 @@ export const changes = {
       body: JSON.stringify({ decision, notes }),
     }),
   blackouts: () => request<{ blackouts: ChangeBlackout[] }>('/changes/blackouts'),
-  createBlackout: (data: Partial<ChangeBlackout>) =>
+  createBlackout: (data: CreateBlackoutInput) =>
     request<ChangeBlackout>('/changes/blackouts', { method: 'POST', body: JSON.stringify(data) }),
-  updateBlackout: (id: string, data: Partial<ChangeBlackout>) =>
+  updateBlackout: (id: string, data: UpdateBlackoutInput) =>
     request<ChangeBlackout>(`/changes/blackouts/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   calendar: (params: Record<string, string> = {}) => {
     const qs = new URLSearchParams(params);
@@ -66,9 +81,9 @@ export const changes = {
     const qs = includeInactive ? '?include_inactive=true' : '';
     return request<{ questions: ChangeRiskQuestion[] }>(`/changes/risk-questions${qs}`);
   },
-  createRiskQuestion: (data: Partial<ChangeRiskQuestion>) =>
+  createRiskQuestion: (data: CreateChangeRiskQuestionInput) =>
     request<ChangeRiskQuestion>('/changes/risk-questions', { method: 'POST', body: JSON.stringify(data) }),
-  updateRiskQuestion: (id: string, data: Partial<ChangeRiskQuestion>) =>
+  updateRiskQuestion: (id: string, data: UpdateChangeRiskQuestionInput) =>
     request<ChangeRiskQuestion>(`/changes/risk-questions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteRiskQuestion: (id: string) =>
     request<ChangeRiskQuestion>(`/changes/risk-questions/${id}`, { method: 'DELETE' }),
@@ -79,41 +94,29 @@ export const changes = {
       risk_level: Change['risk_level'];
       suggested_risk_level: Change['risk_level'] | null;
     }>(`/changes/${changeId}/risk-answers`),
-  submitRiskAssessment: (
-    changeId: string,
-    data: { answers: Array<{ question_id: string; score: number; answer_text?: string | null }>; apply_suggested_risk_level?: boolean },
-  ) =>
+  submitRiskAssessment: (changeId: string, data: SubmitChangeRiskAssessmentInput) =>
     request<{
       risk_score: number;
       risk_level: Change['risk_level'];
       suggested_risk_level: Change['risk_level'];
       answers_saved: number;
     }>(`/changes/${changeId}/risk-assessment`, { method: 'POST', body: JSON.stringify(data) }),
-  transition: (id: string, data: {
-    action: string;
-    notes?: string;
-    scheduled_start?: string | null;
-    scheduled_end?: string | null;
-    override_blocking_conflicts?: boolean;
-    success?: boolean;
-    failure_category?: string | null;
-    planned_downtime_minutes?: number | null;
-    actual_downtime_minutes?: number | null;
-    review_notes?: string | null;
-  }) =>
+  transition: (id: string, data: ChangeTransitionInput) =>
     request<Change>(`/changes/${id}/transition`, { method: 'POST', body: JSON.stringify(data) }),
-  decideApproval: (changeId: string, approvalId: string, decision: 'approved' | 'rejected' | 'waived', notes?: string) =>
+  decideApproval: (
+    changeId: string,
+    approvalId: string,
+    decision: ChangeApprovalDecisionInput['decision'],
+    notes?: string,
+  ) =>
     request<{ success: boolean }>(`/changes/${changeId}/approvals/${approvalId}/decision`, {
       method: 'POST',
-      body: JSON.stringify({ decision, notes }),
+      body: JSON.stringify({ decision, notes } satisfies ChangeApprovalDecisionInput),
     }),
   stats: () => request<ChangeStats>('/changes/stats'),
   journal: (id: string) =>
     request<{ entries: ChangeJournalEntry[] }>(`/changes/${id}/journal`),
-  addJournal: (
-    id: string,
-    data: { entry_type: string; content: string; is_customer_visible?: boolean },
-  ) =>
+  addJournal: (id: string, data: AddChangeJournalEntryInput) =>
     request<ChangeJournalEntry>(`/changes/${id}/journal`, {
       method: 'POST',
       body: JSON.stringify(data),

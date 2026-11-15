@@ -22,7 +22,7 @@ import {
   postmortemActionItemCreateSchema,
   postmortemFollowUpSchema,
 } from '../../domain/schemas';
-import type { CreateMajorIncidentInput } from '../../domain/schemas';
+import type { CreateMajorIncident } from '../../domain/schemas';
 import { AppError, NotFound } from '../../middleware/errorHandler';
 import { resolveSlaDueAt } from '../../domain/sla';
 import { canStartInvestigation, existingFollowUpId } from '../../domain/major-incident-follow-up';
@@ -232,7 +232,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const client = getRequestClient(req);
-      const body = req.body as CreateMajorIncidentInput;
+      const body = req.body as CreateMajorIncident;
       const tenantId = req.user!.tenant_id;
       const userId = req.user!.id;
 

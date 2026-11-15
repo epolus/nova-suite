@@ -21,6 +21,36 @@ export {
   updateIncidentSchema,
   incidentLinkMajorIncidentSchema,
   addJournalEntrySchema,
+  createRequestSchema,
+  batchRequestSchema,
+  approveRequestSchema,
+  createProblemSchema,
+  updateProblemSchema,
+  createChangeSchema,
+  updateChangeSchema,
+  changeTransitionSchema,
+  changeApprovalDecisionSchema,
+  createChangeTypeSchema,
+  updateChangeTypeSchema,
+  createCabMeetingSchema,
+  createBlackoutSchema,
+  updateBlackoutSchema,
+  createChangeRiskQuestionSchema,
+  updateChangeRiskQuestionSchema,
+  submitChangeRiskAssessmentSchema,
+  addChangeJournalEntrySchema,
+  postmortemActionItemSchema,
+  postmortemActionItemCreateSchema,
+  postmortemFollowUpSchema,
+  createMajorIncidentSchema,
+  updateMajorIncidentSchema,
+  majorIncidentStakeholderUpdateSchema,
+  majorIncidentRoleSchema,
+  majorIncidentRelatedSchema,
+  majorIncidentResolveSchema,
+  postmortemUpsertSchema,
+  publishPostmortemSchema,
+  majorIncidentListQuerySchema,
 } from '@nova-suite/shared/schemas';
 export type {
   LoginInput,
@@ -31,11 +61,40 @@ export type {
   UpdateIncident,
   AddJournalEntryInput,
   AddJournalEntry,
+  CreateRequestInput,
+  CreateRequest,
+  BatchRequestInput,
+  ApproveRequestInput,
+  CreateProblemInput,
+  UpdateProblemInput,
+  CreateChangeInput,
+  UpdateChangeInput,
+  ChangeTransitionInput,
+  ChangeApprovalDecisionInput,
+  CreateChangeTypeInput,
+  UpdateChangeTypeInput,
+  CreateCabMeetingInput,
+  CreateBlackoutInput,
+  UpdateBlackoutInput,
+  CreateChangeRiskQuestionInput,
+  UpdateChangeRiskQuestionInput,
+  SubmitChangeRiskAssessmentInput,
+  AddChangeJournalEntryInput,
+  CreateMajorIncidentInput,
+  CreateMajorIncident,
+  UpdateMajorIncidentInput,
+  MajorIncidentStakeholderUpdateInput,
+  MajorIncidentRoleInput,
+  MajorIncidentRelatedInput,
+  MajorIncidentResolveInput,
+  PostmortemActionItemCreateInput,
+  PostmortemFollowUpInput,
+  PostmortemUpsertInput,
+  PublishPostmortemInput,
 } from '@nova-suite/shared/schemas';
 
 import {
   e164PhoneSchema,
-  paginationSchema,
   uuidSchema,
 } from '@nova-suite/shared/schemas';
 
@@ -287,158 +346,7 @@ export const serviceNowApplySchema = z.object({
   create_missing_groups: z.boolean().default(false),
 });
 
-// ─── Requests (User Portal) ───
-export const createRequestSchema = z.object({
-  service_item_id: uuidSchema,
-  form_data: z.record(z.string(), z.unknown()).default({}),
-  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
-  notes: z.string().max(5000).optional(),
-  requested_for: uuidSchema.optional(),
-  delivery_info: z.object({
-    location: z.string().max(500).optional(),
-    date_needed: z.string().optional(),
-    instructions: z.string().max(2000).optional(),
-  }).default({}),
-  batch_id: uuidSchema.optional(),
-});
-
-export const batchRequestSchema = z.object({
-  items: z.array(z.object({
-    service_item_id: uuidSchema,
-    form_data: z.record(z.string(), z.unknown()).default({}),
-    priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
-    notes: z.string().max(5000).optional(),
-  })).min(1).max(50),
-  requested_for: uuidSchema.optional(),
-  delivery_info: z.object({
-    location: z.string().max(500).optional(),
-    date_needed: z.string().optional(),
-    instructions: z.string().max(2000).optional(),
-  }).default({}),
-});
-
-export const approveRequestSchema = z.object({
-  action: z.enum(['approve', 'reject']),
-  notes: z.string().max(2000).optional(),
-});
-
-// ─── Problems ───
-export const createProblemSchema = z.object({
-  title: z.string().min(1).max(500),
-  description: z.string().max(10000).optional(),
-  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
-  impact: z.enum(['low', 'medium', 'high']).default('medium'),
-  category: z.string().max(100).optional(),
-  status: z.enum([
-    'new',
-    'investigating',
-    'root_cause_identified',
-    'fix_in_progress',
-    'resolved',
-    'closed',
-    'known_error',
-  ]).optional(),
-  root_cause: z.string().max(10000).optional(),
-  symptoms: z.string().max(10000).optional(),
-  workaround: z.string().max(10000).optional(),
-  permanent_fix: z.string().max(10000).optional(),
-  reported_by: uuidSchema.optional(),
-  assigned_to: uuidSchema.nullable().optional(),
-  assignment_group_id: uuidSchema,
-  affected_ci: uuidSchema.nullable().optional(),
-  resolution_notes: z.string().max(10000).optional(),
-});
-
-export const updateProblemSchema = createProblemSchema.partial();
-
-// ─── Changes ───
-export const createChangeSchema = z.object({
-  change_type_id: uuidSchema,
-  standard_change_id: uuidSchema.nullable().optional(),
-  category: z.string().max(100).optional(),
-  title: z.string().min(1).max(500),
-  description: z.string().max(10000).optional(),
-  reason_for_change: z.string().max(10000).optional(),
-  stage: z.enum(['request', 'assessment', 'approval', 'planning', 'implementation', 'review']).optional(),
-  status: z.enum([
-    'draft',
-    'assessment',
-    'pending_approval',
-    'approved',
-    'rejected',
-    'planning',
-    'scheduled',
-    'implementing',
-    'implemented',
-    'reviewing',
-    'closed',
-    'cancelled',
-  ]).optional(),
-  risk_level: z.enum(['low', 'medium', 'high', 'very_high']).default('medium'),
-  impact: z.string().max(20).default('medium'),
-  impact_description: z.string().max(10000).optional(),
-  implementation_plan: z.string().max(20000).optional(),
-  backout_plan: z.string().max(20000).optional(),
-  test_plan: z.string().max(20000).optional(),
-  requested_by: uuidSchema.optional(),
-  assigned_to: uuidSchema.nullable().optional(),
-  assignment_group_id: uuidSchema,
-  service_id: uuidSchema.nullable().optional(),
-  affected_cis: z.array(uuidSchema).default([]),
-  scheduled_start: z.string().nullable().optional(),
-  scheduled_end: z.string().nullable().optional(),
-  actual_start: z.string().nullable().optional(),
-  actual_end: z.string().nullable().optional(),
-  downtime_required: z.boolean().optional(),
-  maintenance_window: z.string().max(100).optional(),
-  implementation_notes: z.string().max(10000).optional(),
-  success: z.boolean().nullable().optional(),
-  failure_category: z.enum(['incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other']).nullable().optional(),
-  planned_downtime_minutes: z.number().int().min(0).nullable().optional(),
-  actual_downtime_minutes: z.number().int().min(0).nullable().optional(),
-  related_problem_id: uuidSchema.nullable().optional(),
-  related_incident_id: uuidSchema.nullable().optional(),
-  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
-  business_justification: z.string().max(10000).optional(),
-  estimated_cost: z.number().nonnegative().nullable().optional(),
-  review_notes: z.string().max(10000).optional(),
-  custom_fields: z.record(z.string(), z.unknown()).optional(),
-});
-
-export const updateChangeSchema = createChangeSchema.partial();
-
-export const changeTransitionSchema = z.object({
-  action: z.enum(['submit_assessment', 'request_approval', 'approve', 'reject', 'start_planning', 'schedule', 'start_implementation', 'mark_implemented', 'start_review', 'close', 'cancel']),
-  notes: z.string().max(5000).optional(),
-  scheduled_start: z.string().nullable().optional(),
-  scheduled_end: z.string().nullable().optional(),
-  override_blocking_conflicts: z.boolean().optional(),
-  success: z.boolean().optional(),
-  failure_category: z.enum(['incomplete', 'caused_incident', 'rolled_back', 'exceeded_window', 'other']).nullable().optional(),
-  planned_downtime_minutes: z.number().int().min(0).nullable().optional(),
-  actual_downtime_minutes: z.number().int().min(0).nullable().optional(),
-  review_notes: z.string().max(10000).nullable().optional(),
-});
-
-export const changeApprovalDecisionSchema = z.object({
-  decision: z.enum(['approved', 'rejected', 'waived']),
-  notes: z.string().max(5000).optional(),
-});
-
-export const createChangeTypeSchema = z.object({
-  name: z.enum(['standard', 'normal', 'emergency']).or(z.string().min(1).max(100)),
-  description: z.string().max(2000).optional(),
-  requires_cab_approval: z.boolean().optional(),
-  requires_manager_approval: z.boolean().optional(),
-  auto_approve: z.boolean().optional(),
-  default_risk_level: z.enum(['low', 'medium', 'high', 'very_high']).optional(),
-  max_implementation_hours: z.number().int().positive().optional(),
-  approval_config: z.record(z.string(), z.unknown()).optional(),
-  is_active: z.boolean().optional(),
-});
-
-export const updateChangeTypeSchema = createChangeTypeSchema.partial();
-
+// ─── Admin users ───
 export const adminCreateUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
@@ -459,50 +367,6 @@ export const adminUpdateUserSchema = z.object({
   locked_out: z.boolean().optional(),
   lock_reason: z.string().max(200).optional().nullable(),
 }).loose();
-
-export const createCabMeetingSchema = z.object({
-  title: z.string().min(1).max(255),
-  scheduled_at: z.string(),
-  duration_min: z.number().int().min(15).max(480).default(60),
-  minutes: z.string().max(20000).optional(),
-});
-
-export const majorIncidentResolveSchema = z.object({
-  solution: z.string().min(1).max(20000),
-});
-
-export const createBlackoutSchema = z.object({
-  name: z.string().min(1).max(255),
-  start_date: z.string(),
-  end_date: z.string(),
-  reason: z.string().max(2000).optional(),
-});
-
-export const updateBlackoutSchema = createBlackoutSchema.partial();
-
-export const createChangeRiskQuestionSchema = z.object({
-  prompt: z.string().min(1).max(2000),
-  weight: z.number().positive().max(100).default(1),
-  sort_order: z.number().int().min(0).max(100000).default(0),
-  is_active: z.boolean().optional().default(true),
-});
-
-export const updateChangeRiskQuestionSchema = createChangeRiskQuestionSchema.partial();
-
-export const submitChangeRiskAssessmentSchema = z.object({
-  answers: z.array(z.object({
-    question_id: uuidSchema,
-    score: z.number().int().min(0).max(5),
-    answer_text: z.string().max(2000).optional().nullable(),
-  })).min(1),
-  apply_suggested_risk_level: z.boolean().optional().default(true),
-});
-
-export const addChangeJournalEntrySchema = z.object({
-  entry_type: z.enum(['comment', 'work_note', 'state_change', 'assignment']).default('comment'),
-  content: z.string().min(1).max(10000),
-  is_customer_visible: z.boolean().default(false),
-});
 
 // ─── CMDB ───
 export const createCIClassSchema = z.object({
@@ -550,83 +414,6 @@ export const createCIRelationshipSchema = z.object({
     'manages',
   ]),
   notes: z.string().max(2000).optional(),
-});
-
-// ─── Major incidents ───
-export const postmortemActionItemSchema = z.object({
-  id: z.string().uuid().optional(),
-  title: z.string().min(1).max(500),
-  owner_user_id: uuidSchema.optional().nullable(),
-  due_at: z.string().optional().nullable(),
-  problem_id: uuidSchema.optional().nullable(),
-  change_id: uuidSchema.optional().nullable(),
-  improvement_id: uuidSchema.optional().nullable(),
-});
-
-export const postmortemActionItemCreateSchema = z.object({
-  title: z.string().min(1).max(500),
-});
-
-export const postmortemFollowUpSchema = z.object({
-  kind: z.enum(['problem', 'change']),
-  assignment_group_id: uuidSchema,
-  change_type_id: uuidSchema.optional(),
-});
-
-export const createMajorIncidentSchema = z.object({
-  title: z.string().min(1).max(500),
-  description: z.string().max(10000).optional(),
-  priority: z.union([z.literal(1), z.literal(2)]).default(1),
-  impact: z.enum(['low', 'medium', 'high']).default('high'),
-  urgency: z.enum(['low', 'medium', 'high']).default('high'),
-  affected_service_ids: z.array(uuidSchema).default([]),
-  assigned_team_id: uuidSchema.optional().nullable(),
-  primary_incident_id: uuidSchema.optional().nullable(),
-  war_room_channel: z.string().max(1000).optional().nullable(),
-});
-
-export const updateMajorIncidentSchema = z.object({
-  title: z.string().min(1).max(500).optional(),
-  description: z.string().max(10000).optional().nullable(),
-  war_room_channel: z.string().max(1000).optional().nullable(),
-});
-
-export const majorIncidentStakeholderUpdateSchema = z.object({
-  audience: z.enum(['internal', 'external']).default('external'),
-  subject: z.string().max(500).optional().default(''),
-  body: z.string().min(1).max(20000),
-});
-
-export const majorIncidentRoleSchema = z.object({
-  role: z.enum(['commander', 'comms_lead', 'scribe', 'resolver']),
-  user_id: uuidSchema,
-});
-
-export const majorIncidentRelatedSchema = z.object({
-  incident_id: uuidSchema,
-  link_reason: z.string().max(500).optional(),
-});
-
-export const postmortemUpsertSchema = z.object({
-  timeline: z.array(z.record(z.string(), z.unknown())).optional(),
-  root_causes: z.array(z.string()).optional(),
-  contributing_factors: z.array(z.string()).optional(),
-  action_items: z.array(postmortemActionItemSchema).optional(),
-  status: z.enum(['draft', 'in_review', 'published']).optional(),
-});
-
-export const publishPostmortemSchema = z.object({
-  root_causes: z.array(z.string().min(3)).min(1),
-  contributing_factors: z.array(z.string().min(3)).min(1),
-});
-
-export const majorIncidentListQuerySchema = paginationSchema.extend({
-  status: z.string().max(200).optional(),
-  status_not_in: z.string().max(200).optional(),
-  search: z.string().max(200).optional(),
-  sort_by: z.enum(['declared_major_at', 'title', 'status', 'priority', 'number']).optional(),
-  sort_dir: z.enum(['asc', 'desc']).optional(),
-  priority_lte: z.coerce.number().int().min(1).max(2).optional(),
 });
 
 // ─── Assets ───
@@ -734,5 +521,3 @@ export const addImprovementJournalSchema = z.object({
 });
 
 export const updateCIClassSchema = createCIClassSchema.partial();
-
-export type CreateMajorIncidentInput = z.infer<typeof createMajorIncidentSchema>;
