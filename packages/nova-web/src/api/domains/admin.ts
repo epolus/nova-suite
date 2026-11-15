@@ -1,14 +1,15 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type { AdminCreateUserInput, AdminUpdateUserInput } from '@nova-suite/shared/schemas';
 import { request } from '../http';
-import type { AdminUser, AssignmentGroupItem, AuditEvent, BusinessCalendar, BusinessHourRow, CompanyItem, ConfigDeploymentRun, ConfigPackageApplyResponse, ConfigPackageBundle, ConfigPackageExportResponse, ConfigPackageValidateResponse, CostCenterItem, CreateAssignmentGroupPayload, CreateUserPayload, CustomFieldDefinition, CustomFieldEntityType, CustomFieldOption, DepartmentItem, HolidayRow, IncidentCategory, IncidentResolutionCode, LocationItem, NotificationEmailDelivery, NotificationEmailDeliverySummary, NotificationRule, NotificationWebhook, ProcessItem, RoleItem, RuntimeHealth, ServiceAdminItem, SlaDefinition, SystemMetrics, UpdateAssignmentGroupPayload, UpdateUserPayload, WorkflowDefinition } from '../types';
+import type { AdminUser, AssignmentGroupItem, AuditEvent, BusinessCalendar, BusinessHourRow, CompanyItem, ConfigDeploymentRun, ConfigPackageApplyResponse, ConfigPackageBundle, ConfigPackageExportResponse, ConfigPackageValidateResponse, CostCenterItem, CreateAssignmentGroupPayload, CustomFieldDefinition, CustomFieldEntityType, CustomFieldOption, DepartmentItem, HolidayRow, IncidentCategory, IncidentResolutionCode, LocationItem, NotificationEmailDelivery, NotificationEmailDeliverySummary, NotificationRule, NotificationWebhook, ProcessItem, RoleItem, RuntimeHealth, ServiceAdminItem, SlaDefinition, SystemMetrics, UpdateAssignmentGroupPayload, WorkflowDefinition } from '../types';
 import type { AutomationDryRunRequestContext, AutomationDryRunResult } from '../types/automationDryRun';
 
 export const admin = {
   // Users
   users: () => request<{ users: AdminUser[] }>('/admin/users'),
-  createUser: (data: CreateUserPayload) =>
+  createUser: (data: AdminCreateUserInput) =>
     request<{ id: string }>('/admin/users', { method: 'POST', body: JSON.stringify(data) }),
-  updateUser: (id: string, data: UpdateUserPayload) =>
+  updateUser: (id: string, data: AdminUpdateUserInput) =>
     request<{ success: boolean }>(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteUser: (id: string) =>
     request<void>(`/admin/users/${id}`, { method: 'DELETE' }),

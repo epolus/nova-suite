@@ -206,11 +206,11 @@ export default function AssetDetailPage() {
         custom_fields: customFields,
       };
       if (isNew) {
-        const created = await assets.create(payload);
+        const created = await assets.create(payload as Parameters<typeof assets.create>[0]);
         allowNextNavigation();
         navigate(`/assets/${created.id}`);
       } else if (id) {
-        await assets.update(id, payload);
+        await assets.update(id, payload as Parameters<typeof assets.update>[1]);
         setBaseline(form);
         setBaselineCustomFields(customFields);
       }

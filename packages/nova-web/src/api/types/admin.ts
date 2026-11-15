@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import type { AdminCreateUserInput, AdminUpdateUserInput } from '@nova-suite/shared/schemas';
+
 export interface User {
   id: string;
   tenant_id: string;
@@ -147,34 +149,7 @@ export interface LocationItem {
   updated_at: string;
 }
 
-export interface CreateUserPayload {
-  email: string;
-  password: string;
-  first_name?: string;
-  last_name?: string;
-  display_name: string;
-  title?: string;
-  phone?: string;
-  mobile?: string;
-  vip?: boolean;
-  employee_number?: string;
-  locked_out?: boolean;
-  lock_reason?: string;
-  location?: string;
-  timezone?: string;
-  time_format?: '12h' | '24h';
-  date_format?: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
-  employee_type?: string;
-  company?: string;
-  preferred_language?: string;
-  start_date?: string;
-  last_working_date?: string;
-  user_id?: string;
-  manager_id?: string | null;
-  department_id?: string | null;
-  cost_center_id?: string | null;
-  role_ids?: string[];
-}
+export type CreateUserPayload = AdminCreateUserInput;
 
 export interface ProcessItem {
   id: string;
@@ -244,32 +219,4 @@ export interface UpdateAssignmentGroupPayload {
   ola_resolution_hours?: number | null;
 }
 
-export interface UpdateUserPayload {
-  first_name?: string | null;
-  last_name?: string | null;
-  display_name?: string;
-  title?: string | null;
-  phone?: string | null;
-  mobile?: string | null;
-  location?: string | null;
-  timezone?: string;
-  time_format?: '12h' | '24h';
-  date_format?: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
-  employee_type?: string;
-  company?: string | null;
-  preferred_language?: string;
-  start_date?: string | null;
-  last_working_date?: string | null;
-  email?: string;
-  user_id?: string | null;
-  employee_number?: string | null;
-  vip?: boolean;
-  locked_out?: boolean;
-  lock_reason?: string | null;
-  password?: string;
-  manager_id?: string | null;
-  department_id?: string | null;
-  cost_center_id?: string | null;
-  is_active?: boolean;
-  role_ids?: string[];
-}
+export type UpdateUserPayload = AdminUpdateUserInput;

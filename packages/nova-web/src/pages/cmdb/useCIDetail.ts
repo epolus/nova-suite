@@ -322,7 +322,7 @@ export function useCIDetail() {
       const payload = relForm.direction === 'outgoing'
         ? { source_ci_id: id, target_ci_id: relForm.target, relationship_type: relForm.type, notes: relForm.notes || undefined }
         : { source_ci_id: relForm.target, target_ci_id: id, relationship_type: relForm.type, notes: relForm.notes || undefined };
-      await cmdb.createRelationship(payload);
+      await cmdb.createRelationship(payload as Parameters<typeof cmdb.createRelationship>[0]);
       setShowRelForm(false);
       setRelForm({ target: '', type: 'depends_on', notes: '', direction: 'outgoing' });
       setCiSearch('');
