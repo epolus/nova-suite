@@ -653,10 +653,10 @@ CREATE TABLE incidents (
   configuration_item_id uuid,
   category        text,
   subcategory     text,
-  category_id     uuid REFERENCES incident_categories(id) ON DELETE SET NULL,
-  closure_category_id uuid REFERENCES incident_categories(id) ON DELETE SET NULL,
+  category_id     uuid REFERENCES incident_categories(id) ON DELETE RESTRICT,
+  closure_category_id uuid REFERENCES incident_categories(id) ON DELETE RESTRICT,
   resolution_code text,
-  resolution_code_id uuid REFERENCES incident_resolution_codes(id) ON DELETE SET NULL,
+  resolution_code_id uuid REFERENCES incident_resolution_codes(id) ON DELETE RESTRICT,
   pending_reason  text,
   resolution_notes text,
   resolved_at     timestamptz,
@@ -1220,7 +1220,8 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.40', 'change_collaboration'),
   ('v00.01.41', 'sla_notification_ledger'),
   ('v00.01.42', 'asset_assignment_history'),
-  ('v00.01.43', 'on_call_rota');
+  ('v00.01.43', 'on_call_rota'),
+  ('v00.01.44', 'integrity_constraints');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT
@@ -1312,7 +1313,9 @@ CREATE TABLE asset_assignments (
   returned_at   timestamptz,
   notes         text,
   created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now()
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT asset_assignments_return_chk
+    CHECK (returned_at IS NULL OR returned_at >= assigned_at)
 );
 
 CREATE INDEX idx_asset_assignments_asset
@@ -1398,6 +1401,68 @@ CREATE INDEX idx_field_values_field ON field_values(tenant_id, field_id);
 CREATE TRIGGER trg_field_values_updated_at
   BEFORE UPDATE ON field_values
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE OR REPLACE FUNCTION enforce_field_value_shape()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  def_entity text;
+  def_type   text;
+  set_count  integer;
+  expected   text;
+BEGIN
+  SELECT fd.entity_type, fd.field_type
+    INTO def_entity, def_type
+  FROM field_definitions fd
+  WHERE fd.id = NEW.field_id
+    AND fd.tenant_id = NEW.tenant_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'field_values: field_id % not found for tenant', NEW.field_id;
+  END IF;
+
+  IF NEW.entity_type IS DISTINCT FROM def_entity THEN
+    RAISE EXCEPTION
+      'field_values.entity_type (%) must match field_definitions.entity_type (%)',
+      NEW.entity_type, def_entity;
+  END IF;
+
+  set_count :=
+    (NEW.value_text IS NOT NULL)::int
+    + (NEW.value_number IS NOT NULL)::int
+    + (NEW.value_bool IS NOT NULL)::int
+    + (NEW.value_timestamptz IS NOT NULL)::int
+    + (NEW.value_json IS NOT NULL)::int;
+
+  IF set_count <> 1 THEN
+    RAISE EXCEPTION 'field_values: exactly one value column must be set (got %)', set_count;
+  END IF;
+
+  expected := CASE def_type
+    WHEN 'number' THEN 'value_number'
+    WHEN 'checkbox' THEN 'value_bool'
+    WHEN 'date' THEN 'value_timestamptz'
+    WHEN 'multiselect' THEN 'value_json'
+    ELSE 'value_text'
+  END;
+
+  IF (expected = 'value_text' AND NEW.value_text IS NULL)
+     OR (expected = 'value_number' AND NEW.value_number IS NULL)
+     OR (expected = 'value_bool' AND NEW.value_bool IS NULL)
+     OR (expected = 'value_timestamptz' AND NEW.value_timestamptz IS NULL)
+     OR (expected = 'value_json' AND NEW.value_json IS NULL)
+  THEN
+    RAISE EXCEPTION 'field_values: field_type % requires %', def_type, expected;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_field_values_shape
+  BEFORE INSERT OR UPDATE ON field_values
+  FOR EACH ROW EXECUTE FUNCTION enforce_field_value_shape();
 
 -- ============================================================
 -- RECORD LINKS (bidirectional cross-entity relations)
@@ -1513,14 +1578,17 @@ CREATE TABLE email_messages (
   processed_at        timestamptz,
   created_at          timestamptz NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX uq_email_messages_tenant_message_id
-  ON email_messages(tenant_id, message_id)
+CREATE UNIQUE INDEX uq_email_messages_tenant_mailbox_message_id
+  ON email_messages(tenant_id, mailbox_id, message_id)
   WHERE message_id IS NOT NULL;
 CREATE INDEX idx_email_messages_mailbox
   ON email_messages(tenant_id, mailbox_id, created_at DESC);
 CREATE INDEX idx_email_messages_incident
   ON email_messages(tenant_id, incident_id)
   WHERE incident_id IS NOT NULL;
+CREATE INDEX idx_email_messages_in_reply_to
+  ON email_messages(tenant_id, in_reply_to)
+  WHERE in_reply_to IS NOT NULL;
 
 CREATE TABLE email_templates (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1647,7 +1715,7 @@ CREATE TABLE checklist_instances (
   entity_type    text NOT NULL
                  CHECK (entity_type IN ('incident', 'change')),
   entity_id      uuid NOT NULL,
-  template_id    uuid REFERENCES checklist_templates(id) ON DELETE SET NULL,
+  template_id    uuid REFERENCES checklist_templates(id) ON DELETE RESTRICT,
   template_name  text NOT NULL,
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now(),
@@ -1673,7 +1741,11 @@ CREATE TABLE checklist_instance_items (
   done_by           uuid REFERENCES users(id) ON DELETE SET NULL,
   done_at           timestamptz,
   created_at        timestamptz NOT NULL DEFAULT now(),
-  updated_at        timestamptz NOT NULL DEFAULT now()
+  updated_at        timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT checklist_instance_items_done_chk CHECK (
+    (is_done = false AND done_at IS NULL AND done_by IS NULL)
+    OR (is_done = true AND done_at IS NOT NULL AND done_by IS NOT NULL)
+  )
 );
 
 CREATE INDEX idx_checklist_instance_items_instance
@@ -2683,7 +2755,8 @@ CREATE TRIGGER trg_sla_definitions_updated_at
 CREATE TABLE sla_notifications_sent (
   id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  entity_type  text NOT NULL,
+  entity_type  text NOT NULL
+               CHECK (entity_type IN ('incident', 'request', 'task', 'problem', 'change')),
   entity_id    uuid NOT NULL,
   target       text NOT NULL CHECK (target IN ('response', 'resolution')),
   "trigger"    text NOT NULL CHECK ("trigger" IN ('warning', 'breach')),

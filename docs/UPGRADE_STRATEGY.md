@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.43`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.44`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
@@ -236,3 +236,7 @@ Apply `infra/postgres/migrations/v00.01.36__work_logs.sql` before using time ent
 ## On-call rota (`v00.01.43`)
 
 Apply `infra/postgres/migrations/v00.01.43__on_call_rota.sql` before using the on-call calendar. Seeds `on_call_admin` and `on_call` roles, adds `rota_shifts` (assignment group, user, `starts_at` / `ends_at`), RLS, and grants. Alert-created incidents set `assigned_to` from the covering shift when one exists. UI: `/on-call`.
+
+## Integrity constraints (`v00.01.44`)
+
+Apply `infra/postgres/migrations/v00.01.44__integrity_constraints.sql`. Adds `field_values` shape trigger (entity type must match definition; exactly one typed value column), incident category/resolution FKs `ON DELETE RESTRICT`, per-mailbox `email_messages` uniqueness plus `in_reply_to` index, `sla_notifications_sent.entity_type` check aligned with SLA process types, checklist done-state check and template `ON DELETE RESTRICT`, and `asset_assignments.returned_at >= assigned_at`.
