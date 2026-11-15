@@ -415,6 +415,7 @@
     "dashboard": {
       "title": "Dashboard",
       "welcomeBack": "Welcome back, {name}",
+      "widgetLoadFailed": "Failed to load. Retry",
       "description": "Here's what's happening in your organization.",
       "sections": {
         "incidents": "Incidents",
@@ -4310,6 +4311,7 @@
   },
   "status": {
     "new": "New",
+    "inactive": "Inactive",
     "open": "Open",
     "inProgress": "In Progress",
     "pending": "Pending",

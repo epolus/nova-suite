@@ -4,10 +4,11 @@ import type { User, UserListItem } from '../types';
 
 export const auth = {
   login: (email: string, password: string) =>
-    request<{ token: string; user: User }>('/auth/login', {
+    request<{ user: User }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
+  logout: () => request<void>('/auth/logout', { method: 'POST' }),
   me: () => request<{ user: User }>('/auth/me'),
   updateTimeFormat: (time_format: '12h' | '24h') =>
     request<{ user: User }>('/auth/me/time-format', {
@@ -30,7 +31,7 @@ export const auth = {
   ssoConfig: () =>
     request<{ enabled: boolean; provider_name: string; local_login_enabled?: boolean }>('/auth/sso/config'),
   exchangeSsoCode: (code: string) =>
-    request<{ token: string; user: User }>('/auth/sso/exchange', {
+    request<{ user: User }>('/auth/sso/exchange', {
       method: 'POST',
       body: JSON.stringify({ code }),
     }),

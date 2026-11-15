@@ -303,6 +303,24 @@ CREATE INDEX idx_user_preferences_scope ON user_preferences(tenant_id, scope);
 CREATE INDEX idx_user_preferences_value_gin ON user_preferences USING gin (value);
 
 -- ============================================================
+-- USER SESSIONS (access tokens are only valid while their session is live)
+-- ============================================================
+CREATE TABLE user_sessions (
+  id          uuid PRIMARY KEY,
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  auth_method text NOT NULL DEFAULT 'password' CHECK (auth_method IN ('password', 'sso')),
+  user_agent  text,
+  ip_address  text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  expires_at  timestamptz NOT NULL,
+  revoked_at  timestamptz
+);
+
+CREATE INDEX idx_user_sessions_user ON user_sessions(tenant_id, user_id);
+CREATE INDEX idx_user_sessions_expires ON user_sessions(expires_at);
+
+-- ============================================================
 -- USER DASHBOARDS
 -- ============================================================
 CREATE TABLE user_dashboards (
@@ -1220,7 +1238,9 @@ INSERT INTO schema_migrations (version, name) VALUES
   ('v00.01.43', 'on_call_rota'),
   ('v00.01.44', 'integrity_constraints'),
   ('v00.01.45', 'tenant_scoped_auth_and_kb_numbers'),
-  ('v00.01.46', 'resumable_imports_and_migration_checksums');
+  ('v00.01.46', 'resumable_imports_and_migration_checksums'),
+  ('v00.01.47', 'user_sessions'),
+  ('v00.01.48', 'session_cookie_lookup');
 
 -- ============================================================
 -- TRIGGERS AUTO-UPDATE UPDATED_AT

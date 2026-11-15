@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Link } from 'react-router';
+import { useTranslations } from 'use-intl';
 
 const ACCENT_ICON_BG: Record<string, string> = {
   indigo: 'bg-indigo-500/10 text-indigo-600',
@@ -53,5 +54,14 @@ export function StatContent({
         </div>
       </div>
     </Link>
+  );
+}
+
+export function WidgetLoadError({ onRetry }: { onRetry: () => void }) {
+  const t = useTranslations('pages.dashboard');
+  return (
+    <button type="button" onClick={onRetry} className="text-sm text-red-600 hover:underline">
+      {t('widgetLoadFailed')}
+    </button>
   );
 }

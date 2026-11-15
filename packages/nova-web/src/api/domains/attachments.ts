@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { request, uploadFile, BASE, getToken } from '../http';
+import { request, uploadFile, requestBlob } from '../http';
 import type { Attachment } from '../types';
 import { downloadBlob } from '../../utils/download';
 
@@ -21,21 +21,9 @@ export const attachments = {
     return uploadFile<Attachment>('/attachments/upload', fd);
   },
   download: async (id: string, fileName: string) => {
-    const token = getToken();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(`${BASE}/attachments/${id}/download`, { headers });
-    if (!res.ok) throw new Error('Download failed');
-    downloadBlob(await res.blob(), fileName);
+    downloadBlob(await requestBlob(`/attachments/${id}/download`), fileName);
   },
-  previewUrl: async (id: string): Promise<string> => {
-    const token = getToken();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(`${BASE}/attachments/${id}/download`, { headers });
-    if (!res.ok) throw new Error('Preview failed');
-    const blob = await res.blob();
-    return URL.createObjectURL(blob);
-  },
+  previewUrl: async (id: string): Promise<string> =>
+    URL.createObjectURL(await requestBlob(`/attachments/${id}/download`)),
   delete: (id: string) => request<{ success: boolean }>(`/attachments/${id}`, { method: 'DELETE' }),
 };

@@ -4,6 +4,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../auth/jwt';
+import { isSessionId, readCredential } from '../auth/session';
 import type { AuthUser } from '../auth/types';
 import { db } from '../data/db';
 import { logger } from '../logger';
@@ -19,21 +20,73 @@ declare global {
   }
 }
 
-/** Verify JWT and attach user to request. */
+const DATE_FORMATS = ['DD.MM.YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'] as const;
+
+/** The cookie is a session id. Load the user from that row; there is no token to verify. */
+async function authenticateCookie(req: Request, res: Response, next: NextFunction, sessionId: string): Promise<void> {
+  if (!isSessionId(sessionId)) {
+    res.status(401).json({ error: 'Session expired, please sign in again' });
+    return;
+  }
+
+  let access: Awaited<ReturnType<typeof db.lookupSessionUser>>;
+  try {
+    access = await db.lookupSessionUser(sessionId);
+  } catch (err) {
+    next(err);
+    return;
+  }
+  if (!access) {
+    res.status(401).json({ error: 'Session expired, please sign in again' });
+    return;
+  }
+  if (!access.is_active) {
+    res.status(401).json({ error: 'Account is inactive' });
+    return;
+  }
+  if (!access.session_valid) {
+    res.status(401).json({ error: 'Session expired, please sign in again' });
+    return;
+  }
+
+  const dateFormat = DATE_FORMATS.find((format) => format === access.date_format) ?? 'YYYY-MM-DD';
+  req.user = {
+    id: access.id,
+    tenant_id: access.tenant_id,
+    email: access.email,
+    display_name: access.display_name,
+    time_format: access.time_format === '12h' ? '12h' : '24h',
+    date_format: dateFormat,
+    roles: access.roles.length > 0 ? access.roles : ['user'],
+    sid: sessionId,
+  };
+  next();
+}
+
+/** Verify the session cookie or Bearer token and attach the user to the request. */
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   (req as { _requestStartedAt?: number })._requestStartedAt = Date.now();
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  const credential = readCredential(req);
+  if (!credential) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+  if (credential.source === 'cookie') {
+    await authenticateCookie(req, res, next, credential.sessionId);
     return;
   }
 
   let payload: ReturnType<typeof verifyAccessToken>;
   try {
-    payload = verifyAccessToken(header.slice(7));
+    payload = verifyAccessToken(credential.token);
   } catch (err) {
-    logger.warn({ err }, 'JWT verification failed');
+    logger.warn({ err, source: credential.source }, 'JWT verification failed');
     res.status(401).json({ error: 'Invalid or expired token' });
+    return;
+  }
+  // Tokens issued before server-side sessions existed cannot be revoked; make them log in again.
+  if (typeof payload.sid !== 'string' || !payload.sid) {
+    res.status(401).json({ error: 'Session expired, please sign in again' });
     return;
   }
 
@@ -49,18 +102,22 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
   delete payload.role;
 
-  // Resolve roles and the active flag from the DB on every request so role
-  // changes and deactivation apply without waiting for the token to expire.
+  // Resolve roles, the active flag and the session from the DB on every request so
+  // role changes, deactivation and logout apply without waiting for the token to expire.
   // Lockout is not checked here: failed logins set it, and must not end live sessions.
-  let access: Awaited<ReturnType<typeof db.resolveUserAccess>>;
+  let access: Awaited<ReturnType<typeof db.resolveSessionAccess>>;
   try {
-    access = await db.resolveUserAccess(payload.id, payload.tenant_id);
+    access = await db.resolveSessionAccess(payload.sid, payload.id, payload.tenant_id);
   } catch (err) {
     next(err);
     return;
   }
   if (!access || !access.is_active) {
     res.status(401).json({ error: 'Account is inactive' });
+    return;
+  }
+  if (!access.session_valid) {
+    res.status(401).json({ error: 'Session expired, please sign in again' });
     return;
   }
   payload.roles = access.roles.length > 0 ? access.roles : ['user'];

@@ -17,6 +17,32 @@ export function useIncidentsList(
   });
 }
 
+export function useIncidentDetailQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.incidents.detail(id ?? ''),
+    queryFn: () => incidentsApi.get(id!),
+    enabled: !!id,
+  });
+}
+
+export function useIncidentJournal(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.incidents.journal(id ?? ''),
+    queryFn: () => incidentsApi.journal(id!).then((r) => r.entries),
+    enabled: !!id,
+  });
+}
+
+/** Previous/next incident within the list the user came from. */
+export function useIncidentNav(id: string | undefined, listParams: Record<string, string>) {
+  return useQuery({
+    queryKey: queryKeys.incidents.nav(id ?? '', listParams),
+    queryFn: () => incidentsApi.nav(id!, listParams),
+    enabled: !!id,
+    staleTime: 60_000,
+  });
+}
+
 export function useIncidentAssignmentGroups() {
   return useQuery({
     queryKey: queryKeys.incidents.assignmentGroups(),

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslations, useMessages } from 'use-intl';
 import { approvals as approvalsApi, type PendingApproval } from '../../api/client';
+import { apiFetch } from '../../api/http';
 
 function hasNestedKey(messages: unknown, path: string): boolean {
   const parts = path.split('.');
@@ -143,39 +144,33 @@ export default function ESSApprovalsPage() {
     setError('');
     try {
       const { item, action } = modal;
-      const token = localStorage.getItem('nova_token');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const post = async (path: string, body: Record<string, unknown>, failure: string) => {
+        const response = await apiFetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error(failure);
       };
 
       if (item.type === 'change') {
-        const response = await fetch(`/api/changes/${item.entity_id}/approvals/${item.approval_id}/decision`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ decision: action === 'approved' ? 'approved' : 'rejected', notes }),
-        });
-        if (!response.ok) {
-          throw new Error(t('changeDecisionFailed'));
-        }
+        await post(
+          `/changes/${item.entity_id}/approvals/${item.approval_id}/decision`,
+          { decision: action === 'approved' ? 'approved' : 'rejected', notes },
+          t('changeDecisionFailed'),
+        );
       } else if (item.type === 'knowledge') {
-        const response = await fetch(`/api/knowledge/articles/${item.entity_id}/approvals/${item.approval_id}/decision`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ decision: action, notes }),
-        });
-        if (!response.ok) {
-          throw new Error(t('knowledgeDecisionFailed'));
-        }
+        await post(
+          `/knowledge/articles/${item.entity_id}/approvals/${item.approval_id}/decision`,
+          { decision: action, notes },
+          t('knowledgeDecisionFailed'),
+        );
       } else if (item.type === 'request') {
-        const response = await fetch(`/api/requests/${item.entity_id}/tasks/${item.approval_id}/complete`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ outcome: action, notes }),
-        });
-        if (!response.ok) {
-          throw new Error(t('requestDecisionFailed'));
-        }
+        await post(
+          `/requests/${item.entity_id}/tasks/${item.approval_id}/complete`,
+          { outcome: action, notes },
+          t('requestDecisionFailed'),
+        );
       }
 
       setModal(null);

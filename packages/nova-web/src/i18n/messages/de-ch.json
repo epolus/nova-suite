@@ -347,7 +347,8 @@
             "recent_requests": "Aktuelle Anfragen"
           }
         }
-      }
+      },
+      "widgetLoadFailed": "Laden fehlgeschlagen. Erneut versuchen"
     },
     "incidents": {
       "title": "Vorfälle",
@@ -601,7 +602,8 @@
     "rejected": "Abgelehnt",
     "draft": "Entwurf",
     "published": "Veröffentlicht",
-    "retired": "Zurückgezogen"
+    "retired": "Zurückgezogen",
+    "inactive": "Inaktiv"
   },
   "priority": {
     "p1": "P1 Kritisch",

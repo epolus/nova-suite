@@ -11,6 +11,19 @@
 
 	root * /srv
 
+	# Security headers for the SPA only; /api and /docs get theirs from the engine (helmet).
+	# style-src needs 'unsafe-inline' for React style props rendered as HTML and the chart theme <style>.
+	# img-src allows https: because knowledge articles may embed external images.
+	@spa not path /api/* /docs*
+	header @spa {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Cross-Origin-Opener-Policy "same-origin"
+	}
+
 	# Hashed Vite chunks live under /assets and must 404 when missing — never
 	# SPA-fallback to index.html (that makes dynamic import() fail with an
 	# opaque module error after deploys). Only cache successful asset responses.
@@ -38,7 +51,7 @@
 	}
 
 	# index.html (and other entry files) must revalidate so open tabs pick up new chunk hashes
-	@html path / /index.html /favicon.svg
+	@html path / /index.html /favicon.svg /boot.js
 	header @html Cache-Control "no-cache, must-revalidate"
 
 	# SPA fallback for frontend routes

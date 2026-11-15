@@ -7,6 +7,7 @@ import { useMyQueue } from '../hooks';
 import type { DashboardWidgetProps } from '../types';
 import { PRIORITY_CONFIG } from './priorityConfig';
 import { getListLimit } from './listConfig';
+import { WidgetLoadError } from './shared';
 
 export default function MyQueueWidget({ instance }: DashboardWidgetProps) {
   const t = useTranslations('pages.dashboard');
@@ -19,9 +20,7 @@ export default function MyQueueWidget({ instance }: DashboardWidgetProps) {
   }
   if (isError) {
     return (
-      <button type="button" onClick={() => void refetch()} className="text-sm text-red-600 hover:underline">
-        Failed to load
-      </button>
+      <WidgetLoadError onRetry={() => void refetch()} />
     );
   }
 

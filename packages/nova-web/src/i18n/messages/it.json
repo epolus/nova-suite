@@ -347,7 +347,8 @@
             "recent_requests": "Richieste recenti"
           }
         }
-      }
+      },
+      "widgetLoadFailed": "Caricamento non riuscito. Riprova"
     },
     "incidents": {
       "title": "Incidenti",
@@ -601,7 +602,8 @@
     "rejected": "Respinto",
     "draft": "Bozza",
     "published": "Pubblicato",
-    "retired": "Pensionato"
+    "retired": "Pensionato",
+    "inactive": "Inattivo"
   },
   "priority": {
     "p1": "P1 critico",

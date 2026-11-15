@@ -7,7 +7,9 @@ import ESSLayout from '@/components/ESSLayout';
 import Spinner from '@/components/Spinner';
 import Login from '@/pages/Login';
 import AdminAccessGuard from '@/components/AdminAccessGuard';
-import { canAccessImprovements, isAgentRole } from '@/utils/roles';
+import {
+  canAccessImprovements, canViewAlerts, canViewOnCallRota, hasReportingCreateRole, hasReportingViewRole, isAgentRole,
+} from '@/utils/roles';
 import * as Pages from './lazyPages';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -27,11 +29,14 @@ function SmartHome() {
   return isAgentRole(user?.roles) ? <Pages.Dashboard /> : <Navigate to="/ess" replace />;
 }
 
-function ImprovementAccess() {
+/** Client-side mirror of the API role checks, so users are not dropped onto pages that only return 403s. */
+function RoleGate({ allow }: { allow: (roles: string[] | undefined) => boolean }) {
   const { user } = useAuth();
-  if (!canAccessImprovements(user?.roles)) return <Navigate to="/" replace />;
+  if (!allow(user?.roles)) return <Navigate to="/" replace />;
   return <Outlet />;
 }
+
+const isAgent = (roles: string[] | undefined) => isAgentRole(roles);
 
 function Lazy({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Spinner />}>{children}</Suspense>;
@@ -55,47 +60,58 @@ export default function AppRoutes() {
         <Route path="/" element={<Lazy><SmartHome /></Lazy>} />
         <Route path="/ess" element={<Lazy><Pages.ESSHomePage /></Lazy>} />
         <Route path="/ess/approvals" element={<Lazy><Pages.ESSApprovalsPage /></Lazy>} />
-        <Route path="/my-todo" element={<Lazy><Pages.MyTodoPage /></Lazy>} />
-        <Route path="/my-groups" element={<Lazy><Pages.MyGroupsTodoPage /></Lazy>} />
         <Route path="/catalog" element={<Lazy><Pages.CatalogPage /></Lazy>} />
         <Route path="/catalog/:id" element={<Lazy><Pages.CatalogItemPage /></Lazy>} />
         <Route path="/knowledge" element={<Lazy><Pages.KnowledgePage /></Lazy>} />
         <Route path="/cart" element={<Lazy><Pages.CartPage /></Lazy>} />
         <Route path="/requests" element={<Lazy><Pages.RequestsPage /></Lazy>} />
-        <Route path="/request-tasks" element={<Lazy><Pages.RequestTasksPage /></Lazy>} />
-        <Route path="/request-tasks/:taskId" element={<Lazy><Pages.RequestTaskDetailPage /></Lazy>} />
         <Route path="/requests/:id" element={<Lazy><Pages.RequestDetail /></Lazy>} />
         <Route path="/incidents" element={<Lazy><Pages.IncidentsPage /></Lazy>} />
         <Route path="/incidents/new" element={<Lazy><Pages.NewIncident /></Lazy>} />
         <Route path="/incidents/:id" element={<Lazy><Pages.IncidentDetail /></Lazy>} />
-        <Route path="/major-incidents" element={<Lazy><Pages.MajorIncidentsPage /></Lazy>} />
-        <Route path="/major-incidents/:id" element={<Lazy><Pages.MajorIncidentWarRoom /></Lazy>} />
-        <Route path="/major-incidents/:id/postmortem" element={<Lazy><Pages.MajorIncidentPostmortemPage /></Lazy>} />
-        <Route path="/problems" element={<Lazy><Pages.ProblemsPage /></Lazy>} />
-        <Route path="/problems/new" element={<Lazy><Pages.ProblemDetail /></Lazy>} />
-        <Route path="/problems/:id" element={<Lazy><Pages.ProblemDetail /></Lazy>} />
-        <Route path="/changes" element={<Lazy><Pages.ChangesPage /></Lazy>} />
-        <Route path="/changes/new" element={<Lazy><Pages.ChangeDetailPage /></Lazy>} />
+        {/* Change and asset details stay open: ESS approvers and request owners are linked there. */}
         <Route path="/changes/:id" element={<Lazy><Pages.ChangeDetailPage /></Lazy>} />
-        <Route path="/changes/calendar" element={<Lazy><Pages.ChangeCalendarPage /></Lazy>} />
-        <Route path="/assets" element={<Lazy><Pages.AssetsPage /></Lazy>} />
-        <Route path="/assets/new" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
         <Route path="/assets/:id" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
-        <Route path="/alerts" element={<Lazy><Pages.AlertsPage /></Lazy>} />
-        <Route path="/alerts/:id" element={<Lazy><Pages.AlertDetailPage /></Lazy>} />
-        <Route path="/on-call" element={<Lazy><Pages.OnCallRotaPage /></Lazy>} />
-        <Route path="/improvements" element={<ImprovementAccess />}>
+        <Route element={<RoleGate allow={isAgent} />}>
+          <Route path="/my-todo" element={<Lazy><Pages.MyTodoPage /></Lazy>} />
+          <Route path="/my-groups" element={<Lazy><Pages.MyGroupsTodoPage /></Lazy>} />
+          <Route path="/request-tasks" element={<Lazy><Pages.RequestTasksPage /></Lazy>} />
+          <Route path="/request-tasks/:taskId" element={<Lazy><Pages.RequestTaskDetailPage /></Lazy>} />
+          <Route path="/major-incidents" element={<Lazy><Pages.MajorIncidentsPage /></Lazy>} />
+          <Route path="/major-incidents/:id" element={<Lazy><Pages.MajorIncidentWarRoom /></Lazy>} />
+          <Route path="/major-incidents/:id/postmortem" element={<Lazy><Pages.MajorIncidentPostmortemPage /></Lazy>} />
+          <Route path="/problems" element={<Lazy><Pages.ProblemsPage /></Lazy>} />
+          <Route path="/problems/new" element={<Lazy><Pages.ProblemDetail /></Lazy>} />
+          <Route path="/problems/:id" element={<Lazy><Pages.ProblemDetail /></Lazy>} />
+          <Route path="/changes" element={<Lazy><Pages.ChangesPage /></Lazy>} />
+          <Route path="/changes/new" element={<Lazy><Pages.ChangeDetailPage /></Lazy>} />
+          <Route path="/changes/calendar" element={<Lazy><Pages.ChangeCalendarPage /></Lazy>} />
+          <Route path="/assets" element={<Lazy><Pages.AssetsPage /></Lazy>} />
+          <Route path="/assets/new" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
+          <Route path="/releases" element={<Lazy><Pages.ReleasesPage /></Lazy>} />
+          <Route path="/releases/new" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />
+          <Route path="/releases/:id" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />
+        </Route>
+        <Route element={<RoleGate allow={canViewAlerts} />}>
+          <Route path="/alerts" element={<Lazy><Pages.AlertsPage /></Lazy>} />
+          <Route path="/alerts/:id" element={<Lazy><Pages.AlertDetailPage /></Lazy>} />
+        </Route>
+        <Route element={<RoleGate allow={canViewOnCallRota} />}>
+          <Route path="/on-call" element={<Lazy><Pages.OnCallRotaPage /></Lazy>} />
+        </Route>
+        <Route path="/improvements" element={<RoleGate allow={canAccessImprovements} />}>
           <Route index element={<Lazy><Pages.ImprovementsPage /></Lazy>} />
           <Route path="new" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />
           <Route path=":id" element={<Lazy><Pages.ImprovementDetailPage /></Lazy>} />
         </Route>
-        <Route path="/releases" element={<Lazy><Pages.ReleasesPage /></Lazy>} />
-        <Route path="/releases/new" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />
-        <Route path="/releases/:id" element={<Lazy><Pages.ReleaseDetailPage /></Lazy>} />
-        <Route path="/reports" element={<Lazy><Pages.ReportsLibraryPage /></Lazy>} />
-        <Route path="/reports/new" element={<Lazy><Pages.ReportBuilderPage /></Lazy>} />
-        <Route path="/reports/:reportId" element={<Lazy><Pages.ReportViewerPage /></Lazy>} />
-        <Route path="/reports/:reportId/builder" element={<Lazy><Pages.ReportBuilderPage /></Lazy>} />
+        <Route element={<RoleGate allow={hasReportingViewRole} />}>
+          <Route path="/reports" element={<Lazy><Pages.ReportsLibraryPage /></Lazy>} />
+          <Route path="/reports/:reportId" element={<Lazy><Pages.ReportViewerPage /></Lazy>} />
+        </Route>
+        <Route element={<RoleGate allow={hasReportingCreateRole} />}>
+          <Route path="/reports/new" element={<Lazy><Pages.ReportBuilderPage /></Lazy>} />
+          <Route path="/reports/:reportId/builder" element={<Lazy><Pages.ReportBuilderPage /></Lazy>} />
+        </Route>
         <Route path="/cmdb" element={<Lazy><Pages.CMDBPage /></Lazy>} />
         <Route path="/cmdb/new" element={<Lazy><Pages.CIForm /></Lazy>} />
         <Route path="/cmdb/:id" element={<Lazy><Pages.CIDetail /></Lazy>} />

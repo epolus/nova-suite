@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useTranslations } from 'use-intl';
 import { Button } from '@/components/ui/button';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
 
 interface UnsavedChangesDialogProps {
   open: boolean;
@@ -20,12 +21,14 @@ export default function UnsavedChangesDialog({
   const tActions = useTranslations('common.actions');
   const tMessages = useTranslations('common.messages');
   const tDialog = useTranslations('components.unsavedChangesDialog');
+  const dialogRef = useDialogFocus(open, saving ? undefined : onStay);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="unsaved-changes-dialog-title"

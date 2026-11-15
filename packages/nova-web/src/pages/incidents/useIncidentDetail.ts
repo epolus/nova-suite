@@ -1,15 +1,17 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { useParams, useLocation } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { incidents as incidentsApi } from '../../api/client';
 import type { Incident, JournalEntry } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { isFulfillerRole } from '../../utils/roles';
 import { useUserPreferenceState } from '../../hooks/useUserPreferenceState';
 import {
   queryKeys,
+  useIncidentDetailQuery,
+  useIncidentJournal,
   useIncidentLinkedProblems,
+  useIncidentNav,
   useReferenceAssignmentGroups,
   useReferenceCmdbItems,
   useReferenceIncidentCategories,
@@ -27,7 +29,6 @@ import {
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { useIncidentAttachments } from './useIncidentAttachments';
 import { useIncidentSidebar } from './useIncidentSidebar';
-import { useIncidentDetailLoad } from './useIncidentDetailLoad';
 import { useIncidentDetailActions } from './useIncidentDetailActions';
 
 export function useIncidentDetail() {
@@ -43,14 +44,24 @@ export function useIncidentDetail() {
 
   const isFulfiller = isFulfillerRole(user?.roles);
 
-  // Core data
-  const [inc, setInc] = useState<Incident | null>(null);
-  const [journal, setJournal] = useState<JournalEntry[]>([]);
-  const [journalLoading, setJournalLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [prevId, setPrevId] = useState<string | null>(null);
-  const [nextId, setNextId] = useState<string | null>(null);
+  // Core data (React Query: cached per incident, shared with invalidations from other pages)
+  const incidentQuery = useIncidentDetailQuery(id);
+  const journalQuery = useIncidentJournal(id);
+  const navQuery = useIncidentNav(id, listParams);
+  const inc: Incident | null = incidentQuery.data ?? null;
+  const journal = useMemo<JournalEntry[]>(() => journalQuery.data ?? [], [journalQuery.data]);
+  const journalLoading = journalQuery.isFetching;
+  const loading = incidentQuery.isPending && !!id;
+  const loadError = incidentQuery.error
+    ? (incidentQuery.error instanceof Error ? incidentQuery.error.message : 'Failed to load incident')
+    : null;
+  const prevId = navQuery.data?.prev_id ?? null;
+  const nextId = navQuery.data?.next_id ?? null;
+  const setJournal = useCallback<Dispatch<SetStateAction<JournalEntry[]>>>((next) => {
+    if (!id) return;
+    queryClient.setQueryData<JournalEntry[]>(queryKeys.incidents.journal(id), (prev = []) =>
+      typeof next === 'function' ? next(prev) : next);
+  }, [id, queryClient]);
 
   // Reference data (fulfiller only, cached via React Query)
   const { data: assignmentGroups = [] } = useReferenceAssignmentGroups(isFulfiller);
@@ -132,26 +143,30 @@ export function useIncidentDetail() {
     if (id && isFulfiller) setField('relatedProblemId', relatedProblemSync);
   }
 
-  const loadJournal = useCallback(async (incidentId: string) => {
-    setJournalLoading(true);
-    try {
-      const jRes = await incidentsApi.journal(incidentId);
-      setJournal(jRes.entries);
-    } catch {
-      setJournal([]);
-    } finally {
-      setJournalLoading(false);
-    }
-  }, []);
+  // Copy server data into the edit form on first load, and on later refetches only
+  // while the form has no unsaved edits (refresh() re-syncs explicitly after a save).
+  const [syncedInc, setSyncedInc] = useState<Incident | null>(null);
+  if (inc && inc !== syncedInc) {
+    const firstForThisIncident = !syncedInc || syncedInc.id !== inc.id;
+    const unsaved = !firstForThisIncident && (
+      hasIncidentFormChanges(fields, syncedInc, linkedProblemIds)
+      || JSON.stringify(syncedInc.custom_fields || {}) !== JSON.stringify(customFields)
+    );
+    setSyncedInc(inc);
+    if (!unsaved) syncFields(inc);
+  }
 
+  const { refetch: refetchIncident } = incidentQuery;
+  const { refetch: refetchJournal } = journalQuery;
   const refresh = useCallback(async () => {
     if (!id) return;
-    const full = await incidentsApi.get(id);
-    setInc(full);
-    syncFields(full);
+    const { data: full, error } = await refetchIncident();
+    if (error) throw error;
+    if (full) syncFields(full);
     await queryClient.invalidateQueries({ queryKey: queryKeys.incidents.linkedProblems(id) });
-    void loadJournal(id);
-  }, [id, loadJournal, queryClient, syncFields]);
+    await queryClient.invalidateQueries({ queryKey: queryKeys.incidents.lists() });
+    void refetchJournal();
+  }, [id, queryClient, refetchIncident, refetchJournal, syncFields]);
 
   const withSave = useCallback(async (fn: () => Promise<void>) => {
     setSaving(true);
@@ -161,19 +176,6 @@ export function useIncidentDetail() {
       setSaving(false);
     }
   }, []);
-
-  useIncidentDetailLoad({
-    id,
-    listParams,
-    syncFields,
-    setLoading,
-    setLoadError,
-    setInc,
-    setJournal,
-    setJournalLoading,
-    setPrevId,
-    setNextId,
-  });
 
   const callerUser = useMemo(
     () => users.find((u) => u.id === fields.callerId) ?? null,

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'use-intl';
 import { settings as settingsApi, type ThemeSettings } from '../../api/client';
+import { requestBlob } from '../../api/http';
 import { DEFAULT_THEME, useTheme } from '../../context/ThemeContext';
 import PageHeader from '../../components/PageHeader';
 import Card from '../../components/Card';
@@ -42,11 +43,7 @@ export default function ThemingPage() {
       setLoading(false);
     });
     // Load logo preview
-    const token = localStorage.getItem('nova_token');
-    fetch('/api/settings/logo', {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((r) => { if (r.ok) return r.blob(); throw new Error(); })
+    requestBlob('/settings/logo')
       .then((blob) => setLogoPreview(URL.createObjectURL(blob)))
       .catch(() => setLogoPreview(DEFAULT_LOGO_SRC));
   }, []);

@@ -9,7 +9,7 @@ For the complete baseline list, see `.env.example`.
 |----------|-------------|--------|
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Postgres image init, Temporal auto-setup, `nova-migrate`, backups | Bootstrap **superuser**. Never point the API or worker at this role. |
 | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | `nova-engine`, `nova-worker` | Default `nova_runtime`. Must be `NOSUPERUSER NOBYPASSRLS`. Created by `infra/postgres/00-runtime-role.sh`. |
-| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.46`). Mismatch puts the API in degraded mode and stops the worker. |
+| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.48`). Mismatch puts the API in degraded mode and stops the worker. |
 | `NOVA_MIGRATIONS_DIR` | `nova-migrate` | Directory of `vNN.NN.NN__slug.sql` files. Defaults to `/app/infra/postgres/migrations` in the engine image. |
 | `NOVA_MIGRATE_ACCEPT_CHECKSUMS` | `nova-migrate` | Comma-separated versions whose edited file should be re-recorded instead of stopping the job. One-off repair only; see the forward-only policy in [UPGRADE_STRATEGY.md](./UPGRADE_STRATEGY.md). |
 | `DB_POOL_MAX` | `nova-engine` (`nova-worker` outside compose) | Connection pool size per process. Defaults: engine `20`, worker `5`. Keep the sum across all replicas below Postgres `max_connections`. |
@@ -36,6 +36,8 @@ CATALOG_AUTOMATION_SHARED_KEY=
 NOVA_PRIMARY_TENANT_ID=a0000000-0000-0000-0000-000000000001
 BCRYPT_ROUNDS=12
 OIDC_ALLOWED_EMAIL_DOMAINS=
+SESSION_COOKIE_SECURE=auto
+TRUSTED_ORIGINS=
 
 # API uploads
 UPLOAD_MAX_FILE_SIZE_MB=20
@@ -125,4 +127,7 @@ required in that file, so Compose fails with a named error rather than starting 
 - **`NOVA_PRIMARY_TENANT_ID`** — the tenant this install serves. Password login and SSO only resolve users in this tenant, and the public theme endpoint reads its branding. Defaults to the seeded tenant `a0000000-0000-0000-0000-000000000001`; must be a UUID.
 - **`OIDC_ALLOWED_EMAIL_DOMAINS`** — comma-separated, exact-match email domains (e.g. `example.com,example.ch`). An SSO login that is not yet linked to a user is accepted only when the IdP email is in one of these domains and `email_verified` is not `false`; it then links to the existing user with that email (only if that user has no other SSO link) or provisions a new one. **Empty means no new SSO users or links** — already-linked users keep working. Subdomains must be listed explicitly.
 - **`BCRYPT_ROUNDS`** — bcrypt cost for password hashes (default `12`). Existing hashes with a lower cost are re-hashed on the next successful login. Higher values slow down login and bulk user import.
+- **Sessions** — the web app is signed in through the httpOnly cookie `nova_session`, which holds the session id only (not the access token). It is valid for `JWT_EXPIRES_IN` and backed by a `user_sessions` row that logout, deactivation, admin lock and admin password reset revoke. API scripts keep using `Authorization: Bearer` with the `token` from `POST /api/auth/login`.
+- **`SESSION_COOKIE_SECURE`** — `auto` (default) marks the cookie `Secure` when the request reached the engine over HTTPS, which relies on a correct `TRUST_PROXY`. Set `true` if TLS ends at a proxy that does not send `X-Forwarded-Proto`; `false` only for plain-HTTP test setups.
+- **`TRUSTED_ORIGINS`** — comma-separated origins (`https://portal.example.com`) besides the API's own host that may make cookie-authenticated `POST`/`PUT`/`PATCH`/`DELETE` calls. Leave empty when the UI and `/api` share one host (the default stack).
 - **Event management** — see [EVENT_MANAGEMENT.md](./EVENT_MANAGEMENT.md).

@@ -29,6 +29,7 @@ import {
   startProblemRecurrenceScanSchedule,
 } from './temporal/workflows';
 import { metricsHandler, metricsMiddleware } from './observability/metrics';
+import { requireSameOrigin } from './middleware/csrf';
 
 type SchemaRuntimeStatus = {
   compatible: boolean;
@@ -86,6 +87,7 @@ const mutatingLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Rate limit exceeded. Please slow down and retry.' },
 });
+app.use('/api', requireSameOrigin);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/sso', authLimiter);
 app.use('/api', (req, res, next) => {

@@ -7,6 +7,7 @@ import DarkModeToggle from '../components/DarkModeToggle';
 import { auth as authApi } from '../api/client';
 import { useTranslations } from 'use-intl';
 import { hideDemoLoginCredentials } from '../config/env';
+import { useApiObjectUrl } from '../hooks/useApiObjectUrl';
 
 const DEFAULT_LOGO_SRC = '/default-logo.svg';
 
@@ -25,8 +26,6 @@ export default function Login() {
   );
   const [seenSsoError, setSeenSsoError] = useState(ssoErrorParam);
   const [loading, setLoading] = useState(false);
-  const [logoSrc, setLogoSrc] = useState(DEFAULT_LOGO_SRC);
-  const [prevLogoUrl, setPrevLogoUrl] = useState(theme.logo_url);
   const [ssoEnabled, setSsoEnabled] = useState(false);
   const [ssoProvider, setSsoProvider] = useState('OpenID');
   const [localLoginEnabled, setLocalLoginEnabled] = useState(true);
@@ -34,10 +33,6 @@ export default function Login() {
   if (ssoErrorParam && ssoErrorParam !== seenSsoError) {
     setSeenSsoError(ssoErrorParam);
     setError(decodeURIComponent(ssoErrorParam));
-  }
-  if (theme.logo_url !== prevLogoUrl) {
-    setPrevLogoUrl(theme.logo_url);
-    if (!theme.logo_url) setLogoSrc(DEFAULT_LOGO_SRC);
   }
 
   // If user is already logged in (e.g. from sso_token), redirect
@@ -63,22 +58,8 @@ export default function Login() {
       .catch(() => { /* SSO not available */ });
   }, []);
 
-  useEffect(() => {
-    if (!theme.logo_url) return;
-    let cancelled = false;
-    let objectUrl = '';
-    fetch('/api/settings/logo')
-      .then((r) => { if (r.ok) return r.blob(); throw new Error(); })
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob);
-        if (!cancelled) setLogoSrc(objectUrl);
-      })
-      .catch(() => { if (!cancelled) setLogoSrc(DEFAULT_LOGO_SRC); });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [theme.logo_url]);
+  const logoSrc = useApiObjectUrl(theme.logo_url ? `/settings/logo?v=${encodeURIComponent(theme.logo_url)}` : null)
+    ?? DEFAULT_LOGO_SRC;
 
   const appNameParts = (theme.app_name || 'Nova Suite').split(' ');
   const firstName = appNameParts[0];

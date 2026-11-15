@@ -20,6 +20,7 @@ export const queryKeys = {
     details: () => [...queryKeys.incidents.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.incidents.details(), id] as const,
     journal: (id: string) => [...queryKeys.incidents.detail(id), 'journal'] as const,
+    nav: (id: string, params: Record<string, string>) => [...queryKeys.incidents.detail(id), 'nav', params] as const,
     linkedProblems: (id: string) => [...queryKeys.incidents.detail(id), 'linked-problems'] as const,
     assignmentGroups: () => [...queryKeys.incidents.all, 'assignment-groups'] as const,
   },

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { auth, settings as settingsApi, type ThemeSettings } from '../api/client';
+import { getSessionUserId } from '../api/http';
 import {
   DARK_MODE_STORAGE_KEY,
   DEFAULT_THEME,
@@ -27,7 +28,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const persistDarkToServer = useCallback((next: boolean) => {
     try {
-      if (!localStorage.getItem('nova_token')) return;
+      if (!getSessionUserId()) return;
       void auth.setPreference(UI_DARK_MODE_SCOPE, { value: next }).catch(() => {
         /* offline / non-critical */
       });

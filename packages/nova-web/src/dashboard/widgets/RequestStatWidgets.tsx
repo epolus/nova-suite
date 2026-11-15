@@ -3,7 +3,7 @@ import { useTranslations } from 'use-intl';
 import { DashboardIcons } from '../icons';
 import { useOpenRequestsCount } from '../hooks';
 import type { DashboardWidgetProps } from '../types';
-import { StatContent } from './shared';
+import { StatContent, WidgetLoadError } from './shared';
 
 export default function OpenRequestsStatWidget(_props: DashboardWidgetProps) {
   const t = useTranslations('pages.dashboard.stats');
@@ -14,9 +14,7 @@ export default function OpenRequestsStatWidget(_props: DashboardWidgetProps) {
   }
   if (isError || data === undefined) {
     return (
-      <button type="button" onClick={() => void refetch()} className="text-sm text-red-600 hover:underline">
-        Failed to load
-      </button>
+      <WidgetLoadError onRetry={() => void refetch()} />
     );
   }
 

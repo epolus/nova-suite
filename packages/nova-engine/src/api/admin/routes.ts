@@ -27,6 +27,7 @@ import { getWorkflowStartQueueStats } from '../../temporal/workflow-start-queue'
 import { adminCreateUserSchema, adminUpdateUserSchema } from '../../domain/schemas';
 import { recordAuditEvent } from '../../audit/events';
 import { getClientIp } from '../../middleware/client-ip';
+import { revokeUserSessions } from '../../auth/session';
 import { cacheMetrics } from '../../cache/redis';
 import {
   collectCredSlugsFromAutomation,
@@ -1024,6 +1025,11 @@ router.patch('/users/:id', validateBody(adminUpdateUserSchema), async (req: Requ
         `UPDATE users SET ${sets.join(', ')} WHERE id = $${idx}`,
         values,
       );
+    }
+
+    if (is_active === false || locked_out === true || password) {
+      const keepSession = userId === req.user!.id ? req.user!.sid : undefined;
+      await revokeUserSessions(getRequestClient(req), String(userId), keepSession);
     }
 
     // Update roles if provided

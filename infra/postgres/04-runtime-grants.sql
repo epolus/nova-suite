@@ -212,6 +212,65 @@ $$;
 
 REVOKE ALL ON FUNCTION resolve_user_access(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION resolve_user_access(uuid, uuid) TO nova_runtime;
+
+CREATE OR REPLACE FUNCTION resolve_session_access(p_session_id uuid, p_user_id uuid, p_tenant_id uuid)
+RETURNS TABLE (is_active boolean, roles text[], session_valid boolean)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT a.is_active,
+         a.roles,
+         EXISTS (
+           SELECT 1
+           FROM user_sessions s
+           WHERE s.id = p_session_id
+             AND s.user_id = p_user_id
+             AND s.tenant_id = p_tenant_id
+             AND s.revoked_at IS NULL
+             AND s.expires_at > now()
+         )
+  FROM resolve_user_access(p_user_id, p_tenant_id) a;
+$$;
+
+REVOKE ALL ON FUNCTION resolve_session_access(uuid, uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION resolve_session_access(uuid, uuid, uuid) TO nova_runtime;
+
+-- Browser sessions: the cookie is the session id, so the user is loaded from that id alone.
+CREATE OR REPLACE FUNCTION lookup_session_user(p_session_id uuid)
+RETURNS TABLE (
+  id uuid,
+  tenant_id uuid,
+  email text,
+  display_name text,
+  time_format text,
+  date_format text,
+  is_active boolean,
+  roles text[],
+  session_valid boolean
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT u.id,
+         u.tenant_id,
+         u.email,
+         u.display_name,
+         u.time_format,
+         u.date_format,
+         u.is_active,
+         COALESCE((SELECT a.roles FROM resolve_user_access(u.id, u.tenant_id) a), ARRAY[]::text[]),
+         (s.revoked_at IS NULL AND s.expires_at > now())
+  FROM user_sessions s
+  JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
+  WHERE s.id = p_session_id;
+$$;
+
+REVOKE ALL ON FUNCTION lookup_session_user(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION lookup_session_user(uuid) TO nova_runtime;
 REVOKE ALL ON FUNCTION lookup_user_for_login(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION lookup_user_for_sso(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION lookup_user_for_login(text, uuid) FROM PUBLIC;

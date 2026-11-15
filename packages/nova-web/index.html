@@ -5,17 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nova Suite</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <script>
-      try {
-        if (localStorage.getItem('nova_dark_mode') === 'true') {
-          document.documentElement.classList.add('dark');
-        }
-        const locale = localStorage.getItem('nova_locale');
-        if (locale) {
-          document.documentElement.lang = locale;
-        }
-      } catch (_) {}
-    </script>
+    <script src="/boot.js"></script>
   </head>
   <body class="h-full">
     <div id="root" class="h-full"></div>

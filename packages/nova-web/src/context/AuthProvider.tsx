@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
-import { auth, setToken, clearToken, type User } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { auth, type User } from '../api/client';
+import { dropLegacyToken, setSessionUser, setUnauthorizedHandler } from '../api/http';
 import { AuthContext } from './AuthContext';
 
 const DATE_TIME_PREF_SCOPE = 'ui:date_time_format';
@@ -22,29 +24,40 @@ function isValidDateFormat(v: unknown): v is 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const queryClient = useQueryClient();
+  const [user, setUserState] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const setUser = useCallback((next: User | null | ((prev: User | null) => User | null)) => {
+    setUserState((prev) => {
+      const value = typeof next === 'function' ? next(prev) : next;
+      setSessionUser(value?.id ?? null);
+      return value;
+    });
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      queryClient.clear();
+      setUser(null);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [queryClient, setUser]);
 
   useEffect(() => {
     const bootstrapAuth = async () => {
+      dropLegacyToken();
       const params = new URLSearchParams(window.location.search);
       const ssoCode = params.get('sso_code');
       if (ssoCode) {
         try {
-          const sso = await auth.exchangeSsoCode(ssoCode);
-          setToken(sso.token);
+          await auth.exchangeSsoCode(ssoCode);
         } catch {
-          clearToken();
+          // Invalid or expired code: fall through to the login page.
         } finally {
           const cleanUrl = window.location.pathname;
           window.history.replaceState({}, '', cleanUrl);
         }
-      }
-
-      const token = localStorage.getItem('nova_token');
-      if (!token) {
-        setLoading(false);
-        return;
       }
 
       try {
@@ -71,18 +84,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Non-critical: keep server user profile values.
         }
       } catch {
-        clearToken();
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
     void bootstrapAuth();
-  }, []);
+  }, [setUser]);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await auth.login(email, password);
-    setToken(res.token);
+    queryClient.clear();
     setUser(res.user);
     cacheDateTimeFormats(res.user.time_format || '24h', res.user.date_format || 'YYYY-MM-DD');
     void auth.setPreference(DATE_TIME_PREF_SCOPE, {
@@ -91,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => {
       // Non-critical; local cache still works.
     });
-  }, []);
+  }, [queryClient, setUser]);
 
   const setTimeFormat = useCallback(async (timeFormat: '12h' | '24h') => {
     const res = await auth.updateTimeFormat(timeFormat);
@@ -103,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => {
       // Non-critical; local cache still works.
     });
-  }, []);
+  }, [setUser]);
 
   const setDateFormat = useCallback(async (dateFormat: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD') => {
     const res = await auth.updateDateFormat(dateFormat);
@@ -115,14 +128,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => {
       // Non-critical; local cache still works.
     });
-  }, []);
+  }, [setUser]);
 
-  const logout = useCallback(() => {
-    clearToken();
+  const logout = useCallback(async () => {
+    try {
+      await auth.logout();
+    } catch {
+      // The session cookie is httpOnly; if the server is unreachable it expires on its own.
+    }
     localStorage.removeItem('nova_time_format');
     localStorage.removeItem('nova_date_format');
+    queryClient.clear();
     setUser(null);
-  }, []);
+  }, [queryClient, setUser]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, setTimeFormat, setDateFormat, logout }}>

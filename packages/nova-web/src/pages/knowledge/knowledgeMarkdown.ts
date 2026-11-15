@@ -166,21 +166,20 @@ export function renderMarkdown(md: string, attachmentUrls: Record<string, string
   });
   out = out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   out = out.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  // `out` is already HTML-escaped, so captured groups are safe attribute text; only
+  // attachment URLs substituted from `attachmentUrls` still need escaping.
+  const resolveUrl = (raw: string) => (raw.startsWith('attachment:')
+    ? escapeHtml(attachmentUrls[raw.slice('attachment:'.length)] || '')
+    : raw);
   out = out.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt, src) => {
-    const rawSrc = String(src || '');
-    const finalSrc = rawSrc.startsWith('attachment:')
-      ? (attachmentUrls[rawSrc.slice('attachment:'.length)] || '')
-      : rawSrc;
-    if (!finalSrc) return `<span style="color:#9ca3af;">[image not available: ${escapeHtml(String(alt || 'image'))}]</span>`;
-    return `<img alt="${escapeHtml(String(alt || ''))}" src="${finalSrc}" style="max-width:100%;border-radius:8px;margin:8px 0;" />`;
+    const finalSrc = resolveUrl(String(src || ''));
+    if (!finalSrc) return `<span style="color:#9ca3af;">[image not available: ${String(alt || 'image')}]</span>`;
+    return `<img alt="${String(alt || '')}" src="${finalSrc}" style="max-width:100%;border-radius:8px;margin:8px 0;" />`;
   });
   out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
-    const rawHref = String(href || '');
-    const finalHref = rawHref.startsWith('attachment:')
-      ? (attachmentUrls[rawHref.slice('attachment:'.length)] || '')
-      : rawHref;
-    if (!finalHref) return `<span style="color:#9ca3af;">[link not available: ${escapeHtml(String(label || 'link'))}]</span>`;
-    return `<a href="${escapeHtml(finalHref)}" target="_blank" rel="noreferrer" style="color:#4f46e5;text-decoration:underline;">${label}</a>`;
+    const finalHref = resolveUrl(String(href || ''));
+    if (!finalHref) return `<span style="color:#9ca3af;">[link not available: ${String(label || 'link')}]</span>`;
+    return `<a href="${finalHref}" target="_blank" rel="noreferrer" style="color:#4f46e5;text-decoration:underline;">${label}</a>`;
   });
   out = out.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0;" />');
   out = out.replace(/\n/g, '<br />');

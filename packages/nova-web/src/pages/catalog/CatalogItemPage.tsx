@@ -10,23 +10,13 @@ import Spinner from '../../components/Spinner';
 import DynamicFormField from '../../components/DynamicFormField';
 import { useCart, type CartItem } from '../../context/CartContext';
 import { catalogPictureFrameBaseClass } from './catalogPictureFrame';
+import { useApiObjectUrl } from '../../hooks/useApiObjectUrl';
 import { useTheme } from '../../context/ThemeContext';
 import { formatCurrency } from '../../utils/currency';
 import { useStatusLabel } from '@/i18n/hooks';
 
 function CatalogImage({ itemId }: { itemId: string }) {
-  const [src, setSrc] = useState<string>('');
-  useEffect(() => {
-    let objectUrl = '';
-    const token = localStorage.getItem('nova_token');
-    fetch(`/api/catalog/items/${itemId}/picture`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((res) => { if (res.ok) return res.blob(); throw new Error(); })
-      .then((blob) => { objectUrl = URL.createObjectURL(blob); setSrc(objectUrl); })
-      .catch(() => {});
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [itemId]);
+  const src = useApiObjectUrl(`/catalog/items/${itemId}/picture`);
   if (!src) return null;
   return (
     <div className={`w-full h-56 rounded-xl mb-4 ${catalogPictureFrameBaseClass}`}>

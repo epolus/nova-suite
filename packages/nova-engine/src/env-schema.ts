@@ -42,6 +42,13 @@ const envSchema = z.looseObject({
   NOVA_PRIMARY_TENANT_ID: optional(z.guid({ error: 'must be a UUID' })),
   AUTH_LOCAL_LOGIN_ENABLED: bool,
   BCRYPT_ROUNDS: int(10, 15),
+  SESSION_COOKIE_SECURE: optional(z.enum(['auto', 'true', 'false'], { error: 'must be "auto", "true" or "false"' })),
+  TRUSTED_ORIGINS: optional(
+    z.string().refine(
+      (value) => value.split(',').map((o) => o.trim()).filter(Boolean).every((o) => URL.canParse(o)),
+      'must be a comma-separated list of absolute origins (https://host[:port])',
+    ),
+  ),
 
   TEMPORAL_RETENTION_DAYS: int(1, 3650),
   REDIS_ENABLED: bool,

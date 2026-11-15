@@ -9,6 +9,7 @@ import { formatDate } from '@/utils/dateTime';
 import Card from './Card';
 import UserDateInput from './UserDateInput';
 import { Button } from './ui/button';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
 
 type Props = {
   entityType: WorkLogEntityType;
@@ -76,6 +77,7 @@ export default function WorkLogsCard({ entityType, entityId, readonly = false }:
     setModalOpen(false);
     setActionError('');
   };
+  const dialogRef = useDialogFocus(modalOpen, closeModal);
 
   const submit = async () => {
     const mins = Number.parseInt(minutes, 10);
@@ -170,6 +172,7 @@ export default function WorkLogsCard({ entityType, entityId, readonly = false }:
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="work-log-dialog-title"

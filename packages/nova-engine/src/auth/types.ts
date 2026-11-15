@@ -8,4 +8,6 @@ export interface AuthUser {
   time_format: '12h' | '24h';
   date_format: 'DD.MM.YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
   roles: string[];
+  /** Login session id (`user_sessions.id`); every accepted token carries one. */
+  sid?: string;
 }

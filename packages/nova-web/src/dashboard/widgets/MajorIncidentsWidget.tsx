@@ -4,6 +4,7 @@ import { useTranslations } from 'use-intl';
 import { useStatusLabel } from '@/i18n/hooks';
 import { useActiveMajorIncidents } from '../hooks';
 import type { DashboardWidgetProps } from '../types';
+import { WidgetLoadError } from './shared';
 
 export default function MajorIncidentsWidget(_props: DashboardWidgetProps) {
   const t = useTranslations('pages.dashboard.customize');
@@ -15,9 +16,7 @@ export default function MajorIncidentsWidget(_props: DashboardWidgetProps) {
   }
   if (isError) {
     return (
-      <button type="button" onClick={() => void refetch()} className="text-sm text-red-600 hover:underline">
-        Failed to load
-      </button>
+      <WidgetLoadError onRetry={() => void refetch()} />
     );
   }
 

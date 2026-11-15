@@ -5,6 +5,7 @@ import Badge from '@/components/Badge';
 import { usePendingChanges } from '../hooks';
 import type { DashboardWidgetProps } from '../types';
 import { getListLimit } from './listConfig';
+import { WidgetLoadError } from './shared';
 
 export default function ChangesPendingWidget({ instance }: DashboardWidgetProps) {
   const t = useTranslations('pages.dashboard.changesPending');
@@ -16,9 +17,7 @@ export default function ChangesPendingWidget({ instance }: DashboardWidgetProps)
   }
   if (isError) {
     return (
-      <button type="button" onClick={() => void refetch()} className="text-sm text-red-600 hover:underline">
-        Failed to load
-      </button>
+      <WidgetLoadError onRetry={() => void refetch()} />
     );
   }
 

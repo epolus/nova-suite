@@ -33,7 +33,7 @@ export default function KnowledgePage() {
           : page.saveAndLeave}
       />
       <PageHeader
-        title={page.isReadOnlyView ? t('titleEss') : t('titleEss')}
+        title={page.isReadOnlyView ? t('titleEss') : t('title')}
         description={page.isReadOnlyView ? t('descriptionEss') : t('descriptionAgent')}
         action={
           !page.isReadOnlyView ? (
