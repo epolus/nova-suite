@@ -158,12 +158,14 @@ async function pollOneMailbox(tenantId: string, mailbox: MailboxPollRow): Promis
         return { fetched: 0, errors: 0 };
       }
 
+      const uidNext = typeof client.mailbox === 'object' && client.mailbox
+        ? Number(client.mailbox.uidNext || 1)
+        : 1;
+      const safeUidNext = Number.isFinite(uidNext) && uidNext > 0 ? uidNext : 1;
+
       // First poll: baseline at uidNext-1 so we do not ingest historical mail.
       if (maxUid <= 0) {
-        const uidNext = typeof client.mailbox === 'object' && client.mailbox
-          ? Number(client.mailbox.uidNext || 1)
-          : 1;
-        const baseline = Number.isFinite(uidNext) && uidNext > 1 ? uidNext - 1 : 0;
+        const baseline = safeUidNext > 1 ? safeUidNext - 1 : 0;
         await withTenantContext(tenantId, async (dbClient) => {
           await dbClient.query(
             `UPDATE mailboxes SET last_polled_at = now(), last_uid = $2 WHERE id = $1`,
@@ -174,11 +176,24 @@ async function pollOneMailbox(tenantId: string, mailbox: MailboxPollRow): Promis
       }
 
       const sinceUid = maxUid + 1;
+      // Nothing new yet — avoid FETCH N:* which some servers reject as an invalid set.
+      if (sinceUid >= safeUidNext) {
+        await withTenantContext(tenantId, async (dbClient) => {
+          await dbClient.query(
+            `UPDATE mailboxes SET last_polled_at = now() WHERE id = $1`,
+            [mailbox.id],
+          );
+        });
+        return { fetched: 0, errors: 0 };
+      }
+
+      // Third arg { uid: true } makes the range a UID set. Putting uid in the query
+      // only requests the UID field and still FETCHes by sequence number — which
+      // fails with "Invalid messageset" when N exceeds the message count.
       for await (const msg of client.fetch(`${sinceUid}:*`, {
-        uid: true,
         source: true,
         envelope: true,
-      })) {
+      }, { uid: true })) {
         const uid = Number(msg.uid);
         if (!Number.isFinite(uid) || uid <= maxUid) continue;
         try {
