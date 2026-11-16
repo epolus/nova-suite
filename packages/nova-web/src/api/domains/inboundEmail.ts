@@ -2,6 +2,7 @@
 import { request } from '../http';
 import type {
   EmailMessageItem,
+  ImapLoginProbe,
   InboundEmailRule,
   InboundEmailRulePayload,
   MailboxItem,
@@ -16,8 +17,16 @@ export const inboundEmail = {
     request<{ success: boolean }>(`/admin/mailboxes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteMailbox: (id: string) =>
     request<{ success: boolean }>(`/admin/mailboxes/${id}`, { method: 'DELETE' }),
-  messages: (mailboxId: string, limit = 50) =>
+  messages: (opts?: { mailboxId?: string; limit?: number }) => {
+    const limit = opts?.limit ?? 50;
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (opts?.mailboxId) params.set('mailbox_id', opts.mailboxId);
+    return request<{ messages: EmailMessageItem[] }>(`/admin/mailboxes/messages?${params}`);
+  },
+  mailboxMessages: (mailboxId: string, limit = 50) =>
     request<{ messages: EmailMessageItem[] }>(`/admin/mailboxes/${mailboxId}/messages?limit=${limit}`),
+  testLogin: (mailboxId: string) =>
+    request<ImapLoginProbe>(`/admin/mailboxes/${mailboxId}/test-login`, { method: 'POST' }),
   ingest: (mailboxId: string, data: {
     from_address: string;
     subject?: string;

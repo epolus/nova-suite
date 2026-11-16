@@ -43,6 +43,7 @@ export interface InboundEmailRule {
 
 export interface EmailMessageItem {
   id: string;
+  mailbox_id: string;
   message_id: string | null;
   from_address: string;
   to_addresses: string;
@@ -53,6 +54,19 @@ export interface EmailMessageItem {
   matched_rule_id: string | null;
   processed_at: string | null;
   created_at: string;
+  mailbox_name?: string | null;
+  matched_rule_name?: string | null;
+  matched_rule_action?: InboundEmailAction | null;
+  incident_number?: string | null;
+}
+
+export interface ImapLoginProbe {
+  ok: boolean;
+  message: string;
+  host?: string;
+  port?: number;
+  folder?: string;
+  message_count?: number;
 }
 
 export type MailboxPayload = {

@@ -31,8 +31,24 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<MailboxForm>(emptyMailbox);
   const [saving, setSaving] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ id: string; ok: boolean; message: string } | null>(null);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: INBOUND_EMAIL_QUERY_KEY });
+
+  const testLogin = async (mailboxId: string) => {
+    setTestingId(mailboxId);
+    onError('');
+    try {
+      const probe = await inboundEmailApi.testLogin(mailboxId);
+      setTestResult({ id: mailboxId, ok: probe.ok, message: probe.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('testLoginFailed');
+      setTestResult({ id: mailboxId, ok: false, message });
+    } finally {
+      setTestingId(null);
+    }
+  };
 
   const closeForm = () => {
     setOpen(false);
@@ -185,7 +201,7 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
               <span className="font-medium text-gray-700">{t('active')}</span>
             </label>
           </div>
-          <div className="mt-4 flex gap-3">
+          <div className="mt-4 flex flex-wrap gap-3 items-center">
             <button
               type="button"
               onClick={() => void submit()}
@@ -194,10 +210,31 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
             >
               {saving ? tActions('saving') : editingId ? t('saveMailbox') : t('createMailbox')}
             </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={() => void testLogin(editingId)}
+                disabled={testingId === editingId}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+              >
+                {testingId === editingId ? t('testingLogin') : t('testLogin')}
+              </button>
+            )}
             <button type="button" onClick={closeForm} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">
               {tActions('cancel')}
             </button>
           </div>
+          {editingId && testResult?.id === editingId && (
+            <div
+              className={`mt-3 px-3 py-2 rounded-lg text-sm border ${
+                testResult.ok
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}
+            >
+              {testResult.message}
+            </div>
+          )}
         </Card>
       )}
 
@@ -229,6 +266,7 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
                   onClick={() => {
                     setEditingId(item.id);
                     setForm(mailboxToForm(item));
+                    setTestResult(null);
                     setOpen(true);
                   }}
                   className="text-sm text-indigo-600 hover:text-indigo-800"

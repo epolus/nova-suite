@@ -12,10 +12,11 @@ import {
 import PageHeader from '@/components/PageHeader';
 import Spinner from '@/components/Spinner';
 import { INBOUND_EMAIL_QUERY_KEY } from './inboundEmailForms';
+import InboundEmailHistoryPanel from './InboundEmailHistoryPanel';
 import InboundEmailMailboxesPanel from './InboundEmailMailboxesPanel';
 import InboundEmailRulesPanel from './InboundEmailRulesPanel';
 
-type Tab = 'mailboxes' | 'rules';
+type Tab = 'mailboxes' | 'rules' | 'history';
 
 type InboundEmailData = {
   mailboxes: MailboxItem[];
@@ -60,7 +61,11 @@ export default function InboundEmailPage() {
       )}
 
       <div className="mb-4 flex gap-2 border-b border-gray-200">
-        {(['mailboxes', 'rules'] as Tab[]).map((key) => (
+        {([
+          ['mailboxes', 'tabMailboxes'],
+          ['rules', 'tabRules'],
+          ['history', 'tabHistory'],
+        ] as const).map(([key, labelKey]) => (
           <button
             key={key}
             type="button"
@@ -71,7 +76,7 @@ export default function InboundEmailPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >
-            {key === 'mailboxes' ? t('tabMailboxes') : t('tabRules')}
+            {t(labelKey)}
           </button>
         ))}
       </div>
@@ -82,12 +87,14 @@ export default function InboundEmailPage() {
           groups={data.groups}
           onError={setActionError}
         />
-      ) : (
+      ) : tab === 'rules' ? (
         <InboundEmailRulesPanel
           rules={data.rules}
           mailboxes={data.mailboxes}
           onError={setActionError}
         />
+      ) : (
+        <InboundEmailHistoryPanel mailboxes={data.mailboxes} />
       )}
     </>
   );
