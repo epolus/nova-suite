@@ -201,7 +201,7 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
               <span className="font-medium text-gray-700">{t('active')}</span>
             </label>
           </div>
-          <div className="mt-4 flex gap-3">
+          <div className="mt-4 flex flex-wrap gap-3 items-center">
             <button
               type="button"
               onClick={() => void submit()}
@@ -210,10 +210,31 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
             >
               {saving ? tActions('saving') : editingId ? t('saveMailbox') : t('createMailbox')}
             </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={() => void testLogin(editingId)}
+                disabled={testingId === editingId}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+              >
+                {testingId === editingId ? t('testingLogin') : t('testLogin')}
+              </button>
+            )}
             <button type="button" onClick={closeForm} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">
               {tActions('cancel')}
             </button>
           </div>
+          {editingId && testResult?.id === editingId && (
+            <div
+              className={`mt-3 px-3 py-2 rounded-lg text-sm border ${
+                testResult.ok
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}
+            >
+              {testResult.message}
+            </div>
+          )}
         </Card>
       )}
 
@@ -245,19 +266,12 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
                   onClick={() => {
                     setEditingId(item.id);
                     setForm(mailboxToForm(item));
+                    setTestResult(null);
                     setOpen(true);
                   }}
                   className="text-sm text-indigo-600 hover:text-indigo-800"
                 >
                   {t('editMailbox')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void testLogin(item.id)}
-                  disabled={testingId === item.id}
-                  className="text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50"
-                >
-                  {testingId === item.id ? t('testingLogin') : t('testLogin')}
                 </button>
                 <button
                   type="button"
@@ -272,17 +286,6 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
                 </button>
               </div>
             </div>
-            {testResult?.id === item.id && (
-              <div
-                className={`mt-3 px-3 py-2 rounded-lg text-sm border ${
-                  testResult.ok
-                    ? 'bg-green-50 border-green-200 text-green-700'
-                    : 'bg-red-50 border-red-200 text-red-700'
-                }`}
-              >
-                {testResult.message}
-              </div>
-            )}
           </Card>
         ))}
         {mailboxes.length === 0 && <p className="text-sm text-gray-400">{t('noMailboxes')}</p>}
