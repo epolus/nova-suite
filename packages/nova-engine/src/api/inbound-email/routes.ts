@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Router, Request, Response, NextFunction } from 'express';
+import { loadCredentialSecretsBySlugs } from '@nova-suite/shared/node';
 import { authenticate, requireRole, setTenantRLS, releaseTenantClient, getRequestClient } from '../../middleware/auth';
 import { AppError } from '../../middleware/errorHandler';
 import {
@@ -8,8 +9,24 @@ import {
   getMailbox,
   ingestAndProcessInboundEmail,
 } from '../../domain/inbound-email';
+import {
+  parseImapAuth,
+  parseMailboxConfig,
+  probeImapLogin,
+} from '../../domain/inbound-email-imap';
 import { db } from '../../data/db';
+import { config } from '../../config';
 import { requireAutomationSharedKey } from '../../middleware/automation-key';
+
+const EMAIL_MESSAGE_COLUMNS = `
+  em.id, em.mailbox_id, em.message_id, em.from_address, em.to_addresses, em.subject,
+  em.processing_status, em.processing_notes, em.incident_id, em.matched_rule_id,
+  em.processed_at, em.created_at,
+  mb.name AS mailbox_name,
+  r.name AS matched_rule_name,
+  r.action AS matched_rule_action,
+  i.number AS incident_number
+`;
 
 const MAILBOX_COLUMNS = `
   id, name, address, credential_slug, protocol, config,
@@ -208,6 +225,32 @@ mailboxesRouter.delete('/:id', async (req: Request, res: Response, next: NextFun
   }
 });
 
+mailboxesRouter.get('/messages', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const mailboxId = blankToNull(req.query.mailbox_id);
+    const limit = Math.min(200, Math.max(1, Number.parseInt(String(req.query.limit || '50'), 10) || 50));
+    if (mailboxId) {
+      const mailbox = await getMailbox(client, mailboxId);
+      if (!mailbox) throw new AppError(404, 'Mailbox not found');
+    }
+    const r = await client.query(
+      `SELECT ${EMAIL_MESSAGE_COLUMNS}
+       FROM email_messages em
+       JOIN mailboxes mb ON mb.id = em.mailbox_id
+       LEFT JOIN inbound_email_rules r ON r.id = em.matched_rule_id
+       LEFT JOIN incidents i ON i.id = em.incident_id
+       WHERE ($1::uuid IS NULL OR em.mailbox_id = $1)
+       ORDER BY em.created_at DESC
+       LIMIT $2`,
+      [mailboxId, limit],
+    );
+    res.json({ messages: r.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
 mailboxesRouter.get('/:id/messages', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
@@ -216,15 +259,54 @@ mailboxesRouter.get('/:id/messages', async (req: Request, res: Response, next: N
     const mailbox = await getMailbox(client, id);
     if (!mailbox) throw new AppError(404, 'Mailbox not found');
     const r = await client.query(
-      `SELECT id, message_id, from_address, to_addresses, subject, processing_status,
-              processing_notes, incident_id, matched_rule_id, processed_at, created_at
-       FROM email_messages
-       WHERE mailbox_id = $1
-       ORDER BY created_at DESC
+      `SELECT ${EMAIL_MESSAGE_COLUMNS}
+       FROM email_messages em
+       JOIN mailboxes mb ON mb.id = em.mailbox_id
+       LEFT JOIN inbound_email_rules r ON r.id = em.matched_rule_id
+       LEFT JOIN incidents i ON i.id = em.incident_id
+       WHERE em.mailbox_id = $1
+       ORDER BY em.created_at DESC
        LIMIT $2`,
       [id, limit],
     );
     res.json({ messages: r.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+mailboxesRouter.post('/:id/test-login', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const id = String(req.params.id);
+    const mailbox = await getMailbox(client, id);
+    if (!mailbox) throw new AppError(404, 'Mailbox not found');
+    if (!config.credentials.masterKey || config.credentials.masterKey.length < 16) {
+      throw new AppError(503, 'CREDENTIALS_MASTER_KEY is not set or too short on the API server');
+    }
+    const cfg = parseMailboxConfig(mailbox.config);
+    const host = String(cfg.host || cfg.imap_host || '').trim();
+    if (!host) throw new AppError(400, 'Mailbox config.host is required');
+    const port = Number(cfg.port || cfg.imap_port || 993);
+    const secure = cfg.secure !== false && cfg.tls !== false;
+    const folder = String(cfg.mailbox || cfg.folder || 'INBOX');
+    const secrets = await loadCredentialSecretsBySlugs(
+      client,
+      config.credentials.masterKey,
+      req.user!.tenant_id,
+      [mailbox.credential_slug],
+    );
+    const secret = secrets[mailbox.credential_slug];
+    if (!secret) throw new AppError(400, `Credential slug "${mailbox.credential_slug}" not found`);
+    const auth = parseImapAuth(secret, cfg);
+    const probe = await probeImapLogin({
+      host,
+      port: Number.isFinite(port) ? port : 993,
+      secure,
+      folder,
+      auth,
+    });
+    res.json(probe);
   } catch (err) {
     next(err);
   }

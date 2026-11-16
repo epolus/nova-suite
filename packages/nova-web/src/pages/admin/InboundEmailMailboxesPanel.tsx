@@ -31,8 +31,24 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<MailboxForm>(emptyMailbox);
   const [saving, setSaving] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ id: string; ok: boolean; message: string } | null>(null);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: INBOUND_EMAIL_QUERY_KEY });
+
+  const testLogin = async (mailboxId: string) => {
+    setTestingId(mailboxId);
+    onError('');
+    try {
+      const probe = await inboundEmailApi.testLogin(mailboxId);
+      setTestResult({ id: mailboxId, ok: probe.ok, message: probe.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('testLoginFailed');
+      setTestResult({ id: mailboxId, ok: false, message });
+    } finally {
+      setTestingId(null);
+    }
+  };
 
   const closeForm = () => {
     setOpen(false);
@@ -237,6 +253,14 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
                 </button>
                 <button
                   type="button"
+                  onClick={() => void testLogin(item.id)}
+                  disabled={testingId === item.id}
+                  className="text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50"
+                >
+                  {testingId === item.id ? t('testingLogin') : t('testLogin')}
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     void inboundEmailApi.updateMailbox(item.id, { is_active: !item.is_active })
                       .then(() => refresh())
@@ -248,6 +272,17 @@ export default function InboundEmailMailboxesPanel({ mailboxes, groups, onError 
                 </button>
               </div>
             </div>
+            {testResult?.id === item.id && (
+              <div
+                className={`mt-3 px-3 py-2 rounded-lg text-sm border ${
+                  testResult.ok
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-red-50 border-red-200 text-red-700'
+                }`}
+              >
+                {testResult.message}
+              </div>
+            )}
           </Card>
         ))}
         {mailboxes.length === 0 && <p className="text-sm text-gray-400">{t('noMailboxes')}</p>}
