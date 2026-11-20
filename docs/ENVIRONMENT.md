@@ -24,6 +24,7 @@ TEMPORAL_ADDRESS=temporal:7233
 TEMPORAL_NAMESPACE=default
 TEMPORAL_TASK_QUEUE=nova-itsm
 TEMPORAL_RETENTION_DAYS=30
+AUDIT_RETENTION_DAYS=365
 WORKER_SHUTDOWN_GRACE_MS=20000
 
 # Encrypted tenant credentials (must match between nova-engine and nova-worker)
@@ -109,6 +110,7 @@ required in that file, so Compose fails with a named error rather than starting 
 - **`CATALOG_AUTOMATION_SHARED_KEY`** — shared secret used by internal catalog automation endpoints under `/api/catalog/automation/*` (for example the demo add-support-group-member endpoint) and by in-flow HTTP steps created by catalog automation. Must be identical on **nova-engine** and **nova-worker**. If missing/mismatched, automated tasks can fail with HTTP `401 Invalid automation key` or `503 Catalog automation key is not configured`. Deploy schema `v00.01.23` before engine/worker builds that use `migration_runs` or `request_tasks.parent_task_id` / `automation_checkpoint`.
 
 - **`TEMPORAL_RETENTION_DAYS`** is the app’s configured retention (shown in Admin → Workflows as “App setting”). It does **not** change an already-created Temporal namespace by itself.
+- **`AUDIT_RETENTION_DAYS`** (default `365`) is how long `audit_events` rows are kept. The engine starts a daily Temporal cron (`auditEventsRetention` at 03:00 UTC); the worker deletes aged rows in chunks per tenant. Set `0` to disable the purge. Restart the worker after changing the value so the next run picks it up.
 - **`DEFAULT_NAMESPACE_RETENTION`** is read by `temporalio/auto-setup` when it **first registers** the default namespace (Go duration, e.g. `720h` for 30 days). Defaults to **720h** in `docker-compose.yml` so it matches `TEMPORAL_RETENTION_DAYS=30`. If you changed retention days, set this to `(days)×24` hours (e.g. `14d` → `336h`).
 - **Existing deployments** whose namespace was created with the stock **24h** retention must update the namespace once, for example:
   `docker compose exec temporal temporal operator namespace update default --retention 720h`

@@ -77,3 +77,7 @@ export {
 export {
   pollInboundEmailMailboxes,
 } from './inbound-email-activities';
+
+export {
+  purgeAuditEventsForAllTenants,
+} from './audit-retention-activities';

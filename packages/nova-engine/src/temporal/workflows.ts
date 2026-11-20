@@ -533,6 +533,30 @@ export async function startInboundEmailPollSchedule(cronSchedule = '* * * * *'):
   }
 }
 
+/** Default: daily at 03:00 UTC, after metric / DB-size / recurrence jobs. */
+export async function startAuditEventsRetentionSchedule(cronSchedule = '0 3 * * *'): Promise<string> {
+  const workflowId = 'audit-events-retention-schedule';
+  try {
+    const cl = await getTemporalClient();
+    const handle = await cl.workflow.start('auditEventsRetention', {
+      taskQueue: TASK_QUEUE,
+      workflowId,
+      args: [],
+      cronSchedule,
+      workflowExecutionTimeout: '365 days',
+    });
+    logger.info({ workflowId: handle.workflowId, cronSchedule }, 'Started audit events retention schedule');
+    return handle.workflowId;
+  } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      logger.info({ workflowId, cronSchedule }, 'Audit events retention schedule already running');
+      return workflowId;
+    }
+    logger.warn({ err, workflowId }, 'Failed to start audit events retention schedule');
+    throw err;
+  }
+}
+
 export async function startMajorIncidentWorkflow(params: {
   majorIncidentId: string;
   tenantId: string;
