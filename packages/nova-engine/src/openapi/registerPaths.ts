@@ -44,6 +44,23 @@ import { registerAttachmentPaths } from './paths/attachments';
 import { registerWorkLogPaths } from './paths/workLogs';
 import { registerKnowledgePaths } from './paths/knowledge';
 import { registerInboundEmailPaths } from './paths/inboundEmail';
+import { registerCredentialPaths } from './paths/credentials';
+import { registerDatasourcePaths } from './paths/datasources';
+import { registerDataManagementPaths } from './paths/dataManagement';
+import { registerImportPaths } from './paths/import';
+import { registerRotaPaths } from './paths/rota';
+import { registerChecklistPaths } from './paths/checklists';
+import { registerCartPaths } from './paths/cart';
+import { registerDashboardPaths } from './paths/dashboards';
+import { registerCsatPaths } from './paths/csat';
+import { registerRecordLinkPaths } from './paths/recordLinks';
+import { registerCustomFieldPaths } from './paths/customFields';
+import { registerAiPaths } from './paths/ai';
+import { registerAnalyticsPaths } from './paths/analytics';
+import { registerReportPaths } from './paths/reports';
+import { registerEmailTemplatePaths } from './paths/emailTemplates';
+import { registerWebhookPaths } from './paths/webhooks';
+import { registerAdminPaths } from './paths/admin';
 
 const uuidParam = z.object({ id: uuidSchema });
 
@@ -652,4 +669,21 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
   registerWorkLogPaths(registry);
   registerKnowledgePaths(registry);
   registerInboundEmailPaths(registry);
+  registerCredentialPaths(registry);
+  registerDatasourcePaths(registry);
+  registerDataManagementPaths(registry);
+  registerImportPaths(registry);
+  registerRotaPaths(registry);
+  registerChecklistPaths(registry);
+  registerCartPaths(registry);
+  registerDashboardPaths(registry);
+  registerCsatPaths(registry);
+  registerRecordLinkPaths(registry);
+  registerCustomFieldPaths(registry);
+  registerAiPaths(registry);
+  registerAnalyticsPaths(registry);
+  registerReportPaths(registry);
+  registerEmailTemplatePaths(registry);
+  registerWebhookPaths(registry);
+  registerAdminPaths(registry);
 }
