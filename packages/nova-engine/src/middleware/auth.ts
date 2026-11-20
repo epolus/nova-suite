@@ -3,6 +3,7 @@
 // JWT verification + RLS tenant context injection.
 
 import { Request, Response, NextFunction } from 'express';
+import type { PoolClient } from 'pg';
 import { verifyAccessToken } from '../auth/jwt';
 import { isSessionId, readCredential } from '../auth/session';
 import type { AuthUser } from '../auth/types';
@@ -16,6 +17,10 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      /** Per-request tenant-scoped DB client attached by setTenantRLS. */
+      _dbClient?: PoolClient;
+      /** Epoch ms when `_dbClient` was acquired (timing / Server-Timing). */
+      _dbClientAcquiredAt?: number;
     }
   }
 }
@@ -187,8 +192,8 @@ export async function setTenantRLS(req: Request, _res: Response, next: NextFunct
     try {
       await db.setTenantContext(client, req.user.tenant_id, req.user.id, req.user.roles.join(','));
       // Attach client to request for downstream use
-      (req as any)._dbClient = client;
-      (req as any)._dbClientAcquiredAt = Date.now();
+      req._dbClient = client;
+      req._dbClientAcquiredAt = Date.now();
       db.bindRequestClient(client, () => next());
     } catch (err) {
       client.release();
@@ -204,7 +209,7 @@ export async function setTenantRLS(req: Request, _res: Response, next: NextFunct
  * Must be used AFTER setTenantRLS.
  */
 export function releaseTenantClient(req: Request, _res: Response, next: NextFunction): void {
-  const client = (req as any)._dbClient;
+  const client = req._dbClient;
   if (client) {
     // Clear tenant context and release when the response finishes
     let released = false;
@@ -222,8 +227,8 @@ export function releaseTenantClient(req: Request, _res: Response, next: NextFunc
 }
 
 /** Helper: get the tenant-scoped DB client from the request. */
-export function getRequestClient(req: Request) {
-  const client = (req as any)._dbClient;
+export function getRequestClient(req: Request): PoolClient {
+  const client = req._dbClient;
   if (!client) {
     throw new Error('No database client attached to request – did you use setTenantRLS middleware?');
   }

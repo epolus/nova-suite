@@ -106,8 +106,8 @@ export default function CIClassesPage() {
       }
       setEditing(null);
       load();
-    } catch (err: any) {
-      setError(err?.message || String(err));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -119,8 +119,8 @@ export default function CIClassesPage() {
     try {
       await cmdb.deleteClass(id);
       load();
-    } catch (err: any) {
-      alert(err?.message || String(err));
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : String(err));
     } finally {
       setDeleting('');
     }

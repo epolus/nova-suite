@@ -198,9 +198,9 @@ function CmdbRefPicker({ id, name, ariaLabel, value, onChange, ciClass, ciFilter
     let cancelled = false;
     cmdb.items(buildParams(), 1, 200).then((res) => {
       if (cancelled) return;
-      const found = res.items.find((ci: any) => ci.id === value);
+      const found = res.items.find((ci) => ci.id === value);
       if (found) {
-        const label = `${found.name} (${(found as any).class_display_name || (found as any).class_name || ''})`;
+        const label = `${found.name} (${found.class_display_name || found.class_name || ''})`;
         setSelectedLabel(label);
         setInputText(label);
       }
@@ -232,10 +232,10 @@ function CmdbRefPicker({ id, name, ariaLabel, value, onChange, ciClass, ciFilter
     let cancelled = false;
     cmdb.items(buildParams(debouncedSearch), 1, 25).then((res) => {
       if (cancelled) return;
-      setOptions(res.items.map((ci: any) => ({
+      setOptions(res.items.map((ci) => ({
         id: ci.id,
         name: ci.name,
-        class_name: (ci as any).class_display_name || (ci as any).class_name || '',
+        class_name: ci.class_display_name || ci.class_name || '',
       })));
     }).catch(() => {
       if (!cancelled) setOptions([]);

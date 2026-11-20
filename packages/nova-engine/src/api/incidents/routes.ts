@@ -112,7 +112,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const client = getRequestClient(req);
-      const { page, limit } = req.query as any;
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 20;
       const result = await listIncidents(
         client,
         req.query as Record<string, unknown>,
@@ -141,13 +142,16 @@ router.post(
       const incident = created.incident;
 
       // Fire-and-forget via durable queue: start SLA escalation workflow
+      const incidentId = String(incident.id);
       if (created.slaResolutionDueAt || created.slaResponseDueAt) {
         enqueueIncidentEscalationStartJob({
-          incidentId: incident.id,
+          incidentId,
           tenantId: req.user!.tenant_id,
           priority: created.priority,
-          slaDueAt: (created.slaResolutionDueAt || created.slaResponseDueAt) as any,
-          responseDueAt: created.slaResponseDueAt as any,
+          slaDueAt: String(created.slaResolutionDueAt || created.slaResponseDueAt),
+          responseDueAt: created.slaResponseDueAt == null
+            ? null
+            : String(created.slaResponseDueAt),
         }).catch(() => {});
       }
 
@@ -155,14 +159,14 @@ router.post(
         tenantId: req.user!.tenant_id,
         entityType: 'incident',
         triggerKey: 'incident.created',
-        entityId: incident.id,
+        entityId: incidentId,
         actorUserId: req.user!.id,
       }).catch(() => {});
 
       schedulePostCreateAiAssist({
         tenantId: req.user!.tenant_id,
         actorUserId: req.user!.id,
-        incidentId: incident.id,
+        incidentId,
         title,
         description: description || null,
         essChannel: false,

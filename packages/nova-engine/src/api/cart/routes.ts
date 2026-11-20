@@ -18,6 +18,29 @@ const cartItemSchema = z.object({
   notes: z.string().optional(),
 });
 
+type CartItemRow = {
+  id: string;
+  priority: string | null;
+  notes: string | null;
+  form_data: unknown;
+  service_item: unknown;
+};
+
+type CartSummaryRow = {
+  cart_count: number | string;
+  cart_total: number | string;
+};
+
+function mapCartItem(row: CartItemRow) {
+  return {
+    id: row.id,
+    serviceItem: row.service_item,
+    formData: row.form_data,
+    priority: row.priority,
+    notes: row.notes,
+  };
+}
+
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
@@ -70,13 +93,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     );
 
     res.json({
-      items: itemsRes.rows.map((row: any) => ({
-        id: row.id,
-        serviceItem: row.service_item,
-        formData: row.form_data,
-        priority: row.priority,
-        notes: row.notes,
-      })),
+      items: (itemsRes.rows as CartItemRow[]).map(mapCartItem),
       cartCount: summary ? Number(summary.cart_count) : 0,
       cartTotal: summary ? Number(summary.cart_total) : 0,
     });
@@ -184,18 +201,12 @@ router.post('/items', validateBody(cartItemSchema), async (req: Request, res: Re
         AND c.tenant_id = current_tenant_id()
       `,
     );
-    const row = sum.rows[0] as any;
+    const summaryRow = sum.rows[0] as CartSummaryRow | undefined;
 
     res.status(201).json({
-      items: r.rows.map((row: any) => ({
-        id: row.id,
-        serviceItem: row.service_item,
-        formData: row.form_data,
-        priority: row.priority,
-        notes: row.notes,
-      })),
-      cartCount: Number(row.cart_count || 0),
-      cartTotal: Number(row.cart_total || 0),
+      items: (r.rows as CartItemRow[]).map(mapCartItem),
+      cartCount: Number(summaryRow?.cart_count || 0),
+      cartTotal: Number(summaryRow?.cart_total || 0),
     });
   } catch (err) {
     next(err);
@@ -213,7 +224,7 @@ router.patch('/items/:id', validateBody(z.object({
     const { form_data, priority, notes } = req.body;
 
     const sets: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
     let i = 1;
 
     if (form_data !== undefined) {
@@ -304,18 +315,12 @@ router.patch('/items/:id', validateBody(z.object({
         AND c.tenant_id = current_tenant_id()
       `,
     );
-    const sumRow = sum.rows[0] as any;
+    const sumRow = sum.rows[0] as CartSummaryRow | undefined;
 
     res.json({
-      items: itemsRes.rows.map((row: any) => ({
-        id: row.id,
-        serviceItem: row.service_item,
-        formData: row.form_data,
-        priority: row.priority,
-        notes: row.notes,
-      })),
-      cartCount: Number(sumRow.cart_count || 0),
-      cartTotal: Number(sumRow.cart_total || 0),
+      items: (itemsRes.rows as CartItemRow[]).map(mapCartItem),
+      cartCount: Number(sumRow?.cart_count || 0),
+      cartTotal: Number(sumRow?.cart_total || 0),
     });
   } catch (err) {
     next(err);
@@ -386,17 +391,11 @@ router.delete('/items/:id', async (req: Request, res: Response, next: NextFuncti
           AND c.tenant_id = current_tenant_id()
         `,
       );
-      const sumRow = sum.rows[0] as any;
+      const sumRow = sum.rows[0] as CartSummaryRow | undefined;
       return {
-        items: itemsRes.rows.map((row: any) => ({
-          id: row.id,
-          serviceItem: row.service_item,
-          formData: row.form_data,
-          priority: row.priority,
-          notes: row.notes,
-        })),
-        cartCount: Number(sumRow.cart_count || 0),
-        cartTotal: Number(sumRow.cart_total || 0),
+        items: (itemsRes.rows as CartItemRow[]).map(mapCartItem),
+        cartCount: Number(sumRow?.cart_count || 0),
+        cartTotal: Number(sumRow?.cart_total || 0),
       };
     })());
   } catch (err) {

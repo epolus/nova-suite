@@ -1,4 +1,13 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+
+/** Minimal query surface so SLA helpers work with PoolClient or thin db wrappers. */
+type SlaQueryable = {
+  query: (
+    text: string,
+    params?: unknown[],
+  ) => Promise<{ rows: Array<Record<string, unknown>> }>;
+};
+
 type SlaProcessType = 'incident' | 'request' | 'task' | 'problem' | 'change';
 
 type SlaContext = {
@@ -232,8 +241,12 @@ export function addBusinessHours(
   return cursor;
 }
 
+type CalendarRow = { id: string; timezone: string };
+type HourRow = { day_of_week: number; start_time: string; end_time: string };
+type HolidayRow = { holiday_date: string };
+
 export async function loadDefaultBusinessCalendar(
-  client: any,
+  client: SlaQueryable,
 ): Promise<BusinessCalendarData | null> {
   const cal = await client.query(
     `SELECT id, timezone
@@ -242,7 +255,7 @@ export async function loadDefaultBusinessCalendar(
      ORDER BY created_at ASC
      LIMIT 1`,
   );
-  const row = cal.rows?.[0];
+  const row = cal.rows?.[0] as CalendarRow | undefined;
   if (!row) return null;
 
   const [hoursRes, holidaysRes] = await Promise.all([
@@ -260,12 +273,12 @@ export async function loadDefaultBusinessCalendar(
 
   return {
     timezone: String(row.timezone || 'UTC'),
-    hours: (hoursRes.rows || []).map((h: any) => ({
+    hours: (hoursRes.rows as HourRow[]).map((h) => ({
       dayOfWeek: Number(h.day_of_week),
       startTime: String(h.start_time),
       endTime: String(h.end_time),
     })),
-    holidays: (holidaysRes.rows || []).map((h: any) => String(h.holiday_date).slice(0, 10)),
+    holidays: (holidaysRes.rows as HolidayRow[]).map((h) => String(h.holiday_date).slice(0, 10)),
   };
 }
 
@@ -283,7 +296,7 @@ function dueIsoFromHours(
  * Uses the tenant default business calendar when present; otherwise wall-clock hours.
  */
 export async function resolveSlaDueAt(
-  client: any,
+  client: SlaQueryable,
   processType: SlaProcessType,
   context: SlaContext,
   from: Date = new Date(),
@@ -340,7 +353,7 @@ export type OlaClockFields = {
  * A paused handoff freezes those due dates until resume.
  */
 export async function startOlaClock(
-  client: any,
+  client: SlaQueryable,
   groupId: string | null,
   options: { paused?: boolean; now?: Date } = {},
 ): Promise<OlaClockFields> {

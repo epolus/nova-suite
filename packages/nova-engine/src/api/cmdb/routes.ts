@@ -199,7 +199,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const client = getRequestClient(req);
-      const { page, limit } = req.query as any;
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 20;
       const offset = (page - 1) * limit;
 
       const conditions: string[] = [];
@@ -605,7 +606,7 @@ router.patch(
 
       // Record changes in history
       for (const [key, value] of Object.entries(req.body)) {
-        const oldValue = (current as any)[key];
+        const oldValue = (current as Record<string, unknown>)[key];
         if (JSON.stringify(oldValue) !== JSON.stringify(value)) {
           await client.query(
             `INSERT INTO ci_history (tenant_id, ci_id, changed_by, change_type, field_name, old_value, new_value)
@@ -736,7 +737,7 @@ router.post(
       res.status(201).json(rel);
     } catch (err) {
       // Handle unique constraint violation
-      if ((err as any).code === '23505') {
+      if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === '23505') {
         next(Conflict('This relationship already exists'));
         return;
       }

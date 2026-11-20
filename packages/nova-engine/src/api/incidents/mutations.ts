@@ -36,10 +36,39 @@ import {
   type IncidentServiceResult,
 } from './types';
 
+function asNullableString(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  return String(value);
+}
+
+function asString(value: unknown, fallback = ''): string {
+  if (value == null || value === '') return fallback;
+  return String(value);
+}
+
+function asCustomFields(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+function asDateOrNull(value: unknown): string | Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) return value;
+  return String(value);
+}
+
+function asMsOrNull(value: unknown): number | string | null {
+  if (value == null) return null;
+  if (typeof value === 'number' || typeof value === 'string') return value;
+  return String(value);
+}
+
 // ─── POST /api/incidents ───
 
 export interface CreateIncidentResult {
-  incident: Record<string, any>;
+  incident: Record<string, unknown>;
   priority: number;
   slaResolutionDueAt: string | Date | null;
   slaResponseDueAt: string | Date | null;
@@ -53,14 +82,22 @@ export interface CreateIncidentResult {
 export async function createIncident(
   client: PoolClient,
   actor: IncidentActor,
-  body: Record<string, any>,
+  body: Record<string, unknown>,
 ): Promise<CreateIncidentResult> {
-  const {
-    title, description, impact, urgency,
-    assigned_to, assignment_group_id, caller_id,
-    contact_info, service_id, configuration_item_id,
-    category, subcategory, category_id, request_id,
-  } = body;
+  const title = String(body.title ?? '');
+  const description = asNullableString(body.description);
+  const impact = String(body.impact ?? 'medium');
+  const urgency = String(body.urgency ?? 'medium');
+  const assigned_to = asNullableString(body.assigned_to);
+  const assignment_group_id = asNullableString(body.assignment_group_id);
+  const caller_id = asNullableString(body.caller_id);
+  const contact_info = asNullableString(body.contact_info);
+  const service_id = asNullableString(body.service_id);
+  const configuration_item_id = asNullableString(body.configuration_item_id);
+  const category = asNullableString(body.category);
+  const subcategory = asNullableString(body.subcategory);
+  const category_id = asNullableString(body.category_id);
+  const request_id = asNullableString(body.request_id);
 
   if (!assignment_group_id) {
     throw new AppError(400, 'assignment_group_id is required');
@@ -70,10 +107,10 @@ export async function createIncident(
   const resolvedCategoryId = categoryAssignment?.category_id ?? null;
   const resolvedCategory = categoryAssignment
     ? categoryAssignment.category
-    : (category || null);
+    : category;
   const resolvedSubcategory = categoryAssignment
     ? categoryAssignment.subcategory
-    : (subcategory || null);
+    : subcategory;
 
   // Calculate priority from matrix
   const priorityResult = await client.query(
@@ -91,9 +128,9 @@ export async function createIncident(
     impact,
     urgency,
     category: resolvedCategory || null,
-    serviceId: service_id || null,
+    serviceId: service_id,
   });
-  const ola = await startOlaClock(client, assignment_group_id || null);
+  const ola = await startOlaClock(client, assignment_group_id);
 
   const result = await client.query(
     `INSERT INTO incidents (
@@ -113,10 +150,10 @@ export async function createIncident(
           $21, $22, $23, $24, $25, $26
         ) RETURNING *`,
     [
-      number, request_id || null, title, description || null,
+      number, request_id, title, description,
       'new', impact, urgency, priority,
-      assigned_to || null, assignment_group_id || null, caller_id || null,
-      contact_info || null, service_id || null, configuration_item_id || null,
+      assigned_to, assignment_group_id, caller_id,
+      contact_info, service_id, configuration_item_id,
       resolvedCategory, resolvedSubcategory, resolvedCategoryId,
       sla.resolutionDueAt, sla.responseDueAt,
       sla.slaDefinitionId,
@@ -125,24 +162,27 @@ export async function createIncident(
     ],
   );
 
+  const createdIncident = result.rows[0] as Record<string, unknown>;
+  const createdIncidentId = String(createdIncident.id);
+
   // Add creation journal entry
   await client.query(
     `INSERT INTO incident_journal (tenant_id, incident_id, author_id, entry_type, content)
          VALUES (current_tenant_id(), $1, $2, 'state_change', $3)`,
-    [result.rows[0].id, actor.id, `Incident created with priority ${priority}`],
+    [createdIncidentId, actor.id, `Incident created with priority ${priority}`],
   );
 
   await upsertCustomFields(
     client,
     'incident',
-    result.rows[0].id,
-    body.custom_fields ?? {},
+    createdIncidentId,
+    asCustomFields(body.custom_fields),
     'create',
   );
-  const custom_fields = await loadCustomFieldsMap(client, 'incident', result.rows[0].id);
+  const custom_fields = await loadCustomFieldsMap(client, 'incident', createdIncidentId);
 
   return {
-    incident: result.rows[0],
+    incident: createdIncident,
     priority,
     slaResolutionDueAt: sla.resolutionDueAt,
     slaResponseDueAt: sla.responseDueAt,
@@ -156,7 +196,7 @@ export async function getIncident(
   client: PoolClient,
   actor: IncidentActor,
   incidentId: string,
-): Promise<IncidentServiceResult<Record<string, any>>> {
+): Promise<IncidentServiceResult<Record<string, unknown>>> {
   const result = await client.query(
     `SELECT i.*,
               a.display_name AS assigned_to_name,
@@ -249,17 +289,18 @@ export async function updateIncident(
   client: PoolClient,
   actor: IncidentActor,
   incidentId: string,
-  body: Record<string, any>,
-): Promise<IncidentServiceResult<Record<string, any>>> {
+  body: Record<string, unknown>,
+): Promise<IncidentServiceResult<Record<string, unknown>>> {
   // Get current incident
   const existing = await client.query('SELECT * FROM incidents WHERE id = $1', [incidentId]);
   if (existing.rows.length === 0) {
     throw NotFound('Incident not found');
   }
 
-  const current = existing.rows[0];
-  const updates = { ...body };
-  const customFieldsPayload = updates.custom_fields as Record<string, unknown> | undefined;
+  const current = existing.rows[0] as Record<string, unknown>;
+  const updates: Record<string, unknown> = { ...body };
+  const customFieldsPayload = asCustomFields(updates.custom_fields);
+  const hasCustomFieldsPayload = Object.prototype.hasOwnProperty.call(updates, 'custom_fields');
   delete updates.custom_fields;
   const isFulfiller = actor.isFulfiller;
   const isCaller = current.caller_id === actor.id;
@@ -269,11 +310,12 @@ export async function updateIncident(
       return FORBIDDEN_INSUFFICIENT;
     }
     const allowedKeys = Object.keys(updates);
+    const currentStatus = asString(current.status);
     const isReopenOnly = allowedKeys.length === 1 && allowedKeys[0] === 'status'
-      && updates.status === 'in_progress' && current.status === 'resolved';
+      && updates.status === 'in_progress' && currentStatus === 'resolved';
     const isCancelOnly = allowedKeys.length === 1 && allowedKeys[0] === 'status'
       && updates.status === 'cancelled'
-      && !['closed', 'cancelled'].includes(current.status);
+      && !['closed', 'cancelled'].includes(currentStatus);
     if (!isReopenOnly && !isCancelOnly) {
       return {
         ok: false,
@@ -285,8 +327,8 @@ export async function updateIncident(
 
   const categoryAssignment = await resolveCategoryAssignment(
     client,
-    updates.category_id,
-    current.category_id,
+    asNullableString(updates.category_id),
+    asNullableString(current.category_id),
   );
   if (categoryAssignment) {
     updates.category_id = categoryAssignment.category_id;
@@ -296,8 +338,8 @@ export async function updateIncident(
 
   const closureCategoryAssignment = await resolveCategoryAssignment(
     client,
-    updates.closure_category_id,
-    current.closure_category_id,
+    asNullableString(updates.closure_category_id),
+    asNullableString(current.closure_category_id),
   );
   if (closureCategoryAssignment) {
     updates.closure_category_id = closureCategoryAssignment.category_id;
@@ -305,8 +347,8 @@ export async function updateIncident(
 
   const resolutionCodeAssignment = await resolveResolutionCodeAssignment(
     client,
-    updates.resolution_code_id,
-    current.resolution_code_id,
+    asNullableString(updates.resolution_code_id),
+    asNullableString(current.resolution_code_id),
   );
   if (resolutionCodeAssignment) {
     updates.resolution_code_id = resolutionCodeAssignment.resolution_code_id;
@@ -317,27 +359,29 @@ export async function updateIncident(
     }
   }
 
+  const currentStatus = asString(current.status);
+
   // Status automation
   if (updates.assignment_group_id !== undefined
     && updates.assignment_group_id !== current.assignment_group_id
     && updates.status === undefined
-    && !['resolved', 'closed', 'cancelled'].includes(current.status)) {
+    && !['resolved', 'closed', 'cancelled'].includes(currentStatus)) {
     updates.status = 'assigned';
   }
 
   if (typeof updates.resolution_notes === 'string'
     && updates.resolution_notes.trim().length > 0
     && updates.status === undefined
-    && !['resolved', 'closed', 'cancelled'].includes(current.status)) {
+    && !['resolved', 'closed', 'cancelled'].includes(currentStatus)) {
     updates.status = 'resolved';
   }
 
   // Pending reason lives on pending_reason. Older clients still send it as resolution_code.
   let nextReason: string | null = updates.pending_reason !== undefined
-    ? updates.pending_reason
-    : (current.pending_reason ?? null);
+    ? asNullableString(updates.pending_reason)
+    : asNullableString(current.pending_reason);
   if (
-    (nextReason == null || String(nextReason).trim().length === 0)
+    (nextReason == null || nextReason.trim().length === 0)
     && typeof updates.resolution_code === 'string'
     && shouldPauseSlaForPending(updates.resolution_code)
   ) {
@@ -357,11 +401,11 @@ export async function updateIncident(
   }
 
   // Pause/resume SLA clock on pending transitions with waiting_* reasons.
-  const nextStatus = updates.status !== undefined ? updates.status : current.status;
+  const nextStatus = updates.status !== undefined ? asString(updates.status) : currentStatus;
   const enteringPendingPause = nextStatus === 'pending'
-    && current.status !== 'pending'
+    && currentStatus !== 'pending'
     && shouldPauseSlaForPending(nextReason);
-  const leavingPending = current.status === 'pending'
+  const leavingPending = currentStatus === 'pending'
     && updates.status !== undefined
     && updates.status !== 'pending';
   if (leavingPending && updates.pending_reason === undefined) {
@@ -370,7 +414,7 @@ export async function updateIncident(
   if (
     leavingPending
     && updates.resolution_code === undefined
-    && shouldPauseSlaForPending(current.resolution_code)
+    && shouldPauseSlaForPending(asNullableString(current.resolution_code))
   ) {
     updates.resolution_code = null;
   }
@@ -378,7 +422,7 @@ export async function updateIncident(
   const groupChanged = updates.assignment_group_id !== undefined
     && updates.assignment_group_id !== current.assignment_group_id;
   if (groupChanged && !['resolved', 'closed', 'cancelled'].includes(nextStatus)) {
-    const clock = await startOlaClock(client, updates.assignment_group_id || null, {
+    const clock = await startOlaClock(client, asNullableString(updates.assignment_group_id), {
       paused: nextStatus === 'pending' && shouldPauseSlaForPending(nextReason),
     });
     Object.assign(updates, clock);
@@ -390,27 +434,27 @@ export async function updateIncident(
 
   if (enteringPendingPause) {
     const paused = pauseSlaClock({
-      sla_paused_at: current.sla_paused_at,
-      sla_paused_ms: current.sla_paused_ms,
-      response_due_at: current.response_due_at,
-      sla_due_at: current.sla_due_at,
+      sla_paused_at: asDateOrNull(current.sla_paused_at),
+      sla_paused_ms: asMsOrNull(current.sla_paused_ms),
+      response_due_at: asDateOrNull(current.response_due_at),
+      sla_due_at: asDateOrNull(current.sla_due_at),
     });
     updates.sla_paused_at = paused.sla_paused_at;
     updates.sla_paused_ms = paused.sla_paused_ms;
     if (!groupChanged && olaActive) {
       Object.assign(updates, pauseOlaClock({
-        ola_paused_at: current.ola_paused_at,
-        ola_paused_ms: current.ola_paused_ms,
-        ola_response_due_at: current.ola_response_due_at,
-        ola_resolution_due_at: current.ola_resolution_due_at,
+        ola_paused_at: asDateOrNull(current.ola_paused_at),
+        ola_paused_ms: asMsOrNull(current.ola_paused_ms),
+        ola_response_due_at: asDateOrNull(current.ola_response_due_at),
+        ola_resolution_due_at: asDateOrNull(current.ola_resolution_due_at),
       }));
     }
   } else if (resumeOnLeave) {
     const resumed = resumeSlaClock({
-      sla_paused_at: current.sla_paused_at,
-      sla_paused_ms: current.sla_paused_ms,
-      response_due_at: current.response_due_at,
-      sla_due_at: current.sla_due_at,
+      sla_paused_at: asDateOrNull(current.sla_paused_at),
+      sla_paused_ms: asMsOrNull(current.sla_paused_ms),
+      response_due_at: asDateOrNull(current.response_due_at),
+      sla_due_at: asDateOrNull(current.sla_due_at),
     });
     updates.sla_paused_at = resumed.sla_paused_at;
     updates.sla_paused_ms = resumed.sla_paused_ms;
@@ -418,10 +462,10 @@ export async function updateIncident(
     updates.sla_due_at = resumed.sla_due_at;
     if (!groupChanged && current.ola_paused_at) {
       Object.assign(updates, resumeOlaClock({
-        ola_paused_at: current.ola_paused_at,
-        ola_paused_ms: current.ola_paused_ms,
-        ola_response_due_at: current.ola_response_due_at,
-        ola_resolution_due_at: current.ola_resolution_due_at,
+        ola_paused_at: asDateOrNull(current.ola_paused_at),
+        ola_paused_ms: asMsOrNull(current.ola_paused_ms),
+        ola_response_due_at: asDateOrNull(current.ola_response_due_at),
+        ola_resolution_due_at: asDateOrNull(current.ola_resolution_due_at),
       }));
     }
   }
@@ -524,12 +568,12 @@ export async function updateIncident(
   }
 
   const customPhase = nextStatus === 'resolved' ? 'resolve' : 'update';
-  if (customFieldsPayload !== undefined || customPhase === 'resolve') {
+  if (hasCustomFieldsPayload || customPhase === 'resolve') {
     await upsertCustomFields(
       client,
       'incident',
       String(incidentId),
-      customFieldsPayload,
+      hasCustomFieldsPayload ? customFieldsPayload : {},
       customPhase,
     );
   }
@@ -552,8 +596,8 @@ export async function updateIncident(
     }
 
     // Signal escalation workflow when incident is resolved/closed/cancelled
-    if (['resolved', 'closed', 'cancelled'].includes(updates.status)) {
-      signalIncidentResolved(incidentId as string).catch(() => {});
+    if (['resolved', 'closed', 'cancelled'].includes(asString(updates.status))) {
+      signalIncidentResolved(String(incidentId)).catch(() => {});
     }
 
     if (updates.status === 'resolved') {

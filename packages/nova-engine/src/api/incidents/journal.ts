@@ -43,7 +43,7 @@ export async function addJournalEntry(
   actor: IncidentActor,
   incidentId: string,
   body: { entry_type: string; content: string; is_customer_visible?: boolean },
-): Promise<IncidentServiceResult<Record<string, any>>> {
+): Promise<IncidentServiceResult<Record<string, unknown>>> {
   const { entry_type, content, is_customer_visible } = body;
 
   // Verify incident exists and check permissions
