@@ -76,7 +76,7 @@ describe('SystemStatusPage', () => {
       },
       runtime: {
         uptimeSec: 3600,
-        version: '0.1.5',
+        version: '0.1.6',
         appStatus: 'healthy',
         dbStatus: 'connected',
         redisStatus: 'connected',
