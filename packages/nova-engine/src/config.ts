@@ -91,6 +91,11 @@ export const config = {
     taskQueue: env('TEMPORAL_TASK_QUEUE', 'nova-itsm'),
   },
 
+  /** Days to keep `audit_events` rows. 0 disables the daily purge (worker reads the same env). */
+  audit: {
+    retentionDays: envInt('AUDIT_RETENTION_DAYS', 365),
+  },
+
   redis: {
     enabled: process.env.REDIS_ENABLED === 'true',
     url: env('REDIS_URL', 'redis://localhost:6379'),

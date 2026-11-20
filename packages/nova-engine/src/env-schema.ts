@@ -51,6 +51,8 @@ const envSchema = z.looseObject({
   ),
 
   TEMPORAL_RETENTION_DAYS: int(1, 3650),
+  /** 0 disables purge; default in config is 365. */
+  AUDIT_RETENTION_DAYS: int(0, 3650),
   REDIS_ENABLED: bool,
   REDIS_URL: url,
   REDIS_DEFAULT_TTL_SECONDS: int(1),

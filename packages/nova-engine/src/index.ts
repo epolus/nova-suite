@@ -23,6 +23,7 @@ import {
 import {
   checkTemporalHealth,
   closeTemporalClient,
+  startAuditEventsRetentionSchedule,
   startDbSizeSnapshotSchedule,
   startInboundEmailPollSchedule,
   startMetricSnapshotSchedule,
@@ -48,6 +49,7 @@ let dbSizeSnapshotScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_st
 let metricSnapshotScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
 let recurrenceScanScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
 let inboundEmailPollScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
+let auditEventsRetentionScheduleStatus: 'not_started' | 'running' | 'failed' = 'not_started';
 let snapshotScheduleRetryTimer: NodeJS.Timeout | null = null;
 let workflowDispatcherStarted = false;
 let server: ReturnType<typeof app.listen> | null = null;
@@ -200,12 +202,23 @@ async function ensureInboundEmailPollScheduleStarted(): Promise<void> {
   }
 }
 
+async function ensureAuditEventsRetentionScheduleStarted(): Promise<void> {
+  try {
+    await startAuditEventsRetentionSchedule();
+    auditEventsRetentionScheduleStatus = 'running';
+  } catch (err) {
+    auditEventsRetentionScheduleStatus = 'failed';
+    logger.warn({ err }, 'Audit events retention schedule startup failed; will retry in background');
+  }
+}
+
 async function ensureSnapshotSchedulesStarted(): Promise<void> {
   await Promise.all([
     ensureDbSizeSnapshotScheduleStarted(),
     ensureMetricSnapshotScheduleStarted(),
     ensureRecurrenceScanScheduleStarted(),
     ensureInboundEmailPollScheduleStarted(),
+    ensureAuditEventsRetentionScheduleStarted(),
   ]);
 
   if (
@@ -213,6 +226,7 @@ async function ensureSnapshotSchedulesStarted(): Promise<void> {
     && metricSnapshotScheduleStatus === 'running'
     && recurrenceScanScheduleStatus === 'running'
     && inboundEmailPollScheduleStatus === 'running'
+    && auditEventsRetentionScheduleStatus === 'running'
   ) {
     if (snapshotScheduleRetryTimer) {
       clearInterval(snapshotScheduleRetryTimer);
@@ -264,6 +278,8 @@ async function bootstrap(): Promise<void> {
       dbSizeSnapshotScheduleStatus !== 'running'
       || metricSnapshotScheduleStatus !== 'running'
       || recurrenceScanScheduleStatus !== 'running'
+      || inboundEmailPollScheduleStatus !== 'running'
+      || auditEventsRetentionScheduleStatus !== 'running'
     ) {
       snapshotScheduleRetryTimer = setInterval(() => {
         void ensureSnapshotSchedulesStarted();
@@ -273,6 +289,8 @@ async function bootstrap(): Promise<void> {
     dbSizeSnapshotScheduleStatus = 'not_started';
     metricSnapshotScheduleStatus = 'not_started';
     recurrenceScanScheduleStatus = 'not_started';
+    inboundEmailPollScheduleStatus = 'not_started';
+    auditEventsRetentionScheduleStatus = 'not_started';
     logger.warn('Workflow start queue dispatcher disabled due to schema incompatibility');
   }
 }

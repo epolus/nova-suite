@@ -287,6 +287,10 @@ Apply `infra/postgres/migrations/v00.01.47__user_sessions.sql` before rolling ou
 
 Apply `infra/postgres/migrations/v00.01.48__session_cookie_lookup.sql` with the engine that reads browser sessions. `lookup_session_user(session_id)` loads the user for the `nova_session` cookie. A cookie left over from a build that stored the access token in `nova_session` no longer authenticates; those browsers sign in again. Bearer tokens are unchanged.
 
+## Audit events retention (no migration)
+
+Redeploy **nova-engine** and **nova-worker** builds that include the `auditEventsRetention` schedule. Set `AUDIT_RETENTION_DAYS` (default `365`; `0` disables). No SQL migration or `DB_SCHEMA_VERSION` bump. On engine start the cron workflow id `audit-events-retention-schedule` is registered (daily 03:00 UTC); the worker purges aged `audit_events` rows under RLS per tenant.
+
 ## Temporal Workflow Versioning
 
 Workflow code is replayed from history, so any change to the commands a workflow issues (activities, timers, child workflows, or their order) breaks executions that are already running. Activity bodies and activity options (timeouts, retry policy) may change freely.

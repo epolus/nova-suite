@@ -30,6 +30,10 @@ export const config = {
     /** In-flight activities get this long to finish after SIGTERM before they are cancelled. */
     shutdownGraceMs: envInt('WORKER_SHUTDOWN_GRACE_MS', 20_000),
   },
+  /** Days to keep `audit_events` rows. 0 disables the daily purge. */
+  audit: {
+    retentionDays: envInt('AUDIT_RETENTION_DAYS', 365),
+  },
   /** Must match nova-engine CREDENTIALS_MASTER_KEY for pgp_sym_decrypt. */
   credentials: {
     masterKey: env('CREDENTIALS_MASTER_KEY', ''),
