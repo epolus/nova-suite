@@ -52,7 +52,7 @@ router.get('/runtime-health', async (_req: Request, res: Response) => {
   // operational probes should continue using /health which returns 503 when degraded.
   res.json({
     status,
-    version: '0.1.5',
+    version: '0.1.6',
     timestamp: new Date().toISOString(),
     checks: {
       database: dbOk ? 'connected' : 'disconnected',
@@ -283,7 +283,7 @@ router.get('/system-metrics', async (req: Request, res: Response) => {
     },
     runtime: {
       uptimeSec: Math.floor((Date.now() - processStartedAtMs) / 1000),
-      version: '0.1.5',
+      version: '0.1.6',
       appStatus,
       dbStatus: dbOk ? 'connected' : 'disconnected',
       redisStatus: redis.enabled ? (redis.connected ? 'connected' : 'disconnected') : 'disabled',
