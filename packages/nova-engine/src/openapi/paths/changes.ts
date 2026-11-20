@@ -2,6 +2,7 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import {
+  addChangeJournalEntrySchema,
   changeApprovalDecisionSchema,
   changeTransitionSchema,
   createBlackoutSchema,
@@ -155,4 +156,19 @@ export function registerChangePaths(registry: OpenAPIRegistry): void {
   registerOp(registry, 'post', '/changes/{id}/approvals/{approvalId}/decision', 'Changes', 'Record change approval decision', {
     200: { description: 'Decision recorded' },
   }, { params: approvalParams, ...jsonBody(changeApprovalDecisionSchema) });
+
+  registerOp(registry, 'get', '/changes/{id}/journal', 'Changes', 'List change journal entries', {
+    200: { description: 'Journal entries' },
+    404: { description: 'Not found' },
+  }, { params: uuidParam });
+
+  registerOp(registry, 'post', '/changes/{id}/journal', 'Changes', 'Add change journal entry', {
+    201: { description: 'Journal entry created' },
+    404: { description: 'Not found' },
+  }, { params: uuidParam, ...jsonBody(addChangeJournalEntrySchema) });
+
+  registerOp(registry, 'get', '/changes/{id}/audit', 'Changes', 'List change audit events', {
+    200: { description: 'Audit events' },
+    404: { description: 'Not found' },
+  }, { params: uuidParam });
 }

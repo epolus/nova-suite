@@ -226,4 +226,12 @@ export function registerCoreGaps(registry: OpenAPIRegistry): void {
   registerOp(registry, 'delete', '/incidents/{id}/problems/{problemId}', 'Incidents', 'Unlink a problem from an incident', {
     200: { description: 'Unlinked' },
   }, { params: problemLinkParams });
+
+  registerOp(registry, 'get', '/incidents/categories', 'Incidents', 'List incident categories', {
+    200: { description: 'Categories' },
+  });
+
+  registerOp(registry, 'get', '/incidents/resolution-codes', 'Incidents', 'List incident resolution codes', {
+    200: { description: 'Resolution codes' },
+  });
 }

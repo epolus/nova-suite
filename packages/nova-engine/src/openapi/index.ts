@@ -26,7 +26,7 @@ export const openApiSpec: OpenAPIObject = generator.generateDocument({
       'major incidents, configuration packages, and Temporal-backed automation. ' +
       'Authentication is JWT with optional OIDC/SSO. ' +
       'Paths and request bodies are generated from the same Zod schemas used by the API where available. ' +
-      'Some admin/analytics/import routes remain undocumented; add them in src/openapi/registerPaths.ts or src/openapi/paths/.',
+      'Some admin/analytics/import/report routes remain undocumented; add them in src/openapi/registerPaths.ts or src/openapi/paths/.',
     license: { name: 'AGPL-3.0', url: 'https://www.gnu.org/licenses/agpl-3.0.html' },
   },
   servers: [{ url: '/api', description: 'API base' }],
@@ -41,6 +41,16 @@ export const openApiSpec: OpenAPIObject = generator.generateDocument({
     { name: 'CMDB', description: 'Configuration management database' },
     { name: 'Assets', description: 'IT asset inventory linked to CMDB' },
     { name: 'Alerts', description: 'Event/alert inbox and routing definitions' },
+    { name: 'Knowledge', description: 'Knowledge base categories, workflows, articles & ratings' },
+    { name: 'Releases', description: 'Release management' },
+    { name: 'Improvements', description: 'Continual improvement records and journal' },
+    { name: 'Notifications', description: 'In-app notification inbox' },
+    { name: 'Search', description: 'Global fuzzy search' },
+    { name: 'Approvals', description: 'Pending approvals for the current user' },
+    { name: 'Settings', description: 'Tenant branding, theme, and cache metrics' },
+    { name: 'Attachments', description: 'Entity file attachments' },
+    { name: 'Work logs', description: 'Time worked against ITSM entities' },
+    { name: 'Inbound email', description: 'IMAP mailboxes, rules, and ingest history' },
     { name: 'Temporal', description: 'Background workflow inspection (admin)' },
     { name: 'Config packages', description: 'Admin – catalog & notification bundles' },
     { name: 'ServiceNow migration', description: 'ServiceNow extract, transform & apply' },

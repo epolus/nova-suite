@@ -35,6 +35,15 @@ import { registerAssetPaths } from './paths/assets';
 import { registerAlertPaths } from './paths/alerts';
 import { registerMajorIncidentPaths } from './paths/majorIncidents';
 import { registerTemporalPaths } from './paths/temporal';
+import { registerReleasePaths } from './paths/releases';
+import { registerImprovementPaths } from './paths/improvements';
+import { registerNotificationPaths } from './paths/notifications';
+import { registerSearchAndApprovalPaths } from './paths/searchApprovals';
+import { registerSettingsPaths } from './paths/settings';
+import { registerAttachmentPaths } from './paths/attachments';
+import { registerWorkLogPaths } from './paths/workLogs';
+import { registerKnowledgePaths } from './paths/knowledge';
+import { registerInboundEmailPaths } from './paths/inboundEmail';
 
 const uuidParam = z.object({ id: uuidSchema });
 
@@ -634,4 +643,13 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
   registerAlertPaths(registry);
   registerMajorIncidentPaths(registry);
   registerTemporalPaths(registry);
+  registerReleasePaths(registry);
+  registerImprovementPaths(registry);
+  registerNotificationPaths(registry);
+  registerSearchAndApprovalPaths(registry);
+  registerSettingsPaths(registry);
+  registerAttachmentPaths(registry);
+  registerWorkLogPaths(registry);
+  registerKnowledgePaths(registry);
+  registerInboundEmailPaths(registry);
 }
