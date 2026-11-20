@@ -16,10 +16,16 @@ export async function isChangeEnabledGroup(client: PoolClient, groupId: string):
   return assignmentGroupServesProcess(client, groupId, CHANGE_PROCESS_NAME, CHANGE_MEMBER_ROLE);
 }
 
+type ChangePermissionRow = {
+  assigned_to?: string | null;
+  requested_by?: string | null;
+  assignment_group_id?: string | null;
+};
+
 export async function canWorkOnChange(
   client: PoolClient,
   actor: ChangeActor,
-  change: any,
+  change: ChangePermissionRow,
 ): Promise<boolean> {
   if (actor.isAdmin) return true;
   if (change.assigned_to && change.assigned_to === actor.id) return true;

@@ -10,7 +10,7 @@ import type { PoolClient } from 'pg';
 import { NotFound } from '../../middleware/errorHandler';
 import type { ChangeActor } from './types';
 
-type Row = Record<string, any>;
+type Row = Record<string, unknown>;
 
 // ─── Change types ───
 

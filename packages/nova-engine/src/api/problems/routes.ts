@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Router, Request, Response, NextFunction } from 'express';
+import type { PoolClient } from 'pg';
 import {
   authenticate,
   getRequestClient,
@@ -296,7 +297,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const client = getRequestClient(req);
-      const { page, limit } = req.query as any;
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 20;
       const offset = (page - 1) * limit;
 
       const conditions: string[] = ['p.tenant_id = current_tenant_id()'];
@@ -865,7 +867,7 @@ router.delete('/:id/tasks/:taskId', async (req: Request, res: Response, next: Ne
 });
 
 async function resolveKbArticleId(
-  client: any,
+  client: PoolClient,
   kbArticleId: unknown,
 ): Promise<string | null | undefined> {
   if (kbArticleId === undefined) return undefined;

@@ -72,8 +72,8 @@ export default function Login() {
     try {
       await login(email, password);
       navigate('/');
-    } catch (err: any) {
-      const rawMessage = String(err?.message || '').trim();
+    } catch (err: unknown) {
+      const rawMessage = (err instanceof Error ? err.message : String(err || '')).trim();
       const isAuthFailure = rawMessage === 'Unauthorized' || rawMessage.toLowerCase().includes('401');
       setError(isAuthFailure ? tAuth('invalidCredentials') : (rawMessage || tAuth('loginFailed')));
     } finally {

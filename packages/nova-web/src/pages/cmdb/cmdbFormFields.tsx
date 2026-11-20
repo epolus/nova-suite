@@ -47,8 +47,8 @@ export function CiAttributeFields({ classAttrs, className, attributes, setAttrib
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {Object.entries(classAttrs).map(([attrName, attrDef]) => {
-          const attrType = (attrDef as any)?.type || 'string';
-          const refTable = (attrDef as any)?.reference_table;
+          const attrType = attrDef.type || 'string';
+          const refTable = attrDef.reference_table;
           const refLabel = refTable === 'users' ? tCmdb('refTables.users')
             : refTable === 'assignment_groups' ? tCmdb('refTables.assignmentGroups')
               : refTable === 'departments' ? tCmdb('refTables.departments')
@@ -60,7 +60,9 @@ export function CiAttributeFields({ classAttrs, className, attributes, setAttrib
               <label className="block text-xs font-medium text-gray-500 mb-1 capitalize">
                 {attrName.replace(/_/g, ' ')}
                 <span className="ml-1 text-gray-300 font-normal">
-                  ({attrType === 'reference' ? tCmdb('refLabel', { table: refLabel }) : attrType})
+                  ({attrType === 'reference'
+                    ? tCmdb('refLabel', { table: refLabel ?? refTable ?? '' })
+                    : attrType})
                 </span>
               </label>
               {attrType === 'reference' && refTable ? (

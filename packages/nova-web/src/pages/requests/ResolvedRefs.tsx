@@ -22,7 +22,7 @@ export function ResolvedUserRef({ userId }: { userId: string }) {
   const [label, setLabel] = useState<string>(userId);
   useEffect(() => {
     auth.users().then((res) => {
-      const u = res.users.find((u: any) => u.id === userId);
+      const u = res.users.find((row) => row.id === userId);
       if (u) setLabel(u.display_name || u.email);
     }).catch(() => {});
   }, [userId]);

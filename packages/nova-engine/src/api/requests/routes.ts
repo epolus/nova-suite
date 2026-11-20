@@ -118,7 +118,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const client = getRequestClient(req);
-      const { page, limit } = req.query as any;
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 20;
       const offset = (page - 1) * limit;
 
       // Build dynamic filters
@@ -392,7 +393,7 @@ router.post(
       }
 
       await client.query('BEGIN');
-      let newRequest: any;
+      let newRequest: Record<string, unknown>;
       try {
         const result = await client.query(
           `INSERT INTO requests (
@@ -407,7 +408,7 @@ router.post(
             batch_id || null, status, priority, notes || null,
           ],
         );
-        newRequest = result.rows[0];
+        newRequest = result.rows[0] as Record<string, unknown>;
 
         if (hasWorkflowTasks) {
           await enqueueCatalogFulfillmentStartJob({
@@ -449,7 +450,7 @@ router.post(
       const userId = req.user!.id;
       const batchId = randomUUID();
 
-      const createdRequests: any[] = [];
+      const createdRequests: Record<string, unknown>[] = [];
 
       await client.query('BEGIN');
       try {
@@ -561,7 +562,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const client = getRequestClient(req);
-      const { page, limit } = req.query as any;
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 20;
       const offset = (page - 1) * limit;
       const userId = req.user!.id;
 

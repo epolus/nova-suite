@@ -43,10 +43,20 @@ export async function addJournalEntry(
   const canWork = await canWorkOnChange(client, actor, changeRes.rows[0]);
   if (!canWork) throw new AppError(403, 'Insufficient permissions');
 
+  const entryType = body.entry_type;
+  if (
+    entryType !== 'comment'
+    && entryType !== 'work_note'
+    && entryType !== 'state_change'
+    && entryType !== 'assignment'
+  ) {
+    throw new AppError(400, 'Invalid journal entry_type');
+  }
+
   return addChangeJournalEntry(client, {
     changeId,
     authorId: actor.id,
-    entryType: body.entry_type as any,
+    entryType,
     content: body.content,
     isCustomerVisible: Boolean(body.is_customer_visible),
   });

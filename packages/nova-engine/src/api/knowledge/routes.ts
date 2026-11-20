@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Router, Request, Response, NextFunction } from 'express';
+import type { PoolClient } from 'pg';
 import { validateQuery } from '../../middleware/validate';
 import {
   authenticate,
@@ -29,7 +30,7 @@ function isAdmin(req: Request): boolean {
   return isAdminRole(req);
 }
 
-async function publishArticleAndRetirePrevious(client: any, articleId: string): Promise<void> {
+async function publishArticleAndRetirePrevious(client: PoolClient, articleId: string): Promise<void> {
   const article = await client.query(
     `SELECT id, COALESCE(root_article_id, id) AS root_id
      FROM knowledge_articles
@@ -188,7 +189,7 @@ router.post('/workflows', async (req: Request, res: Response, next: NextFunction
     const { name, category_id, steps, sort_order } = req.body || {};
     if (!name) throw new AppError(400, 'name is required');
     if (!Array.isArray(steps) || steps.length === 0) throw new AppError(400, 'steps is required');
-    const normalizedSteps = steps.map((s: any, idx: number) => ({
+    const normalizedSteps = (steps as Array<{ assignment_group_id?: unknown }>).map((s, idx) => ({
       step_order: idx + 1,
       assignment_group_id: s.assignment_group_id,
     }));
@@ -216,7 +217,10 @@ router.patch('/workflows/:id', async (req: Request, res: Response, next: NextFun
     if (category_id !== undefined) { sets.push(`category_id = $${i++}`); vals.push(category_id || null); }
     if (steps !== undefined) {
       const normalizedSteps = Array.isArray(steps)
-        ? steps.map((s: any, idx: number) => ({ step_order: idx + 1, assignment_group_id: s.assignment_group_id }))
+        ? (steps as Array<{ assignment_group_id?: unknown }>).map((s, idx) => ({
+          step_order: idx + 1,
+          assignment_group_id: s.assignment_group_id,
+        }))
         : [];
       sets.push(`steps = $${i++}`);
       vals.push(JSON.stringify(normalizedSteps));
@@ -544,7 +548,7 @@ router.post('/articles/:id/submit', async (req: Request, res: Response, next: Ne
     await enqueueKnowledgeApprovalStartJob({
       articleId: String(req.params.id),
       tenantId: req.user!.tenant_id,
-      steps: steps.map((s: any) => ({
+      steps: (steps as Array<{ step_order?: unknown; assignment_group_id?: unknown }>).map((s) => ({
         step_order: Number(s.step_order),
         assignment_group_id: String(s.assignment_group_id),
       })),

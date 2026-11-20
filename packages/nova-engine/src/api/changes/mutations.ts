@@ -27,13 +27,30 @@ export function validateScheduleRange(start: unknown, end: unknown): void {
   }
 }
 
+function asNullableString(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  return String(value);
+}
+
+function asString(value: unknown, fallback = ''): string {
+  if (value == null || value === '') return fallback;
+  return String(value);
+}
+
+function asCustomFields(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
 // ─── GET /api/changes/:id ───
 
 export async function getChange(
   client: PoolClient,
   actor: ChangeActor,
   changeId: string,
-): Promise<Record<string, any>> {
+): Promise<Record<string, unknown>> {
   const row = await client.query(
     `SELECT c.*,
               ct.name AS change_type_name,
@@ -109,43 +126,51 @@ export async function getChange(
 export async function createChange(
   client: PoolClient,
   actor: ChangeActor,
-  body: Record<string, any>,
-): Promise<Record<string, any>> {
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
   const b = body || {};
   validateScheduleRange(b.scheduled_start, b.scheduled_end);
-  if (!b.assignment_group_id) {
+  const assignmentGroupId = asNullableString(b.assignment_group_id);
+  if (!assignmentGroupId) {
     throw new AppError(400, 'assignment_group_id is required');
   }
-  const createGroupOk = await isChangeEnabledGroup(client, b.assignment_group_id);
+  const createGroupOk = await isChangeEnabledGroup(client, assignmentGroupId);
   if (!createGroupOk) throw new AppError(400, 'Assignment group is not enabled for Change Management');
+  const changeTypeId = asNullableString(b.change_type_id);
   const typeRes = await client.query(
     `SELECT * FROM change_types
        WHERE tenant_id = current_tenant_id()
          AND id = $1
          AND is_active = true`,
-    [b.change_type_id],
+    [changeTypeId],
   );
   if (typeRes.rows.length === 0) throw new AppError(400, 'Invalid change type');
-  const changeType = typeRes.rows[0];
+  const changeType = typeRes.rows[0] as Record<string, unknown>;
 
   const seq = await client.query(`SELECT nextval('change_number_seq') AS n`);
   const number = `CHG${String(seq.rows[0].n).padStart(7, '0')}`;
 
-  const stage = b.stage || 'request';
-  let status = b.status || 'draft';
+  const stage = asString(b.stage, 'request');
+  let status = asString(b.status, 'draft');
   if (changeType.auto_approve && changeType.name === 'standard') {
     status = 'approved';
   }
 
-  const description = String(b.description || '').trim() || String(b.title || '').trim() || 'Draft change';
-  const reasonForChange = String(b.reason_for_change || '').trim() || 'Pending assessment';
-  const implementationPlan = String(b.implementation_plan || '').trim() || 'Implementation plan to be defined during planning.';
-  const backoutPlan = String(b.backout_plan || '').trim() || 'Backout plan to be defined during planning.';
+  const title = asString(b.title);
+  const description = asString(b.description).trim() || title.trim() || 'Draft change';
+  const reasonForChange = asString(b.reason_for_change).trim() || 'Pending assessment';
+  const implementationPlan = asString(b.implementation_plan).trim()
+    || 'Implementation plan to be defined during planning.';
+  const backoutPlan = asString(b.backout_plan).trim() || 'Backout plan to be defined during planning.';
+  const priority = asString(b.priority, 'medium');
+  const impact = asString(b.impact, 'medium');
+  const category = asNullableString(b.category);
+  const serviceId = asNullableString(b.service_id);
   const sla = await resolveSlaDueAt(client, 'change', {
-    priority: b.priority || 'medium',
-    impact: b.impact || 'medium',
-    category: b.category || null,
-    serviceId: b.service_id || null,
+    priority,
+    impact,
+    category,
+    serviceId,
   });
   const slaDueAt = sla.resolutionDueAt;
 
@@ -166,63 +191,64 @@ export async function createChange(
       ) RETURNING *`,
     [
       number,
-      b.change_type_id,
-      b.standard_change_id || null,
-      b.category || null,
-      b.title,
+      changeTypeId,
+      asNullableString(b.standard_change_id),
+      category,
+      title,
       description,
       reasonForChange,
       stage,
       status,
-      b.risk_level || changeType.default_risk_level,
-      b.impact || 'medium',
-      b.impact_description || null,
+      asString(b.risk_level, asString(changeType.default_risk_level)),
+      impact,
+      asNullableString(b.impact_description),
       implementationPlan,
       backoutPlan,
-      b.test_plan || null,
-      b.requested_by || actor.id,
-      b.assigned_to || null,
-      b.assignment_group_id || null,
-      b.service_id || null,
-      b.scheduled_start || null,
-      b.scheduled_end || null,
-      b.actual_start || null,
-      b.actual_end || null,
+      asNullableString(b.test_plan),
+      asNullableString(b.requested_by) ?? actor.id,
+      asNullableString(b.assigned_to),
+      assignmentGroupId,
+      serviceId,
+      asNullableString(b.scheduled_start),
+      asNullableString(b.scheduled_end),
+      asNullableString(b.actual_start),
+      asNullableString(b.actual_end),
       b.downtime_required,
-      b.maintenance_window || null,
-      b.implementation_notes || null,
+      asNullableString(b.maintenance_window),
+      asNullableString(b.implementation_notes),
       b.success ?? null,
       b.actual_downtime_minutes ?? null,
-      b.related_problem_id || null,
-      b.related_incident_id || null,
-      b.priority || 'medium',
-      b.business_justification || null,
+      asNullableString(b.related_problem_id),
+      asNullableString(b.related_incident_id),
+      priority,
+      asNullableString(b.business_justification),
       b.estimated_cost ?? null,
-      b.review_notes || null,
+      asNullableString(b.review_notes),
       slaDueAt,
     ],
   );
-  const change = created.rows[0];
+  const change = created.rows[0] as Record<string, unknown>;
+  const changeId = String(change.id);
   const cis = Array.isArray(b.affected_cis) ? b.affected_cis : [];
   for (const ciId of cis) {
     await client.query(
       `INSERT INTO change_cis (tenant_id, change_id, ci_id)
          VALUES (current_tenant_id(), $1, $2)
          ON CONFLICT (tenant_id, change_id, ci_id) DO NOTHING`,
-      [change.id, ciId],
+      [changeId, ciId],
     );
   }
 
-  await refreshChangeConflicts(client, change.id);
+  await refreshChangeConflicts(client, changeId);
   await addChangeJournalEntry(client, {
-    changeId: String(change.id),
+    changeId,
     authorId: actor.id,
     entryType: 'state_change',
-    content: `Change created (${change.status} / ${change.stage})`,
+    content: `Change created (${String(change.status)} / ${String(change.stage)})`,
     isCustomerVisible: false,
   });
-  await upsertCustomFields(client, 'change', change.id, b.custom_fields ?? {}, 'create');
-  const custom_fields = await loadCustomFieldsMap(client, 'change', change.id);
+  await upsertCustomFields(client, 'change', changeId, asCustomFields(b.custom_fields), 'create');
+  const custom_fields = await loadCustomFieldsMap(client, 'change', changeId);
   return { ...change, custom_fields };
 }
 
@@ -232,8 +258,8 @@ export async function updateChange(
   client: PoolClient,
   actor: ChangeActor,
   changeId: string,
-  body: Record<string, any>,
-): Promise<Record<string, any>> {
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
   const currentRes = await client.query(
     `SELECT * FROM changes
        WHERE tenant_id = current_tenant_id()
@@ -241,11 +267,12 @@ export async function updateChange(
     [changeId],
   );
   if (currentRes.rows.length === 0) throw NotFound('Change not found');
-  const current = currentRes.rows[0];
+  const current = currentRes.rows[0] as Record<string, unknown>;
   const canWork = await canWorkOnChange(client, actor, current);
   if (!canWork) throw new AppError(403, 'Insufficient permissions');
-  const updates = { ...(body || {}) };
-  const customFieldsPayload = updates.custom_fields as Record<string, unknown> | undefined;
+  const updates: Record<string, unknown> = { ...(body || {}) };
+  const hasCustomFieldsPayload = Object.prototype.hasOwnProperty.call(updates, 'custom_fields');
+  const customFieldsPayload = asCustomFields(updates.custom_fields);
   delete updates.custom_fields;
   validateScheduleRange(
     updates.scheduled_start ?? current.scheduled_start,
@@ -262,11 +289,11 @@ export async function updateChange(
     throw new AppError(400, 'assignment_group_id is required');
   }
   if (updates.assignment_group_id !== undefined) {
-    const ok = await isChangeEnabledGroup(client, updates.assignment_group_id);
+    const ok = await isChangeEnabledGroup(client, String(updates.assignment_group_id));
     if (!ok) throw new AppError(400, 'Assignment group is not enabled for Change Management');
   }
   {
-    const nextStatus = String(updates.status ?? current.status);
+    const nextStatus = asString(updates.status ?? current.status);
     if (nextStatus === 'implemented' || nextStatus === 'closed') {
       await assertRequiredChecklistsComplete(client, 'change', changeId);
     }
@@ -296,15 +323,15 @@ export async function updateChange(
     || updates.service_id !== undefined
     || updates.status !== undefined
   ) {
-    const nextStatus = String(updates.status ?? current.status);
+    const nextStatus = asString(updates.status ?? current.status);
     if (['closed', 'cancelled', 'rejected'].includes(nextStatus)) {
       sets.push('sla_due_at = NULL');
     } else {
       const due = await resolveSlaDueAt(client, 'change', {
-        priority: updates.priority ?? current.priority,
-        impact: updates.impact ?? current.impact,
-        category: updates.category ?? current.category,
-        serviceId: updates.service_id ?? current.service_id,
+        priority: asNullableString(updates.priority ?? current.priority),
+        impact: asNullableString(updates.impact ?? current.impact),
+        category: asNullableString(updates.category ?? current.category),
+        serviceId: asNullableString(updates.service_id ?? current.service_id),
       });
       sets.push(`sla_due_at = $${i++}`);
       vals.push(due.resolutionDueAt);
@@ -365,7 +392,7 @@ export async function updateChange(
   for (const templateId of templateIds) {
     await refreshStandardChangeOutcome(client, templateId);
   }
-  if (customFieldsPayload !== undefined) {
+  if (hasCustomFieldsPayload) {
     await upsertCustomFields(
       client,
       'change',

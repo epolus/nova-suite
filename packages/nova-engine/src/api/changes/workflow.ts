@@ -71,8 +71,24 @@ export function normalizeStatusAndStage(action: string): { stage: string; status
   }
 }
 
+type ChangeActionRow = {
+  status?: string | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  service_id?: string | null;
+  implementation_plan?: string | null;
+};
+
+type ChangeSyncRow = {
+  status?: string | null;
+  number?: string | null;
+  success?: boolean | null;
+  related_incident_id?: string | null;
+  related_problem_id?: string | null;
+};
+
 export function computeAllowedChangeActions(
-  change: any,
+  change: ChangeActionRow,
   pendingApprovals: number,
   hasCiContext: boolean,
 ): ChangeTransitionAction[] {
@@ -106,7 +122,7 @@ export function computeAllowedChangeActions(
 }
 
 /** When a change closes, propagate the outcome to the linked incident / problem. */
-export async function syncRelatedRecords(client: PoolClient, change: any): Promise<void> {
+export async function syncRelatedRecords(client: PoolClient, change: ChangeSyncRow): Promise<void> {
   if (change.status !== 'closed') return;
   if (change.related_incident_id) {
     await client.query(
@@ -154,7 +170,7 @@ export async function transitionChange(
   actor: ChangeActor,
   changeId: string,
   body: ChangeTransitionBody,
-): Promise<Record<string, any>> {
+): Promise<Record<string, unknown>> {
   const changeRes = await client.query(
     `SELECT c.*, ct.auto_approve, ct.approval_config, ct.name AS change_type_name
        FROM changes c
