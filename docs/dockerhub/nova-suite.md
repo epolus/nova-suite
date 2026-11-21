@@ -12,6 +12,10 @@ Source: **[github.com/epolus/nova-suite](https://github.com/epolus/nova-suite)**
 
 *Employee self-service portal — search, service catalog, requests, and knowledge base*
 
+![Agent dashboard](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/agent-dashboard.png)
+
+*Agent console — queue metrics, priority mix, and work assigned to you*
+
 ![Incident detail](https://raw.githubusercontent.com/epolus/nova-suite/main/docs/screenshots/incident-detail.png)
 
 *Incident detail — assignment, priority, SLA, caller context, and resolution actions*

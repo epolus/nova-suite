@@ -16,6 +16,11 @@ Nova Suite provides a complete service management solution — service catalog, 
   <em>Employee self-service portal — search, service catalog, requests, and knowledge base</em>
 </p>
 <p align="center">
+  <img src="docs/screenshots/agent-dashboard.png" alt="Agent dashboard" width="80%">
+  <br>
+  <em>Agent console — queue metrics, priority mix, and work assigned to you</em>
+</p>
+<p align="center">
   <img src="docs/screenshots/incident-detail.png" alt="Incident detail" width="80%">
   <br>
   <em>Incident detail — assignment, priority, SLA, caller context, and resolution actions</em>
