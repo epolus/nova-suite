@@ -4,7 +4,13 @@ import { useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { search as searchApi, type SearchResult } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { isAdminRole } from '../utils/roles';
+import { canAccessAdminRoute } from '../utils/adminRouteAccess';
+import {
+  canAccessImprovements,
+  canViewAlerts,
+  canViewOnCallRota,
+  hasReportingViewRole,
+} from '../utils/roles';
 import { AppIcon } from './globalSearchIcons';
 import GlobalSearchPanel from './GlobalSearchPanel';
 import {
@@ -15,22 +21,35 @@ import {
   parseCmd,
   scoreNav,
   type NavItem,
+  type NavItemDef,
 } from './globalSearchConfig';
+
+/** Same visibility rules as the agent sidebar in Layout.tsx. */
+function canSeeNavItem(item: NavItemDef, roles: string[] | undefined): boolean {
+  if (item.path.startsWith('/admin')) return canAccessAdminRoute(item.path, roles);
+  if (item.path === '/reports') return hasReportingViewRole(roles);
+  if (item.path === '/improvements') return canAccessImprovements(roles);
+  if (item.path === '/alerts') return canViewAlerts(roles);
+  if (item.path === '/on-call') return canViewOnCallRota(roles);
+  return true;
+}
 
 // ─── Component ───────────────────────────────────────────────
 export default function GlobalSearch() {
   const t = useTranslations('components.globalSearch');
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = isAdminRole(user?.roles);
+  const roles = user?.roles;
 
   const navItems = useMemo<NavItem[]>(
-    () => NAV_ITEM_DEFS.map((item) => ({
-      ...item,
-      title: t(`nav.${item.id}.title` as 'nav.dashboard.title'),
-      subtitle: t(`nav.${item.id}.subtitle` as 'nav.dashboard.subtitle'),
-    })),
-    [t],
+    () => NAV_ITEM_DEFS
+      .filter((item) => canSeeNavItem(item, roles))
+      .map((item) => ({
+        ...item,
+        title: t(`nav.${item.id}.title` as 'nav.dashboard.title'),
+        subtitle: t(`nav.${item.id}.subtitle` as 'nav.dashboard.subtitle'),
+      })),
+    [t, roles],
   );
 
   const commands = useMemo(
@@ -67,13 +86,12 @@ export default function GlobalSearch() {
 
   const navResults = !parsed && query.length >= 1
     ? navItems
-        .filter((n) => !n.adminOnly || isAdmin)
         .map((n) => ({ ...n, score: scoreNav(n, query) }))
         .filter((n) => n.score > 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, 5)
     : !parsed
-      ? navItems.filter((n) => !n.adminOnly || isAdmin).slice(0, 6)
+      ? navItems.slice(0, 6)
       : [];
 
   const totalItems = isPalette
