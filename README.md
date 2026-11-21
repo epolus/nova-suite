@@ -21,6 +21,11 @@ Nova Suite provides a complete service management solution — service catalog, 
   <em>Agent console — queue metrics, priority mix, and work assigned to you</em>
 </p>
 <p align="center">
+  <img src="docs/screenshots/agent-dashboard-dark.png" alt="Agent dashboard" width="80%">
+  <br>
+  <em>Agent console — dark mode</em>
+</p>
+<p align="center">
   <img src="docs/screenshots/incident-detail.png" alt="Incident detail" width="80%">
   <br>
   <em>Incident detail — assignment, priority, SLA, caller context, and resolution actions</em>
