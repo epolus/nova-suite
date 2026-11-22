@@ -1,23 +1,17 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { Suspense } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router';
+import { Routes, Route, Navigate } from 'react-router';
 import { useAuth } from '@/context/AuthContext';
 import Layout from '@/components/Layout';
 import ESSLayout from '@/components/ESSLayout';
 import Spinner from '@/components/Spinner';
 import Login from '@/pages/Login';
 import AdminAccessGuard from '@/components/AdminAccessGuard';
+import { RequireAuth, RoleGate } from '@/components/RouteGuards';
 import {
   canAccessImprovements, canViewAlerts, canViewOnCallRota, hasReportingCreateRole, hasReportingViewRole, isAgentRole,
 } from '@/utils/roles';
 import * as Pages from './lazyPages';
-
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  if (loading) return <Spinner />;
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
 
 function SmartLayout() {
   const { user } = useAuth();
@@ -27,13 +21,6 @@ function SmartLayout() {
 function SmartHome() {
   const { user } = useAuth();
   return isAgentRole(user?.roles) ? <Pages.Dashboard /> : <Navigate to="/ess" replace />;
-}
-
-/** Client-side mirror of the API role checks, so users are not dropped onto pages that only return 403s. */
-function RoleGate({ allow }: { allow: (roles: string[] | undefined) => boolean }) {
-  const { user } = useAuth();
-  if (!allow(user?.roles)) return <Navigate to="/" replace />;
-  return <Outlet />;
 }
 
 const isAgent = (roles: string[] | undefined) => isAgentRole(roles);

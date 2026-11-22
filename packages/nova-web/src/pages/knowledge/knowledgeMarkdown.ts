@@ -130,12 +130,23 @@ function sanitizeKnowledgeHtml(html: string): string {
     }
 
     if (tag === 'a') {
+      if (!el.getAttribute('href')) {
+        const text = document.createTextNode(el.textContent || '');
+        el.replaceWith(text);
+        return;
+      }
       if (el.getAttribute('target') === '_blank') {
         el.setAttribute('rel', 'noopener noreferrer nofollow');
       } else {
         el.removeAttribute('target');
         el.removeAttribute('rel');
       }
+    }
+
+    if (tag === 'img' && !el.getAttribute('src')) {
+      const alt = el.getAttribute('alt') || '';
+      el.replaceWith(document.createTextNode(alt ? `[image not available: ${alt}]` : ''));
+      return;
     }
 
     for (const child of Array.from(el.childNodes)) {
