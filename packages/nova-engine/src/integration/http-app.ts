@@ -57,7 +57,7 @@ export async function login(
   return { token: body.token, user: body.user };
 }
 
-export function apiHeaders(token: string): HeadersInit {
+export function apiHeaders(token: string): Record<string, string> {
   return {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
