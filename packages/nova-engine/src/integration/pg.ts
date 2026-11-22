@@ -6,6 +6,14 @@ export const TENANT_B = 'b0000000-0000-0000-0000-000000000001';
 export const USER_A = 'a0000000-0000-0000-0000-0000000000aa';
 export const USER_B = 'b0000000-0000-0000-0000-0000000000bb';
 
+/** Seeded Acme users from infra/postgres/init.sql */
+export const SEED_ADMIN = 'b0000000-0000-0000-0000-000000000001';
+export const SEED_FULFILLER = 'b0000000-0000-0000-0000-000000000002';
+export const SEED_USER = 'b0000000-0000-0000-0000-000000000003';
+export const SEED_CHANGE_MGR = 'b0000000-0000-0000-0000-000000000008';
+
+export const SEED_CHANGE_TYPE_NORMAL = 'a9000000-0000-0000-0000-000000000002';
+
 function env(name: string, fallback?: string): string {
   const value = process.env[name];
   if (value !== undefined && value !== '') return value;
