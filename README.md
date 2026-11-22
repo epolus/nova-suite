@@ -16,7 +16,7 @@ Nova Suite provides a complete service management solution — service catalog, 
   <em>Employee self-service portal — search, service catalog, requests, and knowledge base</em>
 </p>
 <p align="center">
-  <img src="docs/screenshots/pportal-dark.png" alt="Employee self-service portal" width="80%">
+  <img src="docs/screenshots/portal-dark.png" alt="Employee self-service portal" width="80%">
   <br>
   <em>Employee self-service portal — dark mode</em>
 </p>
