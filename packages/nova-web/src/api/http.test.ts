@@ -1,6 +1,13 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dropLegacyToken, request, setSessionUser, setUnauthorizedHandler, getSessionUserId } from './http';
+import {
+  dropLegacyToken,
+  request,
+  setSessionUser,
+  setUnauthorizedHandler,
+  getSessionUserId,
+  uploadFile,
+} from './http';
 
 function respond(status: number, body: unknown = {}) {
   vi.mocked(fetch).mockResolvedValue({
@@ -70,5 +77,25 @@ describe('api/http', () => {
   it('returns undefined for 204 responses', async () => {
     respond(204);
     await expect(request('/reports/definitions/x', { method: 'DELETE' })).resolves.toBeUndefined();
+  });
+
+  it('uploadFile posts FormData with same-origin credentials', async () => {
+    respond(200, { id: 'f1' });
+    const fd = new FormData();
+    fd.append('file', new Blob(['x']), 'a.txt');
+    await expect(uploadFile('/attachments', fd)).resolves.toEqual({ id: 'f1' });
+    const init = vi.mocked(fetch).mock.calls[0]![1]!;
+    expect(init.method).toBe('POST');
+    expect(init.credentials).toBe('same-origin');
+    expect(init.body).toBe(fd);
+  });
+
+  it('redirects to login when a 401 arrives and no handler is registered', async () => {
+    const location = { pathname: '/incidents', href: '/incidents' };
+    vi.stubGlobal('location', location);
+    respond(401);
+    await expect(request('/incidents')).rejects.toThrow('Unauthorized');
+    expect(location.href).toBe('/login');
+    expect(getSessionUserId()).toBeNull();
   });
 });
