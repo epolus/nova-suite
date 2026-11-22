@@ -6,6 +6,7 @@ import Spinner from '../../components/Spinner';
 import UnsavedChangesDialog from '../../components/ui/UnsavedChangesDialog';
 import { hasConfigurationRole } from '../../utils/roles';
 import { CiClassIcon } from '../../components/CiClassIcon';
+import { buildClassTree, classPath, flattenClassTree } from '../admin/ci-classes/classHelpers';
 import { useFieldLabel, useStatusLabel } from '@/i18n/hooks';
 import { useTranslations } from 'use-intl';
 import { CiAttributeFields, UserPicker } from './cmdbFormFields';
@@ -131,29 +132,33 @@ export default function CIForm() {
             {classes.length === 0 ? (
               <p className="text-sm text-gray-400">{tCmdb('noCiClasses')}</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {classes.map((cls) => (
-                  <button
-                    key={cls.id}
-                    onClick={() => { handleClassChange(cls.id); setStep(2); }}
-                    className={`text-left p-4 rounded-xl border-2 transition-all hover:shadow-md ${
-                      classId === cls.id
-                        ? 'border-indigo-500 bg-indigo-50'
-                        : 'border-gray-200 hover:border-indigo-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-gray-600"><CiClassIcon name={cls.icon} className="w-7 h-7" /></span>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">{cls.display_name}</h4>
-                        {cls.description && <p className="text-xs text-gray-500 mt-0.5">{cls.description}</p>}
-                        {Object.keys(cls.attributes).length > 0 && (
-                          <p className="text-xs text-gray-400 mt-1">{tCmdb('attributeCount', { count: Object.keys(cls.attributes).length })}</p>
-                        )}
+              <div className="max-h-[32rem] overflow-y-auto space-y-2 pr-1">
+                {flattenClassTree(buildClassTree(classes)).map((node) => {
+                  const ancestors = classPath(node.cls, classes).slice(0, -1);
+                  return (
+                    <button
+                      key={node.cls.id}
+                      onClick={() => { handleClassChange(node.cls.id); setStep(2); }}
+                      style={{ marginLeft: node.depth * 16, width: `calc(100% - ${node.depth * 16}px)` }}
+                      className={`text-left p-3 rounded-xl border-2 transition-all hover:shadow-md ${
+                        classId === node.cls.id
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-600"><CiClassIcon name={node.cls.icon} className="w-6 h-6" /></span>
+                        <div className="min-w-0">
+                          {ancestors.length > 0 && (
+                            <p className="text-[11px] text-indigo-600">{tCmdb('childOf', { parent: ancestors.join(' / ') })}</p>
+                          )}
+                          <h4 className="font-semibold text-gray-900">{node.cls.display_name}</h4>
+                          {node.cls.description && <p className="text-xs text-gray-500 mt-0.5">{node.cls.description}</p>}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </Card>

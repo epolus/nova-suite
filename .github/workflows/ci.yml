@@ -70,7 +70,7 @@ jobs:
       POSTGRES_PASSWORD: ci_test_password
       POSTGRES_APP_USER: nova_runtime
       POSTGRES_APP_PASSWORD: ci_test_password
-      DB_SCHEMA_VERSION: v00.01.48
+      DB_SCHEMA_VERSION: v00.01.49
       NOVA_MIGRATIONS_DIR: ${{ github.workspace }}/infra/postgres/migrations
       NODE_ENV: test
     steps:

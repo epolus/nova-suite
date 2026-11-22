@@ -5,6 +5,7 @@ import type { AssignmentGroupItem, CIClass } from '../../api/client';
 import Card from '../../components/Card';
 import { controlClass } from './serviceItemFormModel';
 import { CI_STATUSES, emptyTask, type FormState, type TaskDraft } from './fulfillmentModelForm';
+import { buildClassTree, classOptionLabel, flattenClassTree } from './ci-classes/classHelpers';
 
 type Props = {
   title: string;
@@ -118,7 +119,12 @@ export default function FulfillmentModelForm({ title, form, setForm, groups, cla
               <label className="block text-xs font-medium text-gray-500 mb-1">{t('ciClass')}</label>
               <select value={form.class_id} onChange={(e) => set('class_id', e.target.value)} className={controlClass(false)}>
                 <option value="">{t('selectClass')}</option>
-                {classes.map((ciClass) => <option key={ciClass.id} value={ciClass.id}>{ciClass.display_name}</option>)}
+                {flattenClassTree(buildClassTree(classes)).map((node) => (
+                  <option key={node.cls.id} value={node.cls.id}>
+                    {classOptionLabel(node.cls.display_name, node.depth)}
+                    {node.cls.is_active === false ? ` (${tStates('inactive')})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

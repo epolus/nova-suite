@@ -5,6 +5,10 @@ import { CiClassIcon } from '../../../components/CiClassIcon';
 import {
   ATTR_TYPES,
   REFERENCE_TABLES,
+  buildClassTree,
+  classOptionLabel,
+  descendantIds,
+  flattenClassTree,
   formatAttrType,
   getInheritedAttrs,
   type ClassDraft,
@@ -139,17 +143,42 @@ export default function ClassEditorModal({
                 onChange={(e) => onChange({ ...editing, parent_class: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="">{tStates('none')}</option>
-                {classes.filter((c) => c.id !== editing.id).map((c) => (
-                  <option key={c.id} value={c.id}>{c.display_name}</option>
-                ))}
+                <option value="">{t('topLevelOption')}</option>
+                {flattenClassTree(buildClassTree(classes))
+                  .filter((node) => {
+                    if (!editing.id) return true;
+                    if (node.cls.id === editing.id) return false;
+                    return !descendantIds(editing.id, classes).has(node.cls.id);
+                  })
+                  .map((node) => (
+                    <option key={node.cls.id} value={node.cls.id}>
+                      {classOptionLabel(node.cls.display_name, node.depth)}
+                      {node.cls.is_active === false ? ` (${tStates('inactive')})` : ''}
+                    </option>
+                  ))}
               </select>
+              <p className="text-xs text-gray-400 mt-1">{t('parentHint')}</p>
             </div>
           </div>
 
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={editing.is_active}
+              onChange={(e) => onChange({ ...editing, is_active: e.target.checked })}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">{t('activeClass')}</span>
+              <span className="block text-xs text-gray-400">{t('activeHint')}</span>
+            </span>
+          </label>
+
           {/* Inherited attributes (read-only) */}
           {editing.parent_class && (() => {
-            const inherited = getInheritedAttrs(editing.parent_class, classes);
+            const ownKeys = new Set(editing.attributes.map((attr) => attr.key.trim()).filter(Boolean));
+            const inherited = getInheritedAttrs(editing.parent_class, classes)
+              .filter((attr) => !ownKeys.has(attr.key));
             if (inherited.length === 0) return null;
             return (
               <div>

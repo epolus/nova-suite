@@ -98,7 +98,7 @@ describe('postgres RLS (integration)', () => {
   });
 
   it('records schema_migrations through the latest expected version', async () => {
-    const expected = process.env.DB_SCHEMA_VERSION || 'v00.01.48';
+    const expected = process.env.DB_SCHEMA_VERSION || 'v00.01.49';
     const { rows } = await admin.query<{ version: string }>(
       `SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1`,
     );

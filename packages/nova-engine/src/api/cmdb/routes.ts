@@ -16,6 +16,7 @@
 //   DELETE /api/cmdb/relationships/:id
 
 import { Router, Request, Response, NextFunction } from 'express';
+import type { PoolClient } from 'pg';
 import {
   authenticate,
   requireRole,
@@ -32,7 +33,7 @@ import {
   createCIRelationshipSchema,
   paginationSchema,
 } from '../../domain/schemas';
-import { NotFound, Conflict, Forbidden } from '../../middleware/errorHandler';
+import { NotFound, Conflict, Forbidden, BadRequest } from '../../middleware/errorHandler';
 import { hasConfigurationRole } from '../roles';
 
 const router = Router();
@@ -74,6 +75,39 @@ function applyCiVisibilityFilter(
 // All CMDB routes require auth + tenant context
 router.use(authenticate, setTenantRLS, releaseTenantClient);
 
+async function assertParentClass(
+  client: PoolClient,
+  parentId: string | null,
+  classId?: string,
+): Promise<void> {
+  if (!parentId) return;
+  if (classId && parentId === classId) {
+    throw BadRequest('A class cannot be its own parent');
+  }
+  const parent = await client.query('SELECT id FROM ci_classes WHERE id = $1', [parentId]);
+  if (parent.rows.length === 0) {
+    throw BadRequest('Parent class not found');
+  }
+  if (!classId) return;
+  const cycle = await client.query(
+    `WITH RECURSIVE chain AS (
+       SELECT id, parent_class, 1 AS depth
+       FROM ci_classes
+       WHERE id = $1
+       UNION ALL
+       SELECT c.id, c.parent_class, chain.depth + 1
+       FROM ci_classes c
+       JOIN chain ON c.id = chain.parent_class
+       WHERE chain.parent_class IS NOT NULL AND chain.depth < 50
+     )
+     SELECT 1 FROM chain WHERE id = $2 LIMIT 1`,
+    [parentId, classId],
+  );
+  if (cycle.rows.length > 0) {
+    throw BadRequest('That parent would create a cycle in the class hierarchy');
+  }
+}
+
 // ════════════════════════════════════════
 // CI CLASSES
 // ════════════════════════════════════════
@@ -82,7 +116,19 @@ router.use(authenticate, setTenantRLS, releaseTenantClient);
 router.get('/classes', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
-    const result = await client.query('SELECT * FROM ci_classes ORDER BY display_name');
+    const restricted = !hasConfigurationRole(req);
+    const result = await client.query(
+      `SELECT cc.*, COALESCE(ci_counts.ci_count, 0)::int AS ci_count
+       FROM ci_classes cc
+       LEFT JOIN (
+         SELECT class_id, COUNT(*)::int AS ci_count
+         FROM configuration_items
+         WHERE $1::uuid IS NULL OR managed_by = $1 OR assigned_to = $1
+         GROUP BY class_id
+       ) ci_counts ON ci_counts.class_id = cc.id
+       ORDER BY cc.display_name`,
+      [restricted ? req.user!.id : null],
+    );
     res.json({ classes: result.rows });
   } catch (err) {
     next(err);
@@ -98,6 +144,7 @@ router.post(
     try {
       const client = getRequestClient(req);
       const { name, display_name, description, parent_class, attributes, icon, is_active } = req.body;
+      await assertParentClass(client, parent_class || null);
 
       const result = await client.query(
         `INSERT INTO ci_classes (
@@ -131,6 +178,10 @@ router.put(
       }
 
       const { display_name, description, parent_class, attributes, icon, is_active } = req.body;
+      if (parent_class !== undefined) {
+        const currentId = Array.isArray(classId) ? classId[0] : classId;
+        await assertParentClass(client, parent_class || null, currentId);
+      }
       const setClauses: string[] = [];
       const params: unknown[] = [];
       let idx = 0;
@@ -178,6 +229,14 @@ router.delete(
       );
       if (parseInt(ciCount.rows[0].count, 10) > 0) {
         throw Conflict('Cannot delete a class that has existing configuration items');
+      }
+
+      const childCount = await client.query(
+        'SELECT count(*) FROM ci_classes WHERE parent_class = $1',
+        [classId],
+      );
+      if (parseInt(childCount.rows[0].count, 10) > 0) {
+        throw Conflict('Cannot delete a class that still has child classes');
       }
 
       await client.query('DELETE FROM ci_classes WHERE id = $1', [classId]);

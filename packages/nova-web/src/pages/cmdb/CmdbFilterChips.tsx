@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
+import { useMemo } from 'react';
 import { useTranslations } from 'use-intl';
 import type { CIClass } from '../../api/client';
+import { buildClassTree, classOptionLabel, flattenClassTree } from '../admin/ci-classes/classHelpers';
 
 const STATUSES = ['installed', 'in_stock', 'planned', 'maintenance', 'retired'] as const;
 const ENVIRONMENTS = ['production', 'staging', 'development', 'test'] as const;
@@ -25,6 +27,10 @@ export function CmdbFilterChips({
   statusLabel: (value: string) => string;
 }) {
   const tCmdb = useTranslations('pages.cmdb');
+  const classOptions = useMemo(
+    () => flattenClassTree(buildClassTree(classes)),
+    [classes],
+  );
   const chip = (active: boolean) =>
     `px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
       active ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
@@ -33,14 +39,22 @@ export function CmdbFilterChips({
   return (
     <>
       <div className="flex gap-2 flex-wrap items-center">
-        <button onClick={() => setFilter('class_id', '')} className={chip(!classFilter)}>
+        <label className="text-xs font-medium text-gray-500" htmlFor="cmdb-class-filter">
           {tCmdb('filters.allTypes')}
-        </button>
-        {classes.map((c) => (
-          <button key={c.id} onClick={() => setFilter('class_id', c.id)} className={chip(classFilter === c.id)}>
-            {c.display_name}
-          </button>
-        ))}
+        </label>
+        <select
+          id="cmdb-class-filter"
+          value={classFilter}
+          onChange={(e) => setFilter('class_id', e.target.value)}
+          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-gray-700 border border-gray-200"
+        >
+          <option value="">{tCmdb('filters.allTypes')}</option>
+          {classOptions.map((node) => (
+            <option key={node.cls.id} value={node.cls.id}>
+              {classOptionLabel(node.cls.display_name, node.depth)}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="flex gap-2 flex-wrap items-center">
         <button onClick={() => setFilter('status', '')} className={chip(!statusFilter)}>
