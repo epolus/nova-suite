@@ -9,7 +9,7 @@
 
 ## Database Migration Strategy
 
-Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.48`). Those files **do not re-run** on an existing volume.
+Empty Postgres volumes are created by [`infra/postgres/init.sql`](../infra/postgres/init.sql) and [`infra/postgres/rls.sql`](../infra/postgres/rls.sql) (`docker-entrypoint-initdb.d`). Fresh installs get the current schema and seed `schema_migrations` through the latest version (currently `v00.01.49`). Those files **do not re-run** on an existing volume.
 
 Later schema changes for **existing** volumes are numbered SQL files under `infra/postgres/migrations/` (`vNN.NN.NN__slug.sql`). Each file is incremental DDL for databases that already have an older ledger. A wiped volume does not re-apply those files; it already matches `init.sql`.
 
@@ -286,6 +286,10 @@ Apply `infra/postgres/migrations/v00.01.47__user_sessions.sql` before rolling ou
 ## Session cookie lookup (`v00.01.48`)
 
 Apply `infra/postgres/migrations/v00.01.48__session_cookie_lookup.sql` with the engine that reads browser sessions. `lookup_session_user(session_id)` loads the user for the `nova_session` cookie. A cookie left over from a build that stored the access token in `nova_session` no longer authenticates; those browsers sign in again. Bearer tokens are unchanged.
+
+## CI class hierarchy (`v00.01.49`)
+
+Apply `infra/postgres/migrations/v00.01.49__ci_class_hierarchy.sql`. It adds a parent index and a self-parent check, then inserts the vendor-neutral class catalog for every tenant that does not already have those class names. Existing classes keep their attribute definitions. A parent link is set only when that class has no parent yet, and only when the link would not create a cycle. `is_active` already existed; inactive classes stay out of the new-CI picker.
 
 ## Audit events retention (no migration)
 

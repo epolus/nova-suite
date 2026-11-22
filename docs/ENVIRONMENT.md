@@ -9,7 +9,7 @@ For the complete baseline list, see `.env.example`.
 |----------|-------------|--------|
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Postgres image init, Temporal auto-setup, `nova-migrate`, backups | Bootstrap **superuser**. Never point the API or worker at this role. |
 | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | `nova-engine`, `nova-worker` | Default `nova_runtime`. Must be `NOSUPERUSER NOBYPASSRLS`. Created by `infra/postgres/00-runtime-role.sh`. |
-| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.48`). Mismatch puts the API in degraded mode and stops the worker. |
+| `DB_SCHEMA_VERSION` | `nova-engine`, `nova-worker` | Must match `MAX(version)` in `schema_migrations` after `nova-migrate` (current: `v00.01.49`). Mismatch puts the API in degraded mode and stops the worker. |
 | `NOVA_MIGRATIONS_DIR` | `nova-migrate` | Directory of `vNN.NN.NN__slug.sql` files. Defaults to `/app/infra/postgres/migrations` in the engine image. |
 | `NOVA_MIGRATE_ACCEPT_CHECKSUMS` | `nova-migrate` | Comma-separated versions whose edited file should be re-recorded instead of stopping the job. One-off repair only; see the forward-only policy in [UPGRADE_STRATEGY.md](./UPGRADE_STRATEGY.md). |
 | `DB_POOL_MAX` | `nova-engine` (`nova-worker` outside compose) | Connection pool size per process. Defaults: engine `20`, worker `5`. Keep the sum across all replicas below Postgres `max_connections`. |

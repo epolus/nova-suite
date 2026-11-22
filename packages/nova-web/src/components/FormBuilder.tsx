@@ -3,12 +3,13 @@ import { useMemo, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import type { FormField } from '../api/client';
 import { FIELD_TYPE_VALUES, TYPE_COLORS, fieldTypeMessageKey, slugify, EMPTY_FIELD } from './formBuilderConfig';
+import { buildClassTree, classOptionLabel, flattenClassTree } from '../pages/admin/ci-classes/classHelpers';
 import FormFieldPreview from './FormFieldPreview';
 
 interface Props {
   fields: FormField[];
   onChange: (fields: FormField[]) => void;
-  ciClasses?: { id: string; name: string; display_name: string }[];
+  ciClasses?: { id: string; name: string; display_name: string; parent_class?: string | null }[];
 }
 
 export default function FormBuilder({ fields, onChange, ciClasses = [] }: Props) {
@@ -332,8 +333,10 @@ export default function FormBuilder({ fields, onChange, ciClasses = [] }: Props)
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-hidden focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">{t('anyClass')}</option>
-                {ciClasses.map((c) => (
-                  <option key={c.id} value={c.name}>{c.display_name}</option>
+                {flattenClassTree(buildClassTree(ciClasses)).map((node) => (
+                  <option key={node.cls.id} value={node.cls.name}>
+                    {classOptionLabel(node.cls.display_name, node.depth)}
+                  </option>
                 ))}
               </select>
             </div>
