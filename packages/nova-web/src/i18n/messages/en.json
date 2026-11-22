@@ -2019,6 +2019,8 @@
         "childOf": "Child of {parent}",
         "children": "Children",
         "childCount": "{count, plural, one {# child} other {# children}}",
+        "ciCount": "{count, plural, one {# CI} other {# CIs}}",
+        "ciCountBranch": "{count, plural, one {# in this branch} other {# in this branch}}",
         "addChild": "Add child",
         "activate": "Activate",
         "deactivate": "Deactivate",

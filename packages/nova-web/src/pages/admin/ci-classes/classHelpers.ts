@@ -144,6 +144,29 @@ export function classOptionLabel(displayName: string, depth: number): string {
   return `${'\u00A0\u00A0'.repeat(depth)}${displayName}`;
 }
 
+export function subtreeCiCounts(
+  classes: Array<{ id: string; parent_class?: string | null; ci_count?: number }>,
+): Map<string, number> {
+  const memo = new Map<string, number>();
+  const visiting = new Set<string>();
+  const total = (id: string): number => {
+    const cached = memo.get(id);
+    if (cached !== undefined) return cached;
+    if (visiting.has(id)) return 0;
+    visiting.add(id);
+    const cls = classes.find((item) => item.id === id);
+    let sum = cls?.ci_count ?? 0;
+    for (const child of classes) {
+      if (child.parent_class === id) sum += total(child.id);
+    }
+    visiting.delete(id);
+    memo.set(id, sum);
+    return sum;
+  };
+  for (const cls of classes) total(cls.id);
+  return memo;
+}
+
 export function classMatchesQuery(
   cls: { display_name: string; name?: string; description?: string | null },
   query: string,

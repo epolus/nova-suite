@@ -6,6 +6,7 @@ import {
   descendantIds,
   filterClassTree,
   flattenClassTree,
+  subtreeCiCounts,
 } from './classHelpers';
 
 const classes = [
@@ -50,6 +51,17 @@ describe('CI class hierarchy helpers', () => {
       { id: 'b', display_name: 'B', parent_class: 'a' },
     ];
     expect(buildClassTree(cyclic).map((node) => node.cls.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('rolls configuration item counts up to ancestor classes', () => {
+    const counts = subtreeCiCounts([
+      { id: 'hw', parent_class: null, ci_count: 1 },
+      { id: 'computer', parent_class: 'hw', ci_count: 2 },
+      { id: 'server', parent_class: 'computer', ci_count: 4 },
+    ]);
+    expect(counts.get('server')).toBe(4);
+    expect(counts.get('computer')).toBe(6);
+    expect(counts.get('hw')).toBe(7);
   });
 
   it('treats a missing parent as a top-level class', () => {

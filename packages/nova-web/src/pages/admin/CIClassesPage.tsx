@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { cmdb } from '../../api/client';
 import type { CIClass } from '../../api/client';
@@ -19,6 +20,7 @@ import {
   filterClassTree,
   formatAttrType,
   getInheritedAttrs,
+  subtreeCiCounts,
   type ClassDraft,
   type ClassTreeNode,
 } from './ci-classes/classHelpers';
@@ -75,6 +77,8 @@ export default function CIClassesPage() {
     }
     return counts;
   }, [classes]);
+
+  const branchCiCount = useMemo(() => subtreeCiCounts(classes), [classes]);
 
   const matches = (cls: CIClass) => {
     if (activeFilter === 'active' && !isClassActive(cls)) return false;
@@ -202,6 +206,8 @@ export default function CIClassesPage() {
     const cls = node.cls;
     const active = isClassActive(cls);
     const kids = childCount.get(cls.id) ?? 0;
+    const directCis = cls.ci_count ?? 0;
+    const branchCis = branchCiCount.get(cls.id) ?? directCis;
     const expanded = forceExpand || !collapsed.has(cls.id);
     const own = Object.entries(cls.attributes);
     const ownKeys = new Set(own.map(([key]) => key));
@@ -249,6 +255,17 @@ export default function CIClassesPage() {
                       {t('childCount', { count: kids })}
                     </span>
                   )}
+                  <Link
+                    to={`/cmdb?class_id=${cls.id}`}
+                    className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium hover:bg-slate-200"
+                  >
+                    {t('ciCount', { count: directCis })}
+                  </Link>
+                  {branchCis > directCis && (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 text-[11px] font-medium">
+                      {t('ciCountBranch', { count: branchCis })}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-400 font-mono">{cls.name}</p>
                 {cls.description && <p className="text-sm text-gray-500 mt-1">{cls.description}</p>}
@@ -261,6 +278,7 @@ export default function CIClassesPage() {
                         <span key={child.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 rounded-sm text-xs text-indigo-700">
                           <CiClassIcon name={child.icon} className="w-3.5 h-3.5" />
                           {child.display_name}
+                          <span className="text-indigo-400">{t('ciCount', { count: child.ci_count ?? 0 })}</span>
                           {!isClassActive(child) && (
                             <span className="text-indigo-300">{tStates('inactive')}</span>
                           )}

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { IntlProvider } from 'use-intl';
 import enMessages from '../../i18n/messages/en.json';
 import type { CIClass } from '../../api/client';
@@ -27,6 +28,7 @@ const hardware: CIClass = {
   attributes: { serial_number: { type: 'string' } },
   icon: 'server',
   is_active: true,
+  ci_count: 1,
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-01T00:00:00.000Z',
 };
@@ -40,6 +42,7 @@ const server: CIClass = {
   attributes: { ip_address: { type: 'string' } },
   icon: 'server',
   is_active: true,
+  ci_count: 4,
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-01T00:00:00.000Z',
 };
@@ -57,9 +60,11 @@ const legacy: CIClass = {
 
 function renderPage() {
   return render(
-    <IntlProvider locale="en" messages={enMessages}>
-      <CIClassesPage />
-    </IntlProvider>,
+    <MemoryRouter>
+      <IntlProvider locale="en" messages={enMessages}>
+        <CIClassesPage />
+      </IntlProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -77,6 +82,8 @@ describe('CIClassesPage hierarchy', () => {
 
     expect(await screen.findByText('Child of Hardware')).toBeInTheDocument();
     expect(screen.getByText('1 child')).toBeInTheDocument();
+    expect(screen.getByText('4 CIs')).toBeInTheDocument();
+    expect(screen.getByText('5 in this branch')).toBeInTheDocument();
     expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Inactive').length).toBeGreaterThan(1);
 

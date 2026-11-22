@@ -8,6 +8,7 @@ export interface CIClass {
   attributes: Record<string, { type: string; reference_table?: string }>;
   icon: string;
   is_active?: boolean;
+  ci_count?: number;
   created_at: string;
   updated_at: string;
 }

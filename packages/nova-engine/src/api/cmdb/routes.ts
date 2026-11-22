@@ -116,7 +116,19 @@ async function assertParentClass(
 router.get('/classes', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const client = getRequestClient(req);
-    const result = await client.query('SELECT * FROM ci_classes ORDER BY display_name');
+    const restricted = !hasConfigurationRole(req);
+    const result = await client.query(
+      `SELECT cc.*, COALESCE(ci_counts.ci_count, 0)::int AS ci_count
+       FROM ci_classes cc
+       LEFT JOIN (
+         SELECT class_id, COUNT(*)::int AS ci_count
+         FROM configuration_items
+         WHERE $1::uuid IS NULL OR managed_by = $1 OR assigned_to = $1
+         GROUP BY class_id
+       ) ci_counts ON ci_counts.class_id = cc.id
+       ORDER BY cc.display_name`,
+      [restricted ? req.user!.id : null],
+    );
     res.json({ classes: result.rows });
   } catch (err) {
     next(err);
