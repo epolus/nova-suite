@@ -13,6 +13,10 @@ export const SEED_USER = 'b0000000-0000-0000-0000-000000000003';
 export const SEED_CHANGE_MGR = 'b0000000-0000-0000-0000-000000000008';
 
 export const SEED_CHANGE_TYPE_NORMAL = 'a9000000-0000-0000-0000-000000000002';
+/** Network Operations — linked to Change Management in seed data. */
+export const SEED_CHANGE_GROUP = 'a5000000-0000-0000-0000-000000000002';
+/** Service Desk — linked to Incident Management in seed data. */
+export const SEED_INCIDENT_GROUP = 'a5000000-0000-0000-0000-000000000001';
 
 function env(name: string, fallback?: string): string {
   const value = process.env[name];
