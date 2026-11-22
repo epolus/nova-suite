@@ -44,3 +44,61 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: nova
+          POSTGRES_USER: nova_app
+          POSTGRES_PASSWORD: ci_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nova_app -d nova"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: nova
+      POSTGRES_USER: nova_app
+      POSTGRES_PASSWORD: ci_test_password
+      POSTGRES_APP_USER: nova_runtime
+      POSTGRES_APP_PASSWORD: ci_test_password
+      DB_SCHEMA_VERSION: v00.01.48
+      NOVA_MIGRATIONS_DIR: ${{ github.workspace }}/infra/postgres/migrations
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Bootstrap schema (init + RLS + grants)
+        run: bash scripts/ci/postgres-bootstrap.sh
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared + engine (for migrate.js)
+        run: |
+          npm run build --workspace=packages/nova-shared
+          npm run build --workspace=packages/nova-engine
+
+      - name: Run migrations
+        run: node packages/nova-engine/dist/migrate.js
+
+      - name: Integration tests
+        run: npm run test:integration
