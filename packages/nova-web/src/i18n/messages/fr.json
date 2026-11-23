@@ -153,6 +153,7 @@
     "agent": {
       "dashboard": "Tableau de bord",
       "myTodo": "Ma tâche",
+      "workbench": "Console agent",
       "myGroups": "Mes groupes",
       "catalog": "Catalogue",
       "knowledge": "Connaissance",

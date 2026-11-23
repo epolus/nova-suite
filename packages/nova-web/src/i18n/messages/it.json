@@ -153,6 +153,7 @@
     "agent": {
       "dashboard": "Pannello di controllo",
       "myTodo": "Il mio Todo",
+      "workbench": "Console agente",
       "myGroups": "I miei gruppi",
       "catalog": "Catalogare",
       "knowledge": "Conoscenza",

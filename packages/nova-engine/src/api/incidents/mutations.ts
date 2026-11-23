@@ -206,6 +206,7 @@ export async function getIncident(
               c.mobile AS caller_mobile,
               c.vip AS caller_vip,
               cd.name AS caller_department_name,
+              mgr.display_name AS caller_manager_name,
               ci.name AS ci_name,
               ci.display_name AS ci_display_name,
               ag.name AS assignment_group_name,
@@ -214,6 +215,7 @@ export async function getIncident(
        LEFT JOIN users a ON a.id = i.assigned_to
        LEFT JOIN users c ON c.id = i.caller_id
        LEFT JOIN departments cd ON cd.id = c.department_id
+       LEFT JOIN users mgr ON mgr.id = c.manager_id
        LEFT JOIN configuration_items ci ON ci.id = i.configuration_item_id
        LEFT JOIN assignment_groups ag ON ag.id = i.assignment_group_id
        LEFT JOIN services svc ON svc.id = i.service_id

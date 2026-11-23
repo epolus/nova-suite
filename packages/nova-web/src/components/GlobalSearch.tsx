@@ -124,7 +124,12 @@ export default function GlobalSearch() {
       if (e.key === 'Escape' && open) setOpen(false);
     };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    const openFromWorkbench = () => setOpen(true);
+    window.addEventListener('nova:open-global-search', openFromWorkbench);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      window.removeEventListener('nova:open-global-search', openFromWorkbench);
+    };
   }, [open]);
 
   // Focus input when opening

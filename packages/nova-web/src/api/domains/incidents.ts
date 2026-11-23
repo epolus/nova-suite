@@ -6,7 +6,7 @@ import type {
   UpdateIncidentInput,
 } from '@nova-suite/shared/schemas';
 import { request } from '../http';
-import type { AssignmentGroupItem, CorrelationHint, Incident, IncidentAiSuggestion, IncidentCategory, IncidentProblemLink, IncidentResolutionCode, IncidentStats, JournalEntry, KnownErrorSuggestion, Pagination, ServiceListItem, SimilarIncident, UserListItem } from '../types';
+import type { AssignmentGroupItem, CorrelationHint, Incident, IncidentAiSuggestion, IncidentCategory, IncidentEmail, IncidentProblemLink, IncidentResolutionCode, IncidentStats, JournalEntry, KnownErrorSuggestion, Pagination, ServiceListItem, SimilarIncident, UserListItem } from '../types';
 
 export const incidents = {
   list: (params: Record<string, string> = {}, page = 1, limit = 20) => {
@@ -21,6 +21,7 @@ export const incidents = {
   update: (id: string, data: UpdateIncidentInput) =>
     request<Incident>(`/incidents/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   journal: (id: string) => request<{ entries: JournalEntry[] }>(`/incidents/${id}/journal`),
+  emails: (id: string) => request<{ emails: IncidentEmail[] }>(`/incidents/${id}/emails`),
   addJournal: (id: string, data: AddJournalEntryInput) =>
     request<JournalEntry>(`/incidents/${id}/journal`, { method: 'POST', body: JSON.stringify(data) }),
   nav: (currentId: string, params: Record<string, string> = {}) => {

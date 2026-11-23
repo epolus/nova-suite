@@ -73,8 +73,10 @@ export function buildIncidentListFilters(
     params.push(user.id);
   }
 
-  // "My Todo" / "My Groups" filters auto-exclude closed statuses unless explicit status is set
-  const isTodoFilter = query.assigned_to_me === 'true' || query.my_groups === 'true';
+  // Queue filters auto-exclude closed statuses unless an explicit status is set.
+  const isTodoFilter = query.assigned_to_me === 'true'
+    || query.my_groups === 'true'
+    || query.unassigned === 'true';
 
   if (query.status) {
     paramIdx++;
@@ -101,7 +103,9 @@ export function buildIncidentListFilters(
     conditions.push(`i.status NOT IN ('resolved', 'closed', 'cancelled')`);
   }
 
-  if (query.assigned_to_me === 'true') {
+  if (query.unassigned === 'true') {
+    conditions.push('i.assigned_to IS NULL');
+  } else if (query.assigned_to_me === 'true') {
     paramIdx++;
     conditions.push(`i.assigned_to = $${paramIdx}`);
     params.push(user.id);

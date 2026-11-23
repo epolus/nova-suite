@@ -153,6 +153,7 @@
     "agent": {
       "dashboard": "Dashboard",
       "myTodo": "Mein Todo",
+      "workbench": "Arbeitsplatz",
       "myGroups": "Meine Gruppen",
       "catalog": "Katalog",
       "knowledge": "Wissensdatenbank",

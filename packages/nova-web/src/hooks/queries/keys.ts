@@ -20,6 +20,7 @@ export const queryKeys = {
     details: () => [...queryKeys.incidents.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.incidents.details(), id] as const,
     journal: (id: string) => [...queryKeys.incidents.detail(id), 'journal'] as const,
+    emails: (id: string) => [...queryKeys.incidents.detail(id), 'emails'] as const,
     nav: (id: string, params: Record<string, string>) => [...queryKeys.incidents.detail(id), 'nav', params] as const,
     linkedProblems: (id: string) => [...queryKeys.incidents.detail(id), 'linked-problems'] as const,
     assignmentGroups: () => [...queryKeys.incidents.all, 'assignment-groups'] as const,
@@ -51,6 +52,11 @@ export const queryKeys = {
   },
   cart: {
     all: ['cart'] as const,
+  },
+  workbench: {
+    all: ['workbench'] as const,
+    queue: (bucket: string, search: string) => [...queryKeys.workbench.all, 'queue', bucket, search] as const,
+    resolve: (numbers: readonly string[]) => [...queryKeys.workbench.all, 'resolve', numbers] as const,
   },
   majorIncidents: {
     all: ['major-incidents'] as const,

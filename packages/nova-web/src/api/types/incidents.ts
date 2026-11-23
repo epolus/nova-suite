@@ -50,6 +50,7 @@ export interface Incident {
   caller_mobile?: string;
   caller_vip?: boolean;
   caller_department_name?: string;
+  caller_manager_name?: string | null;
   service_name?: string;
   ci_name?: string;
   ci_display_name?: string;
@@ -153,4 +154,14 @@ export interface JournalEntry {
   is_customer_visible: boolean;
   created_at: string;
   author_name?: string;
+}
+
+export interface IncidentEmail {
+  id: string;
+  direction: string;
+  from_address: string;
+  to_addresses: string;
+  subject: string;
+  body_text: string | null;
+  created_at: string;
 }

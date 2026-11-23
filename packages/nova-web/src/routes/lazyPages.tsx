@@ -47,6 +47,7 @@ export const ProfileSettingsPage = lazy(() => import('@/pages/ProfileSettingsPag
 export const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage'));
 export const MyTodoPage = lazy(() => import('@/pages/MyTodoPage'));
 export const MyGroupsTodoPage = lazy(() => import('@/pages/MyGroupsTodoPage'));
+export const WorkbenchPage = lazy(() => import('@/pages/workbench/WorkbenchPage'));
 
 export const CIClassesPage = lazy(() => import('@/pages/admin/CIClassesPage'));
 export const UsersPage = lazy(() => import('@/pages/admin/UsersPage'));
