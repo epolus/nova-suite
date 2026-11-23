@@ -61,6 +61,7 @@ export default function AppRoutes() {
         <Route path="/assets/:id" element={<Lazy><Pages.AssetDetailPage /></Lazy>} />
         <Route element={<RoleGate allow={isAgent} />}>
           <Route path="/my-todo" element={<Lazy><Pages.MyTodoPage /></Lazy>} />
+          <Route path="/workbench" element={<Lazy><Pages.WorkbenchPage /></Lazy>} />
           <Route path="/my-groups" element={<Lazy><Pages.MyGroupsTodoPage /></Lazy>} />
           <Route path="/request-tasks" element={<Lazy><Pages.RequestTasksPage /></Lazy>} />
           <Route path="/request-tasks/:taskId" element={<Lazy><Pages.RequestTaskDetailPage /></Lazy>} />

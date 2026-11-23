@@ -61,6 +61,7 @@ import { registerReportPaths } from './paths/reports';
 import { registerEmailTemplatePaths } from './paths/emailTemplates';
 import { registerWebhookPaths } from './paths/webhooks';
 import { registerAdminPaths } from './paths/admin';
+import { registerWorkbenchPaths } from './paths/workbench';
 
 const uuidParam = z.object({ id: uuidSchema });
 
@@ -80,6 +81,7 @@ const incidentListQuerySchema = paginationSchema.merge(
       sla_breached: z.enum(['true', 'false']).optional(),
       assigned_to_me: z.enum(['true', 'false']).optional(),
       my_groups: z.enum(['true', 'false']).optional(),
+      unassigned: z.enum(['true', 'false']).optional(),
     })
     .partial(),
 );
@@ -90,6 +92,7 @@ const cmdbItemsQuerySchema = paginationSchema.merge(
       class_id: uuidSchema.optional(),
       class: z.string().optional(),
       managed_by: z.string().optional(),
+      assigned_to: z.string().optional(),
       status: z.string().optional(),
       environment: z.string().optional(),
       search: z.string().optional(),
@@ -686,4 +689,5 @@ export function registerApiPaths(registry: OpenAPIRegistry): void {
   registerEmailTemplatePaths(registry);
   registerWebhookPaths(registry);
   registerAdminPaths(registry);
+  registerWorkbenchPaths(registry);
 }

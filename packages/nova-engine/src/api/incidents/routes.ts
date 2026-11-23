@@ -48,6 +48,7 @@ import {
 } from './list';
 import { createIncident, getIncident, updateIncident } from './mutations';
 import { addJournalEntry, getJournal } from './journal';
+import { listIncidentEmails } from './emails';
 import { bulkUpdate } from './bulk';
 import {
   acceptAiSuggestion,
@@ -577,6 +578,21 @@ router.patch(
     }
   },
 );
+
+// ─── GET /api/incidents/:id/emails ───
+router.get('/:id/emails', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = getRequestClient(req);
+    const result = await listIncidentEmails(client, actorFrom(req), String(req.params.id));
+    if (!result.ok) {
+      sendFailure(res, result);
+      return;
+    }
+    res.json(result.data);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── GET /api/incidents/:id/journal ───
 router.get('/:id/journal', async (req: Request, res: Response, next: NextFunction) => {

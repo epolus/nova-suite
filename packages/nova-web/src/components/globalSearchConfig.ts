@@ -67,6 +67,7 @@ export const NAV_ITEM_DEFS: NavItemDef[] = [
   // Agent
   { id: 'dashboard', path: '/', icon: 'home' },
   { id: 'myTodo', path: '/my-todo', icon: 'check' },
+  { id: 'workbench', path: '/workbench', icon: 'record' },
   { id: 'myGroups', path: '/my-groups', icon: 'users' },
   { id: 'catalog', path: '/catalog', icon: 'catalog' },
   { id: 'knowledge', path: '/knowledge', icon: 'knowledge' },

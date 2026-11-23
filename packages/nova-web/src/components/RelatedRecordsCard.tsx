@@ -41,9 +41,10 @@ type Props = {
   entityType: RecordLinkEntityType;
   entityId: string;
   readonly?: boolean;
+  onOpenNumber?: (number: string) => void;
 };
 
-export default function RelatedRecordsCard({ entityType, entityId, readonly = false }: Props) {
+export default function RelatedRecordsCard({ entityType, entityId, readonly = false, onOpenNumber }: Props) {
   const t = useTranslations('components.relatedRecords');
   const { user } = useAuth();
   const canEdit = !readonly && isAgentRole(user?.roles);
@@ -173,6 +174,18 @@ export default function RelatedRecordsCard({ entityType, entityId, readonly = fa
                     {linkTypeLabel(link)}
                   </span>
                 </div>
+                {onOpenNumber && /^(INC|PRB|CHG|MI)\d+$/.test(link.other_identifier) ? (
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-indigo-700 hover:text-indigo-900 truncate block mt-0.5 text-left"
+                    onClick={() => onOpenNumber(link.other_identifier)}
+                  >
+                    {link.other_identifier}
+                    {link.other_title && link.other_title !== link.other_identifier
+                      ? ` — ${link.other_title}`
+                      : ''}
+                  </button>
+                ) : (
                 <Link
                   to={link.other_path}
                   className="text-sm font-medium text-indigo-700 hover:text-indigo-900 truncate block mt-0.5"
@@ -182,6 +195,7 @@ export default function RelatedRecordsCard({ entityType, entityId, readonly = fa
                     ? ` — ${link.other_title}`
                     : ''}
                 </Link>
+                )}
                 {link.other_status && (
                   <p className="text-xs text-gray-500 mt-0.5 capitalize">{link.other_status}</p>
                 )}

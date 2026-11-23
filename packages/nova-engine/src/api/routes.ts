@@ -50,6 +50,7 @@ import {
   emailTemplatesAgentRoutes,
 } from './email-templates/routes';
 import workLogRoutes from './work-logs/routes';
+import workbenchRoutes from './workbench/routes';
 import csatRoutes from './csat/routes';
 import checklistRoutes, { checklistTemplatesAdminRoutes } from './checklists/routes';
 import rotaRoutes from './rota/routes';
@@ -79,6 +80,7 @@ router.use('/record-links', recordLinkRoutes);
 router.use('/catalog', catalogRoutes);
 router.use('/requests', requestRoutes);
 router.use('/incidents', incidentRoutes);
+router.use('/workbench', workbenchRoutes);
 router.use('/major-incidents', majorIncidentRoutes);
 router.use('/cmdb', cmdbRoutes);
 router.use('/temporal', temporalRoutes);

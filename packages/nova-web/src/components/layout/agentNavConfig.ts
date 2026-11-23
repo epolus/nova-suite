@@ -9,6 +9,7 @@ export type RawAdminSection = { key: string; labelKey: string; icon: IconName; i
 export const agentNav: RawNavItemDef[] = [
   { to: '/', labelKey: 'agent.dashboard', icon: 'home' },
   { to: '/my-todo', labelKey: 'agent.myTodo', icon: 'check' },
+  { to: '/workbench', labelKey: 'agent.workbench', icon: 'record' },
   { to: '/my-groups', labelKey: 'agent.myGroups', icon: 'users' },
   { to: '/catalog', labelKey: 'agent.catalog', icon: 'catalog' },
   { to: '/knowledge', labelKey: 'agent.knowledge', icon: 'knowledge' },
@@ -61,6 +62,7 @@ export function useFullWidthContent(pathname: string): boolean {
   if (pathname === '/admin/data-management' || pathname.startsWith('/admin/data-management/')) return true;
   const fullWidthPaths = new Set([
     '/my-todo',
+    '/workbench',
     '/my-groups',
     '/incidents',
     '/alerts',
@@ -82,7 +84,7 @@ export function useFullWidthContent(pathname: string): boolean {
 
 /** Pages that should fill the main content pane instead of scrolling the whole page. */
 export function useFillHeightContent(pathname: string): boolean {
-  return isWorkflowEditorPath(pathname);
+  return isWorkflowEditorPath(pathname) || pathname === '/workbench';
 }
 
 export const adminSections: RawAdminSection[] = [

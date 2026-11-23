@@ -95,6 +95,18 @@ describe('buildIncidentListFilters', () => {
     expect(explicit.conditions[0]).toBe('i.status = $1');
   });
 
+  it('unassigned queue matches a null assignee and still excludes closed work', () => {
+    const f = buildIncidentListFilters(
+      { unassigned: 'true', my_groups: 'true' },
+      USER,
+      { isFulfiller: true, sort: 'list' },
+    );
+    expect(f.conditions[0]).toBe(`i.status NOT IN ('resolved', 'closed', 'cancelled')`);
+    expect(f.conditions).toContain('i.assigned_to IS NULL');
+    expect(f.conditions.some((condition) => condition.includes('assignment_group_members'))).toBe(true);
+    expect(f.params).toEqual(['user-1']);
+  });
+
   it('only applies known cf.* columns', () => {
     const f = buildIncidentListFilters(
       { 'cf.title': 'net', 'cf.bogus': 'x' },

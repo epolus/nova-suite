@@ -7,6 +7,8 @@ export { auth } from './domains/auth';
 export { catalog } from './domains/catalog';
 export { requests } from './domains/requests';
 export { incidents } from './domains/incidents';
+export { workbench } from './domains/workbench';
+export type { WorkbenchBucket, WorkbenchQueueItem, WorkbenchRecordKind, WorkbenchResolvedRecord } from './domains/workbench';
 export { majorIncidents } from './domains/majorIncidents';
 export { problems } from './domains/problems';
 export { changes } from './domains/changes';

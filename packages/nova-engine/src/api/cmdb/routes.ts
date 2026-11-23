@@ -287,6 +287,12 @@ router.get(
         conditions.push(`ci.managed_by = $${idx}`);
         params.push(mbVal);
       }
+      if (req.query.assigned_to) {
+        idx++;
+        const assignedVal = req.query.assigned_to === '$current_user' ? req.user!.id : req.query.assigned_to;
+        conditions.push(`ci.assigned_to = $${idx}`);
+        params.push(assignedVal);
+      }
       if (req.query.status) {
         idx++;
         conditions.push(`ci.status = $${idx}`);
