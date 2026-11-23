@@ -146,7 +146,7 @@ export default function WorkbenchStream({
             <PopoverTrigger asChild>
               <Button type="button" size="sm" disabled={commands.busy || closed}>{t('status')}</Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 space-y-3" align="start">
+            <PopoverContent className="w-96 space-y-3" align="start">
               {incident && statusOpen && (
                 <StatusEditor
                   key={`${incident.id}:${statusIntent}`}
@@ -269,6 +269,9 @@ export default function WorkbenchStream({
   );
 }
 
+const fieldSelectClass = 'mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm text-foreground';
+const fieldOptionStyle = { color: '#0f172a', backgroundColor: '#ffffff' } as const;
+
 function initialStatus(
   incident: Incident,
   statusIntent: 'current' | 'resolved',
@@ -302,12 +305,12 @@ function StatusEditor({
       <label className="block text-xs font-medium text-muted-foreground">
         {t('status')}
         <select
-          className="mt-1 h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+          className={fieldSelectClass}
           value={status}
           onChange={(event) => setStatus(event.target.value as (typeof QUICK_STATUSES)[number])}
         >
           {QUICK_STATUSES.map((value) => (
-            <option key={value} value={value}>{value}</option>
+            <option key={value} value={value} style={fieldOptionStyle}>{value}</option>
           ))}
         </select>
       </label>
@@ -322,13 +325,13 @@ function StatusEditor({
           <label className="block text-xs font-medium text-muted-foreground">
             {t('resolutionCode')}
             <select
-              className="mt-1 h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              className={fieldSelectClass}
               value={resolutionCodeId}
               onChange={(event) => setResolutionCodeId(event.target.value)}
             >
-              <option value="">{t('resolutionCode')}</option>
+              <option value="" style={fieldOptionStyle}>{t('resolutionCode')}</option>
               {codes.map((code) => (
-                <option key={code.id} value={code.id}>{code.code} — {code.label}</option>
+                <option key={code.id} value={code.id} style={fieldOptionStyle}>{code.code} — {code.label}</option>
               ))}
             </select>
           </label>
