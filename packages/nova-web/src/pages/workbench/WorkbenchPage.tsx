@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { useDefaultLayout } from 'react-resizable-panels';
 import { useTranslations } from 'use-intl';
@@ -17,11 +17,13 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { useAuth } from '@/context/AuthContext';
+import { isFulfillerRole } from '@/utils/roles';
 import { queryKeys } from '@/hooks/queries/keys';
 import { useChange, useIncidentDetailQuery, useIncidentJournal, useProblem } from '@/hooks/queries';
 import { useReferenceProblemPicker } from '@/hooks/queries/useReferenceDataQuery';
 import WorkbenchCommandPalette from './WorkbenchCommandPalette';
 import WorkbenchInspector from './WorkbenchInspector';
+import WorkbenchNewIncident from './WorkbenchNewIncident';
 import WorkbenchQueue from './WorkbenchQueue';
 import WorkbenchStream from './WorkbenchStream';
 import { mergeActivity } from './mergeActivity';
@@ -33,12 +35,15 @@ import { useWorkbenchUrl } from './useWorkbenchUrl';
 export default function WorkbenchPage() {
   const t = useTranslations('pages.workbench');
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
+  const canCreate = isFulfillerRole(user?.roles);
   const url = useWorkbenchUrl();
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [highlight, setHighlight] = useState(0);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusIntent, setStatusIntent] = useState<'current' | 'resolved'>('current');
   const [templateOpen, setTemplateOpen] = useState(false);
@@ -189,7 +194,14 @@ export default function WorkbenchPage() {
     <div className="flex min-h-[70vh] flex-1 flex-col xl:h-full xl:min-h-0">
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">{t('title')}</h2>
-        <p className="text-xs text-muted-foreground">{t('shortcutHint')}</p>
+        <div className="flex items-center gap-3">
+          {canCreate && (
+            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+              {t('newIncident')}
+            </Button>
+          )}
+          <p className="text-xs text-muted-foreground">{t('shortcutHint')}</p>
+        </div>
       </div>
       <div className="mb-2 flex gap-1 overflow-x-auto">
         {url.tabs.map((number) => (
@@ -281,6 +293,7 @@ export default function WorkbenchPage() {
         canTemplate={Boolean(incident)}
         canClose={Boolean(url.active)}
         canQueue={items.length > 0}
+        canCreate={canCreate}
         problems={(problems.data ?? []).map((problem) => ({
           id: problem.id,
           number: problem.number,
@@ -292,6 +305,7 @@ export default function WorkbenchPage() {
             window.dispatchEvent(new Event('nova:open-global-search'));
             return;
           }
+          if (action === 'new-incident') setCreateOpen(true);
           if (action === 'assign') void commands.assignToMe();
           if (action === 'resolve') openStatus('resolved');
           if (action === 'reopen') void commands.reopen();
@@ -302,6 +316,18 @@ export default function WorkbenchPage() {
           if (action === 'queue-prev') moveHighlight(-1);
         }}
       />
+      {canCreate && (
+        <WorkbenchNewIncident
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={(number) => {
+            setCreateOpen(false);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.incidents.all });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.workbench.all });
+            url.open(number);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -4023,7 +4023,20 @@
       "globalSearch": "Global search",
       "linkProblem": "Link to problem",
       "prevQueue": "Previous in queue",
-      "nextQueue": "Next in queue"
+      "nextQueue": "Next in queue",
+      "newIncident": "New incident",
+      "newIncidentHint": "Log a call without leaving the workbench. The new incident opens as a tab.",
+      "createIncident": "Create incident",
+      "creating": "Creating…",
+      "caller": "Caller",
+      "searchCaller": "Search caller",
+      "noCallers": "No matching callers",
+      "loadingCallers": "Loading callers…",
+      "callerRequired": "Choose the caller",
+      "titleRequired": "Title is required",
+      "assignmentGroupRequired": "Assignment group is required",
+      "selectAssignmentGroup": "Select an assignment group",
+      "createFailed": "Could not create the incident"
     }
   },
   "components": {

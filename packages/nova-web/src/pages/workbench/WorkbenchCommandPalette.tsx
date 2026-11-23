@@ -21,8 +21,9 @@ type Props = {
   canTemplate: boolean;
   canClose: boolean;
   canQueue: boolean;
+  canCreate: boolean;
   problems: Array<{ id: string; number: string; title: string }>;
-  onAction: (action: 'global-search' | 'assign' | 'resolve' | 'reopen' | 'escalate' | 'templates' | 'close' | 'queue-next' | 'queue-prev') => void;
+  onAction: (action: 'global-search' | 'new-incident' | 'assign' | 'resolve' | 'reopen' | 'escalate' | 'templates' | 'close' | 'queue-next' | 'queue-prev') => void;
   onLinkProblem: (problemId: string) => void;
 };
 
@@ -37,6 +38,7 @@ export default function WorkbenchCommandPalette({
   canTemplate,
   canClose,
   canQueue,
+  canCreate,
   problems,
   onAction,
   onLinkProblem,
@@ -58,6 +60,9 @@ export default function WorkbenchCommandPalette({
             {t('globalSearch')}
             <CommandShortcut>Ctrl+K</CommandShortcut>
           </CommandItem>
+          {canCreate && (
+            <CommandItem onSelect={() => run('new-incident')}>{t('newIncident')}</CommandItem>
+          )}
           <CommandItem disabled={!canAssign} onSelect={() => run('assign')}>{t('assignToMe')}</CommandItem>
           <CommandItem disabled={!canResolve} onSelect={() => run('resolve')}>{t('resolve')}</CommandItem>
           <CommandItem disabled={!canReopen} onSelect={() => run('reopen')}>{t('reopen')}</CommandItem>
