@@ -1,7 +1,7 @@
 # ─── Nova Postgres – PostgreSQL 18 with the Nova bootstrap scripts baked in ───
 # Published so deployments can pull the stack without cloning the repository.
 # Scripts in /docker-entrypoint-initdb.d run once, on an empty data directory only.
-FROM postgres:18-alpine
+FROM postgres:19-alpine
 
 # Runs in lexical order: runtime role, schema, RLS policies, demo data, grants.
 COPY infra/postgres/00-runtime-role.sh     /docker-entrypoint-initdb.d/00-runtime-role.sh
